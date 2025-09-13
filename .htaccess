@@ -1,0 +1,10 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /TMS/
+
+  # Send everything to public/index.php
+  RewriteCond %{REQUEST_URI} !^/TMS/public/
+  RewriteRule ^ public/ [L]
+</IfModule>
