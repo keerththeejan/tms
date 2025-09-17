@@ -116,7 +116,36 @@
     </div>
     <div class="col-md-4">
       <label class="form-label">Vehicle No. (Optional)</label>
-      <input type="text" name="vehicle_no" class="form-control" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>">
+      <?php if (!empty($vehiclesAll)): ?>
+        <select name="vehicle_no" class="form-select">
+          <option value="">-- None --</option>
+          <?php 
+            $vehCurrent = trim((string)($parcel['vehicle_no'] ?? ''));
+            foreach ($vehiclesAll as $v): 
+              $vno = trim((string)($v['vehicle_no'] ?? ''));
+              if ($vno === '') continue; 
+          ?>
+            <option value="<?php echo htmlspecialchars($vno); ?>" <?php echo (strcasecmp($vehCurrent, $vno) === 0) ? 'selected' : ''; ?>><?php echo htmlspecialchars($vno); ?></option>
+          <?php endforeach; ?>
+        </select>
+      <?php else: ?>
+        <input type="text" name="vehicle_no" class="form-control" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>">
+      <?php endif; ?>
+      <?php 
+        $lorryChecked = 0; 
+        $pid = (int)($parcel['id'] ?? 0);
+        if ($pid > 0 && !empty($_SESSION['lorry_full_saved'][$pid])) { 
+          $lorryChecked = 1; 
+        } elseif (!empty($_SESSION['lorry_full_pref'])) { 
+          $lorryChecked = 1; 
+        }
+      ?>
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" value="1" id="lorry_full" name="lorry_full" <?php echo $lorryChecked ? 'checked' : ''; ?>>
+        <label class="form-check-label" for="lorry_full">
+          Lorry Full (start next lorry after saving)
+        </label>
+      </div>
     </div>
   </div>
 

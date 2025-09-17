@@ -55,4 +55,37 @@ class Auth
         if (!$user) return false;
         return (bool)$user['is_main_branch'];
     }
+
+    // ----- Centralized permission helpers -----
+    public static function isAdmin(): bool
+    {
+        return self::hasRole('admin');
+    }
+
+    // Parcels: who can create/edit parcels
+    public static function canCreateParcels(): bool
+    {
+        // Admin and Parcel User can, allow Staff if needed for your ops
+        return self::hasAnyRole(['admin','parcel_user','staff']);
+    }
+
+    // Payments: who can collect/record payments
+    public static function canCollectPayments(): bool
+    {
+        // Admin, Accountant, Cashier, Due Collector
+        return self::hasAnyRole(['admin','accountant','cashier','collector']);
+    }
+
+    // Expenses: who can create/manage expenses
+    public static function canManageExpenses(): bool
+    {
+        // Admin and Accountant
+        return self::hasAnyRole(['admin','accountant']);
+    }
+
+    // Reports: who can view reports (optional helper)
+    public static function canViewReports(): bool
+    {
+        return self::hasAnyRole(['admin','accountant']);
+    }
 }

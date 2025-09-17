@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Sep 14, 2025 at 07:40 AM
+-- Generation Time: Sep 16, 2025 at 06:23 AM
 -- Server version: 8.3.0
 -- PHP Version: 8.3.6
 
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `customers` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `phone` (`phone`),
   KEY `idx_customers_phone` (`phone`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `customers`
@@ -79,7 +79,8 @@ CREATE TABLE IF NOT EXISTS `customers` (
 INSERT INTO `customers` (`id`, `name`, `phone`, `address`, `delivery_location`, `place_id`, `lat`, `lng`, `customer_type`, `created_at`, `updated_at`) VALUES
 (1, 'user user', '0778870135', 'Kilinochchi', 'kili', NULL, NULL, NULL, 'regular', '2025-09-13 07:12:54', '2025-09-13 08:53:55'),
 (3, 'hh', '0798645352', '', '', NULL, NULL, NULL, NULL, '2025-09-13 09:09:55', '2025-09-13 09:09:55'),
-(4, 'yathu', '0765489736', 'murasumoddai', '', NULL, NULL, NULL, 'regular', '2025-09-14 05:32:05', '2025-09-14 05:32:05');
+(4, 'yathu', '0765489736', 'murasumoddai', '', NULL, NULL, NULL, 'regular', '2025-09-14 05:32:05', '2025-09-14 05:32:05'),
+(5, 'moon', '0773859464', 'murasumoddai', 'mul', NULL, NULL, NULL, 'regular', '2025-09-15 15:24:00', '2025-09-15 15:24:00');
 
 -- --------------------------------------------------------
 
@@ -99,14 +100,19 @@ CREATE TABLE IF NOT EXISTS `delivery_notes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_dn_customer_date_branch` (`customer_id`,`delivery_date`,`branch_id`),
   KEY `fk_dn_branch` (`branch_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `delivery_notes`
 --
 
 INSERT INTO `delivery_notes` (`id`, `customer_id`, `branch_id`, `delivery_date`, `total_amount`, `created_at`, `updated_at`) VALUES
-(1, 1, 1, '2025-09-13', 0.00, '2025-09-13 07:13:07', '2025-09-13 07:13:07');
+(1, 1, 1, '2025-09-13', 15000.00, '2025-09-13 07:13:07', '2025-09-15 15:47:03'),
+(2, 1, 1, '2025-09-15', 5000.00, '2025-09-15 15:21:29', '2025-09-15 15:21:29'),
+(3, 1, 1, '2025-09-16', 7500.50, '2025-09-15 15:21:29', '2025-09-15 15:21:29'),
+(4, 1, 1, '2025-09-17', 12000.00, '2025-09-15 15:21:29', '2025-09-15 15:21:29'),
+(5, 1, 1, '2025-09-18', 2500.75, '2025-09-15 15:21:29', '2025-09-15 15:21:29'),
+(6, 1, 1, '2025-09-19', 9999.99, '2025-09-15 15:21:29', '2025-09-15 15:21:29');
 
 -- --------------------------------------------------------
 
@@ -142,7 +148,20 @@ CREATE TABLE IF NOT EXISTS `employees` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_employees_branch` (`branch_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `employees`
+--
+
+INSERT INTO `employees` (`id`, `name`, `position`, `salary_amount`, `branch_id`, `created_at`, `updated_at`) VALUES
+(1, 'Arun Kumar', 'Manager', 0.00, 1, '2025-09-15 07:13:38', '2025-09-15 07:13:38'),
+(2, 'Siva Raj', 'Accountant', 0.00, 1, '2025-09-15 07:13:38', '2025-09-15 07:13:38'),
+(3, 'Meena Devi', 'HR Executive', 0.00, 2, '2025-09-15 07:13:38', '2025-09-15 07:13:38'),
+(4, 'New Employee', 'HR', 5000000.00, 3, '2025-09-15 07:31:06', '2025-09-15 07:44:59'),
+(5, 'Customer', 'HR', 67890.00, 3, '2025-09-15 15:04:23', '2025-09-15 15:04:23'),
+(6, 'yathu', 'HR', 45000.00, 1, '2025-09-15 15:04:45', '2025-09-15 15:04:45'),
+(7, 'lux', 'HR', 9999999999.99, 3, '2025-09-15 15:05:03', '2025-09-15 15:06:22');
 
 -- --------------------------------------------------------
 
@@ -165,7 +184,24 @@ CREATE TABLE IF NOT EXISTS `expenses` (
   KEY `fk_expenses_approver` (`approved_by`),
   KEY `idx_expenses_branch` (`branch_id`),
   KEY `idx_expenses_date` (`expense_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `expenses`
+--
+
+INSERT INTO `expenses` (`id`, `expense_type`, `amount`, `branch_id`, `expense_date`, `notes`, `approved_by`, `created_at`, `updated_at`) VALUES
+(1, 'fuel', 5000.00, 1, '2025-09-15', 'Diesel refill', 4, '2025-09-15 15:26:34', '2025-09-15 15:28:09'),
+(2, 'fuel', 5000.00, 1, '2025-09-15', 'Diesel refill', 4, '2025-09-15 15:27:24', '2025-09-15 15:28:05'),
+(3, 'vehicle_maintenance', 12000.50, 1, '2025-09-16', 'Engine checkup', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(4, 'office', 2500.75, 1, '2025-09-16', 'Stationery purchase', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(5, 'utilities', 8000.00, 1, '2025-09-17', 'Electricity bill', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(6, 'fuel', 4500.25, 1, '2025-09-17', 'Petrol refill', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(7, 'office', 1500.00, 1, '2025-09-18', 'Printer ink', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(8, 'vehicle_maintenance', 9000.00, 1, '2025-09-18', 'Tire replacement', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(9, 'utilities', 7000.50, 1, '2025-09-19', 'Water bill', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(10, 'fuel', 4800.00, 1, '2025-09-19', 'Diesel refill', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24'),
+(11, 'office', 2000.00, 1, '2025-09-20', 'Office chairs', 1, '2025-09-15 15:27:24', '2025-09-15 15:27:24');
 
 -- --------------------------------------------------------
 
@@ -194,38 +230,29 @@ CREATE TABLE IF NOT EXISTS `parcels` (
   KEY `idx_parcels_customer` (`customer_id`),
   KEY `idx_parcels_status` (`status`),
   KEY `idx_parcels_to_branch` (`to_branch_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `parcels`
 --
 
 INSERT INTO `parcels` (`id`, `customer_id`, `supplier_id`, `from_branch_id`, `to_branch_id`, `weight`, `price`, `status`, `tracking_number`, `vehicle_no`, `created_at`, `updated_at`) VALUES
-(1, 1, NULL, 2, 1, 0.00, NULL, 'in_transit', '', '123', '2025-09-13 07:32:15', '2025-09-13 07:32:15'),
-(3, 3, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '', '2025-09-14 05:05:55', '2025-09-14 05:05:55'),
-(4, 3, NULL, 2, 1, 0.00, NULL, 'delivered', NULL, '67', '2025-09-14 05:07:08', '2025-09-14 05:07:08'),
-(5, 1, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '', '2025-09-14 05:15:39', '2025-09-14 05:15:39'),
-(6, 3, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '', '2025-09-14 05:17:20', '2025-09-14 05:17:20'),
-(7, 3, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '', '2025-09-14 05:17:56', '2025-09-14 05:17:56'),
-(8, 3, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '67', '2025-09-14 05:18:17', '2025-09-14 05:18:17'),
-(9, 3, NULL, 1, 2, 2.00, NULL, 'pending', NULL, '', '2025-09-14 05:21:17', '2025-09-14 05:21:17'),
-(10, 3, NULL, 1, 2, 1.00, NULL, 'pending', NULL, '', '2025-09-14 05:21:17', '2025-09-14 05:21:17'),
-(11, 1, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '69', '2025-09-14 05:24:44', '2025-09-14 05:24:44'),
-(12, 3, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '', '2025-09-14 05:25:10', '2025-09-14 05:25:10'),
-(13, 1, NULL, 3, 1, 0.00, NULL, 'in_transit', NULL, '90', '2025-09-14 05:27:20', '2025-09-14 05:27:20'),
-(14, 3, NULL, 1, 2, 12.00, NULL, 'pending', NULL, '90', '2025-09-14 05:28:04', '2025-09-14 05:28:04'),
-(15, 4, NULL, 1, 2, 0.00, NULL, 'pending', NULL, '90', '2025-09-14 05:35:45', '2025-09-14 05:35:45'),
-(16, 4, NULL, 2, 1, 78.00, NULL, 'in_transit', NULL, '90', '2025-09-14 05:36:44', '2025-09-14 05:36:44'),
-(17, 1, NULL, 1, 2, 0.00, NULL, 'in_transit', NULL, '89', '2025-09-14 05:41:04', '2025-09-14 05:41:04'),
-(18, 4, NULL, 1, 2, 0.00, NULL, 'pending', NULL, '89', '2025-09-14 05:41:48', '2025-09-14 05:41:48'),
-(19, 3, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '', '2025-09-14 05:45:35', '2025-09-14 05:45:35'),
-(20, 3, NULL, 2, 1, 0.00, NULL, 'pending', NULL, '89', '2025-09-14 05:45:50', '2025-09-14 05:45:50'),
-(21, 4, NULL, 1, 2, 9.00, NULL, 'pending', NULL, '34', '2025-09-14 05:54:51', '2025-09-14 06:05:42'),
-(22, 4, NULL, 2, 1, 7.00, NULL, 'pending', NULL, '12', '2025-09-14 05:56:19', '2025-09-14 06:05:13'),
-(23, 3, NULL, 2, 3, 790.00, NULL, 'pending', NULL, '', '2025-09-14 06:06:36', '2025-09-14 06:06:36'),
-(24, 1, NULL, 1, 2, 67.00, NULL, 'pending', NULL, '11', '2025-09-14 06:14:19', '2025-09-14 06:14:19'),
-(25, 1, NULL, 1, 2, 89.00, NULL, 'delivered', NULL, '11', '2025-09-14 06:15:05', '2025-09-14 06:42:41'),
-(26, 4, NULL, 2, 1, 0.00, NULL, 'in_transit', NULL, '8', '2025-09-14 06:41:48', '2025-09-14 06:42:06');
+(23, 3, NULL, 2, 3, 79.00, 343255.00, 'pending', NULL, '89', '2025-09-14 06:06:36', '2025-09-14 08:49:52'),
+(26, 4, NULL, 2, 1, 29.00, 2363.00, 'in_transit', NULL, '8', '2025-09-14 06:41:48', '2025-09-14 08:48:57'),
+(29, 3, NULL, 1, 2, 6.00, 456.00, 'pending', NULL, '11', '2025-09-14 08:35:01', '2025-09-14 08:48:26'),
+(30, 3, NULL, 1, 2, 89.00, 80100.00, 'delivered', NULL, '8989', '2025-09-14 08:41:33', '2025-09-14 08:46:13'),
+(31, 1, NULL, 1, 2, 7.00, 6230.00, 'pending', NULL, '890', '2025-09-14 08:42:38', '2025-09-14 08:46:01'),
+(32, 4, NULL, 2, 1, 79.00, NULL, 'pending', NULL, '14', '2025-09-14 08:50:58', '2025-09-14 08:53:19'),
+(33, 1, NULL, 2, 2, 79.00, NULL, 'pending', NULL, '', '2025-09-14 08:53:51', '2025-09-14 08:53:51'),
+(34, 1, NULL, 1, 2, 78.00, NULL, 'delivered', NULL, '90', '2025-09-14 09:02:50', '2025-09-15 05:48:56'),
+(35, 4, NULL, 2, 1, 67.00, 3995210.00, 'delivered', NULL, '14', '2025-09-14 09:17:06', '2025-09-14 10:00:02'),
+(36, 4, NULL, 2, 1, 90.00, NULL, 'pending', NULL, '90', '2025-09-14 10:00:56', '2025-09-14 10:00:56'),
+(37, 3, NULL, 2, 2, 78.00, NULL, 'delivered', NULL, '94', '2025-09-14 16:31:13', '2025-09-14 16:31:38'),
+(38, 3, NULL, 2, 1, 3.00, 702.00, 'in_transit', NULL, '115', '2025-09-14 16:33:09', '2025-09-15 06:00:46'),
+(39, 3, NULL, 1, 2, 1.00, NULL, 'in_transit', NULL, '42', '2025-09-14 16:34:07', '2025-09-15 05:48:47'),
+(40, 3, NULL, 2, 2, 67.00, 804.00, 'pending', NULL, '80', '2025-09-15 05:49:47', '2025-09-15 05:49:47'),
+(41, 3, NULL, 1, 2, 7.00, 315.00, 'in_transit', NULL, '', '2025-09-15 05:53:12', '2025-09-15 05:53:12'),
+(42, 1, NULL, 2, 1, 90.00, NULL, 'delivered', NULL, '90', '2025-09-15 05:59:50', '2025-09-15 05:59:59');
 
 -- --------------------------------------------------------
 
@@ -243,32 +270,33 @@ CREATE TABLE IF NOT EXISTS `parcel_items` (
   `amount` decimal(12,2) GENERATED ALWAYS AS ((ifnull(`qty`,0) * ifnull(`rate`,0))) STORED,
   PRIMARY KEY (`id`),
   KEY `idx_parcel_items_parcel` (`parcel_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `parcel_items`
 --
 
 INSERT INTO `parcel_items` (`id`, `parcel_id`, `qty`, `description`, `rate`) VALUES
-(1, 1, 5.00, 'box', 0.00),
-(2, 9, 1.00, 'hggu', NULL),
-(3, 9, 1.00, 'dfdg', NULL),
-(4, 10, 1.00, 'sdfg', NULL),
-(5, 14, 6.00, 'tg', 0.00),
-(6, 14, 6.00, 'hht', 0.00),
-(7, 16, 78.00, 'vbn', 0.00),
-(9, 22, 7.00, 'tg', 0.00),
-(10, 21, 9.00, 'vbn', 0.00),
-(12, 23, 790.00, 'hggu', 0.00),
-(22, 26, 0.00, 'fdnvn', 0.00),
-(23, 26, 0.00, 'fvghjk', 0.00),
-(24, 26, 0.00, 'sdfg', 0.00),
-(25, 26, 0.00, 'tgyh', 0.00),
-(26, 26, 0.00, 'tyuik', 0.00),
-(29, 25, 89.00, 'fdnvn', 0.00),
-(30, 25, 0.00, 'dfdg', 0.00),
-(31, 24, 67.00, 'fdnvn', 0.00),
-(32, 24, 0.00, 'fvghjk', 0.00);
+(41, 31, 7.00, 'vgbhnjm', 890.00),
+(42, 30, 89.00, 'fdnvn', 900.00),
+(43, 29, 6.00, '5tytmy', 76.00),
+(44, 26, 6.00, 'fdnvn', 78.00),
+(45, 26, 9.00, 'fvghjk', 90.00),
+(46, 26, 4.00, 'sdfg', 65.00),
+(47, 26, 7.00, 'tgyh', 90.00),
+(48, 26, 3.00, 'tyuik', 65.00),
+(52, 23, 79.00, 'hggu', 4345.00),
+(57, 32, 79.00, 'aaaaaaa', NULL),
+(58, 33, 79.00, 'fdnvn', NULL),
+(63, 35, 67.00, 'vgbhnjm', 59630.00),
+(64, 36, 90.00, 'mmm', NULL),
+(66, 37, 78.00, 'vgbhnjm', NULL),
+(70, 39, 1.00, 'tgghbnm', 0.00),
+(71, 34, 78.00, 'vgbhnjm', 0.00),
+(72, 40, 67.00, 'dfghj', 0.00),
+(73, 41, 7.00, 'tg', 0.00),
+(75, 42, 90.00, 'aaaaaaa', 0.00),
+(76, 38, 3.00, '5tytmyhjnm', 234.00);
 
 -- --------------------------------------------------------
 
@@ -287,7 +315,19 @@ CREATE TABLE IF NOT EXISTS `payments` (
   KEY `fk_payments_user` (`received_by`),
   KEY `idx_payments_dn` (`delivery_note_id`),
   KEY `idx_payments_paid_at` (`paid_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `payments`
+--
+
+INSERT INTO `payments` (`id`, `delivery_note_id`, `amount`, `paid_at`, `received_by`) VALUES
+(7, 1, 5000.00, '2025-09-15 20:49:08', 1),
+(8, 1, 7500.50, '2025-09-10 14:30:00', 4),
+(9, 1, 12000.00, '2025-09-12 09:15:00', 5),
+(10, 1, 2500.75, '2025-09-13 16:45:00', 6),
+(11, 1, 9999.99, '2025-09-15 11:00:00', 7),
+(12, 2, 5000.00, '2025-09-15 15:24:00', 1);
 
 -- --------------------------------------------------------
 
@@ -308,7 +348,23 @@ CREATE TABLE IF NOT EXISTS `salaries` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_salary_emp_month` (`employee_id`,`month`,`month_num`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=85 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `salaries`
+--
+
+INSERT INTO `salaries` (`id`, `employee_id`, `month`, `month_num`, `payment_date`, `status`, `amount`, `created_at`, `updated_at`) VALUES
+(8, 2, '0000', 1, '2025-09-15', 'paid', 45000.00, '2025-09-15 07:16:31', '2025-09-15 07:16:53'),
+(9, 3, '0000', 2, '2025-02-28', 'paid', 60000.00, '2025-09-15 07:16:31', '2025-09-15 07:16:31'),
+(43, 1, '2025', 1, '2025-01-31', 'paid', 55000.00, '2025-09-15 07:28:17', '2025-09-15 07:28:17'),
+(44, 2, '2025', 2, '2025-02-28', 'paid', 45000.00, '2025-09-15 07:28:17', '2025-09-15 07:28:17'),
+(45, 3, '2025', 3, '2025-03-31', 'pending', 60000.00, '2025-09-15 07:28:17', '2025-09-15 07:28:17'),
+(48, 4, '2025', 4, '2025-04-30', 'paid', 70000.00, '2025-09-15 07:31:14', '2025-09-15 07:31:14'),
+(49, 1, '2000', 0, NULL, 'pending', 0.00, '2025-09-15 07:45:35', '2025-09-15 07:45:35'),
+(50, 2, '2000', 0, NULL, 'pending', 0.00, '2025-09-15 07:45:35', '2025-09-15 07:45:35'),
+(51, 3, '2000', 0, NULL, 'pending', 0.00, '2025-09-15 07:45:35', '2025-09-15 07:45:35'),
+(52, 4, '2000', 0, NULL, 'pending', 5000000.00, '2025-09-15 07:45:35', '2025-09-15 07:45:35');
 
 -- --------------------------------------------------------
 
@@ -328,7 +384,16 @@ CREATE TABLE IF NOT EXISTS `suppliers` (
   PRIMARY KEY (`id`),
   KEY `idx_suppliers_branch` (`branch_id`),
   KEY `idx_suppliers_code` (`supplier_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `suppliers`
+--
+
+INSERT INTO `suppliers` (`id`, `name`, `phone`, `branch_id`, `supplier_code`, `created_at`, `updated_at`) VALUES
+(1, 'yathu', '0765489736', 2, '3442', '2025-09-15 15:22:10', '2025-09-15 15:22:10'),
+(2, 'hh', '0707234561', 3, '8765', '2025-09-15 15:23:05', '2025-09-15 15:23:05'),
+(3, 'hhtyu', '0773859464', 1, '65432', '2025-09-15 15:23:26', '2025-09-15 15:23:26');
 
 -- --------------------------------------------------------
 
@@ -351,14 +416,20 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   KEY `fk_users_branch` (`branch_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `users`
 --
 
 INSERT INTO `users` (`id`, `username`, `password_hash`, `full_name`, `role`, `branch_id`, `is_main_branch`, `active`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2y$10$4lCTWMXSEXV5kGIgzKrkt.8iyQSSf.ic0lTIIri2SMs8mC9HQdFzm', 'Administrator', 'admin', 1, 1, 1, '2025-09-13 06:30:56', '2025-09-13 06:35:12');
+(1, 'admin', '$2y$10$4lCTWMXSEXV5kGIgzKrkt.8iyQSSf.ic0lTIIri2SMs8mC9HQdFzm', 'Administrator', 'admin', 1, 1, 1, '2025-09-13 06:30:56', '2025-09-14 08:07:35'),
+(4, 'col_admin', '$2y$10$6730x7hdVyKeXlAvFHJDTuMGTwEjtaGpHylwPCzigleDKtI8h3syq', 'Colombo Admin', 'admin', 2, 0, 1, '2025-09-14 08:07:35', '2025-09-14 08:15:14'),
+(5, 'mul_admin', '$2y$10$flwLd3d26Sek7Vr/KYzicuPTYKg0lPPhajD8CfiuF7Bv4mYxgekPu', 'Mullaitivu Admin', 'admin', 3, 0, 1, '2025-09-14 08:07:35', '2025-09-14 08:15:14'),
+(6, 'account', '$2y$10$0EDLzzRa6Z/mrHRHmnYi4udvTQ2XlBib1Z720M/nfJhPnDPS80hl2', 'accountant', 'accountant', 1, 0, 1, '2025-09-15 06:08:04', '2025-09-15 06:09:44'),
+(7, 'cashier', '$2y$10$F56K9NRjkcDWvi4lnCbigOIDjF9bUPXNmlZ1pux1KoaKl0WLn0UVu', 'cashier', 'cashier', 1, 0, 1, '2025-09-15 06:10:20', '2025-09-15 06:10:20'),
+(8, 'duecollector', '$2y$10$cPHq/NSQm.OxW2TLE13MK.X29CXXeC5R.vVFHiZqyAMWCqAY3KN6m', 'due collector', 'collector', 1, 0, 1, '2025-09-15 06:11:31', '2025-09-15 06:11:31'),
+(9, 'parceluser', '$2y$10$HaGYqB2s69nR1Y8WOnIjgOCqHS6eAL5ipARAfVf.GlsCM8/aML6AS', 'parcel user', 'parcel_user', 1, 0, 1, '2025-09-15 06:12:15', '2025-09-15 06:12:15');
 
 --
 -- Constraints for dumped tables

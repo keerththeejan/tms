@@ -1,4 +1,64 @@
 <h2 class="mb-3">Dashboard</h2>
+
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 quick-actions mb-3">
+  <div class="col">
+    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <i class="bi bi-search fs-1 me-3 text-primary"></i>
+          <div>
+            <div class="h6 mb-1">Search Customer</div>
+            <small class="text-muted">Find by phone number</small>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <?php if (Auth::canCreateParcels()): ?>
+  <div class="col">
+    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new'); ?>">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <i class="bi bi-box-seam fs-1 me-3 text-success"></i>
+          <div>
+            <div class="h6 mb-1">Add Parcel</div>
+            <small class="text-muted">Record incoming/outgoing</small>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <?php endif; ?>
+  <div class="col">
+    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <i class="bi bi-receipt fs-1 me-3 text-warning"></i>
+          <div>
+            <div class="h6 mb-1">Print Delivery Note</div>
+            <small class="text-muted">Group daily parcels</small>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <?php if (Auth::canCollectPayments()): ?>
+  <div class="col">
+    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <i class="bi bi-cash-coin fs-1 me-3 text-danger"></i>
+          <div>
+            <div class="h6 mb-1">Collect Due</div>
+            <small class="text-muted">Record payments</small>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <?php endif; ?>
+</div>
+
 <form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="row g-2 align-items-end mb-3">
   <input type="hidden" name="page" value="dashboard">
   <div class="col-6 col-md-3">
@@ -204,57 +264,106 @@
     </div>
   </div>
 <?php endif; ?>
-<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 quick-actions">
-  <div class="col">
-    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center">
-          <i class="bi bi-search fs-1 me-3 text-primary"></i>
-          <div>
-            <div class="h6 mb-1">Search Customer</div>
-            <small class="text-muted">Find by phone number</small>
+
+<?php
+  // Helper to safely fetch status counts
+  $getCnt = function(array $arr, int $bid, string $status): int {
+    return isset($arr[$bid][$status]) ? (int)$arr[$bid][$status] : 0;
+  };
+?>
+
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h5 class="mb-3">Branch Status Summary</h5>
+        <ul class="nav nav-tabs" id="statusTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="today-tab" data-bs-toggle="tab" data-bs-target="#today-pane" type="button" role="tab">Today</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="yesterday-tab" data-bs-toggle="tab" data-bs-target="#yesterday-pane" type="button" role="tab">Yesterday</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="last30-tab" data-bs-toggle="tab" data-bs-target="#last30-pane" type="button" role="tab">Last 30 Days</button>
+          </li>
+        </ul>
+        <div class="tab-content pt-3">
+          <div class="tab-pane fade show active" id="today-pane" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Branch</th>
+                    <th class="text-end">Pending</th>
+                    <th class="text-end">In Transit</th>
+                    <th class="text-end">Delivered</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
+                  <tr>
+                    <td><?php echo htmlspecialchars($b['name']); ?></td>
+                    <td class="text-end"><span class="badge text-bg-secondary"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'pending'); ?></span></td>
+                    <td class="text-end"><span class="badge text-bg-info"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'in_transit'); ?></span></td>
+                    <td class="text-end"><span class="badge text-bg-success"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'delivered'); ?></span></td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="yesterday-pane" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Branch</th>
+                    <th class="text-end">Pending</th>
+                    <th class="text-end">In Transit</th>
+                    <th class="text-end">Delivered</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
+                  <tr>
+                    <td><?php echo htmlspecialchars($b['name']); ?></td>
+                    <td class="text-end"><span class="badge text-bg-secondary"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'pending'); ?></span></td>
+                    <td class="text-end"><span class="badge text-bg-info"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'in_transit'); ?></span></td>
+                    <td class="text-end"><span class="badge text-bg-success"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'delivered'); ?></span></td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="last30-pane" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Branch</th>
+                    <th class="text-end">Pending</th>
+                    <th class="text-end">In Transit</th>
+                    <th class="text-end">Delivered</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
+                  <tr>
+                    <td><?php echo htmlspecialchars($b['name']); ?></td>
+                    <td class="text-end"><span class="badge text-bg-secondary"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'pending'); ?></span></td>
+                    <td class="text-end"><span class="badge text-bg-info"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'in_transit'); ?></span></td>
+                    <td class="text-end"><span class="badge text-bg-success"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'delivered'); ?></span></td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
-    </a>
-  </div>
-  <div class="col">
-    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new'); ?>">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center">
-          <i class="bi bi-box-seam fs-1 me-3 text-success"></i>
-          <div>
-            <div class="h6 mb-1">Add Parcel</div>
-            <small class="text-muted">Record incoming/outgoing</small>
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col">
-    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center">
-          <i class="bi bi-receipt fs-1 me-3 text-warning"></i>
-          <div>
-            <div class="h6 mb-1">Print Delivery Note</div>
-            <small class="text-muted">Group daily parcels</small>
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col">
-    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center">
-          <i class="bi bi-cash-coin fs-1 me-3 text-danger"></i>
-          <div>
-            <div class="h6 mb-1">Collect Due</div>
-            <small class="text-muted">Record payments</small>
-          </div>
-        </div>
-      </div>
-    </a>
+    </div>
   </div>
 </div>
+ 

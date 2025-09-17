@@ -111,34 +111,56 @@ switch ($page) {
         $rp->execute([$pendingBranchId, $df, $dt]);
         $recentPayments = $rp->fetchAll();
 
-        // If main branch, also compute per-branch aggregates
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        // Per-branch aggregates and status stats across all branches
+        $branchesAll = $pdo->query('SELECT id, name, code FROM branches ORDER BY name')->fetchAll();
         $pendingByBranch = [];
         $dueByBranch = [];
         $todayParcelsByBranch = [];
         $collectionsTodayByBranch = [];
         $expensesTodayByBranch = [];
-        if ($isMain) {
-            $q1 = $pdo->query("SELECT to_branch_id AS branch_id, COUNT(*) AS c FROM parcels WHERE status='pending' GROUP BY to_branch_id");
-            foreach ($q1->fetchAll() as $r) { $pendingByBranch[(int)$r['branch_id']] = (int)$r['c']; }
-            $q2 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM(dn.total_amount - COALESCE(paid.total_paid,0)),0) AS due
-                                  FROM delivery_notes dn
-                                  LEFT JOIN (SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id) paid
-                                    ON paid.delivery_note_id = dn.id
-                                  GROUP BY dn.branch_id");
-            $q2->execute(); foreach ($q2->fetchAll() as $r) { $dueByBranch[(int)$r['branch_id']] = (float)$r['due']; }
-            $q3 = $pdo->prepare("SELECT to_branch_id AS branch_id, COUNT(*) AS c FROM parcels WHERE DATE(created_at)=? GROUP BY to_branch_id");
-            $q3->execute([$today]); foreach ($q3->fetchAll() as $r) { $todayParcelsByBranch[(int)$r['branch_id']] = (int)$r['c']; }
-            $q4 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM(p.amount),0) AS s FROM payments p LEFT JOIN delivery_notes dn ON dn.id=p.delivery_note_id WHERE DATE(p.paid_at)=? GROUP BY dn.branch_id");
-            $q4->execute([$today]); foreach ($q4->fetchAll() as $r) { $collectionsTodayByBranch[(int)$r['branch_id']] = (float)$r['s']; }
-            $q5 = $pdo->prepare('SELECT branch_id, COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date=? GROUP BY branch_id');
-            $q5->execute([$today]); foreach ($q5->fetchAll() as $r) { $expensesTodayByBranch[(int)$r['branch_id']] = (float)$r['s']; }
+
+        // Always compute these simple branch summaries for dashboard
+        $q1 = $pdo->query("SELECT to_branch_id AS branch_id, COUNT(*) AS c FROM parcels WHERE status='pending' GROUP BY to_branch_id");
+        foreach ($q1->fetchAll() as $r) { $pendingByBranch[(int)$r['branch_id']] = (int)$r['c']; }
+        $q2 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM(dn.total_amount - COALESCE(paid.total_paid,0)),0) AS due
+                              FROM delivery_notes dn
+                              LEFT JOIN (SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id) paid
+                                ON paid.delivery_note_id = dn.id
+                              GROUP BY dn.branch_id");
+        $q2->execute(); foreach ($q2->fetchAll() as $r) { $dueByBranch[(int)$r['branch_id']] = (float)$r['due']; }
+        $q3 = $pdo->prepare("SELECT to_branch_id AS branch_id, COUNT(*) AS c FROM parcels WHERE DATE(created_at)=? GROUP BY to_branch_id");
+        $q3->execute([$today]); foreach ($q3->fetchAll() as $r) { $todayParcelsByBranch[(int)$r['branch_id']] = (int)$r['c']; }
+        $q4 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM(p.amount),0) AS s FROM payments p LEFT JOIN delivery_notes dn ON dn.id=p.delivery_note_id WHERE DATE(p.paid_at)=? GROUP BY dn.branch_id");
+        $q4->execute([$today]); foreach ($q4->fetchAll() as $r) { $collectionsTodayByBranch[(int)$r['branch_id']] = (float)$r['s']; }
+        $q5 = $pdo->prepare('SELECT branch_id, COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date=? GROUP BY branch_id');
+        $q5->execute([$today]); foreach ($q5->fetchAll() as $r) { $expensesTodayByBranch[(int)$r['branch_id']] = (float)$r['s']; }
+
+        // Status counts for Today, Yesterday, and Last 30 days per branch
+        $statusStats = ['today'=>[], 'yesterday'=>[], 'last30'=>[]];
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+        $date30 = date('Y-m-d', strtotime('-30 days'));
+        // helper to run a grouped count
+        $grouped = $pdo->prepare("SELECT to_branch_id AS branch_id, status, COUNT(*) AS c FROM parcels WHERE DATE(created_at) BETWEEN ? AND ? GROUP BY to_branch_id, status");
+        // today
+        $grouped->execute([$today, $today]);
+        foreach ($grouped->fetchAll() as $r) {
+            $bid = (int)$r['branch_id']; $st = (string)$r['status']; $statusStats['today'][$bid][$st] = (int)$r['c'];
+        }
+        // yesterday
+        $grouped->execute([$yesterday, $yesterday]);
+        foreach ($grouped->fetchAll() as $r) {
+            $bid = (int)$r['branch_id']; $st = (string)$r['status']; $statusStats['yesterday'][$bid][$st] = (int)$r['c'];
+        }
+        // last30
+        $grouped->execute([$date30, $today]);
+        foreach ($grouped->fetchAll() as $r) {
+            $bid = (int)$r['branch_id']; $st = (string)$r['status']; $statusStats['last30'][$bid][$st] = (int)$r['c'];
         }
 
         // Customers list for filter
         $customersAll = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
 
-        Helpers::view('dashboard', compact('pendingParcels','totalDue','todayParcels','today','collectionsToday','expensesToday','recentPayments','isMain','branchesAll','pendingByBranch','dueByBranch','todayParcelsByBranch','collectionsTodayByBranch','expensesTodayByBranch','df','dt','fb','tb','cust','customersAll'));
+        Helpers::view('dashboard', compact('pendingParcels','totalDue','todayParcels','today','collectionsToday','expensesToday','recentPayments','isMain','branchesAll','pendingByBranch','dueByBranch','todayParcelsByBranch','collectionsTodayByBranch','expensesTodayByBranch','df','dt','fb','tb','cust','customersAll','statusStats'));
         break;
 
     case 'change_password':
@@ -471,11 +493,18 @@ switch ($page) {
 
     case 'parcels':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
-        if (!Auth::hasAnyRole(['admin','parcel_user','staff'])) { http_response_code(403); echo 'Forbidden'; break; }
+        if (!Auth::canCreateParcels()) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
         $user = Auth::user();
-        $isMain = (bool)($user['is_main_branch'] ?? false);
+        $userBranchCode = (string)($user['branch_code'] ?? '');
+        $userBranchName = (string)($user['branch_name'] ?? '');
+        // Main branch flag used for pricing, not for create restriction
+        $isMain = Auth::isMainBranch()
+                  || (strcasecmp($userBranchCode, 'KIL') === 0)
+                  || (strcasecmp($userBranchName, 'Kilinochchi') === 0);
+        // Allow all branches with parcel role to create parcels
+        $canCreateParcels = true;
 
         // data for forms
         $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
@@ -494,23 +523,36 @@ switch ($page) {
             $status = $_POST['status'] ?? 'pending';
             $tracking_number = trim($_POST['tracking_number'] ?? '');
             $vehicle_no = trim($_POST['vehicle_no'] ?? '');
+            // Normalize empty tracking number to NULL so UNIQUE allows multiple NULLs and avoids duplicate ''
+            if ($tracking_number === '') { $tracking_number = null; }
+            // Lorry full flag
+            $lorry_full = isset($_POST['lorry_full']) && ($_POST['lorry_full'] === '1' || $_POST['lorry_full'] === 'on');
+            // Remember preference in session so the form can keep the checkbox state on next load
+            $_SESSION['lorry_full_pref'] = $lorry_full ? 1 : 0;
             $items = $_POST['items'] ?? [];
+            // Derive total weight as sum of item quantities for all branches
+            $sumQty = 0.0;
+            if (is_array($items)) {
+                foreach ($items as $it) {
+                    $sumQty += (float)($it['qty'] ?? 0);
+                }
+            }
+            if ($sumQty > 0) { $weight = $sumQty; }
+
             // Price only from Main Branch
             $price = null;
             if ($isMain) {
-                // If items are provided, compute price from items; else fallback to posted price
+                // If items are provided, compute price from items (qty * (rs+cts/100)); else fallback to posted price
                 $sum = 0.0;
-                $sumQty = 0.0;
                 if (is_array($items)) {
                     foreach ($items as $it) {
                         $q = (float)($it['qty'] ?? 0);
-                        $r = (float)($it['rate'] ?? 0);
+                        $rs = (float)($it['rs'] ?? 0);
+                        $cts = (float)($it['cts'] ?? 0);
+                        $r = $rs + ($cts / 100.0);
                         $sum += $q * $r;
-                        $sumQty += $q;
                     }
                 }
-                // derive total weight as sum of quantities if provided
-                if ($sumQty > 0) { $weight = $sumQty; }
                 if ($sum > 0) {
                     $price = $sum;
                 } else {
@@ -522,7 +564,17 @@ switch ($page) {
             if ($customer_id <= 0 || $from_branch_id <= 0 || $to_branch_id <= 0) {
                 $error = 'Customer, From Branch and To Branch are required.';
                 $parcel = compact('id','customer_id','supplier_id','from_branch_id','to_branch_id','weight','status','tracking_number','vehicle_no');
-                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','isMain','items'));
+                // Load vehicles list: prefer reg_number, fallback to plate_no, then vehicle_no
+                try {
+                    $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
+                } catch (Throwable $e) {
+                    try { $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                    catch (Throwable $e2) {
+                        try { $vehiclesAll = $pdo->query('SELECT id, vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                        catch (Throwable $e3) { $vehiclesAll = []; }
+                    }
+                }
+                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','isMain','items','vehiclesAll'));
                 break;
             }
 
@@ -532,11 +584,11 @@ switch ($page) {
             $pdo->beginTransaction();
             if ($id > 0) {
                 if ($isMain) {
-                    $stmt = $pdo->prepare('UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number=?, vehicle_no=? WHERE id=?');
+                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
                     $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$id]);
                 } else {
                     // Non-main branches cannot change price
-                    $stmt = $pdo->prepare('UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, status=?, tracking_number=?, vehicle_no=? WHERE id=?');
+                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
                     $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$id]);
                 }
                 // Replace items
@@ -546,18 +598,25 @@ switch ($page) {
                     foreach ($items as $it) {
                         $desc = trim($it['description'] ?? '');
                         $qty = (float)($it['qty'] ?? 0);
-                        $rate = $isMain ? (float)($it['rate'] ?? 0) : null;
-                        if ($desc !== '' && $qty > 0) {
+                        // Save per-unit rate from rs/cts for main branch
+                        if ($isMain) {
+                            $rs = (float)($it['rs'] ?? 0);
+                            $cts = (float)($it['cts'] ?? 0);
+                            $rate = $rs + ($cts/100.0);
+                        } else {
+                            $rate = null;
+                        }
+                        if ($desc !== '' || $qty > 0) {
                             $insItem->execute([$id, $qty, $desc, $rate]);
                         }
                     }
                 }
             } else {
                 if ($isMain) {
-                    $stmt = $pdo->prepare('INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,?,?,?)');
+                    $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?)");
                     $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no]);
                 } else {
-                    $stmt = $pdo->prepare('INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,?,?)');
+                    $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?)");
                     $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no]);
                 }
                 $id = (int)$pdo->lastInsertId();
@@ -567,13 +626,19 @@ switch ($page) {
                         $desc = trim($it['description'] ?? '');
                         $qty = (float)($it['qty'] ?? 0);
                         $rate = $isMain ? (float)($it['rate'] ?? 0) : null;
-                        if ($desc !== '' && $qty > 0) {
+                        if ($desc !== '' || $qty > 0) {
                             $insItem->execute([$id, $qty, $desc, $rate]);
                         }
                     }
                 }
             }
             $pdo->commit();
+            // Remember this record's lorry_full state for edit form rendering in this session
+            if (!isset($_SESSION['lorry_full_saved']) || !is_array($_SESSION['lorry_full_saved'])) {
+                $_SESSION['lorry_full_saved'] = [];
+            }
+            $_SESSION['lorry_full_saved'][(int)$id] = $lorry_full ? 1 : 0;
+            // After save: go to Parcels index page
             Helpers::redirect('index.php?page=parcels');
             break;
         }
@@ -601,10 +666,23 @@ switch ($page) {
                 'tracking_number'=>'',
                 'vehicle_no'=>''
             ];
+            // Prefill vehicle no from query if provided
+            $preVeh = isset($_GET['vehicle_no']) ? trim((string)$_GET['vehicle_no']) : '';
+            if ($preVeh !== '') { $parcel['vehicle_no'] = $preVeh; }
             $pre = (int)($_GET['customer_id'] ?? 0);
             if ($pre > 0) { $parcel['customer_id'] = $pre; }
             $items = [];
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items'));
+            // Load vehicles list
+            try {
+                $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
+            } catch (Throwable $e) {
+                try { $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                catch (Throwable $e2) {
+                    try { $vehiclesAll = $pdo->query('SELECT id, vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                    catch (Throwable $e3) { $vehiclesAll = []; }
+                }
+            }
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll'));
             break;
         }
 
@@ -617,7 +695,13 @@ switch ($page) {
             $itStmt = $pdo->prepare('SELECT * FROM parcel_items WHERE parcel_id=? ORDER BY id');
             $itStmt->execute([$id]);
             $items = $itStmt->fetchAll();
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items'));
+            // Load vehicles list
+            try {
+                $vehiclesAll = $pdo->query('SELECT id, vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
+            } catch (Throwable $e) {
+                try { $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e2) { $vehiclesAll = []; }
+            }
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll'));
             break;
         }
 
@@ -671,7 +755,7 @@ switch ($page) {
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
         // branches for filter
         $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain'));
+        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels'));
         break;
 
     case 'parcel_print':
@@ -797,13 +881,17 @@ switch ($page) {
 
     case 'payments':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
-        if (!Auth::hasAnyRole(['admin','accountant','cashier','collector'])) { http_response_code(403); echo 'Forbidden'; break; }
+        if (!Auth::canCollectPayments()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
         $user = Auth::user();
         $branchId = (int)($user['branch_id'] ?? 0);
+        $isMain = Auth::isMainBranch();
         $action = $_GET['action'] ?? 'index';
+        // For Main branch users, allow selecting any branch or All (0). Default to All.
+        $branchFilterId = $isMain ? (int)($_GET['branch_id'] ?? 0) : $branchId;
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!$isMain) { http_response_code(403); echo 'Forbidden'; break; }
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $dnId = (int)($_POST['delivery_note_id'] ?? 0);
             $amount = (float)($_POST['amount'] ?? 0);
@@ -814,11 +902,21 @@ switch ($page) {
             $stmt->execute([$dnId]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Delivery note not found'; break; }
+            // Enforce AFTER delivery: ensure all parcels in this DN are delivered
+            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND p.status <> "delivered"');
+            $undel->execute([$dnId]);
+            $undelCnt = (int)$undel->fetchColumn();
+            if ($undelCnt > 0) {
+                $error = 'Payments are allowed only after delivery. Some parcels in this delivery note are not delivered yet.';
+            }
+            // Recompute current due and prevent overpayment
             $due = (float)$dn['total_amount'] - (float)$dn['paid'];
-            if ($amount > $due) { $amount = $due; }
-            if (!empty($error) || $amount <= 0) {
-                $payment = ['delivery_note_id'=>$dnId,'amount'=>$amount,'paid_at'=>$paid_at];
-                Helpers::view('payments/form', compact('payment','dn','error'));
+            if ($amount > $due) {
+                $error = 'Amount exceeds due. Please enter an amount up to the current due.';
+            }
+            if (!empty($error)) {
+                $payment = ['delivery_note_id'=>$dnId,'amount'=>max(0,$amount),'paid_at'=>$paid_at];
+                Helpers::view('payments/form', compact('payment','dn','error','isMain'));
                 break;
             }
             $ins = $pdo->prepare('INSERT INTO payments (delivery_note_id, amount, paid_at, received_by) VALUES (?,?,?,?)');
@@ -828,17 +926,26 @@ switch ($page) {
         }
 
         if ($action === 'new') {
+            if (!$isMain) { http_response_code(403); echo 'Forbidden'; break; }
             $id = (int)($_GET['id'] ?? 0);
             $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, COALESCE((SELECT SUM(amount) FROM payments WHERE delivery_note_id=dn.id),0) AS paid FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id WHERE dn.id=?');
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Delivery note not found'; break; }
+            // Block payments before delivery if any parcels are undelivered
+            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND p.status <> "delivered"');
+            $undel->execute([$id]);
+            $undelCnt = (int)$undel->fetchColumn();
+            $error = '';
+            if ($undelCnt > 0) {
+                $error = 'Payments are allowed only after delivery. Some parcels in this delivery note are not delivered yet.';
+            }
             $payment = ['delivery_note_id'=>$id,'amount'=>max(0, (float)$dn['total_amount'] - (float)$dn['paid']),'paid_at'=>date('Y-m-d H:i:s')];
-            Helpers::view('payments/form', compact('payment','dn'));
+            Helpers::view('payments/form', compact('payment','dn','isMain','error'));
             break;
         }
 
-        // index: list DNs with outstanding due for this branch, filter by date range and search
+        // index: list DNs with outstanding due for selected branch (or All for main), filter by date range and search
         $from = $_GET['from'] ?? date('Y-m-01');
         $to = $_GET['to'] ?? date('Y-m-d');
         $q = trim($_GET['q'] ?? '');
@@ -851,22 +958,54 @@ switch ($page) {
                     SELECT delivery_note_id, SUM(amount) AS total_paid
                     FROM payments GROUP BY delivery_note_id
                 ) paid ON paid.delivery_note_id = dn.id
-                WHERE dn.branch_id = ? AND dn.delivery_date BETWEEN ? AND ?';
-        $params = [$branchFilterId, $from, $to];
+                WHERE dn.delivery_date BETWEEN ? AND ?';
+        $params = [$from, $to];
+        if ($branchFilterId > 0) {
+            $sql .= ' AND dn.branch_id = ?';
+            $params[] = $branchFilterId;
+        }
         if ($q !== '') {
             $sql .= ' AND (c.phone LIKE ? OR c.name LIKE ?)';
             $like = "%$q%";
             array_push($params, $like, $like);
         }
-        $sql .= ' HAVING due > 0 ORDER BY dn.delivery_date DESC, dn.id DESC LIMIT 200';
+        $sql .= ' HAVING due > 0.01 ORDER BY dn.delivery_date DESC, dn.id DESC LIMIT 200';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $dues = $stmt->fetchAll();
-        Helpers::view('payments/index', compact('dues','from','to','q'));
+        
+        // Get payment history for DataTable
+        $paymentsSql = 'SELECT p.*, dn.id as dn_id, c.name AS customer_name, c.phone AS customer_phone, 
+                               u.full_name AS received_by_name, b.name AS branch_name
+                        FROM payments p
+                        LEFT JOIN delivery_notes dn ON dn.id = p.delivery_note_id
+                        LEFT JOIN customers c ON c.id = dn.customer_id
+                        LEFT JOIN users u ON u.id = p.received_by
+                        LEFT JOIN branches b ON b.id = dn.branch_id
+                        WHERE p.paid_at BETWEEN ? AND ?';
+        $paymentsParams = [$from, $to];
+        if ($branchFilterId > 0) {
+            $paymentsSql .= ' AND dn.branch_id = ?';
+            $paymentsParams[] = $branchFilterId;
+        }
+        if ($q !== '') {
+            $paymentsSql .= ' AND (c.phone LIKE ? OR c.name LIKE ?)';
+            $like = "%$q%";
+            array_push($paymentsParams, $like, $like);
+        }
+        $paymentsSql .= ' ORDER BY p.paid_at DESC, p.id DESC LIMIT 500';
+        $paymentsStmt = $pdo->prepare($paymentsSql);
+        $paymentsStmt->execute($paymentsParams);
+        $payments = $paymentsStmt->fetchAll();
+        
+        // For main users, provide branches list for dropdown
+        $branchesAll = $isMain ? $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll() : [];
+        Helpers::view('payments/index', compact('dues','payments','from','to','q','isMain','branchesAll','branchFilterId'));
         break;
 
     case 'expenses':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        if (!Auth::canManageExpenses()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
         $user = Auth::user();
         $branchId = (int)($user['branch_id'] ?? 0);
@@ -973,26 +1112,89 @@ switch ($page) {
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
+            $emp_code = trim($_POST['emp_code'] ?? '');
             $name = trim($_POST['name'] ?? '');
+            $first_name = trim($_POST['first_name'] ?? '');
+            $last_name = trim($_POST['last_name'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $phone = trim($_POST['phone'] ?? '');
+            $address = trim($_POST['address'] ?? '');
             $position = trim($_POST['position'] ?? '');
+            $role = trim($_POST['role'] ?? '');
             $salary_amount = (float)($_POST['salary_amount'] ?? 0);
+            $license_number = trim($_POST['license_number'] ?? '');
+            $license_expiry = $_POST['license_expiry'] ?? null;
+            // Normalize vehicle_id: empty => NULL, else integer
+            $vehicle_id_raw = trim($_POST['vehicle_id'] ?? '');
+            $vehicle_id = ($vehicle_id_raw === '') ? null : (int)$vehicle_id_raw;
             $branch_id = (int)($_POST['branch_id'] ?? 0);
+            $join_date = $_POST['join_date'] ?? null;
+            $status = $_POST['status'] ?? 'active';
+            
             if ($name === '' || $position === '' || $salary_amount <= 0 || $branch_id <= 0) {
                 $error = 'Name, Position, Salary and Branch are required.';
-                $employee = compact('id','name','position','salary_amount','branch_id');
+                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','salary_amount','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
                 $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-                Helpers::view('employees/form', compact('employee','branchesAll','error'));
+                // Load vehicles for dropdown
+                try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
+                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','error'));
                 break;
             }
-            if ($id > 0) {
-                $stmt = $pdo->prepare('UPDATE employees SET name=?, position=?, salary_amount=?, branch_id=? WHERE id=?');
-                $stmt->execute([$name,$position,$salary_amount,$branch_id,$id]);
-            } else {
-                $stmt = $pdo->prepare('INSERT INTO employees (name, position, salary_amount, branch_id) VALUES (?,?,?,?)');
-                $stmt->execute([$name,$position,$salary_amount,$branch_id]);
+            
+            // Validate vehicle_id exists if provided; if not found, set to NULL (do not block save)
+            if ($vehicle_id !== null) {
+                $vehChk = $pdo->prepare('SELECT 1 FROM vehicles WHERE id=?');
+                $vehChk->execute([$vehicle_id]);
+                if (!$vehChk->fetchColumn()) {
+                    $vehicle_id = null; // fallback to NULL to satisfy FK
+                }
             }
-            Helpers::redirect('index.php?page=employees');
-            break;
+
+            // Ensure unique Employee Code (emp_code). If blank or duplicate, auto-generate next EMP###
+            $emp_code = strtoupper($emp_code);
+            $needsGenerate = ($emp_code === '');
+            if (!$needsGenerate) {
+                $chk = $pdo->prepare('SELECT id FROM employees WHERE emp_code = ? LIMIT 1');
+                $chk->execute([$emp_code]);
+                $exists = $chk->fetch();
+                if ($exists && (int)$exists['id'] !== (int)$id) {
+                    $needsGenerate = true; // duplicate for another employee
+                }
+            }
+            if ($needsGenerate) {
+                // Find max EMP number and increment
+                try {
+                    $mx = $pdo->query("SELECT MAX(CAST(SUBSTRING(emp_code, 4) AS UNSIGNED)) AS m FROM employees WHERE emp_code REGEXP '^EMP[0-9]+' ")->fetch();
+                    $next = (int)($mx['m'] ?? 0) + 1;
+                } catch (Throwable $e) { $next = 1; }
+                $emp_code = 'EMP' . str_pad((string)$next, 3, '0', STR_PAD_LEFT);
+            }
+
+            try {
+                if ($id > 0) {
+                    $stmt = $pdo->prepare("UPDATE employees SET emp_code=?, name=?, first_name=?, last_name=?, email=?, phone=?, address=?, position=?, role=?, salary_amount=?, license_number=?, license_expiry=?, vehicle_id = NULLIF(?, ''), branch_id=?, join_date=?, status=? WHERE id=?");
+                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$salary_amount,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status,$id]);
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO employees (emp_code, name, first_name, last_name, email, phone, address, position, role, salary_amount, license_number, license_expiry, vehicle_id, branch_id, join_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?)");
+                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$salary_amount,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status]);
+                }
+                Helpers::redirect('index.php?page=employees');
+                break;
+            } catch (PDOException $ex) {
+                $msg = $ex->getMessage();
+                if (str_contains($msg, 'Duplicate entry') && str_contains($msg, "employees.email")) {
+                    $error = 'This Email is already used by another employee.';
+                } elseif (str_contains($msg, 'Duplicate entry') && str_contains($msg, "employees.emp_code")) {
+                    $error = 'This Employee Code already exists.';
+                } else {
+                    $error = 'Could not save employee. ' . $msg;
+                }
+                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','salary_amount','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
+                $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+                try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
+                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','error'));
+                break;
+            }
         }
 
         if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -1006,7 +1208,9 @@ switch ($page) {
         if ($action === 'new') {
             $employee = ['id'=>0,'name'=>'','position'=>'','salary_amount'=>'','branch_id'=>0];
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-            Helpers::view('employees/form', compact('employee','branchesAll'));
+            // Load vehicles for dropdown
+            try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
+            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll'));
             break;
         }
 
@@ -1017,12 +1221,14 @@ switch ($page) {
             $employee = $stmt->fetch();
             if (!$employee) { http_response_code(404); echo 'Not found'; break; }
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-            Helpers::view('employees/form', compact('employee','branchesAll'));
+            // Load vehicles for dropdown
+            try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
+            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll'));
             break;
         }
 
-        // index
-        $employees = $pdo->query('SELECT e.*, b.name AS branch_name FROM employees e LEFT JOIN branches b ON b.id=e.branch_id ORDER BY e.created_at DESC, e.id DESC LIMIT 300')->fetchAll();
+        // index - fetch all employee fields from database (join vehicles to display vehicle id reliably)
+        $employees = $pdo->query('SELECT e.*, b.name AS branch_name, v.id AS vehicle_id_join FROM employees e LEFT JOIN branches b ON b.id=e.branch_id LEFT JOIN vehicles v ON v.id = e.vehicle_id ORDER BY e.created_at DESC, e.id DESC LIMIT 300')->fetchAll();
         Helpers::view('employees/index', compact('employees'));
         break;
 
@@ -1061,25 +1267,100 @@ switch ($page) {
             break;
         }
 
-        // index with filters
-        $year = (int)($_GET['year'] ?? date('Y'));
-        $month_num = (int)($_GET['month_num'] ?? date('n'));
+        // index with OPTIONAL filters: Year, Month, Branch
+        $year = (int)($_GET['year'] ?? 0);
+        $month_num = (int)($_GET['month_num'] ?? 0);
+        if ($year <= 0) { $year = (int)date('Y'); }
+        if ($month_num <= 0) { $month_num = (int)date('n'); }
         $branchFilter = (int)($_GET['branch_id'] ?? 0);
-        $where = ['s.month = ?','s.month_num = ?'];
-        $params = [$year, $month_num];
+        $where = [];
+        $params = [];
+        if ($year > 0) { $where[] = 's.month = ?'; $params[] = $year; }
+        if ($month_num > 0) { $where[] = 's.month_num = ?'; $params[] = $month_num; }
         if ($branchFilter > 0) { $where[] = 'e.branch_id = ?'; $params[] = $branchFilter; }
-        $sql = 'SELECT s.*, e.name AS employee_name, e.position, b.name AS branch_name
+
+        // Ensure salaries exist for selected Year/Month so that all employees show up
+        if ($year > 0 && $month_num > 0) {
+            // Insert missing rows as pending with employee's salary_amount
+            $empStmt = $pdo->query('SELECT id, salary_amount FROM employees');
+            $employeesForGen = $empStmt->fetchAll();
+            if ($employeesForGen) {
+                $ins = $pdo->prepare("INSERT IGNORE INTO salaries (employee_id, month, month_num, amount, status) VALUES (?,?,?,?, 'pending')");
+                foreach ($employeesForGen as $eRow) {
+                    $ins->execute([(int)$eRow['id'], $year, $month_num, (float)$eRow['salary_amount']]);
+                }
+            }
+        }
+        $sql = 'SELECT s.*, e.name AS employee_name, e.position, e.salary_amount AS employee_salary, b.name AS branch_name
                 FROM salaries s
                 LEFT JOIN employees e ON e.id = s.employee_id
-                LEFT JOIN branches b ON b.id = e.branch_id
-                WHERE ' . implode(' AND ', $where) . ' ORDER BY b.name, e.name';
+                LEFT JOIN branches b ON b.id = e.branch_id';
+        if (!empty($where)) { $sql .= ' WHERE ' . implode(' AND ', $where); }
+        $sql .= ' ORDER BY s.month DESC, s.month_num DESC, b.name, e.name LIMIT 200';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
         $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-        // Totals
-        $total = 0; $paid = 0; foreach ($rows as $r) { $total += (float)$r['amount']; if ($r['status']==='paid') $paid += (float)$r['amount']; }
-        Helpers::view('salaries/index', compact('rows','year','month_num','branchFilter','branchesAll','total','paid'));
+        // Totals for current result set
+        $total = 0; $paid = 0; $countTotal = 0; $countPaid = 0; $countPending = 0;
+        foreach ($rows as $r) {
+            $amt = (float)$r['amount'];
+            $total += $amt; $countTotal++;
+            if ($r['status'] === 'paid') { $paid += $amt; $countPaid++; } else { $countPending++; }
+        }
+
+        // Totals by branch for CURRENT date filters (include ALL branches even if zero)
+        // Apply ONLY year/month filters to salaries; do NOT apply branch filter here so every branch (e.g., Mullaitivu) appears
+        $sqlBranch = 'SELECT b.id AS branch_id, b.name AS branch_name,
+                             COALESCE(SUM(s.amount),0) AS total,
+                             COALESCE(SUM(CASE WHEN s.status="paid" THEN s.amount ELSE 0 END),0) AS paid,
+                             COALESCE(SUM(CASE WHEN s.status<>"paid" AND s.status IS NOT NULL THEN s.amount ELSE 0 END),0) AS pending
+                      FROM branches b
+                      LEFT JOIN employees e ON e.branch_id = b.id
+                      LEFT JOIN (
+                          SELECT * FROM salaries 
+                          WHERE 1=1';
+        $paramsB = [];
+        if ($year > 0) { $sqlBranch .= ' AND month = ?'; $paramsB[] = $year; }
+        if ($month_num > 0) { $sqlBranch .= ' AND month_num = ?'; $paramsB[] = $month_num; }
+        $sqlBranch .= ' ) s ON s.employee_id = e.id';
+        // No WHERE clause here to ensure all branches appear
+        $sqlBranch .= ' GROUP BY b.id, b.name ORDER BY b.name';
+        $stmtB = $pdo->prepare($sqlBranch);
+        $stmtB->execute($paramsB);
+        $byBranchTotals = $stmtB->fetchAll();
+
+        // Status counts for CURRENT FILTERS (only for non-NULL status)
+        $sqlStatus = 'SELECT s.status, COUNT(*) AS c
+                      FROM salaries s JOIN employees e ON e.id = s.employee_id';
+        $whereStatus = [];
+        $paramsStatus = [];
+        if ($year > 0) { $whereStatus[] = 's.month = ?'; $paramsStatus[] = $year; }
+        if ($month_num > 0) { $whereStatus[] = 's.month_num = ?'; $paramsStatus[] = $month_num; }
+        if ($branchFilter > 0) { $whereStatus[] = 'e.branch_id = ?'; $paramsStatus[] = $branchFilter; }
+        if (!empty($whereStatus)) { $sqlStatus .= ' WHERE ' . implode(' AND ', $whereStatus); }
+        $sqlStatus .= ' AND s.status IS NOT NULL GROUP BY s.status';
+        $stmtS = $pdo->prepare($sqlStatus);
+        $stmtS->execute($paramsStatus);
+        $statusCounts = [];
+        foreach ($stmtS->fetchAll() as $r) { $statusCounts[$r['status']] = (int)$r['c']; }
+
+        // Last 6 months trend (optionally filtered by branch only)
+        $trendParams = [];
+        $sqlTrend = 'SELECT s.month, s.month_num,
+                            COALESCE(SUM(s.amount),0) AS total,
+                            COALESCE(SUM(CASE WHEN s.status="paid" THEN s.amount ELSE 0 END),0) AS paid
+                     FROM salaries s
+                     JOIN employees e ON e.id = s.employee_id';
+        $trendWhere = [];
+        if ($branchFilter > 0) { $trendWhere[] = 'e.branch_id = ?'; $trendParams[] = $branchFilter; }
+        if (!empty($trendWhere)) { $sqlTrend .= ' WHERE ' . implode(' AND ', $trendWhere); }
+        $sqlTrend .= ' GROUP BY s.month, s.month_num ORDER BY s.month DESC, s.month_num DESC LIMIT 6';
+        $stmtT = $pdo->prepare($sqlTrend);
+        $stmtT->execute($trendParams);
+        $trend = $stmtT->fetchAll();
+
+        Helpers::view('salaries/index', compact('rows','year','month_num','branchFilter','branchesAll','total','paid','countTotal','countPaid','countPending','byBranchTotals','statusCounts','trend'));
         break;
 
     case 'search':
@@ -1118,16 +1399,41 @@ switch ($page) {
         $export = $_GET['export'] ?? '';
         $type = $_GET['type'] ?? '';
 
-        // Revenue by branch (delivery notes total_amount)
-        $whereDN = ['dn.delivery_date BETWEEN ? AND ?'];
-        $paramsDN = [$from, $to];
-        if ($branchId > 0) { $whereDN[] = 'dn.branch_id = ?'; $paramsDN[] = $branchId; }
-        $revSql = 'SELECT b.name AS branch_name, SUM(dn.total_amount) AS revenue
-                   FROM delivery_notes dn LEFT JOIN branches b ON b.id=dn.branch_id
-                   WHERE ' . implode(' AND ', $whereDN) . ' GROUP BY b.name ORDER BY b.name';
+        // Revenue by branch (include ALL branches even if no data)
+        $revSql = 'SELECT b.id AS branch_id, b.name AS branch_name, 
+                          COALESCE(SUM(CASE WHEN dn.delivery_date BETWEEN ? AND ? THEN dn.total_amount ELSE 0 END), 0) AS revenue
+                   FROM branches b
+                   LEFT JOIN delivery_notes dn ON dn.branch_id = b.id ';
+        $revWhere = [];
+        $revParams = [$from, $to];
+        if ($branchId > 0) { 
+            $revWhere[] = 'b.id = ?'; 
+            $revParams[] = $branchId; 
+        }
+        if (!empty($revWhere)) { 
+            $revSql .= ' WHERE ' . implode(' AND ', $revWhere); 
+        }
+        $revSql .= ' GROUP BY b.id, b.name ORDER BY b.name';
         $revStmt = $pdo->prepare($revSql);
-        $revStmt->execute($paramsDN);
+        $revStmt->execute($revParams);
         $revenueByBranch = $revStmt->fetchAll();
+        
+        // If no branch filter, ensure all branches are included (even with 0 revenue)
+        if ($branchId === 0) {
+            $allBranches = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            $branchMap = [];
+            foreach ($revenueByBranch as $row) {
+                $branchMap[$row['branch_id']] = $row;
+            }
+            $revenueByBranch = [];
+            foreach ($allBranches as $branch) {
+                $revenueByBranch[] = [
+                    'branch_id' => $branch['id'],
+                    'branch_name' => $branch['name'],
+                    'revenue' => $branchMap[$branch['id']]['revenue'] ?? 0
+                ];
+            }
+        }
 
         // Parcels by supplier
         $whereP = ['p.created_at BETWEEN ? AND ?'];
