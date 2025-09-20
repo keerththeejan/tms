@@ -44,19 +44,84 @@
         <input type="text" name="position" class="form-control" required value="<?php echo htmlspecialchars($employee['position'] ?? ''); ?>">
       </div>
       <div class="col-md-6">
-        <label class="form-label">Role</label>
-        <select name="role" class="form-select">
+        <label class="form-label d-flex justify-content-between align-items-center">
+          <span>Role</span>
+          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddEmpRole" aria-expanded="false"><i class="bi bi-person-gear"></i> Quick Add</button>
+        </label>
+        <select name="role" class="form-select" id="empRoleSelect">
           <option value="">Select Role</option>
-          <option value="admin" <?php echo ($employee['role'] ?? '') === 'admin' ? 'selected' : ''; ?>>Admin</option>
-          <option value="manager" <?php echo ($employee['role'] ?? '') === 'manager' ? 'selected' : ''; ?>>Manager</option>
-          <option value="driver" <?php echo ($employee['role'] ?? '') === 'driver' ? 'selected' : ''; ?>>Driver</option>
-          <option value="clerk" <?php echo ($employee['role'] ?? '') === 'clerk' ? 'selected' : ''; ?>>Clerk</option>
-          <option value="mechanic" <?php echo ($employee['role'] ?? '') === 'mechanic' ? 'selected' : ''; ?>>Mechanic</option>
+          <?php 
+            $builtin = ['admin'=>'Admin','manager'=>'Manager','driver'=>'Driver','clerk'=>'Clerk','mechanic'=>'Mechanic'];
+            $curRole = (string)($employee['role'] ?? '');
+            // Render built-ins
+            foreach ($builtin as $k=>$lbl): ?>
+              <option value="<?php echo $k; ?>" <?php echo $curRole===$k?'selected':''; ?>><?php echo $lbl; ?></option>
+          <?php endforeach; 
+            // Render dynamic roles from DB
+            $rendered = array_fill_keys(array_keys($builtin), true);
+            if (!empty($rolesDynamic) && is_array($rolesDynamic)) {
+              foreach ($rolesDynamic as $r) {
+                $rk = trim((string)($r['role'] ?? ''));
+                if ($rk === '' || isset($rendered[$rk])) continue;
+                $rendered[$rk] = true;
+                $label = ucwords(str_replace('_',' ', $rk));
+          ?>
+                <option value="<?php echo htmlspecialchars($rk); ?>" <?php echo $curRole===$rk?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option>
+          <?php 
+              }
+            }
+            // If current is custom and not in the lists yet
+            if ($curRole !== '' && !isset($rendered[$curRole])) { 
+              $label = ucwords(str_replace('_',' ', $curRole)); ?>
+              <option value="<?php echo htmlspecialchars($curRole); ?>" selected><?php echo htmlspecialchars($label); ?></option>
+          <?php } ?>
         </select>
+        <div class="collapse mt-2" id="quickAddEmpRole">
+          <div class="border rounded p-2 bg-light">
+            <div class="row g-2">
+              <div class="col-8"><input type="text" id="empRoleNew" class="form-control form-control-sm" placeholder="e.g., supervisor or hub_manager"></div>
+              <div class="col-4 text-end"><button type="button" id="empRoleAdd" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Add & Select</button></div>
+            </div>
+            <div class="form-text">Tip: Use simple words or snake_case.</div>
+          </div>
+        </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Salary Amount</label>
-        <input type="number" step="0.01" name="salary_amount" class="form-control" required value="<?php echo htmlspecialchars((string)($employee['salary_amount'] ?? '')); ?>">
+      <!-- Salary Amount removed as per request -->
+      <div class="col-12">
+        <hr class="my-2">
+        <h6 class="mb-0">Payroll</h6>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Basic Salary</label>
+        <input type="number" step="0.01" name="basic_salary" id="basic_salary" class="form-control" value="<?php echo htmlspecialchars((string)($employee['basic_salary'] ?? '0.00')); ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">EPF (Employee)</label>
+        <input type="number" step="0.01" name="epf_employee" id="epf_employee" class="form-control" value="<?php echo htmlspecialchars((string)($employee['epf_employee'] ?? '0.00')); ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">EPF (Employer)</label>
+        <input type="number" step="0.01" name="epf_employer" id="epf_employer" class="form-control" value="<?php echo htmlspecialchars((string)($employee['epf_employer'] ?? '0.00')); ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">ETF</label>
+        <input type="number" step="0.01" name="etf" id="etf" class="form-control" value="<?php echo htmlspecialchars((string)($employee['etf'] ?? '0.00')); ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Allowance</label>
+        <input type="number" step="0.01" name="allowance" id="allowance" class="form-control" value="<?php echo htmlspecialchars((string)($employee['allowance'] ?? '0.00')); ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Deductions</label>
+        <input type="number" step="0.01" name="deductions" id="deductions" class="form-control" value="<?php echo htmlspecialchars((string)($employee['deductions'] ?? '0.00')); ?>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Net Salary (auto)</label>
+        <input type="text" id="net_salary_preview" class="form-control" value="" readonly>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Month-Year</label>
+        <input type="text" name="month_year" id="month_year" maxlength="7" class="form-control" placeholder="YYYY-MM" value="<?php echo htmlspecialchars((string)($employee['month_year'] ?? date('Y-m'))); ?>">
       </div>
       <div class="col-md-6">
         <label class="form-label">License Number</label>
@@ -67,17 +132,28 @@
         <input type="date" name="license_expiry" class="form-control" value="<?php echo htmlspecialchars($employee['license_expiry'] ?? ''); ?>">
       </div>
       <div class="col-md-6">
-        <label class="form-label">Vehicle ID</label>
+        <label class="form-label d-flex justify-content-between align-items-center">
+          <span>Vehicle ID</span>
+          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddEmpVehicle" aria-expanded="false"><i class="bi bi-truck"></i> Quick Add</button>
+        </label>
         <?php if (!empty($vehiclesAll)): ?>
-          <select name="vehicle_id" class="form-select">
+          <select name="vehicle_id" id="empVehicleSelect" class="form-select">
             <option value="">-- None --</option>
-            <?php foreach ($vehiclesAll as $v): $vid = (int)($v['id'] ?? 0); ?>
-              <option value="<?php echo $vid; ?>" <?php echo ((int)($employee['vehicle_id'] ?? 0) === $vid) ? 'selected' : ''; ?>><?php echo $vid; ?></option>
+            <?php foreach ($vehiclesAll as $v): $vid = (int)($v['id'] ?? 0); $vno = trim((string)($v['vehicle_no'] ?? '')); ?>
+              <option value="<?php echo $vid; ?>" <?php echo ((int)($employee['vehicle_id'] ?? 0) === $vid) ? 'selected' : ''; ?>><?php echo $vno!=='' ? htmlspecialchars($vno) : 'ID '.$vid; ?></option>
             <?php endforeach; ?>
           </select>
         <?php else: ?>
-          <input type="text" name="vehicle_id" class="form-control" value="<?php echo htmlspecialchars($employee['vehicle_id'] ?? ''); ?>">
+          <input type="text" name="vehicle_id" id="empVehicleInput" class="form-control" value="<?php echo htmlspecialchars($employee['vehicle_id'] ?? ''); ?>">
         <?php endif; ?>
+        <div class="collapse mt-2" id="quickAddEmpVehicle">
+          <div class="border rounded p-2 bg-light">
+            <div class="row g-2">
+              <div class="col-8"><input type="text" id="empVehicleNo" class="form-control form-control-sm" placeholder="Vehicle Number (e.g., AB-1234)"></div>
+              <div class="col-4 text-end"><button type="button" id="empVehicleAdd" class="btn btn-sm btn-primary"><i class="bi bi-save"></i> Save & Use</button></div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="col-md-6">
         <label class="form-label">Branch</label>
@@ -113,3 +189,86 @@
   })();
 </script>
 <?php endif; ?>
+
+<script>
+(function(){
+  // Quick Add Role
+  const roleBtn = document.getElementById('empRoleAdd');
+  const roleSelect = document.getElementById('empRoleSelect');
+  roleBtn?.addEventListener('click', function(){
+    const input = document.getElementById('empRoleNew');
+    if (!input || !roleSelect) return;
+    const raw = (input.value || '').trim();
+    if (!raw) { alert('Enter a role'); return; }
+    let key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!key) key = raw.toLowerCase();
+    let exists = false;
+    Array.from(roleSelect.options).forEach(opt => { if ((opt.value||'') === key) exists = true; });
+    if (!exists) {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = raw;
+      roleSelect.appendChild(opt);
+    }
+    roleSelect.value = key;
+    input.value = '';
+    const c = document.getElementById('quickAddEmpRole'); if (c && window.bootstrap) new bootstrap.Collapse(c, {toggle:true});
+  });
+
+  // Quick Add Vehicle by Number via AJAX -> returns ID
+  const vehBtn = document.getElementById('empVehicleAdd');
+  vehBtn?.addEventListener('click', async function(){
+    const vInput = document.getElementById('empVehicleNo');
+    const v = (vInput?.value || '').trim();
+    if (!v) { alert('Enter a vehicle number'); return; }
+    try {
+      const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+      const fd = new FormData();
+      fd.append('csrf_token', csrf);
+      fd.append('vehicle_no', v);
+      const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=vehicles&action=save'); ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+        body: fd
+      });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      const sel = document.getElementById('empVehicleSelect');
+      const inp = document.getElementById('empVehicleInput');
+      if (sel) {
+        // Add if not present
+        let exists = false;
+        Array.from(sel.options).forEach(o=>{ if (String(o.value) === String(data.id)) exists = true; });
+        if (!exists) {
+          const opt = document.createElement('option');
+          opt.value = String(data.id);
+          opt.textContent = (data.vehicle_no || v) + ' (ID ' + data.id + ')';
+          sel.appendChild(opt);
+        }
+        sel.value = String(data.id);
+      } else if (inp) {
+        inp.value = String(data.id);
+      }
+      if (vInput) vInput.value = '';
+      const c = document.getElementById('quickAddEmpVehicle'); if (c && window.bootstrap) new bootstrap.Collapse(c, {toggle:true});
+    } catch (e) {
+      alert('Failed to add vehicle');
+    }
+  });
+
+  // Payroll: auto compute net salary preview = basic + allowance - deductions - epf_employee
+  function toNum(v){ const n = parseFloat(v); return isNaN(n)?0:n; }
+  function updateNet(){
+    const b = toNum(document.getElementById('basic_salary')?.value);
+    const al = toNum(document.getElementById('allowance')?.value);
+    const de = toNum(document.getElementById('deductions')?.value);
+    const epfe = toNum(document.getElementById('epf_employee')?.value);
+    const net = (b + al - de - epfe).toFixed(2);
+    const out = document.getElementById('net_salary_preview'); if (out) out.value = net;
+  }
+  ['basic_salary','allowance','deductions','epf_employee'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.addEventListener('input', updateNet);
+  });
+  updateNet();
+})();
+</script>

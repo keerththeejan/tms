@@ -29,6 +29,20 @@
     </a>
   </div>
   <?php endif; ?>
+  <!-- Pending Parcels quick card -->
+  <div class="col">
+    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending'); ?>">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <i class="bi bi-hourglass-split fs-1 me-3 text-secondary"></i>
+          <div>
+            <div class="h6 mb-1">Pending Parcels</div>
+            <small class="text-muted">Count: <strong><?php echo (int)($pendingParcels ?? 0); ?></strong></small>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
   <div class="col">
     <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">
       <div class="card border-0 shadow-sm h-100">
@@ -57,6 +71,20 @@
     </a>
   </div>
   <?php endif; ?>
+  <!-- Pending Payments quick card -->
+  <div class="col">
+    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center">
+          <i class="bi bi-exclamation-octagon fs-1 me-3 text-danger"></i>
+          <div>
+            <div class="h6 mb-1">Pending Payments</div>
+            <small class="text-muted">Due: <strong>Rs. <?php echo number_format((float)($totalDue ?? 0), 2); ?></strong></small>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
 </div>
 
 <form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="row g-2 align-items-end mb-3">
@@ -103,23 +131,7 @@
 </form>
 <?php if (isset($pendingParcels, $totalDue, $todayParcels)): ?>
   <div class="row g-3 mb-3">
-    <div class="col-sm-4">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="text-muted">Pending Parcels (to your branch)</div>
-          <div class="display-6 fw-bold"><?php echo (int)$pendingParcels; ?></div>
-        </div>
-      </div>
-    </div>
-    <div class="col-sm-4">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="text-muted">Total Payment Due (Your Branch)</div>
-          <div class="display-6 fw-bold">Rs. <?php echo number_format((float)$totalDue, 2); ?></div>
-        </div>
-      </div>
-    </div>
-    <div class="col-sm-4 d-flex align-items-stretch">
+    <div class="col-12">
       <div class="card border-0 shadow-sm w-100">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">

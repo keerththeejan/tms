@@ -32,10 +32,29 @@ $user = Auth::user();
             <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>">Users</a></li>
           <?php endif; ?>
           <?php 
+            // Compute URLs and active states for Parcels (create/edit) and Parcel Details (list)
+            $currentPage = $_GET['page'] ?? '';
+            $action = $_GET['action'] ?? '';
             $canCreateParcels = Auth::canCreateParcels();
-            $parcelsUrl = $canCreateParcels ? Helpers::baseUrl('index.php?page=parcels&action=new') : Helpers::baseUrl('index.php?page=parcels');
+            $parcelsCreateUrl = $canCreateParcels
+              ? Helpers::baseUrl('index.php?page=parcels&action=new')
+              : Helpers::baseUrl('index.php?page=parcels');
+            $parcelsListUrl = Helpers::baseUrl('index.php?page=parcels');
+            $isParcelsCreateActive = ($currentPage === 'parcels' && in_array($action, ['new','edit'], true));
+            $isParcelsListActive = ($currentPage === 'parcels' && !in_array($action, ['new','edit'], true));
           ?>
-          <li class="nav-item"><a class="nav-link" href="<?php echo $parcelsUrl; ?>">Parcels</a></li>
+          <!-- Parcels (create/edit) -->
+          <li class="nav-item">
+            <a class="nav-link d-flex align-items-center gap-1 <?php echo $isParcelsCreateActive ? 'active' : ''; ?>" href="<?php echo $parcelsCreateUrl; ?>">
+              <span>Parcels</span>
+            </a>
+          </li>
+          <!-- Parcel Details (list) -->
+          <li class="nav-item">
+            <a class="nav-link d-flex align-items-center gap-1 <?php echo $isParcelsListActive ? 'active' : ''; ?>" href="<?php echo $parcelsListUrl; ?>">
+              <span>Parcel Details</span>
+            </a>
+          </li>
           <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=customers'); ?>">Customers</a></li>
           <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>">Suppliers</a></li>
           <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">Delivery Notes</a></li>

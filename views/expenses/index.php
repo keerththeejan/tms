@@ -57,7 +57,13 @@
         <tr>
           <td><?php echo (int)$e['id']; ?></td>
           <td><?php echo htmlspecialchars($e['expense_date']); ?></td>
-          <td><?php echo htmlspecialchars($e['expense_type']); ?></td>
+          <td>
+            <?php 
+              $t = trim((string)($e['expense_type'] ?? ''));
+              if ($t === '') { echo 'Other'; }
+              else { echo htmlspecialchars(ucwords(str_replace('_',' ', $t))); }
+            ?>
+          </td>
           <td><?php echo number_format((float)$e['amount'], 2); ?></td>
           <td><?php echo htmlspecialchars($e['branch_name'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($e['notes'] ?? ''); ?></td>

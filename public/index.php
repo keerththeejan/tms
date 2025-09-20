@@ -208,6 +208,8 @@ switch ($page) {
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
 
+        
+
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
@@ -215,6 +217,9 @@ switch ($page) {
             $code = trim($_POST['code'] ?? '');
             $is_main = isset($_POST['is_main']) ? 1 : 0;
             if ($name === '' || $code === '') { $error = 'Name and Code are required.'; Helpers::view('branches/form', compact('error')); break; }
+            $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
+                         || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
+                         || (($_POST['ajax'] ?? '') === '1');
 
             if ($id > 0) {
                 $stmt = $pdo->prepare('UPDATE branches SET name=?, code=?, is_main=? WHERE id=?');
@@ -230,6 +235,11 @@ switch ($page) {
                 $stmt->execute([$id]);
                 // Mark all users of that branch as is_main_branch=1, others 0
                 $pdo->prepare('UPDATE users SET is_main_branch = CASE WHEN branch_id = ? THEN 1 ELSE 0 END')->execute([$id]);
+            }
+            if ($wantsJson) {
+                header('Content-Type: application/json');
+                echo json_encode(['id'=>$id, 'name'=>$name, 'code'=>$code, 'is_main'=>$is_main]);
+                return;
             }
             Helpers::redirect('index.php?page=branches');
             break;
@@ -289,34 +299,86 @@ switch ($page) {
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
+            // Normalize username: trim only (allow internal spaces)
             $username = trim($_POST['username'] ?? '');
             $full_name = trim($_POST['full_name'] ?? '');
-            $role = $_POST['role'] ?? 'staff';
+            $role = $_POST['role'] ?? '';
             $branch_id = (int)($_POST['branch_id'] ?? 0);
             $active = isset($_POST['active']) ? 1 : 0;
             $password = $_POST['password'] ?? '';
-            if ($username === '' || $full_name === '' || !in_array($role, ['admin','staff','accountant','cashier','collector','parcel_user'], true)) {
-                $error = 'Username, Full Name and valid Role are required.';
+            if ($username === '' || $full_name === '') {
+                $error = 'Username and Full Name are required.';
                 $userRow = compact('id','username','full_name','role','branch_id','active');
-                Helpers::view('users/form', compact('userRow','branchesAll','error'));
+                $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic'));
                 break;
             }
-            if ($id > 0) {
-                if ($password !== '') {
-                    $hash = password_hash($password, PASSWORD_BCRYPT);
-                    $stmt = $pdo->prepare('UPDATE users SET username=?, full_name=?, role=?, branch_id=?, active=?, password_hash=? WHERE id=?');
-                    $stmt->execute([$username,$full_name,$role,($branch_id>0?$branch_id:null),$active,$hash,$id]);
-                } else {
-                    $stmt = $pdo->prepare('UPDATE users SET username=?, full_name=?, role=?, branch_id=?, active=? WHERE id=?');
-                    $stmt->execute([$username,$full_name,$role,($branch_id>0?$branch_id:null),$active,$id]);
+            // Pre-check: unique username (case-insensitive, ignore leading/trailing spaces only)
+            $unameNorm = strtolower(trim($username));
+            $sqlChk = 'SELECT id, username FROM users WHERE LOWER(TRIM(username)) = ?' . ($id>0 ? ' AND id <> ?' : '') . ' LIMIT 1';
+            $chk = $pdo->prepare($sqlChk);
+            if ($id>0) { $chk->execute([$unameNorm, $id]); } else { $chk->execute([$unameNorm]); }
+            $dup = $chk->fetch();
+            if ($dup) {
+                $conflict = (string)($dup['username'] ?? '');
+                // Suggest next available username
+                $base = preg_replace('/\s+/', ' ', trim($username));
+                $suffix = 1;
+                $suggest = $base . ' ' . $suffix;
+                $checkStmt = $pdo->prepare('SELECT 1 FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 1');
+                while (true) {
+                    $checkStmt->execute([$suggest]);
+                    if (!$checkStmt->fetch()) break;
+                    $suffix++;
+                    $suggest = $base . ' ' . $suffix;
                 }
-            } else {
-                if ($password === '') { $error = 'Password is required for new user.'; $userRow = compact('id','username','full_name','role','branch_id','active'); Helpers::view('users/form', compact('userRow','branchesAll','error')); break; }
-                $hash = password_hash($password, PASSWORD_BCRYPT);
-                $stmt = $pdo->prepare('INSERT INTO users (username, full_name, role, branch_id, active, password_hash) VALUES (?,?,?,?,?,?)');
-                $stmt->execute([$username,$full_name,$role,($branch_id>0?$branch_id:null),$active,$hash]);
+                $suggestedUsername = $suggest;
+                $error = 'Username already exists: ' . htmlspecialchars($conflict) . '. Try: ' . htmlspecialchars($suggestedUsername);
+                $userRow = compact('id','username','full_name','role','branch_id','active');
+                $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                Helpers::view('users/form', compact('userRow','branchesAll','error','suggestedUsername','rolesDynamic'));
+                break;
             }
-            Helpers::redirect('index.php?page=users');
+            // If your DB schema requires NOT NULL on users.role, fallback to 'staff' when empty
+            $roleParam = ($role === '') ? 'staff' : $role;
+            try {
+                $pdo->beginTransaction();
+                if ($id > 0) {
+                    if ($password !== '') {
+                        $hash = password_hash($password, PASSWORD_BCRYPT);
+                        $stmt = $pdo->prepare('UPDATE users SET username=?, full_name=?, role=?, branch_id=?, active=?, password_hash=? WHERE id=?');
+                        $stmt->execute([$username,$full_name,$roleParam,($branch_id>0?$branch_id:null),$active,$hash,$id]);
+                    } else {
+                        $stmt = $pdo->prepare('UPDATE users SET username=?, full_name=?, role=?, branch_id=?, active=? WHERE id=?');
+                        $stmt->execute([$username,$full_name,$roleParam,($branch_id>0?$branch_id:null),$active,$id]);
+                    }
+                } else {
+                    if ($password === '') { $error = 'Password is required for new user.'; $userRow = compact('id','username','full_name','role','branch_id','active'); $pdo->rollBack(); Helpers::view('users/form', compact('userRow','branchesAll','error')); break; }
+                    $hash = password_hash($password, PASSWORD_BCRYPT);
+                    $stmt = $pdo->prepare('INSERT INTO users (username, full_name, role, branch_id, active, password_hash) VALUES (?,?,?,?,?,?)');
+                    $stmt->execute([$username,$full_name,$roleParam,($branch_id>0?$branch_id:null),$active,$hash]);
+                }
+                $pdo->commit();
+                Helpers::redirect('index.php?page=users');
+                break;
+            } catch (PDOException $e) {
+                if ($pdo->inTransaction()) { $pdo->rollBack(); }
+                $msg = 'Failed to save user.';
+                // 23000: constraint violation. Try to detect username duplicate vs other constraints
+                if ($e->getCode() === '23000') {
+                    $em = $e->getMessage();
+                    if (stripos($em, 'users.username') !== false || stripos($em, 'Duplicate entry') !== false) {
+                        $msg = 'Username already exists. Please choose a different username.';
+                    } else if (stripos($em, 'role') !== false && stripos($em, 'null') !== false) {
+                        $msg = 'Role cannot be empty in the current database settings. Please choose a Role.';
+                    }
+                }
+                $error = $msg;
+                $userRow = compact('id','username','full_name','role','branch_id','active');
+                $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic'));
+                break;
+            }
             break;
         }
 
@@ -331,8 +393,9 @@ switch ($page) {
         }
 
         if ($action === 'new') {
-            $userRow = ['id'=>0,'username'=>'','full_name'=>'','role'=>'staff','branch_id'=>0,'active'=>1];
-            Helpers::view('users/form', compact('userRow','branchesAll'));
+            $userRow = ['id'=>0,'username'=>'','full_name'=>'','role'=>'','branch_id'=>0,'active'=>1];
+            $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic'));
             break;
         }
 
@@ -342,7 +405,8 @@ switch ($page) {
             $stmt->execute([$id]);
             $userRow = $stmt->fetch();
             if (!$userRow) { http_response_code(404); echo 'Not found'; break; }
-            Helpers::view('users/form', compact('userRow','branchesAll'));
+            $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic'));
             break;
         }
 
@@ -417,6 +481,39 @@ switch ($page) {
             $customers = $pdo->query('SELECT * FROM customers ORDER BY created_at DESC LIMIT 100')->fetchAll();
         }
         Helpers::view('customers/index', compact('customers','q'));
+        break;
+
+    case 'vehicles':
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        $action = $_GET['action'] ?? 'index';
+        $pdo = Database::pdo();
+
+        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $vno = trim($_POST['vehicle_no'] ?? '');
+            if ($vno === '') { http_response_code(400); echo 'Vehicle number required'; break; }
+
+            // Use reg_number explicitly
+            try {
+                $q = $pdo->prepare('SELECT id FROM vehicles WHERE reg_number = ? LIMIT 1');
+                $q->execute([$vno]);
+                $r = $q->fetch();
+                if ($r) {
+                    $id = (int)$r['id'];
+                } else {
+                    $ins = $pdo->prepare('INSERT INTO vehicles (reg_number) VALUES (?)');
+                    $ins->execute([$vno]);
+                    $id = (int)$pdo->lastInsertId();
+                }
+            } catch (Throwable $e) {
+                http_response_code(500); echo 'Failed to save vehicle'; break;
+            }
+            header('Content-Type: application/json');
+            echo json_encode(['id'=>$id, 'vehicle_no'=>$vno]);
+            return;
+        }
+
+        http_response_code(404); echo 'Not found';
         break;
 
     case 'suppliers':
@@ -1015,28 +1112,44 @@ switch ($page) {
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
-            $expense_type = $_POST['expense_type'] ?? '';
+            $expense_type = trim($_POST['expense_type'] ?? '');
             $amount = (float)($_POST['amount'] ?? 0);
             $branch_id = (int)($_POST['branch_id'] ?? $branchId);
             $expense_date = $_POST['expense_date'] ?? date('Y-m-d');
             $notes = trim($_POST['notes'] ?? '');
-            $allowedTypes = ['fuel','vehicle_maintenance','office','utilities','other'];
-            if (!in_array($expense_type, $allowedTypes, true)) { $expense_type = 'other'; }
+            if ($expense_type === '') { $expense_type = 'other'; }
             if ($amount <= 0 || $branch_id <= 0) { $error = 'Amount and Branch are required.'; }
             if (!empty($error)) {
                 $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
                 $expense = compact('id','expense_type','amount','branch_id','expense_date','notes');
-                Helpers::view('expenses/form', compact('expense','branchesAll','error'));
+                $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
+                Helpers::view('expenses/form', compact('expense','branchesAll','error','typesDynamic'));
                 break;
             }
-            if ($id > 0) {
-                $stmt = $pdo->prepare('UPDATE expenses SET expense_type=?, amount=?, branch_id=?, expense_date=?, notes=? WHERE id=?');
-                $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes,$id]);
-            } else {
-                $stmt = $pdo->prepare('INSERT INTO expenses (expense_type, amount, branch_id, expense_date, notes) VALUES (?,?,?,?,?)');
-                $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes]);
+            try {
+                if ($id > 0) {
+                    $stmt = $pdo->prepare('UPDATE expenses SET expense_type=?, amount=?, branch_id=?, expense_date=?, notes=? WHERE id=?');
+                    $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes,$id]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO expenses (expense_type, amount, branch_id, expense_date, notes) VALUES (?,?,?,?,?)');
+                    $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes]);
+                }
+                Helpers::redirect('index.php?page=expenses');
+            } catch (PDOException $e) {
+                // Likely cause: expenses.expense_type is ENUM and rejects custom value
+                $msg = 'Failed to save expense.';
+                if ($e->getCode() === '22007' || $e->getCode() === 'HY000' || $e->getCode() === '23000') {
+                    $em = $e->getMessage();
+                    if (stripos($em, 'enum') !== false || stripos($em, 'Incorrect') !== false) {
+                        $msg = 'This database does not allow new Expense Types. Please change expenses.expense_type to VARCHAR(50), or choose an existing type.';
+                    }
+                }
+                $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+                $expense = compact('id','expense_type','amount','branch_id','expense_date','notes');
+                $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
+                $error = $msg;
+                Helpers::view('expenses/form', compact('expense','branchesAll','error','typesDynamic'));
             }
-            Helpers::redirect('index.php?page=expenses');
             break;
         }
 
@@ -1063,7 +1176,8 @@ switch ($page) {
         if ($action === 'new') {
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
             $expense = ['id'=>0,'expense_type'=>'other','amount'=>'','branch_id'=>$branchId,'expense_date'=>date('Y-m-d'),'notes'=>''];
-            Helpers::view('expenses/form', compact('expense','branchesAll'));
+            $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
+            Helpers::view('expenses/form', compact('expense','branchesAll','typesDynamic'));
             break;
         }
 
@@ -1074,7 +1188,8 @@ switch ($page) {
             $expense = $stmt->fetch();
             if (!$expense) { http_response_code(404); echo 'Not found'; break; }
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-            Helpers::view('expenses/form', compact('expense','branchesAll'));
+            $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
+            Helpers::view('expenses/form', compact('expense','branchesAll','typesDynamic'));
             break;
         }
 
@@ -1121,7 +1236,17 @@ switch ($page) {
             $address = trim($_POST['address'] ?? '');
             $position = trim($_POST['position'] ?? '');
             $role = trim($_POST['role'] ?? '');
-            $salary_amount = (float)($_POST['salary_amount'] ?? 0);
+            // salary_amount removed from schema/UI
+            $salary_amount = 0.0;
+            // New payroll fields
+            $basic_salary   = isset($_POST['basic_salary']) ? (float)$_POST['basic_salary'] : 0.0;
+            $epf_employee   = isset($_POST['epf_employee']) ? (float)$_POST['epf_employee'] : 0.0;
+            $epf_employer   = isset($_POST['epf_employer']) ? (float)$_POST['epf_employer'] : 0.0;
+            $etf            = isset($_POST['etf']) ? (float)$_POST['etf'] : 0.0;
+            $allowance      = isset($_POST['allowance']) ? (float)$_POST['allowance'] : 0.0;
+            $deductions     = isset($_POST['deductions']) ? (float)$_POST['deductions'] : 0.0;
+            $month_year     = trim($_POST['month_year'] ?? '');
+            if ($month_year === '' || !preg_match('/^\d{4}-\d{2}$/', $month_year)) { $month_year = date('Y-m'); }
             $license_number = trim($_POST['license_number'] ?? '');
             $license_expiry = $_POST['license_expiry'] ?? null;
             // Normalize vehicle_id: empty => NULL, else integer
@@ -1131,13 +1256,15 @@ switch ($page) {
             $join_date = $_POST['join_date'] ?? null;
             $status = $_POST['status'] ?? 'active';
             
-            if ($name === '' || $position === '' || $salary_amount <= 0 || $branch_id <= 0) {
-                $error = 'Name, Position, Salary and Branch are required.';
-                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','salary_amount','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
+            if ($name === '' || $position === '' || $branch_id <= 0) {
+                $error = 'Name, Position and Branch are required.';
+                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','basic_salary','epf_employee','epf_employer','etf','allowance','deductions','month_year','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
                 $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-                // Load vehicles for dropdown
-                try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
-                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','error'));
+                // Load vehicles for dropdown (use reg_number explicitly)
+                try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
+                $rolesDynamic = [];
+                try { $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM employees WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll(); } catch (Throwable $e) {}
+                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic','error'));
                 break;
             }
             
@@ -1172,11 +1299,11 @@ switch ($page) {
 
             try {
                 if ($id > 0) {
-                    $stmt = $pdo->prepare("UPDATE employees SET emp_code=?, name=?, first_name=?, last_name=?, email=?, phone=?, address=?, position=?, role=?, salary_amount=?, license_number=?, license_expiry=?, vehicle_id = NULLIF(?, ''), branch_id=?, join_date=?, status=? WHERE id=?");
-                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$salary_amount,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status,$id]);
+                    $stmt = $pdo->prepare("UPDATE employees SET emp_code=?, name=?, first_name=?, last_name=?, email=?, phone=?, address=?, position=?, role=?, basic_salary=?, epf_employee=?, epf_employer=?, etf=?, allowance=?, deductions=?, month_year=?, license_number=?, license_expiry=?, vehicle_id = NULLIF(?, ''), branch_id=?, join_date=?, status=? WHERE id=?");
+                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$basic_salary,$epf_employee,$epf_employer,$etf,$allowance,$deductions,$month_year,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status,$id]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO employees (emp_code, name, first_name, last_name, email, phone, address, position, role, salary_amount, license_number, license_expiry, vehicle_id, branch_id, join_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?)");
-                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$salary_amount,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status]);
+                    $stmt = $pdo->prepare("INSERT INTO employees (emp_code, name, first_name, last_name, email, phone, address, position, role, basic_salary, epf_employee, epf_employer, etf, allowance, deductions, month_year, license_number, license_expiry, vehicle_id, branch_id, join_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?, NULLIF(?, ''), ?, ?, ?)");
+                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$basic_salary,$epf_employee,$epf_employer,$etf,$allowance,$deductions,$month_year,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status]);
                 }
                 Helpers::redirect('index.php?page=employees');
                 break;
@@ -1206,11 +1333,25 @@ switch ($page) {
         }
 
         if ($action === 'new') {
-            $employee = ['id'=>0,'name'=>'','position'=>'','salary_amount'=>'','branch_id'=>0];
+            $employee = [
+                'id'=>0,
+                'name'=>'',
+                'position'=>'',
+                'basic_salary'=>'0.00',
+                'epf_employee'=>'0.00',
+                'epf_employer'=>'0.00',
+                'etf'=>'0.00',
+                'allowance'=>'0.00',
+                'deductions'=>'0.00',
+                'month_year'=>date('Y-m'),
+                'branch_id'=>0
+            ];
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-            // Load vehicles for dropdown
-            try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
-            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll'));
+            // Load vehicles for dropdown (use reg_number explicitly)
+            try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
+            $rolesDynamic = [];
+            try { $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM employees WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll(); } catch (Throwable $e) {}
+            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic'));
             break;
         }
 
@@ -1221,14 +1362,14 @@ switch ($page) {
             $employee = $stmt->fetch();
             if (!$employee) { http_response_code(404); echo 'Not found'; break; }
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-            // Load vehicles for dropdown
-            try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
+            // Load vehicles for dropdown (id + best-guess number)
+            try { $vehiclesAll = $pdo->query('SELECT id, COALESCE(vehicle_no, reg_number, plate_no) AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
             Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll'));
             break;
         }
 
-        // index - fetch all employee fields from database (join vehicles to display vehicle id reliably)
-        $employees = $pdo->query('SELECT e.*, b.name AS branch_name, v.id AS vehicle_id_join FROM employees e LEFT JOIN branches b ON b.id=e.branch_id LEFT JOIN vehicles v ON v.id = e.vehicle_id ORDER BY e.created_at DESC, e.id DESC LIMIT 300')->fetchAll();
+        // index - fetch all employee fields + branch name + vehicle registration
+        $employees = $pdo->query('SELECT e.*, b.name AS branch_name, v.id AS vehicle_id_join, v.reg_number AS vehicle_no_join FROM employees e LEFT JOIN branches b ON b.id=e.branch_id LEFT JOIN vehicles v ON v.id = e.vehicle_id ORDER BY e.created_at DESC, e.id DESC LIMIT 300')->fetchAll();
         Helpers::view('employees/index', compact('employees'));
         break;
 
@@ -1281,17 +1422,17 @@ switch ($page) {
 
         // Ensure salaries exist for selected Year/Month so that all employees show up
         if ($year > 0 && $month_num > 0) {
-            // Insert missing rows as pending with employee's salary_amount
-            $empStmt = $pdo->query('SELECT id, salary_amount FROM employees');
+            // Insert missing rows as pending with employee's basic_salary
+            $empStmt = $pdo->query('SELECT id, basic_salary FROM employees');
             $employeesForGen = $empStmt->fetchAll();
             if ($employeesForGen) {
                 $ins = $pdo->prepare("INSERT IGNORE INTO salaries (employee_id, month, month_num, amount, status) VALUES (?,?,?,?, 'pending')");
                 foreach ($employeesForGen as $eRow) {
-                    $ins->execute([(int)$eRow['id'], $year, $month_num, (float)$eRow['salary_amount']]);
+                    $ins->execute([(int)$eRow['id'], $year, $month_num, (float)$eRow['basic_salary']]);
                 }
             }
         }
-        $sql = 'SELECT s.*, e.name AS employee_name, e.position, e.salary_amount AS employee_salary, b.name AS branch_name
+        $sql = 'SELECT s.*, e.name AS employee_name, e.position, e.basic_salary AS employee_salary, b.name AS branch_name
                 FROM salaries s
                 LEFT JOIN employees e ON e.id = s.employee_id
                 LEFT JOIN branches b ON b.id = e.branch_id';

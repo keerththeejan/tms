@@ -2,7 +2,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0">Delivery Note #<?php echo (int)$dn['id']; ?></h3>
   <div>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> Next</a>
     <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=print&id='.(int)$dn['id']); ?>" target="_blank" class="btn btn-primary"><i class="bi bi-printer"></i> Print</a>
   </div>
 </div>

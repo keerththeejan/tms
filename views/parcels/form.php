@@ -10,7 +10,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> Next</a>
 </div>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
@@ -96,16 +96,32 @@
       <input type="date" class="form-control" value="<?php echo date('Y-m-d'); ?>" disabled>
     </div>
     <div class="col-md-4">
-      <label class="form-label">From Branch</label>
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>From Branch</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddFromBranch" aria-expanded="false"><i class="bi bi-building-add"></i> Quick Add</button>
+      </label>
       <select name="from_branch_id" class="form-select" required>
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesAll ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['from_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
         <?php endforeach; ?>
       </select>
+      <div class="collapse mt-2" id="quickAddFromBranch">
+        <div class="border rounded p-2 bg-light">
+          <div class="row g-2">
+            <div class="col-6"><input type="text" id="fab_name" class="form-control form-control-sm" placeholder="Branch name"></div>
+            <div class="col-4"><input type="text" id="fab_code" class="form-control form-control-sm" placeholder="Code"></div>
+            <div class="col-2 d-flex align-items-center"><div class="form-check"><input id="fab_main" class="form-check-input" type="checkbox"> <label class="form-check-label" for="fab_main">Main</label></div></div>
+            <div class="col-12 text-end"><button type="button" id="fab_submit" class="btn btn-sm btn-primary"><i class="bi bi-save"></i> Save & Use</button></div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="col-md-4">
-      <label class="form-label">To Branch</label>
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>To Branch</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddToBranch" aria-expanded="false"><i class="bi bi-building-add"></i> Quick Add</button>
+      </label>
       <select name="to_branch_id" class="form-select" required>
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesAll ?? []) as $b): ?>
@@ -113,11 +129,24 @@
         <?php endforeach; ?>
       </select>
       <div id="toBranchSuggest" class="form-text"></div>
+      <div class="collapse mt-2" id="quickAddToBranch">
+        <div class="border rounded p-2 bg-light">
+          <div class="row g-2">
+            <div class="col-6"><input type="text" id="tab_name" class="form-control form-control-sm" placeholder="Branch name"></div>
+            <div class="col-4"><input type="text" id="tab_code" class="form-control form-control-sm" placeholder="Code"></div>
+            <div class="col-2 d-flex align-items-center"><div class="form-check"><input id="tab_main" class="form-check-input" type="checkbox"> <label class="form-check-label" for="tab_main">Main</label></div></div>
+            <div class="col-12 text-end"><button type="button" id="tab_submit" class="btn btn-sm btn-primary"><i class="bi bi-save"></i> Save & Use</button></div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="col-md-4">
-      <label class="form-label">Vehicle No. (Optional)</label>
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>Vehicle No. (Optional)</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddVehicle" aria-expanded="false"><i class="bi bi-truck"></i> Quick Add</button>
+      </label>
       <?php if (!empty($vehiclesAll)): ?>
-        <select name="vehicle_no" class="form-select">
+        <select name="vehicle_no" class="form-select" id="vehicleSelect">
           <option value="">-- None --</option>
           <?php 
             $vehCurrent = trim((string)($parcel['vehicle_no'] ?? ''));
@@ -129,8 +158,16 @@
           <?php endforeach; ?>
         </select>
       <?php else: ?>
-        <input type="text" name="vehicle_no" class="form-control" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>">
+        <input type="text" name="vehicle_no" class="form-control" id="vehicleInput" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>">
       <?php endif; ?>
+      <div class="collapse mt-2" id="quickAddVehicle">
+        <div class="border rounded p-2 bg-light">
+          <div class="row g-2">
+            <div class="col-8"><input type="text" id="qv_no" class="form-control form-control-sm" placeholder="e.g., REG011 or AB-1234"></div>
+            <div class="col-4 text-end"><button type="button" id="qv_submit" class="btn btn-sm btn-primary"><i class="bi bi-save"></i> Save & Use</button></div>
+          </div>
+        </div>
+      </div>
       <?php 
         $lorryChecked = 0; 
         $pid = (int)($parcel['id'] ?? 0);
@@ -282,30 +319,24 @@
     }
   }
 
-  // Quick Add submit without nested form
-  const qaBtn = document.getElementById('qa_submit');
-  if (qaBtn) {
-    qaBtn.addEventListener('click', function(){
-      var nameEl = document.getElementById('qa_name');
-      var phoneEl = document.getElementById('qa_phone');
-      var addressEl = document.getElementById('qa_address');
-      var dlEl = document.getElementById('qa_delivery_location');
-      var typeEl = document.getElementById('qa_type');
-      var name = nameEl ? nameEl.value.trim() : '';
-      var phone = phoneEl ? phoneEl.value.trim() : '';
-      var address = addressEl ? addressEl.value.trim() : '';
-      var delivery_location = dlEl ? dlEl.value.trim() : '';
-      var type = typeEl ? typeEl.value : '';
-      if (!name || !phone) { alert('Name and Phone are required'); return; }
-      var tmp = document.createElement('form');
-      tmp.method = 'POST';
-      tmp.action = '<?php echo Helpers::baseUrl('index.php?page=quick_add_customer'); ?>';
-      var csrf = document.createElement('input'); csrf.type='hidden'; csrf.name='csrf_token'; csrf.value='<?php echo Helpers::csrfToken(); ?>'; tmp.appendChild(csrf);
-      function addField(n, v){ var i=document.createElement('input'); i.type='hidden'; i.name=n; i.value=v; tmp.appendChild(i);}    
-      addField('name', name); addField('phone', phone); addField('address', address); addField('delivery_location', delivery_location); addField('customer_type', type);
-      document.body.appendChild(tmp);
-      tmp.submit();
+  async function quickAdd(name, code, isMain){
+    const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+    const form = new FormData();
+    form.append('csrf_token', csrf);
+    form.append('ajax', '1');
+    form.append('id', '0');
+    form.append('name', name);
+    form.append('code', code);
+    if (isMain) form.append('is_main', '1');
+    const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=branches&action=save'); ?>', {
+      method: 'POST',
+      headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+      body: form
     });
+    if (!res.ok) throw new Error('Failed to save');
+    const data = await res.json();
+    if (!data || !data.id) throw new Error('Invalid response');
+    return { id: data.id, name: data.name || name };
   }
 
   table.addEventListener('input', function(e){
@@ -349,6 +380,41 @@
   const toBranchDisplay = document.getElementById('toBranchDisplay');
   const customerLocDisplay = document.getElementById('customerLocDisplay');
   const toBranchSuggest = document.getElementById('toBranchSuggest');
+  // Quick Add Vehicle handlers
+  const qvBtn = document.getElementById('qv_submit');
+  qvBtn?.addEventListener('click', async function(){
+    const v = (document.getElementById('qv_no')?.value || '').trim();
+    if (!v) { alert('Enter a vehicle number'); return; }
+    try {
+      const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+      const fd = new FormData();
+      fd.append('csrf_token', csrf);
+      fd.append('vehicle_no', v);
+      const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=vehicles&action=save'); ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+        body: fd
+      });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      // If we have a select, append option; else fill input
+      const sel = document.getElementById('vehicleSelect');
+      const inp = document.getElementById('vehicleInput');
+      if (sel) {
+        // Avoid duplicate option
+        let exists = false;
+        Array.from(sel.options).forEach(o=>{ if ((o.value||'').toLowerCase() === v.toLowerCase()) exists = true; });
+        if (!exists) { const opt=document.createElement('option'); opt.value=v; opt.textContent=v; sel.appendChild(opt); }
+        sel.value = v;
+      } else if (inp) {
+        inp.value = v;
+      }
+      document.getElementById('qv_no').value='';
+      const collapseEl = document.getElementById('quickAddVehicle'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
+    } catch (e) {
+      alert('Failed to add vehicle');
+    }
+  });
   const branchesData = <?php echo json_encode(array_map(function($b){ return ['id'=>(int)$b['id'],'name'=>$b['name']]; }, $branchesAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   const customersData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)$c['id'],'delivery_location'=>$c['delivery_location'] ?? '']; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   function updateMeta(){
@@ -446,6 +512,30 @@
         customerSelect2.value = id;
         customerSelect2.dispatchEvent(new Event('change'));
       }
+    }
+  });
+
+  const fromSel = document.querySelector('select[name="from_branch_id"]');
+  const toSel = document.querySelector('select[name="to_branch_id"]');
+  document.getElementById('fab_submit')?.addEventListener('click', async function(){
+    const name = document.getElementById('fab_name')?.value.trim() || '';
+    const code = document.getElementById('fab_code')?.value.trim() || '';
+    const isMain = document.getElementById('fab_main')?.checked || false;
+    if (!name || !code) { alert('Name and Code are required'); return; }
+    const b = await quickAdd(name, code, isMain);
+    if (fromSel) {
+      const opt = document.createElement('option'); opt.value = String(b.id); opt.textContent = b.name || name; fromSel.appendChild(opt); fromSel.value = String(b.id);
+      fromSel.dispatchEvent(new Event('change'));
+    }
+  });
+  document.getElementById('tab_submit')?.addEventListener('click', async function(){
+    const name = document.getElementById('tab_name')?.value.trim() || '';
+    const code = document.getElementById('tab_code')?.value.trim() || '';
+    const isMain = document.getElementById('tab_main')?.checked || false;
+    if (!name || !code) { alert('Name and Code are required'); return; }
+    const b = await quickAdd(name, code, isMain);
+    if (toSel) {
+      const opt = document.createElement('option'); opt.value = String(b.id); opt.textContent = b.name || name; toSel.appendChild(opt); toSel.value = String(b.id);
     }
   });
 })();
