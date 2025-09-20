@@ -23,6 +23,9 @@ A lightweight PHP 8 + MySQL 8 application to manage parcel movements, delivery n
    - Username: `admin`
    - Password: `admin123`
 
+
+   'kjljrelgerotlkr4
+
 ## Next Steps
 - Implement CRUD modules for Branches, Customers, Suppliers, Parcels.
 - Add Delivery Notes generation and printing.
