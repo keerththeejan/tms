@@ -40,7 +40,11 @@
     <tfoot>
       <tr>
         <th colspan="4" class="text-end">Total</th>
-        <th class="text-end"><?php echo number_format($total, 2); ?></th>
+        <th class="text-end"><?php 
+          $grand = (float)$total; 
+          if ($grand <= 0 && isset($dn['total_amount'])) { $grand = (float)$dn['total_amount']; }
+          echo number_format($grand, 2); 
+        ?></th>
       </tr>
     </tfoot>
   </table>

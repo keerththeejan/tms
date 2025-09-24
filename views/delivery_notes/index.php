@@ -1,7 +1,10 @@
 <?php /** @var array $notes */ ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0">Delivery Notes</h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=generate'); ?>" class="btn btn-primary"><i class="bi bi-magic"></i> Generate</a>
+  <div class="d-flex gap-2">
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" class="btn btn-outline-primary"><i class="bi bi-truck"></i> Route</a>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=generate'); ?>" class="btn btn-primary"><i class="bi bi-magic"></i> Generate</a>
+  </div>
 </div>
 <form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="delivery_notes">

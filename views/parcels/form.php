@@ -81,6 +81,7 @@
           <div id="locResults" class="small" style="max-height: 180px; overflow:auto"></div>
         </div>
       </div>
+      <div id="customerSummary" class="mt-2"></div>
     </div>
     <div class="col-md-4">
       <label class="form-label">Supplier (Optional)</label>
@@ -447,10 +448,39 @@
       }
     }
   }
+  async function fetchCustomerSummary(){
+    const custId = parseInt(customerSelect?.value || '0');
+    const box = document.getElementById('customerSummary');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!custId) return;
+    try {
+      const url = '<?php echo Helpers::baseUrl('index.php?page=customers&action=summary'); ?>' + '&id=' + custId;
+      const res = await fetch(url, { headers: { 'Accept':'application/json' } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && !data.error && ((data.total_delivery_notes||0) > 0 || (data.total_parcels||0) > 0)) {
+        const due = (data.due||0);
+        const cls = due > 0 ? 'alert-warning' : 'alert-info';
+        const dueHtml = due > 0 ? `<div><strong>Due:</strong> <span class="text-danger">${due.toFixed(2)}</span></div>` : '';
+        box.innerHTML = `
+          <div class="alert ${cls} py-2">
+            <div class="fw-semibold">Previous activity found for ${data.name} (${data.phone})</div>
+            <div class="small text-muted">Delivery Notes: ${data.total_delivery_notes}, Parcels: ${data.total_parcels}${data.last_delivery_date ? ', Last: ' + data.last_delivery_date : ''}</div>
+            ${dueHtml}
+            <div class="mt-1">
+              <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>&phone=${encodeURIComponent(data.phone)}" target="_blank">View Details</a>
+            </div>
+          </div>`;
+      }
+    } catch (e) { /* ignore */ }
+  }
   customerSelect?.addEventListener('change', updateMeta);
+  customerSelect?.addEventListener('change', fetchCustomerSummary);
   fromBranchSelect?.addEventListener('change', updateMeta);
   toBranchSelect?.addEventListener('change', updateMeta);
   updateMeta();
+  fetchCustomerSummary();
 
   // Handle clicking suggestion links
   toBranchSuggest?.addEventListener('click', function(e){

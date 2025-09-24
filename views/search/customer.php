@@ -1,14 +1,36 @@
-<?php /** @var string $phone */ /** @var array|null $customer */ ?>
+<?php /** @var string $phone */ /** @var string $name */ /** @var array|null $customer */ /** @var array $matches */ ?>
 <h3 class="mb-3">Customer Search</h3>
 <form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="search">
   <div class="col-md-4">
-    <input type="text" class="form-control" name="phone" placeholder="Enter phone number" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
+    <input type="text" class="form-control" name="phone" placeholder="Phone number" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
+  </div>
+  <div class="col-md-4">
+    <input type="text" class="form-control" name="name" placeholder="Customer name" value="<?php echo htmlspecialchars($name ?? ''); ?>">
   </div>
   <div class="col-auto">
     <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
   </div>
+  <div class="col-12 small text-muted">Search by phone (exact) or by name (partial match). If both given, phone takes priority.</div>
 </form>
+<?php if (!empty($matches) && !$customer): ?>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="mb-2">Matching Customers</h6>
+    <div class="list-group">
+      <?php foreach ($matches as $m): ?>
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="<?php echo Helpers::baseUrl('index.php?page=search&name=' . urlencode($m['name'])); ?>">
+          <span>
+            <strong><?php echo htmlspecialchars($m['name']); ?></strong>
+            <span class="text-muted ms-2"><?php echo htmlspecialchars($m['phone'] ?? ''); ?></span>
+          </span>
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  </div>
+<?php endif; ?>
 <?php if ($customer): ?>
 <div class="card shadow-sm mb-3">
   <div class="card-body">
@@ -90,6 +112,6 @@
     </tbody>
   </table>
 </div>
-<?php elseif ($phone !== ''): ?>
-<div class="alert alert-warning">No customer found with phone: <?php echo htmlspecialchars($phone); ?></div>
+<?php elseif ($phone !== '' || $name !== ''): ?>
+<div class="alert alert-warning">No customer found<?php echo $phone !== '' ? ' with phone: ' . htmlspecialchars($phone) : ' for name: ' . htmlspecialchars($name); ?></div>
 <?php endif; ?>
