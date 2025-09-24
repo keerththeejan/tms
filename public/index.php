@@ -1238,15 +1238,7 @@ switch ($page) {
             $role = trim($_POST['role'] ?? '');
             // salary_amount removed from schema/UI
             $salary_amount = 0.0;
-            // New payroll fields
-            $basic_salary   = isset($_POST['basic_salary']) ? (float)$_POST['basic_salary'] : 0.0;
-            $epf_employee   = isset($_POST['epf_employee']) ? (float)$_POST['epf_employee'] : 0.0;
-            $epf_employer   = isset($_POST['epf_employer']) ? (float)$_POST['epf_employer'] : 0.0;
-            $etf            = isset($_POST['etf']) ? (float)$_POST['etf'] : 0.0;
-            $allowance      = isset($_POST['allowance']) ? (float)$_POST['allowance'] : 0.0;
-            $deductions     = isset($_POST['deductions']) ? (float)$_POST['deductions'] : 0.0;
-            $month_year     = trim($_POST['month_year'] ?? '');
-            if ($month_year === '' || !preg_match('/^\d{4}-\d{2}$/', $month_year)) { $month_year = date('Y-m'); }
+            // Payroll fields are no longer managed on the Employees form (moved to employee_payroll)
             $license_number = trim($_POST['license_number'] ?? '');
             $license_expiry = $_POST['license_expiry'] ?? null;
             // Normalize vehicle_id: empty => NULL, else integer
@@ -1258,7 +1250,7 @@ switch ($page) {
             
             if ($name === '' || $position === '' || $branch_id <= 0) {
                 $error = 'Name, Position and Branch are required.';
-                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','basic_salary','epf_employee','epf_employer','etf','allowance','deductions','month_year','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
+                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
                 $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
                 // Load vehicles for dropdown (use reg_number explicitly)
                 try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
@@ -1299,13 +1291,18 @@ switch ($page) {
 
             try {
                 if ($id > 0) {
-                    $stmt = $pdo->prepare("UPDATE employees SET emp_code=?, name=?, first_name=?, last_name=?, email=?, phone=?, address=?, position=?, role=?, basic_salary=?, epf_employee=?, epf_employer=?, etf=?, allowance=?, deductions=?, month_year=?, license_number=?, license_expiry=?, vehicle_id = NULLIF(?, ''), branch_id=?, join_date=?, status=? WHERE id=?");
-                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$basic_salary,$epf_employee,$epf_employer,$etf,$allowance,$deductions,$month_year,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status,$id]);
+                    $stmt = $pdo->prepare("UPDATE employees SET emp_code=?, name=?, first_name=?, last_name=?, email=?, phone=?, address=?, position=?, role=?, license_number=?, license_expiry=?, vehicle_id = ?, branch_id=?, join_date=?, status=? WHERE id=?");
+                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status,$id]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO employees (emp_code, name, first_name, last_name, email, phone, address, position, role, basic_salary, epf_employee, epf_employer, etf, allowance, deductions, month_year, license_number, license_expiry, vehicle_id, branch_id, join_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?, NULLIF(?, ''), ?, ?, ?)");
-                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$basic_salary,$epf_employee,$epf_employer,$etf,$allowance,$deductions,$month_year,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status]);
+                    $stmt = $pdo->prepare("INSERT INTO employees (emp_code, name, first_name, last_name, email, phone, address, position, role, license_number, license_expiry, vehicle_id, branch_id, join_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                    $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status]);
                 }
-                Helpers::redirect('index.php?page=employees');
+                $redir = trim($_POST['redirect_to'] ?? '');
+                if ($redir !== '') {
+                    Helpers::redirect($redir);
+                } else {
+                    Helpers::redirect('index.php?page=employees');
+                }
                 break;
             } catch (PDOException $ex) {
                 $msg = $ex->getMessage();
@@ -1316,7 +1313,7 @@ switch ($page) {
                 } else {
                     $error = 'Could not save employee. ' . $msg;
                 }
-                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','salary_amount','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
+                $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
                 $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
                 try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
                 Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','error'));
@@ -1337,13 +1334,6 @@ switch ($page) {
                 'id'=>0,
                 'name'=>'',
                 'position'=>'',
-                'basic_salary'=>'0.00',
-                'epf_employee'=>'0.00',
-                'epf_employer'=>'0.00',
-                'etf'=>'0.00',
-                'allowance'=>'0.00',
-                'deductions'=>'0.00',
-                'month_year'=>date('Y-m'),
                 'branch_id'=>0
             ];
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
@@ -1368,7 +1358,112 @@ switch ($page) {
             break;
         }
 
-        // index - fetch all employee fields + branch name + vehicle registration
+        // payroll sub-view: list latest payroll row per employee
+        if ($action === 'payroll') {
+            $sql = "SELECT e.id, e.emp_code, e.name, e.position, b.name AS branch_name,
+                           p.id AS payroll_id, p.basic_salary, p.epf_employee, p.epf_employer, p.etf, p.allowance, p.deductions, p.net_salary, p.month_year
+                    FROM employees e
+                    LEFT JOIN branches b ON b.id = e.branch_id
+                    LEFT JOIN (
+                      SELECT ep.* FROM employee_payroll ep
+                      INNER JOIN (
+                        SELECT employee_id, MAX(month_year) AS mm FROM employee_payroll GROUP BY employee_id
+                      ) m ON m.employee_id = ep.employee_id AND m.mm = ep.month_year
+                    ) p ON p.employee_id = e.id
+                    ORDER BY e.created_at DESC, e.id DESC LIMIT 300";
+            $employees = $pdo->query($sql)->fetchAll();
+            Helpers::view('employees/payroll', compact('employees'));
+            break;
+        }
+        // new payroll entry form (choose employee and enter payroll fields)
+        if ($action === 'new_payroll') {
+            $employee = ['id'=>0,'month_year'=>date('Y-m'),'basic_salary'=>'0.00','epf_employee'=>'0.00','epf_employer'=>'0.00','etf'=>'0.00','allowance'=>'0.00','deductions'=>'0.00'];
+            $selectedEmployeeId = (int)($_GET['employee_id'] ?? 0);
+            $employeesAll = $pdo->query('SELECT id, emp_code, name FROM employees ORDER BY id DESC LIMIT 500')->fetchAll();
+            Helpers::view('employees/payroll_form', compact('employee','employeesAll','selectedEmployeeId'));
+            break;
+        }
+        // save payroll row (insert or update)
+        if ($action === 'save_payroll' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $payroll_id  = (int)($_POST['id'] ?? 0);
+            $employee_id = (int)($_POST['employee_id'] ?? 0);
+            $month_year  = trim($_POST['month_year'] ?? date('Y-m'));
+            $basic_salary = (float)($_POST['basic_salary'] ?? 0);
+            $epf_employee = (float)($_POST['epf_employee'] ?? 0);
+            $epf_employer = (float)($_POST['epf_employer'] ?? 0);
+            $etf          = (float)($_POST['etf'] ?? 0);
+            $allowance    = (float)($_POST['allowance'] ?? 0);
+            $deductions   = (float)($_POST['deductions'] ?? 0);
+            if ($employee_id <= 0) { http_response_code(400); echo 'Employee required'; break; }
+            if ($payroll_id > 0) {
+                $stmt = $pdo->prepare('UPDATE employee_payroll SET employee_id=?, month_year=?, basic_salary=?, epf_employee=?, epf_employer=?, etf=?, allowance=?, deductions=? WHERE id=?');
+                $stmt->execute([$employee_id, $month_year, $basic_salary, $epf_employee, $epf_employer, $etf, $allowance, $deductions, $payroll_id]);
+            } else {
+                $stmt = $pdo->prepare('INSERT INTO employee_payroll (employee_id, month_year, basic_salary, epf_employee, epf_employer, etf, allowance, deductions) VALUES (?,?,?,?,?,?,?,?)');
+                $stmt->execute([$employee_id, $month_year, $basic_salary, $epf_employee, $epf_employer, $etf, $allowance, $deductions]);
+            }
+            Helpers::redirect('index.php?page=employees&action=payroll');
+            break;
+        }
+        // edit payroll row
+        if ($action === 'edit_payroll') {
+            $id = (int)($_GET['id'] ?? 0);
+            $stmt = $pdo->prepare('SELECT * FROM employee_payroll WHERE id=?');
+            $stmt->execute([$id]);
+            $employee = $stmt->fetch();
+            if (!$employee) { http_response_code(404); echo 'Not found'; break; }
+            $employeesAll = $pdo->query('SELECT id, emp_code, name FROM employees ORDER BY id DESC LIMIT 500')->fetchAll();
+            Helpers::view('employees/payroll_form', compact('employee','employeesAll'));
+            break;
+        }
+        // delete payroll row
+        if ($action === 'payroll_delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) { $pdo->prepare('DELETE FROM employee_payroll WHERE id=?')->execute([$id]); }
+            Helpers::redirect('index.php?page=employees&action=payroll');
+            break;
+        }
+        // print payroll row. If id (payroll_id) provided, use it; else if employee_id provided, print blank/zero template for that employee
+        if ($action === 'payroll_print') {
+            $id = (int)($_GET['id'] ?? 0);
+            $employee_id = (int)($_GET['employee_id'] ?? 0);
+            if ($id > 0) {
+                $stmt = $pdo->prepare('SELECT ep.*, e.emp_code, e.name, e.position, b.name AS branch_name FROM employee_payroll ep JOIN employees e ON e.id=ep.employee_id LEFT JOIN branches b ON b.id=e.branch_id WHERE ep.id=?');
+                $stmt->execute([$id]);
+                $employee = $stmt->fetch();
+                if (!$employee) { http_response_code(404); echo 'Not found'; break; }
+            } else if ($employee_id > 0) {
+                $stmt = $pdo->prepare('SELECT e.id, e.emp_code, e.name, e.position, b.name AS branch_name FROM employees e LEFT JOIN branches b ON b.id=e.branch_id WHERE e.id=?');
+                $stmt->execute([$employee_id]);
+                $emp = $stmt->fetch();
+                if (!$emp) { http_response_code(404); echo 'Not found'; break; }
+                // Build zeroed payroll structure compatible with the view
+                $employee = [
+                    'employee_id'   => (int)$emp['id'],
+                    'emp_code'      => (string)($emp['emp_code'] ?? ''),
+                    'name'          => (string)($emp['name'] ?? ''),
+                    'position'      => (string)($emp['position'] ?? ''),
+                    'branch_name'   => (string)($emp['branch_name'] ?? ''),
+                    'month_year'    => date('Y-m'),
+                    'status'        => '',
+                    'basic_salary'  => 0.0,
+                    'epf_employee'  => 0.0,
+                    'epf_employer'  => 0.0,
+                    'etf'           => 0.0,
+                    'allowance'     => 0.0,
+                    'deductions'    => 0.0,
+                    'net_salary'    => 0.0,
+                ];
+            } else {
+                http_response_code(400); echo 'Bad request'; break;
+            }
+            require __DIR__ . '/../views/employees/payroll_print.php';
+            return;
+        }
+
+        // index - fetch all employee DETAIL fields + branch name + vehicle registration
         $employees = $pdo->query('SELECT e.*, b.name AS branch_name, v.id AS vehicle_id_join, v.reg_number AS vehicle_no_join FROM employees e LEFT JOIN branches b ON b.id=e.branch_id LEFT JOIN vehicles v ON v.id = e.vehicle_id ORDER BY e.created_at DESC, e.id DESC LIMIT 300')->fetchAll();
         Helpers::view('employees/index', compact('employees'));
         break;

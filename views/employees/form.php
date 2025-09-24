@@ -87,42 +87,7 @@
         </div>
       </div>
       <!-- Salary Amount removed as per request -->
-      <div class="col-12">
-        <hr class="my-2">
-        <h6 class="mb-0">Payroll</h6>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Basic Salary</label>
-        <input type="number" step="0.01" name="basic_salary" id="basic_salary" class="form-control" value="<?php echo htmlspecialchars((string)($employee['basic_salary'] ?? '0.00')); ?>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">EPF (Employee)</label>
-        <input type="number" step="0.01" name="epf_employee" id="epf_employee" class="form-control" value="<?php echo htmlspecialchars((string)($employee['epf_employee'] ?? '0.00')); ?>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">EPF (Employer)</label>
-        <input type="number" step="0.01" name="epf_employer" id="epf_employer" class="form-control" value="<?php echo htmlspecialchars((string)($employee['epf_employer'] ?? '0.00')); ?>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">ETF</label>
-        <input type="number" step="0.01" name="etf" id="etf" class="form-control" value="<?php echo htmlspecialchars((string)($employee['etf'] ?? '0.00')); ?>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Allowance</label>
-        <input type="number" step="0.01" name="allowance" id="allowance" class="form-control" value="<?php echo htmlspecialchars((string)($employee['allowance'] ?? '0.00')); ?>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Deductions</label>
-        <input type="number" step="0.01" name="deductions" id="deductions" class="form-control" value="<?php echo htmlspecialchars((string)($employee['deductions'] ?? '0.00')); ?>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Net Salary (auto)</label>
-        <input type="text" id="net_salary_preview" class="form-control" value="" readonly>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Month-Year</label>
-        <input type="text" name="month_year" id="month_year" maxlength="7" class="form-control" placeholder="YYYY-MM" value="<?php echo htmlspecialchars((string)($employee['month_year'] ?? date('Y-m'))); ?>">
-      </div>
+      
       <div class="col-md-6">
         <label class="form-label">License Number</label>
         <input type="text" name="license_number" class="form-control" value="<?php echo htmlspecialchars($employee['license_number'] ?? ''); ?>">
@@ -256,19 +221,6 @@
     }
   });
 
-  // Payroll: auto compute net salary preview = basic + allowance - deductions - epf_employee
-  function toNum(v){ const n = parseFloat(v); return isNaN(n)?0:n; }
-  function updateNet(){
-    const b = toNum(document.getElementById('basic_salary')?.value);
-    const al = toNum(document.getElementById('allowance')?.value);
-    const de = toNum(document.getElementById('deductions')?.value);
-    const epfe = toNum(document.getElementById('epf_employee')?.value);
-    const net = (b + al - de - epfe).toFixed(2);
-    const out = document.getElementById('net_salary_preview'); if (out) out.value = net;
-  }
-  ['basic_salary','allowance','deductions','epf_employee'].forEach(id=>{
-    const el = document.getElementById(id); if (el) el.addEventListener('input', updateNet);
-  });
-  updateNet();
+  // No payroll calculations on this form (cash-related fields removed)
 })();
 </script>

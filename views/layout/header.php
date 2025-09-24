@@ -14,6 +14,9 @@ $user = Auth::user();
     body { padding-top: 4.5rem; }
     .quick-actions .card { cursor: pointer; transition: transform .05s ease-in; }
     .quick-actions .card:hover { transform: scale(1.01); }
+    /* Slightly smaller, neater navbar font sizes */
+    .navbar .navbar-brand { font-size: 1rem; }
+    .navbar .nav-link, .navbar .navbar-text { font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -65,7 +68,16 @@ $user = Auth::user();
             <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Expenses</a></li>
           <?php endif; ?>
           <?php if (Auth::hasAnyRole(['admin','accountant'])): ?>
-            <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>">Employees</a></li>
+            <?php 
+              $isEmployeesDetailsActive = ($currentPage === 'employees' && ($action === '' || $action === 'index' || !in_array($action, ['payroll','new','edit'], true)));
+              $isEmployeesPayrollActive = ($currentPage === 'employees' && $action === 'payroll');
+            ?>
+            <li class="nav-item">
+              <a class="nav-link <?php echo $isEmployeesDetailsActive ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>">Employee Details</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link <?php echo $isEmployeesPayrollActive ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>">Salary Report</a>
+            </li>
             <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=salaries'); ?>">Salaries</a></li>
           <?php endif; ?>
           <li class="nav-item"><a class="nav-link" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>">Search</a></li>
