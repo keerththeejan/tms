@@ -461,21 +461,31 @@ switch ($page) {
             $id = (int)($_POST['id'] ?? 0);
             $name = trim($_POST['name'] ?? '');
             $phone = trim($_POST['phone'] ?? '');
+            if ($phone === '') { $phone = 'NA-' . date('YmdHis') . '-' . str_pad((string)random_int(100,999), 3, '0', STR_PAD_LEFT); }
             $address = trim($_POST['address'] ?? '');
             $delivery_location = trim($_POST['delivery_location'] ?? '');
             $place_id = trim($_POST['place_id'] ?? '');
             $lat = ($_POST['lat'] ?? '') !== '' ? (float)$_POST['lat'] : null;
             $lng = ($_POST['lng'] ?? '') !== '' ? (float)$_POST['lng'] : null;
             $customer_type = $_POST['customer_type'] ?? null;
-            if ($name === '' || $phone === '') { $error = 'Name and Phone are required.'; $customer = compact('id','name','phone','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break; }
-            if ($id > 0) {
-                $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
-                $stmt->execute([$name,$phone,$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
-            } else {
-                $stmt = $pdo->prepare('INSERT INTO customers (name, phone, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?)');
-                $stmt->execute([$name,$phone,$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
-                $id = (int)$pdo->lastInsertId();
+            $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
+                         || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
+                         || (($_POST['ajax'] ?? '') === '1');
+            if ($name === '') { $error = 'Name is required.'; $customer = compact('id','name','phone','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break; }
+            try {
+                if ($id > 0) {
+                    $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
+                    $stmt->execute([$name,$phone,$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO customers (name, phone, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?)');
+                    $stmt->execute([$name,$phone,$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
+                    $id = (int)$pdo->lastInsertId();
+                }
+            } catch (Throwable $e) {
+                if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>'Failed to save customer']); return; }
+                $error = 'Failed to save customer.'; $customer = compact('id','name','phone','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
             }
+            if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone]); return; }
             Helpers::redirect('index.php?page=customers');
             break;
         }
@@ -673,26 +683,37 @@ switch ($page) {
             }
             if ($sumQty > 0) { $weight = $sumQty; }
 
-            // Price only from Main Branch
+            // Price handling
+            // For new parcels: compute from items for main branch; for edit: allow manual price with optional discount for all branches
+            $discountRaw = trim($_POST['discount'] ?? '');
+            $discount = ($discountRaw === '') ? 0.0 : (float)$discountRaw;
             $price = null;
-            if ($isMain) {
-                // If items are provided, compute price from items (qty * (rs+cts/100)); else fallback to posted price
-                $sum = 0.0;
-                if (is_array($items)) {
-                    foreach ($items as $it) {
-                        $q = (float)($it['qty'] ?? 0);
-                        $rs = (float)($it['rs'] ?? 0);
-                        $cts = (float)($it['cts'] ?? 0);
-                        $r = $rs + ($cts / 100.0);
-                        $sum += $q * $r;
+            if ($id <= 0) {
+                if ($isMain) {
+                    // If items are provided, compute price from items (qty * (rs+cts/100)); else fallback to posted price
+                    $sum = 0.0;
+                    if (is_array($items)) {
+                        foreach ($items as $it) {
+                            $q = (float)($it['qty'] ?? 0);
+                            $rs = (float)($it['rs'] ?? 0);
+                            $cts = (float)($it['cts'] ?? 0);
+                            $r = $rs + ($cts / 100.0);
+                            $sum += $q * $r;
+                        }
+                    }
+                    if ($sum > 0) {
+                        $price = $sum;
+                    } else {
+                        $priceRaw = trim($_POST['price'] ?? '');
+                        $price = ($priceRaw === '') ? null : (float)$priceRaw;
                     }
                 }
-                if ($sum > 0) {
-                    $price = $sum;
-                } else {
-                    $priceRaw = trim($_POST['price'] ?? '');
-                    $price = ($priceRaw === '') ? null : (float)$priceRaw;
-                }
+            } else {
+                // Edit: allow direct price and discount
+                $priceRaw = trim($_POST['price'] ?? '');
+                $p = ($priceRaw === '') ? 0.0 : (float)$priceRaw;
+                $p = max(0.0, $p - max(0.0, $discount));
+                $price = $p;
             }
 
             if ($customer_id <= 0 || $from_branch_id <= 0 || $to_branch_id <= 0) {
@@ -717,14 +738,9 @@ switch ($page) {
 
             $pdo->beginTransaction();
             if ($id > 0) {
-                if ($isMain) {
-                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
-                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$id]);
-                } else {
-                    // Non-main branches cannot change price
-                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
-                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$id]);
-                }
+                // Allow editing price after creation (final price after discount already computed above)
+                $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
+                $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$id]);
                 // Replace items
                 $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]);
                 if (is_array($items)) {
@@ -732,14 +748,8 @@ switch ($page) {
                     foreach ($items as $it) {
                         $desc = trim($it['description'] ?? '');
                         $qty = (float)($it['qty'] ?? 0);
-                        // Save per-unit rate from rs/cts for main branch
-                        if ($isMain) {
-                            $rs = (float)($it['rs'] ?? 0);
-                            $cts = (float)($it['cts'] ?? 0);
-                            $rate = $rs + ($cts/100.0);
-                        } else {
-                            $rate = null;
-                        }
+                        // Do not allow editing item pricing after creation; keep existing rates null to indicate locked
+                        $rate = null;
                         if ($desc !== '' || $qty > 0) {
                             $insItem->execute([$id, $qty, $desc, $rate]);
                         }

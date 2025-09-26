@@ -107,8 +107,8 @@
         <input type="text" name="name" class="form-control" required value="<?php echo htmlspecialchars($customer['name']); ?>">
       </div>
       <div class="col-md-6">
-        <label class="form-label">Phone</label>
-        <input type="text" name="phone" class="form-control" required value="<?php echo htmlspecialchars($customer['phone']); ?>">
+        <label class="form-label">Phone <span class="text-muted small">(optional)</span></label>
+        <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>">
       </div>
       <div class="col-md-6">
         <label class="form-label">Address</label>

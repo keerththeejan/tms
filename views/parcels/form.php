@@ -40,7 +40,7 @@
               <input type="text" id="qa_name" class="form-control form-control-sm" placeholder="Name">
             </div>
             <div class="col-6">
-              <input type="text" id="qa_phone" class="form-control form-control-sm" placeholder="Phone (unique)">
+              <input type="text" id="qa_phone" class="form-control form-control-sm" placeholder="Phone (optional)">
             </div>
             <div class="col-6">
               <input type="text" id="qa_address" class="form-control form-control-sm" placeholder="Address">
@@ -214,6 +214,7 @@
         </div>
       </div>
 
+      <?php $isEdit = (int)($parcel['id'] ?? 0) > 0; ?>
       <div class="table-responsive">
         <table class="table receipt-grid mb-2" id="itemsTable">
           <thead>
@@ -240,34 +241,52 @@
             ?>
             <tr>
               <td class="text-center align-middle"><?php echo $rowIndex; ?></td>
-              <td><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description"></td>
-              <td><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty"></td>
-              <td><input type="number" step="1" min="0" name="items[<?php echo $rowIndex; ?>][rs]" class="form-control item-rs" value="<?php echo $rs>0?(string)$rs:''; ?>" <?php echo !($isMain ?? false) ? 'disabled' : ''; ?> placeholder="Rs"></td>
-              <td><input type="number" step="1" min="0" max="99" name="items[<?php echo $rowIndex; ?>][cts]" class="form-control item-cts" value="<?php echo $amt>0?str_pad((string)$ct,2,'0',STR_PAD_LEFT):''; ?>" <?php echo !($isMain ?? false) ? 'disabled' : ''; ?> placeholder="Cts"></td>
-              <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button></td>
+              <td><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="1" min="0" name="items[<?php echo $rowIndex; ?>][rs]" class="form-control item-rs" value="<?php echo $rs>0?(string)$rs:''; ?>" <?php echo ($isEdit ? 'disabled' : ((!$isMain)?'disabled':'')); ?> placeholder="Rs"></td>
+              <td><input type="number" step="1" min="0" max="99" name="items[<?php echo $rowIndex; ?>][cts]" class="form-control item-cts" value="<?php echo $amt>0?str_pad((string)$ct,2,'0',STR_PAD_LEFT):''; ?>" <?php echo ($isEdit ? 'disabled' : ((!$isMain)?'disabled':'')); ?> placeholder="Cts"></td>
+              <td class="text-center"><?php if (!$isEdit): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
             </tr>
             <?php endforeach; ?>
             <?php if (empty($items)): ?>
             <tr>
               <td class="text-center align-middle">1</td>
-              <td><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description"></td>
-              <td><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty"></td>
-              <td><input type="number" step="1" min="0" name="items[1][rs]" class="form-control item-rs" <?php echo !($isMain ?? false) ? 'disabled' : ''; ?> placeholder="Rs"></td>
-              <td><input type="number" step="1" min="0" max="99" name="items[1][cts]" class="form-control item-cts" <?php echo !($isMain ?? false) ? 'disabled' : ''; ?> placeholder="Cts"></td>
-              <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button></td>
+              <td><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="1" min="0" name="items[1][rs]" class="form-control item-rs" <?php echo $isEdit ? 'disabled' : ((!$isMain)?'disabled':''); ?> placeholder="Rs"></td>
+              <td><input type="number" step="1" min="0" max="99" name="items[1][cts]" class="form-control item-cts" <?php echo $isEdit ? 'disabled' : ((!$isMain)?'disabled':''); ?> placeholder="Cts"></td>
+              <td class="text-center"><?php if (!$isEdit): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
             </tr>
             <?php endif; ?>
           </tbody>
         </table>
         <div class="text-end mb-2">
-          <button type="button" class="btn btn-sm btn-outline-primary" id="addRow"><i class="bi bi-plus-lg"></i> Add Row</button>
+          <?php if (!$isEdit): ?>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="addRow"><i class="bi bi-plus-lg"></i> Add Row</button>
+          <?php endif; ?>
         </div>
       </div>
 
       <div class="receipt-total p-2 d-flex justify-content-end">
-        <div>
-          Total: <span class="fs-5" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
-          <input type="hidden" name="price" id="totalPrice" value="<?php echo htmlspecialchars((string)($parcel['price'] ?? '')); ?>">
+        <div class="text-end" style="min-width: 360px;">
+          <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
+          <div class="row g-2 align-items-center">
+            <div class="col-auto">
+              <label class="col-form-label"><strong>Total</strong></label>
+            </div>
+            <div class="col">
+              <input type="number" step="0.01" min="0" class="form-control" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php echo $isEdit ? '' : ($isMain ? '' : 'disabled'); ?> placeholder="0.00">
+            </div>
+            <div class="col-auto">
+              <label class="col-form-label"><strong>Discount</strong></label>
+            </div>
+            <div class="col">
+              <input type="number" step="0.01" min="0" class="form-control" name="discount" id="discountInput" value="" <?php echo $isEdit ? '' : 'disabled'; ?> placeholder="0.00">
+            </div>
+            <div class="col-auto">
+              <span class="fs-5" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -292,12 +311,21 @@
 <script>
 (function(){
   const isMain = <?php echo $isMain ? 'true' : 'false'; ?>;
+  const isEdit = <?php echo $isEdit ? 'true' : 'false'; ?>;
   const table = document.getElementById('itemsTable');
   const addBtn = document.getElementById('addRow');
   const totalDisplay = document.getElementById('totalDisplay');
   const totalPrice = document.getElementById('totalPrice');
+  const discountInput = document.getElementById('discountInput');
 
   function recalc(){
+    if (isEdit) {
+      const p = parseFloat(totalPrice?.value || '0') || 0;
+      const d = parseFloat(discountInput?.value || '0') || 0;
+      const v = Math.max(0, p - Math.max(0, d));
+      totalDisplay.textContent = v > 0 ? v.toFixed(2) : '—';
+      return;
+    }
     let total = 0;
     const rows = table.querySelectorAll('tbody tr');
     rows.forEach(row => {
@@ -307,7 +335,6 @@
       const rs = parseFloat(rsInput?.value || '0');
       const cts = parseFloat(ctsInput?.value || '0');
       let amt = rs + (cts/100);
-      // If non-main branch, amounts should be ignored for total (cannot set price). Keep display only.
       if (!isMain) { amt = 0; }
       total += (amt>0 && qty>=0) ? amt : 0;
     });
@@ -342,6 +369,7 @@
 
   table.addEventListener('input', function(e){
     const target = e.target;
+    if (isEdit) return; // item editing disabled
     if (target.classList.contains('item-qty') || target.classList.contains('item-rate')) {
       recalc();
     }
@@ -547,6 +575,51 @@
 
   const fromSel = document.querySelector('select[name="from_branch_id"]');
   const toSel = document.querySelector('select[name="to_branch_id"]');
+  // Quick Add Customer via AJAX
+  document.getElementById('qa_submit')?.addEventListener('click', async function(){
+    const name = (document.getElementById('qa_name')?.value || '').trim();
+    const phone = (document.getElementById('qa_phone')?.value || '').trim();
+    const address = (document.getElementById('qa_address')?.value || '').trim();
+    const delivery_location = (document.getElementById('qa_delivery_location')?.value || '').trim();
+    const type = (document.getElementById('qa_type')?.value || '').trim();
+    if (!name) { alert('Enter a customer name'); return; }
+    try {
+      const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+      const fd = new FormData();
+      fd.append('csrf_token', csrf);
+      fd.append('ajax', '1');
+      fd.append('id', '0');
+      fd.append('name', name);
+      fd.append('phone', phone);
+      fd.append('address', address);
+      fd.append('delivery_location', delivery_location);
+      fd.append('customer_type', type);
+      const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=customers&action=save'); ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+        body: fd
+      });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      if (!data || !data.id) throw new Error('Invalid response');
+      // Append to customer select
+      const sel = document.querySelector('select[name="customer_id"]');
+      if (sel) {
+        const opt = document.createElement('option');
+        opt.value = String(data.id);
+        opt.textContent = data.name + (data.phone ? ' ('+data.phone+')' : '');
+        sel.appendChild(opt);
+        sel.value = String(data.id);
+        sel.dispatchEvent(new Event('change'));
+      }
+      // Close the collapse
+      const collapseEl = document.getElementById('quickAddCustomer'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
+      // Clear inputs
+      ['qa_name','qa_phone','qa_address','qa_delivery_location'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
+    } catch (e) {
+      alert('Failed to add customer');
+    }
+  });
   document.getElementById('fab_submit')?.addEventListener('click', async function(){
     const name = document.getElementById('fab_name')?.value.trim() || '';
     const code = document.getElementById('fab_code')?.value.trim() || '';

@@ -1,7 +1,10 @@
 <?php /** @var array $routes */ /** @var string $date */ ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0">Delivery Route Planning</h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+  <div class="d-flex gap-2">
+    <a href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>" class="btn btn-primary"><i class="bi bi-person-plus"></i> Add Customer</a>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+  </div>
 </div>
 <?php if (isset($parcels_total) || isset($customers_total) || isset($branchName)): ?>
 <div class="row g-3 mb-3">
