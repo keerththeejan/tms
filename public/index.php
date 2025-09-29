@@ -643,10 +643,16 @@ switch ($page) {
         $user = Auth::user();
         $userBranchCode = (string)($user['branch_code'] ?? '');
         $userBranchName = (string)($user['branch_name'] ?? '');
-        // Main branch flag used for pricing, not for create restriction
-        $isMain = Auth::isMainBranch()
-                  || (strcasecmp($userBranchCode, 'KIL') === 0)
-                  || (strcasecmp($userBranchName, 'Kilinochchi') === 0);
+        $isKilinochchi = (strcasecmp($userBranchCode, 'KIL') === 0) || (strcasecmp($userBranchName, 'Kilinochchi') === 0);
+        $isColombo = (strcasecmp($userBranchCode, 'COL') === 0) || (strcasecmp($userBranchName, 'Colombo') === 0);
+        $isMullaitivu = (strcasecmp($userBranchCode, 'MLT') === 0)
+                         || (stripos($userBranchName, 'Mullaitivu') !== false)
+                         || (stripos($userBranchName, 'Mullaithivu') !== false)
+                         || (stripos($userBranchName, 'Mullaithiv') !== false);
+        // Keep legacy isMain flag aligned to Colombo for pricing behavior
+        $isMain = $isColombo;
+        // Policy: Item amount entry should NOT work in Colombo or Mullaitivu; enable only at Kilinochchi if ever needed
+        $canEnterItemAmounts = $isKilinochchi;
         // Allow all branches with parcel role to create parcels
         $canCreateParcels = true;
 
@@ -683,40 +689,74 @@ switch ($page) {
             }
             if ($sumQty > 0) { $weight = $sumQty; }
 
+            // Fetch existing parcel for policy decisions on edit
+            $existing = null; $isBilled = false;
+            if ($id > 0) {
+                $st = $pdo->prepare('SELECT * FROM parcels WHERE id=?');
+                $st->execute([$id]);
+                $existing = $st->fetch();
+                if ($existing) { $isBilled = ($existing['price'] !== null && (float)$existing['price'] > 0); }
+            }
+            // Determine if this is a price-only edit at Kilinochchi (fields were disabled in UI)
+            $priceOnlyEdit = ($id > 0 && $isKilinochchi && !$isBilled);
+
             // Price handling
-            // For new parcels: compute from items for main branch; for edit: allow manual price with optional discount for all branches
-            $discountRaw = trim($_POST['discount'] ?? '');
-            $discount = ($discountRaw === '') ? 0.0 : (float)$discountRaw;
+            // Only Kilinochchi can set or change price. Others cannot set price at create or edit.
             $price = null;
             if ($id <= 0) {
-                if ($isMain) {
-                    // If items are provided, compute price from items (qty * (rs+cts/100)); else fallback to posted price
-                    $sum = 0.0;
-                    if (is_array($items)) {
-                        foreach ($items as $it) {
-                            $q = (float)($it['qty'] ?? 0);
-                            $rs = (float)($it['rs'] ?? 0);
-                            $cts = (float)($it['cts'] ?? 0);
-                            $r = $rs + ($cts / 100.0);
-                            $sum += $q * $r;
-                        }
-                    }
-                    if ($sum > 0) {
-                        $price = $sum;
-                    } else {
-                        $priceRaw = trim($_POST['price'] ?? '');
-                        $price = ($priceRaw === '') ? null : (float)$priceRaw;
-                    }
-                }
+                // Always defer pricing to Kilinochchi
+                $price = null;
             } else {
-                // Edit: allow direct price and discount
-                $priceRaw = trim($_POST['price'] ?? '');
-                $p = ($priceRaw === '') ? 0.0 : (float)$priceRaw;
-                $p = max(0.0, $p - max(0.0, $discount));
-                $price = $p;
+                if ($isBilled) {
+                    $error = 'This parcel has already been billed and cannot be edited.';
+                    $parcel = $existing ?: ['id'=>$id];
+                    // Load vehicles list for form
+                    try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                    catch (Throwable $e) { $vehiclesAll = []; }
+                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error') + ['policy'=>['priceOnly'=>false,'lockAll'=>true,'canEnterItemAmounts'=>$canEnterItemAmounts]]);
+                    break;
+                }
+                if ($isKilinochchi) {
+                    $priceRaw = trim($_POST['price'] ?? '');
+                    $discountRaw = trim($_POST['discount'] ?? '');
+                    $p = ($priceRaw === '') ? null : (float)$priceRaw;
+                    if ($p === null) {
+                        // Fallback: compute from posted items
+                        $sum = 0.0;
+                        if (is_array($items)) {
+                            foreach ($items as $it) {
+                                $q = (float)($it['qty'] ?? 0);
+                                $rs = (float)($it['rs'] ?? 0);
+                                $cts = (float)($it['cts'] ?? 0);
+                                $r = $rs + ($cts/100.0);
+                                if ($q > 0 && $r > 0) { $sum += $q * $r; }
+                            }
+                        }
+                        if ($sum > 0) { $p = $sum; }
+                    }
+                    if ($p !== null) {
+                        $d = ($discountRaw === '') ? 0.0 : (float)$discountRaw;
+                        $p = max(0.0, $p - max(0.0, $d));
+                    }
+                    $price = $p;
+                    if ($price === null) {
+                        // Re-render with error for missing price
+                        $error = 'Please enter a valid price (or RS/CTS) for Kilinochchi.';
+                        // Load vehicles for form
+                        try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                        catch (Throwable $e) { $vehiclesAll = []; }
+                        $parcel = $existing ?: ['id'=>$id,'customer_id'=>$customer_id,'from_branch_id'=>$from_branch_id,'to_branch_id'=>$to_branch_id,'weight'=>$weight,'status'=>$status,'tracking_number'=>$tracking_number,'vehicle_no'=>$vehicle_no];
+                        $policy = ['priceOnly'=>true, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+                        Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy'));
+                        break;
+                    }
+                } else {
+                    // Not Kilinochchi: keep existing price intact
+                    $price = $existing ? ($existing['price'] ?? null) : null;
+                }
             }
 
-            if ($customer_id <= 0 || $from_branch_id <= 0 || $to_branch_id <= 0) {
+            if (!$priceOnlyEdit && ($customer_id <= 0 || $from_branch_id <= 0 || $to_branch_id <= 0)) {
                 $error = 'Customer, From Branch and To Branch are required.';
                 $parcel = compact('id','customer_id','supplier_id','from_branch_id','to_branch_id','weight','status','tracking_number','vehicle_no');
                 // Load vehicles list: prefer reg_number, fallback to plate_no, then vehicle_no
@@ -729,7 +769,8 @@ switch ($page) {
                         catch (Throwable $e3) { $vehiclesAll = []; }
                     }
                 }
-                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','isMain','items','vehiclesAll'));
+                $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy'));
                 break;
             }
 
@@ -738,28 +779,59 @@ switch ($page) {
 
             $pdo->beginTransaction();
             if ($id > 0) {
-                // Allow editing price after creation (final price after discount already computed above)
-                $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
-                $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$id]);
-                // Replace items
-                $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]);
-                if (is_array($items)) {
-                    $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate) VALUES (?,?,?,?)');
-                    foreach ($items as $it) {
-                        $desc = trim($it['description'] ?? '');
-                        $qty = (float)($it['qty'] ?? 0);
-                        // Do not allow editing item pricing after creation; keep existing rates null to indicate locked
-                        $rate = null;
-                        if ($desc !== '' || $qty > 0) {
-                            $insItem->execute([$id, $qty, $desc, $rate]);
+                if ($isKilinochchi) {
+                    // Kilinochchi: price-only update
+                    $stmt = $pdo->prepare("UPDATE parcels SET price=? WHERE id=?");
+                    $stmt->execute([$price, $id]);
+                } else {
+                    // Other branches: full edit except price (kept same value as existing)
+                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
+                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$id]);
+                    // Replace items allowed for non-Kilinochchi
+                    $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]);
+                    if (is_array($items)) {
+                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate) VALUES (?,?,?,?)');
+                        foreach ($items as $it) {
+                            $desc = trim($it['description'] ?? '');
+                            $qty = (float)($it['qty'] ?? 0);
+                            $rs = (float)($it['rs'] ?? 0);
+                            $cts = (float)($it['cts'] ?? 0);
+                            $rate = $canEnterItemAmounts ? ($rs + ($cts/100.0)) : null;
+                            if ($desc !== '' || $qty > 0) {
+                                $insItem->execute([$id, $qty, $desc, $rate]);
+                            }
                         }
                     }
                 }
             } else {
-                if ($isMain) {
+                // Create
+                if ($isKilinochchi) {
+                    // Compute price now for Kilinochchi create
+                    $priceRaw = trim($_POST['price'] ?? '');
+                    $discountRaw = trim($_POST['discount'] ?? '');
+                    $p = ($priceRaw === '') ? null : (float)$priceRaw;
+                    if ($p === null) {
+                        $sum = 0.0;
+                        if (is_array($items)) {
+                            foreach ($items as $it) {
+                                $q = (float)($it['qty'] ?? 0);
+                                $rs = (float)($it['rs'] ?? 0);
+                                $cts = (float)($it['cts'] ?? 0);
+                                $r = $rs + ($cts/100.0);
+                                if ($q > 0 && $r > 0) { $sum += $q * $r; }
+                            }
+                        }
+                        if ($sum > 0) { $p = $sum; }
+                    }
+                    if ($p !== null) {
+                        $d = ($discountRaw === '') ? 0.0 : (float)$discountRaw;
+                        $p = max(0.0, $p - max(0.0, $d));
+                    }
+                    $price = $p;
                     $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?)");
                     $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no]);
                 } else {
+                    // Other branches: do not set price at create
                     $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?)");
                     $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no]);
                 }
@@ -769,7 +841,9 @@ switch ($page) {
                     foreach ($items as $it) {
                         $desc = trim($it['description'] ?? '');
                         $qty = (float)($it['qty'] ?? 0);
-                        $rate = $isMain ? (float)($it['rate'] ?? 0) : null;
+                        $rs = (float)($it['rs'] ?? 0);
+                        $cts = (float)($it['cts'] ?? 0);
+                        $rate = $canEnterItemAmounts ? ($rs + ($cts/100.0)) : null;
                         if ($desc !== '' || $qty > 0) {
                             $insItem->execute([$id, $qty, $desc, $rate]);
                         }
@@ -826,7 +900,9 @@ switch ($page) {
                     catch (Throwable $e3) { $vehiclesAll = []; }
                 }
             }
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll'));
+            // Determine lock/priceOnly flags for UI
+            $policy = ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>$canEnterItemAmounts];
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy'));
             break;
         }
 
@@ -845,7 +921,9 @@ switch ($page) {
             } catch (Throwable $e) {
                 try { $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e2) { $vehiclesAll = []; }
             }
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll'));
+            // Ensure pricing policy is passed so Kilinochchi can edit price
+            $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy'));
             break;
         }
 
@@ -899,7 +977,7 @@ switch ($page) {
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
         // branches for filter
         $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels'));
+        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels','isKilinochchi'));
         break;
 
     case 'parcel_print':
@@ -1088,6 +1166,32 @@ switch ($page) {
                 }
             }
             include __DIR__ . '/../views/delivery_notes/print.php';
+            break;
+        }
+
+        if ($action === 'customer_summary') {
+            // Summary report: invoice count per customer for current branch, with date range
+            $from = $_GET['from'] ?? date('Y-m-01');
+            $to = $_GET['to'] ?? date('Y-m-d');
+            $q = trim($_GET['q'] ?? '');
+            $where = ['dn.branch_id = ?','dn.delivery_date BETWEEN ? AND ?'];
+            $params = [$branchId, $from, $to];
+            if ($q !== '') {
+                $where[] = '(c.phone LIKE ? OR c.name LIKE ?)';
+                $like = "%$q%";
+                array_push($params, $like, $like);
+            }
+            $sql = 'SELECT c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone, COUNT(dn.id) AS invoices_count, COALESCE(SUM(dn.total_amount),0) AS total_amount
+                    FROM delivery_notes dn
+                    LEFT JOIN customers c ON c.id = dn.customer_id
+                    WHERE ' . implode(' AND ', $where) . '
+                    GROUP BY c.id, c.name, c.phone
+                    ORDER BY invoices_count DESC, total_amount DESC
+                    LIMIT 500';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            Helpers::view('delivery_notes/customer_summary', compact('rows','from','to','q'));
             break;
         }
 

@@ -8,6 +8,13 @@
   .serial-badge { border: 2px solid #0d6efd; padding: .25rem .5rem; border-radius: .25rem; font-weight: 600; }
 </style>
 
+<?php 
+  $isEdit = (int)($parcel['id'] ?? 0) > 0; 
+  $policy = $policy ?? ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>false];
+  $priceOnly = !empty($policy['priceOnly']);
+  $lockAll = !empty($policy['lockAll']);
+  $canEnterItemAmounts = !empty($policy['canEnterItemAmounts']);
+?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h3>
   <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> Next</a>
@@ -27,7 +34,7 @@
         <span>Customer</span>
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddCustomer" aria-expanded="false"><i class="bi bi-person-plus"></i> Quick Add</button>
       </label>
-      <select name="customer_id" class="form-select" required>
+      <select name="customer_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Customer --</option>
         <?php foreach (($customersAll ?? []) as $c): ?>
           <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($parcel['customer_id'] ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($c['name'].' ('.$c['phone'].')'); ?></option>
@@ -85,7 +92,7 @@
     </div>
     <div class="col-md-4">
       <label class="form-label">Supplier (Optional)</label>
-      <select name="supplier_id" class="form-select">
+      <select name="supplier_id" class="form-select" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="0">-- None --</option>
         <?php foreach (($suppliersAll ?? []) as $s): ?>
           <option value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($parcel['supplier_id'] ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($s['name']); ?></option>
@@ -101,7 +108,7 @@
         <span>From Branch</span>
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddFromBranch" aria-expanded="false"><i class="bi bi-building-add"></i> Quick Add</button>
       </label>
-      <select name="from_branch_id" class="form-select" required>
+      <select name="from_branch_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesAll ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['from_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
@@ -123,7 +130,7 @@
         <span>To Branch</span>
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddToBranch" aria-expanded="false"><i class="bi bi-building-add"></i> Quick Add</button>
       </label>
-      <select name="to_branch_id" class="form-select" required>
+      <select name="to_branch_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesAll ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['to_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
@@ -147,7 +154,7 @@
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddVehicle" aria-expanded="false"><i class="bi bi-truck"></i> Quick Add</button>
       </label>
       <?php if (!empty($vehiclesAll)): ?>
-        <select name="vehicle_no" class="form-select" id="vehicleSelect">
+        <select name="vehicle_no" class="form-select" id="vehicleSelect" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
           <option value="">-- None --</option>
           <?php 
             $vehCurrent = trim((string)($parcel['vehicle_no'] ?? ''));
@@ -159,7 +166,7 @@
           <?php endforeach; ?>
         </select>
       <?php else: ?>
-        <input type="text" name="vehicle_no" class="form-control" id="vehicleInput" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>">
+        <input type="text" name="vehicle_no" class="form-control" id="vehicleInput" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
       <?php endif; ?>
       <div class="collapse mt-2" id="quickAddVehicle">
         <div class="border rounded p-2 bg-light">
@@ -179,7 +186,7 @@
         }
       ?>
       <div class="form-check mt-2">
-        <input class="form-check-input" type="checkbox" value="1" id="lorry_full" name="lorry_full" <?php echo $lorryChecked ? 'checked' : ''; ?>>
+        <input class="form-check-input" type="checkbox" value="1" id="lorry_full" name="lorry_full" <?php echo $lorryChecked ? 'checked' : ''; ?> <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <label class="form-check-label" for="lorry_full">
           Lorry Full (start next lorry after saving)
         </label>
@@ -214,7 +221,6 @@
         </div>
       </div>
 
-      <?php $isEdit = (int)($parcel['id'] ?? 0) > 0; ?>
       <div class="table-responsive">
         <table class="table receipt-grid mb-2" id="itemsTable">
           <thead>
@@ -241,27 +247,27 @@
             ?>
             <tr>
               <td class="text-center align-middle"><?php echo $rowIndex; ?></td>
-              <td><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
-              <td><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
-              <td><input type="number" step="1" min="0" name="items[<?php echo $rowIndex; ?>][rs]" class="form-control item-rs" value="<?php echo $rs>0?(string)$rs:''; ?>" <?php echo ($isEdit ? 'disabled' : ((!$isMain)?'disabled':'')); ?> placeholder="Rs"></td>
-              <td><input type="number" step="1" min="0" max="99" name="items[<?php echo $rowIndex; ?>][cts]" class="form-control item-cts" value="<?php echo $amt>0?str_pad((string)$ct,2,'0',STR_PAD_LEFT):''; ?>" <?php echo ($isEdit ? 'disabled' : ((!$isMain)?'disabled':'')); ?> placeholder="Cts"></td>
-              <td class="text-center"><?php if (!$isEdit): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
+              <td><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="1" min="0" name="items[<?php echo $rowIndex; ?>][rs]" class="form-control item-rs" value="<?php echo $rs>0?(string)$rs:''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rs"></td>
+              <td><input type="number" step="1" min="0" max="99" name="items[<?php echo $rowIndex; ?>][cts]" class="form-control item-cts" value="<?php echo $amt>0?str_pad((string)$ct,2,'0',STR_PAD_LEFT):''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Cts"></td>
+              <td class="text-center"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
             </tr>
             <?php endforeach; ?>
             <?php if (empty($items)): ?>
             <tr>
               <td class="text-center align-middle">1</td>
-              <td><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
-              <td><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo $isEdit ? 'readonly' : ''; ?>></td>
-              <td><input type="number" step="1" min="0" name="items[1][rs]" class="form-control item-rs" <?php echo $isEdit ? 'disabled' : ((!$isMain)?'disabled':''); ?> placeholder="Rs"></td>
-              <td><input type="number" step="1" min="0" max="99" name="items[1][cts]" class="form-control item-cts" <?php echo $isEdit ? 'disabled' : ((!$isMain)?'disabled':''); ?> placeholder="Cts"></td>
-              <td class="text-center"><?php if (!$isEdit): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
+              <td><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td><input type="number" step="1" min="0" name="items[1][rs]" class="form-control item-rs" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rs"></td>
+              <td><input type="number" step="1" min="0" max="99" name="items[1][cts]" class="form-control item-cts" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Cts"></td>
+              <td class="text-center"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
             </tr>
             <?php endif; ?>
           </tbody>
         </table>
         <div class="text-end mb-2">
-          <?php if (!$isEdit): ?>
+          <?php if (!$isEdit && !$lockAll): ?>
             <button type="button" class="btn btn-sm btn-outline-primary" id="addRow"><i class="bi bi-plus-lg"></i> Add Row</button>
           <?php endif; ?>
         </div>
@@ -275,14 +281,18 @@
               <label class="col-form-label"><strong>Total</strong></label>
             </div>
             <div class="col">
-              <input type="number" step="0.01" min="0" class="form-control" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php echo $isEdit ? '' : ($isMain ? '' : 'disabled'); ?> placeholder="0.00">
+              <input type="number" step="0.01" min="0" class="form-control" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php 
+                echo ($lockAll || !$priceOnly) ? 'disabled' : '';
+              ?> placeholder="0.00">
             </div>
-            <div class="col-auto">
-              <label class="col-form-label"><strong>Discount</strong></label>
-            </div>
-            <div class="col">
-              <input type="number" step="0.01" min="0" class="form-control" name="discount" id="discountInput" value="" <?php echo $isEdit ? '' : 'disabled'; ?> placeholder="0.00">
-            </div>
+            <?php if ($priceOnly && !$lockAll): ?>
+              <div class="col-auto">
+                <label class="col-form-label"><strong>Discount</strong></label>
+              </div>
+              <div class="col">
+                <input type="number" step="0.01" min="0" class="form-control" name="discount" id="discountInput" value="" placeholder="0.00">
+              </div>
+            <?php endif; ?>
             <div class="col-auto">
               <span class="fs-5" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
             </div>
@@ -310,8 +320,10 @@
 
 <script>
 (function(){
-  const isMain = <?php echo $isMain ? 'true' : 'false'; ?>;
   const isEdit = <?php echo $isEdit ? 'true' : 'false'; ?>;
+  const priceOnly = <?php echo $priceOnly ? 'true' : 'false'; ?>;
+  const lockAll = <?php echo $lockAll ? 'true' : 'false'; ?>;
+  const canEnterItemAmounts = <?php echo $canEnterItemAmounts ? 'true' : 'false'; ?>;
   const table = document.getElementById('itemsTable');
   const addBtn = document.getElementById('addRow');
   const totalDisplay = document.getElementById('totalDisplay');
@@ -319,6 +331,31 @@
   const discountInput = document.getElementById('discountInput');
 
   function recalc(){
+    if (lockAll) { return; }
+    // When item amounts are allowed (Kilinochchi), always derive total from RS/CTS even on edit
+    if (canEnterItemAmounts) {
+      let total = 0;
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const qty = parseFloat(row.querySelector('.item-qty')?.value || '0');
+        const rsInput = row.querySelector('.item-rs');
+        const ctsInput = row.querySelector('.item-cts');
+        const rs = parseFloat(rsInput?.value || '0');
+        const cts = parseFloat(ctsInput?.value || '0');
+        const perUnit = rs + (cts/100);
+        const line = (qty > 0 && perUnit > 0) ? (qty * perUnit) : 0;
+        total += line;
+      });
+      if (total > 0) {
+        totalDisplay.textContent = total.toFixed(2);
+        if (totalPrice) totalPrice.value = total.toFixed(2);
+      } else {
+        totalDisplay.textContent = '—';
+        if (totalPrice) totalPrice.value = '';
+      }
+      return;
+    }
+    // Otherwise (other branches), show price minus discount on edit
     if (isEdit) {
       const p = parseFloat(totalPrice?.value || '0') || 0;
       const d = parseFloat(discountInput?.value || '0') || 0;
@@ -326,25 +363,8 @@
       totalDisplay.textContent = v > 0 ? v.toFixed(2) : '—';
       return;
     }
-    let total = 0;
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const qty = parseFloat(row.querySelector('.item-qty')?.value || '0');
-      const rsInput = row.querySelector('.item-rs');
-      const ctsInput = row.querySelector('.item-cts');
-      const rs = parseFloat(rsInput?.value || '0');
-      const cts = parseFloat(ctsInput?.value || '0');
-      let amt = rs + (cts/100);
-      if (!isMain) { amt = 0; }
-      total += (amt>0 && qty>=0) ? amt : 0;
-    });
-    if (total > 0) {
-      totalDisplay.textContent = total.toFixed(2);
-      totalPrice.value = total.toFixed(2);
-    } else {
-      totalDisplay.textContent = '—';
-      totalPrice.value = '';
-    }
+    // Default fallback for create in other branches
+    totalDisplay.textContent = totalPrice?.value ? String(totalPrice.value) : '—';
   }
 
   async function quickAdd(name, code, isMain){
@@ -369,8 +389,9 @@
 
   table.addEventListener('input', function(e){
     const target = e.target;
-    if (isEdit) return; // item editing disabled
-    if (target.classList.contains('item-qty') || target.classList.contains('item-rate')) {
+    if (lockAll) return;
+    if (!canEnterItemAmounts) return;
+    if (target.classList.contains('item-qty') || target.classList.contains('item-rs') || target.classList.contains('item-cts')) {
       recalc();
     }
   });
