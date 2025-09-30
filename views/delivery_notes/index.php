@@ -2,7 +2,6 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0">Delivery Notes</h3>
   <div class="d-flex gap-2">
-    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" class="btn btn-outline-primary"><i class="bi bi-truck"></i> Route</a>
     <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=generate'); ?>" class="btn btn-primary"><i class="bi bi-magic"></i> Generate</a>
     <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=customer_summary'); ?>" class="btn btn-outline-secondary"><i class="bi bi-people"></i> Customer Summary</a>
   </div>

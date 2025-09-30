@@ -5,7 +5,7 @@
 <form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="parcels">
   <div class="col-sm-6 col-md-4">
-    <input type="text" class="form-control" name="q" placeholder="Search by customer phone/name or tracking" value="<?php echo htmlspecialchars($q ?? ''); ?>">
+    <input type="text" class="form-control" name="q" placeholder="Search by customer phone or name" value="<?php echo htmlspecialchars($q ?? ''); ?>">
   </div>
   <div class="col-sm-4 col-md-3">
     <input type="text" class="form-control" name="vehicle_no" placeholder="Vehicle No" value="<?php echo htmlspecialchars($vehicle_no ?? ''); ?>">
@@ -57,7 +57,6 @@
         <th>Weight</th>
         <th>Price</th>
         <th>Status</th>
-        <th>Tracking</th>
         <th class="text-end">Actions</th>
       </tr>
     </thead>
@@ -86,7 +85,6 @@
           <td><?php echo number_format((float)$p['weight'], 2); ?></td>
           <td><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
           <td><span class="badge bg-<?php echo $p['status']==='delivered'?'success':($p['status']==='in_transit'?'info':'secondary'); ?>"><?php echo htmlspecialchars($p['status']); ?></span></td>
-          <td><?php echo htmlspecialchars($p['tracking_number'] ?? ''); ?></td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-primary" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer"></i> Print</a>
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square"></i> Edit</a>

@@ -164,6 +164,81 @@ switch ($page) {
         Helpers::view('dashboard', compact('pendingParcels','totalDue','todayParcels','today','collectionsToday','expensesToday','recentPayments','isMain','branchesAll','pendingByBranch','dueByBranch','todayParcelsByBranch','collectionsTodayByBranch','expensesTodayByBranch','df','dt','fb','tb','cust','customersAll','statusStats'));
         break;
 
+    case 'routes':
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdo = Database::pdo();
+        // Ensure table exists
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS routes (
+                id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(120) NOT NULL UNIQUE,
+                notes VARCHAR(255) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB");
+        } catch (Throwable $e) { /* ignore */ }
+        $action = $_GET['action'] ?? 'index';
+
+        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $name = trim($_POST['name'] ?? '');
+            $notes = trim($_POST['notes'] ?? '');
+            if ($name === '') { $error = 'Route name is required.'; $route = compact('id','name','notes'); Helpers::view('routes/form', compact('route','error')); break; }
+            try {
+                if ($id > 0) {
+                    $stmt = $pdo->prepare('UPDATE routes SET name=?, notes=? WHERE id=?');
+                    $stmt->execute([$name, ($notes !== '' ? $notes : null), $id]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO routes (name, notes) VALUES (?, ?)');
+                    $stmt->execute([$name, ($notes !== '' ? $notes : null)]);
+                    $id = (int)$pdo->lastInsertId();
+                }
+                Helpers::redirect('index.php?page=routes');
+                break;
+            } catch (PDOException $e) {
+                $msg = 'Failed to save route.';
+                if ($e->getCode() === '23000') { $msg = 'Route name already exists.'; }
+                $error = $msg; $route = compact('id','name','notes'); Helpers::view('routes/form', compact('route','error')); break;
+            }
+        }
+
+        if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) { $pdo->prepare('DELETE FROM routes WHERE id=?')->execute([$id]); }
+            Helpers::redirect('index.php?page=routes');
+            break;
+        }
+
+        if ($action === 'new') {
+            $route = ['id'=>0,'name'=>'','notes'=>''];
+            Helpers::view('routes/form', compact('route'));
+            break;
+        }
+
+        if ($action === 'edit') {
+            $id = (int)($_GET['id'] ?? 0);
+            $stmt = $pdo->prepare('SELECT * FROM routes WHERE id=?');
+            $stmt->execute([$id]);
+            $route = $stmt->fetch();
+            if (!$route) { http_response_code(404); echo 'Not found'; break; }
+            Helpers::view('routes/form', compact('route'));
+            break;
+        }
+
+        // index
+        $q = trim($_GET['q'] ?? '');
+        if ($q !== '') {
+            $stmt = $pdo->prepare('SELECT * FROM routes WHERE name LIKE ? OR notes LIKE ? ORDER BY name LIMIT 200');
+            $like = "%$q%"; $stmt->execute([$like,$like]);
+            $routes = $stmt->fetchAll();
+        } else {
+            $routes = $pdo->query('SELECT * FROM routes ORDER BY name LIMIT 200')->fetchAll();
+        }
+        Helpers::view('routes/index', compact('routes','q'));
+        break;
+
     case 'change_password':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
@@ -461,13 +536,23 @@ switch ($page) {
             $id = (int)($_POST['id'] ?? 0);
             $name = trim($_POST['name'] ?? '');
             $phone = trim($_POST['phone'] ?? '');
-            if ($phone === '') { $phone = 'NA-' . date('YmdHis') . '-' . str_pad((string)random_int(100,999), 3, '0', STR_PAD_LEFT); }
+            if ($phone === '') {
+                // Ensure fallback fits VARCHAR(20)
+                // Format: NA<epoch>-<3digits> (max length 2 + 10 + 1 + 3 = 16)
+                $phone = 'NA' . time() . '-' . str_pad((string)random_int(0,999), 3, '0', STR_PAD_LEFT);
+            }
             $address = trim($_POST['address'] ?? '');
             $delivery_location = trim($_POST['delivery_location'] ?? '');
             $place_id = trim($_POST['place_id'] ?? '');
             $lat = ($_POST['lat'] ?? '') !== '' ? (float)$_POST['lat'] : null;
             $lng = ($_POST['lng'] ?? '') !== '' ? (float)$_POST['lng'] : null;
-            $customer_type = $_POST['customer_type'] ?? null;
+            // Normalize customer_type to enum values or null
+            $customer_type_raw = $_POST['customer_type'] ?? null;
+            $customer_type = null;
+            if (is_string($customer_type_raw)) {
+                $ct = strtolower(trim($customer_type_raw));
+                if ($ct === 'corporate' || $ct === 'regular') { $customer_type = $ct; }
+            }
             $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
                          || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
                          || (($_POST['ajax'] ?? '') === '1');
@@ -482,8 +567,21 @@ switch ($page) {
                     $id = (int)$pdo->lastInsertId();
                 }
             } catch (Throwable $e) {
-                if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>'Failed to save customer']); return; }
-                $error = 'Failed to save customer.'; $customer = compact('id','name','phone','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
+                $msg = 'Failed to save customer.';
+                if ($e instanceof PDOException) {
+                    $code = $e->getCode();
+                    $emsg = $e->getMessage();
+                    if ($code === '23000') {
+                        if (stripos($emsg, 'customers') !== false && stripos($emsg, 'phone') !== false) {
+                            $msg = 'Phone number already exists. Use a different phone or edit the existing customer.';
+                        }
+                    } elseif ($code === '22001') {
+                        // data too long
+                        $msg = 'Some fields are too long (ensure Phone is at most 20 characters).';
+                    }
+                }
+                if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>$msg]); return; }
+                $error = $msg; $customer = compact('id','name','phone','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
             }
             if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone]); return; }
             Helpers::redirect('index.php?page=customers');
@@ -865,7 +963,32 @@ switch ($page) {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $pdo->prepare('DELETE FROM parcels WHERE id=?')->execute([$id]);
+                try {
+                    $pdo->beginTransaction();
+                    // If parcel is linked to any delivery notes, detach and recalc totals
+                    $sel = $pdo->prepare('SELECT DISTINCT delivery_note_id FROM delivery_note_parcels WHERE parcel_id=?');
+                    $sel->execute([$id]);
+                    $affectedDns = array_map(function($r){ return (int)$r['delivery_note_id']; }, $sel->fetchAll() ?: []);
+                    if ($affectedDns) {
+                        $pdo->prepare('DELETE FROM delivery_note_parcels WHERE parcel_id=?')->execute([$id]);
+                        // Recalculate totals for affected delivery notes
+                        $sumStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM delivery_note_parcels WHERE delivery_note_id=?');
+                        $updStmt = $pdo->prepare('UPDATE delivery_notes SET total_amount=? WHERE id=?');
+                        foreach ($affectedDns as $dnId) {
+                            $sumStmt->execute([$dnId]);
+                            $s = (float)($sumStmt->fetch()['s'] ?? 0);
+                            $updStmt->execute([$s, $dnId]);
+                        }
+                    }
+                    // Delete parcel items first to satisfy FK
+                    try { $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]); } catch (Throwable $e) { /* ignore if table absent */ }
+                    // Delete the parcel
+                    $pdo->prepare('DELETE FROM parcels WHERE id=?')->execute([$id]);
+                    $pdo->commit();
+                } catch (Throwable $e) {
+                    if ($pdo->inTransaction()) { $pdo->rollBack(); }
+                    // Fall through to redirect; optionally could log $e
+                }
             }
             Helpers::redirect('index.php?page=parcels');
             break;
@@ -1090,6 +1213,70 @@ switch ($page) {
             $customers_total = count($routes);
             $branchName = (string)($user['branch_name'] ?? '');
             Helpers::view('delivery_notes/route', compact('routes','date','parcels_total','customers_total','branchName'));
+            break;
+        }
+
+        if ($action === 'route_vehicles') {
+            // Vehicle-wise route list for THIS branch and selected date range (by parcels created_at)
+            $from = $_GET['from'] ?? date('Y-m-01');
+            $to = $_GET['to'] ?? date('Y-m-d');
+            $direction = $_GET['direction'] ?? 'from'; // 'from' (dispatch) or 'to' (arrivals)
+            $branchColumn = ($direction === 'to') ? 'p.to_branch_id' : 'p.from_branch_id';
+            $sql = "SELECT COALESCE(p.vehicle_no,'—') AS vehicle_no,
+                           COUNT(*) AS parcels_count,
+                           SUM(CASE WHEN p.status='delivered' THEN 1 ELSE 0 END) AS delivered_count
+                    FROM parcels p
+                    LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
+                    WHERE $branchColumn = ? AND DATE(p.created_at) BETWEEN ? AND ?
+                    GROUP BY COALESCE(p.vehicle_no,'—')
+                    ORDER BY MAX(p.created_at) DESC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$branchId, $from, $to]);
+            $routes = $stmt->fetchAll();
+            Helpers::view('delivery_notes/route_vehicles', compact('routes','from','to','direction'));
+            break;
+        }
+
+        if ($action === 'route_detail') {
+            // Show parcels for a given vehicle number, grouped by customer, only those not yet attached to a DN for this branch
+            $vehicle_no = trim($_GET['vehicle_no'] ?? '');
+            $from = $_GET['from'] ?? date('Y-m-01');
+            $to = $_GET['to'] ?? date('Y-m-d');
+            $direction = $_GET['direction'] ?? 'from';
+            $placeFilter = trim($_GET['place'] ?? '');
+            $branchColumn = ($direction === 'to') ? 'p.to_branch_id' : 'p.from_branch_id';
+            $where = ["$branchColumn = ?",'DATE(p.created_at) BETWEEN ? AND ?'];
+            $params = [$branchId, $from, $to];
+            if ($vehicle_no !== '') { $where[] = 'COALESCE(p.vehicle_no,"") = ?'; $params[] = $vehicle_no; }
+            if ($placeFilter !== '') { $where[] = 'COALESCE(c.delivery_location,"") LIKE ?'; $params[] = '%'.$placeFilter.'%'; }
+            // Fetch parcels with customer info and delivered flags
+            $sql = 'SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS customer_place,
+                           (dnp.id IS NOT NULL) AS in_delivery_note
+                    FROM parcels p
+                    LEFT JOIN customers c ON c.id = p.customer_id
+                    LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
+                    WHERE ' . implode(' AND ', $where) . ' ORDER BY c.name, p.created_at DESC';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $parcels = $stmt->fetchAll();
+            // Build grouped map customer_id => rows
+            $grouped = [];
+            foreach ($parcels as $row) { $grouped[(int)$row['customer_id']][] = $row; }
+            // Also need a customers mini map
+            $customers = [];
+            foreach ($parcels as $row) {
+                $cid = (int)$row['customer_id'];
+                if (!isset($customers[$cid])) { $customers[$cid] = ['id'=>$cid,'name'=>$row['customer_name'] ?? '','phone'=>$row['customer_phone'] ?? '']; }
+            }
+            // Place-wise counts across all parcels in this route detail
+            $placeCounts = [];
+            foreach ($parcels as $row) {
+                $place = trim((string)($row['customer_place'] ?? ''));
+                if ($place === '') { $place = '—'; }
+                $placeCounts[$place] = ($placeCounts[$place] ?? 0) + 1;
+            }
+            arsort($placeCounts);
+            Helpers::view('delivery_notes/route_detail', compact('vehicle_no','from','to','grouped','customers','direction','placeCounts','placeFilter'));
             break;
         }
 
