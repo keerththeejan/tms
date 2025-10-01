@@ -34,6 +34,12 @@
   <div class="col-md-4">
     <input type="text" class="form-control" name="q" placeholder="Search customer phone or name" value="<?php echo htmlspecialchars($q ?? ''); ?>">
   </div>
+  <div class="col-md-2">
+    <select class="form-select" name="group">
+      <option value="customer" <?php echo ($groupMode ?? 'customer')==='customer'?'selected':''; ?>>Group by Customer</option>
+      <option value="dn" <?php echo ($groupMode ?? 'customer')==='dn'?'selected':''; ?>>Show Each Bill</option>
+    </select>
+  </div>
   <div class="col-auto">
     <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
   </div>
@@ -42,40 +48,86 @@
 <div class="tab-content" id="paymentTabContent">
   <!-- Due Collections Tab -->
   <div class="tab-pane fade show active" id="dues" role="tabpanel">
-    <div class="table-responsive">
-      <table class="table table-sm table-striped align-middle">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Date</th>
-            <th>Customer</th>
-            <th>Phone</th>
-            <th>Total</th>
-            <th>Paid</th>
-            <th>Due</th>
-            <th class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($dues as $n): ?>
+    <?php if (($groupMode ?? 'customer') === 'customer'): ?>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+          <thead>
             <tr>
-              <td><?php echo (int)$n['id']; ?></td>
-              <td><?php echo htmlspecialchars($n['delivery_date']); ?></td>
-              <td><?php echo htmlspecialchars($n['customer_name'] ?? ''); ?></td>
-              <td><?php echo htmlspecialchars($n['customer_phone'] ?? ''); ?></td>
-              <td><?php echo number_format((float)$n['total_amount'], 2); ?></td>
-              <td><?php echo number_format((float)$n['paid'], 2); ?></td>
-              <td><strong><?php echo number_format((float)$n['due'], 2); ?></strong></td>
-              <td class="text-end">
-                <?php if (!empty($isMain)): ?>
-                  <a class="btn btn-sm btn-primary" href="<?php echo Helpers::baseUrl('index.php?page=payments&action=new&id='.(int)$n['id']); ?>"><i class="bi bi-cash-coin"></i> Collect</a>
-                <?php endif; ?>
-              </td>
+              <th>Customer</th>
+              <th>Phone</th>
+              <th class="text-end">Total</th>
+              <th class="text-end">Paid</th>
+              <th class="text-end">Due</th>
+              <th class="text-end">Actions</th>
             </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            <?php foreach (($dueGroups ?? []) as $g): ?>
+              <tr class="table-dark">
+                <td><strong><?php echo htmlspecialchars($g['customer_name']); ?></strong></td>
+                <td><?php echo htmlspecialchars($g['customer_phone']); ?></td>
+                <td class="text-end"><?php echo number_format((float)$g['total_amount'],2); ?></td>
+                <td class="text-end"><?php echo number_format((float)$g['paid'],2); ?></td>
+                <td class="text-end"><strong><?php echo number_format((float)$g['due'],2); ?></strong></td>
+                <td class="text-end">
+                  <!-- no direct collect here since collection is per DN; expand below -->
+                </td>
+              </tr>
+              <?php foreach ($g['bills'] as $n): ?>
+                <tr>
+                  <td colspan="2" class="ps-4">DN #<?php echo (int)$n['id']; ?> — <?php echo htmlspecialchars($n['delivery_date']); ?></td>
+                  <td class="text-end"><?php echo number_format((float)$n['total_amount'],2); ?></td>
+                  <td class="text-end"><?php echo number_format((float)$n['paid'],2); ?></td>
+                  <td class="text-end"><strong><?php echo number_format((float)$n['due'],2); ?></strong></td>
+                  <td class="text-end">
+                    <?php if (!empty($isMain)): ?>
+                      <a class="btn btn-sm btn-primary" href="<?php echo Helpers::baseUrl('index.php?page=payments&action=new&id='.(int)$n['id']); ?>"><i class="bi bi-cash-coin"></i> Collect</a>
+                    <?php endif; ?>
+                    <a class="btn btn-sm btn-outline-secondary" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='.(int)$n['id']); ?>"><i class="bi bi-receipt"></i> View</a>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php else: ?>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Phone</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Due</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($dues as $n): ?>
+              <tr>
+                <td><?php echo (int)$n['id']; ?></td>
+                <td><?php echo htmlspecialchars($n['delivery_date']); ?></td>
+                <td><?php echo htmlspecialchars($n['customer_name'] ?? ''); ?></td>
+                <td><?php echo htmlspecialchars($n['customer_phone'] ?? ''); ?></td>
+                <td><?php echo number_format((float)$n['total_amount'], 2); ?></td>
+                <td><?php echo number_format((float)$n['paid'], 2); ?></td>
+                <td><strong><?php echo number_format((float)$n['due'], 2); ?></strong></td>
+                <td class="text-end">
+                  <?php if (!empty($isMain)): ?>
+                    <a class="btn btn-sm btn-primary" href="<?php echo Helpers::baseUrl('index.php?page=payments&action=new&id='.(int)$n['id']); ?>"><i class="bi bi-cash-coin"></i> Collect</a>
+                  <?php endif; ?>
+                  <a class="btn btn-sm btn-outline-secondary" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='.(int)$n['id']); ?>"><i class="bi bi-receipt"></i> View</a>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
   </div>
 
   <!-- Payment History Tab -->

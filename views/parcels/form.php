@@ -22,6 +22,27 @@
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
+<?php if (!empty($_SESSION['flash_parcel_saved'])): ?>
+  <?php 
+    $flash = $_SESSION['flash_parcel_saved']; 
+    // Resolve customer name/phone from provided list
+    $custName = 'Customer #'.(int)($flash['customer_id'] ?? 0);
+    $custPhone = '';
+    if (!empty($customersAll)) {
+      foreach ($customersAll as $c) {
+        if ((int)$c['id'] === (int)$flash['customer_id']) { $custName = (string)$c['name']; $custPhone = (string)($c['phone'] ?? ''); break; }
+      }
+    }
+    $veh = trim((string)($flash['vehicle_no'] ?? ''));
+    $msg = 'Saved Parcel #'.(int)($flash['id'] ?? 0).' for ' . htmlspecialchars($custName);
+    if ($custPhone !== '') { $msg .= ' ('.htmlspecialchars($custPhone).')'; }
+    if ($veh !== '') { $msg .= ' — Vehicle: '.htmlspecialchars($veh); }
+  ?>
+  <div class="alert alert-success py-2">
+    <?php echo $msg; ?>
+  </div>
+  <?php unset($_SESSION['flash_parcel_saved']); ?>
+<?php endif; ?>
 
 <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>">
   <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
@@ -412,8 +433,8 @@
       <td class="text-center align-middle">${idx}</td>
       <td><input type="text" name="items[${idx}][description]" class="form-control item-desc" placeholder="Description"></td>
       <td><input type="number" step="0.01" name="items[${idx}][qty]" class="form-control item-qty" placeholder="Qty"></td>
-      <td><input type="number" step="1" min="0" name="items[${idx}][rs]" class="form-control item-rs" ${isMain? '' : 'disabled'} placeholder="Rs"></td>
-      <td><input type="number" step="1" min="0" max="99" name="items[${idx}][cts]" class="form-control item-cts" ${isMain? '' : 'disabled'} placeholder="Cts"></td>
+      <td><input type="number" step="1" min="0" name="items[${idx}][rs]" class="form-control item-rs" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rs"></td>
+      <td><input type="number" step="1" min="0" max="99" name="items[${idx}][cts]" class="form-control item-cts" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Cts"></td>
       <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button></td>
     `;
     tbody.appendChild(tr);
@@ -512,13 +533,21 @@
         const due = (data.due||0);
         const cls = due > 0 ? 'alert-warning' : 'alert-info';
         const dueHtml = due > 0 ? `<div><strong>Due:</strong> <span class="text-danger">${due.toFixed(2)}</span></div>` : '';
+        const links = [];
+        if (data.today_delivery_note_id) {
+          links.push(`<a class="btn btn-sm btn-primary me-1" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='); ?>${data.today_delivery_note_id}">Open Today's Bill</a>`);
+        }
+        if (data.last_delivery_note_id && data.last_delivery_note_id !== data.today_delivery_note_id) {
+          links.push(`<a class=\"btn btn-sm btn-outline-primary\" target=\"_blank\" href=\"<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='); ?>${data.last_delivery_note_id}\">Open Last Bill</a>`);
+        }
         box.innerHTML = `
           <div class="alert ${cls} py-2">
             <div class="fw-semibold">Previous activity found for ${data.name} (${data.phone})</div>
             <div class="small text-muted">Delivery Notes: ${data.total_delivery_notes}, Parcels: ${data.total_parcels}${data.last_delivery_date ? ', Last: ' + data.last_delivery_date : ''}</div>
             ${dueHtml}
-            <div class="mt-1">
+            <div class="mt-1 d-flex flex-wrap gap-1">
               <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>&phone=${encodeURIComponent(data.phone)}" target="_blank">View Details</a>
+              ${links.join('')}
             </div>
           </div>`;
       }

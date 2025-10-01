@@ -500,6 +500,8 @@ switch ($page) {
             header('Content-Type: application/json');
             $id = (int)($_GET['id'] ?? 0);
             if ($id <= 0) { echo json_encode(['error' => 'invalid id']); return; }
+            $user = Auth::user();
+            $branchId = (int)($user['branch_id'] ?? 0);
             $c = $pdo->prepare('SELECT id, name, phone FROM customers WHERE id=? LIMIT 1');
             $c->execute([$id]);
             $cust = $c->fetch();
@@ -517,6 +519,21 @@ switch ($page) {
             $paidStmt->execute([$id]);
             $total_paid = (float)($paidStmt->fetch()['paid'] ?? 0);
             $due = max(0, $total_amount - $total_paid);
+
+            // Find today's delivery note for this customer at current branch (if any)
+            $todayDnId = null;
+            if ($branchId > 0) {
+                $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=CURDATE() LIMIT 1');
+                $stmt->execute([$id, $branchId]);
+                $row = $stmt->fetch();
+                if ($row) { $todayDnId = (int)$row['id']; }
+            }
+            // Find the last delivery note id for this customer (any branch/date)
+            $lastDnId = null;
+            $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? ORDER BY delivery_date DESC, id DESC LIMIT 1');
+            $stmt->execute([$id]);
+            $row = $stmt->fetch();
+            if ($row) { $lastDnId = (int)$row['id']; }
             echo json_encode([
                 'id' => (int)$cust['id'],
                 'name' => (string)$cust['name'],
@@ -526,7 +543,9 @@ switch ($page) {
                 'last_delivery_date' => $last_delivery_date,
                 'total_amount' => $total_amount,
                 'total_paid' => $total_paid,
-                'due' => $due
+                'due' => $due,
+                'today_delivery_note_id' => $todayDnId,
+                'last_delivery_note_id' => $lastDnId
             ]);
             return;
         }
@@ -954,8 +973,23 @@ switch ($page) {
                 $_SESSION['lorry_full_saved'] = [];
             }
             $_SESSION['lorry_full_saved'][(int)$id] = $lorry_full ? 1 : 0;
-            // After save: go to Parcels index page
-            Helpers::redirect('index.php?page=parcels');
+            // Flash message with last saved parcel info
+            $_SESSION['flash_parcel_saved'] = [
+                'id' => (int)$id,
+                'customer_id' => (int)$customer_id,
+                'vehicle_no' => (string)$vehicle_no,
+                'from_branch_id' => (int)$from_branch_id,
+                'to_branch_id' => (int)$to_branch_id,
+                'time' => date('Y-m-d H:i:s')
+            ];
+            // After save: stay in create flow with previous selections
+            // Prefill customer, branches and vehicle so user can add next parcel quickly
+            $q = 'index.php?page=parcels&action=new'
+               . '&customer_id=' . urlencode((string)$customer_id)
+               . '&vehicle_no=' . urlencode((string)$vehicle_no)
+               . '&from_branch_id=' . urlencode((string)$from_branch_id)
+               . '&to_branch_id=' . urlencode((string)$to_branch_id);
+            Helpers::redirect($q);
             break;
         }
 
@@ -1055,7 +1089,8 @@ switch ($page) {
         $status = $_GET['status'] ?? '';
         $vehicle_no = trim($_GET['vehicle_no'] ?? '');
         $customer_filter_id = (int)($_GET['customer_id'] ?? 0);
-        $from = $_GET['from'] ?? date('Y-m-01');
+        // Default to last 30 days so recent payments (e.g., previous month) appear without manual filtering
+        $from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
         $to = $_GET['to'] ?? date('Y-m-d');
         $to_branch_filter_id = (int)($_GET['to_branch_id'] ?? 0);
         $where = [];
@@ -1467,8 +1502,10 @@ switch ($page) {
         }
 
         // index: list DNs with outstanding due for selected branch (or All for main), filter by date range and search
-        $from = $_GET['from'] ?? date('Y-m-01');
+        // Default range: last 30 days, so recent dues and payments are visible without manual filtering
+        $from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
         $to = $_GET['to'] ?? date('Y-m-d');
+        $groupMode = $_GET['group'] ?? 'customer'; // 'customer' (default) or 'dn'
         $q = trim($_GET['q'] ?? '');
         $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone,
                        (dn.total_amount - COALESCE(paid.total_paid,0)) AS due,
@@ -1494,8 +1531,44 @@ switch ($page) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $dues = $stmt->fetchAll();
+
+        // Build grouped data by customer when requested
+        $dueGroups = [];
+        if ($groupMode === 'customer') {
+            foreach ($dues as $row) {
+                $cid = (int)($row['customer_id'] ?? 0);
+                if ($cid <= 0) { $cid = -1; }
+                if (!isset($dueGroups[$cid])) {
+                    $dueGroups[$cid] = [
+                        'customer_id' => $cid,
+                        'customer_name' => (string)($row['customer_name'] ?? 'Unknown'),
+                        'customer_phone' => (string)($row['customer_phone'] ?? ''),
+                        'bills' => [],
+                        'total_amount' => 0.0,
+                        'paid' => 0.0,
+                        'due' => 0.0,
+                    ];
+                }
+                $dueGroups[$cid]['bills'][] = [
+                    'id' => (int)$row['id'],
+                    'delivery_date' => (string)$row['delivery_date'],
+                    'total_amount' => (float)$row['total_amount'],
+                    'paid' => (float)$row['paid'],
+                    'due' => (float)$row['due'],
+                ];
+                $dueGroups[$cid]['total_amount'] += (float)$row['total_amount'];
+                $dueGroups[$cid]['paid'] += (float)$row['paid'];
+                $dueGroups[$cid]['due'] += (float)$row['due'];
+            }
+            // Reindex to a numeric array for the view
+            $dueGroups = array_values($dueGroups);
+        }
         
         // Get payment history for DataTable
+
+        
+        $fromStart = $from . ' 00:00:00';
+        $toEnd = $to . ' 23:59:59';
         $paymentsSql = 'SELECT p.*, dn.id as dn_id, c.name AS customer_name, c.phone AS customer_phone, 
                                u.full_name AS received_by_name, b.name AS branch_name
                         FROM payments p
@@ -1504,7 +1577,7 @@ switch ($page) {
                         LEFT JOIN users u ON u.id = p.received_by
                         LEFT JOIN branches b ON b.id = dn.branch_id
                         WHERE p.paid_at BETWEEN ? AND ?';
-        $paymentsParams = [$from, $to];
+        $paymentsParams = [$fromStart, $toEnd];
         if ($branchFilterId > 0) {
             $paymentsSql .= ' AND dn.branch_id = ?';
             $paymentsParams[] = $branchFilterId;
@@ -1521,7 +1594,7 @@ switch ($page) {
         
         // For main users, provide branches list for dropdown
         $branchesAll = $isMain ? $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll() : [];
-        Helpers::view('payments/index', compact('dues','payments','from','to','q','isMain','branchesAll','branchFilterId'));
+        Helpers::view('payments/index', compact('dues','dueGroups','groupMode','payments','from','to','q','isMain','branchesAll','branchFilterId'));
         break;
 
     case 'expenses':
