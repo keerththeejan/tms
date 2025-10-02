@@ -14,6 +14,79 @@
   <h3 class="mb-0">Employees</h3>
   <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Employee</a>
 </div>
+<form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+  <input type="hidden" name="page" value="employees">
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="emp_code" placeholder="Employee Code" value="<?php echo htmlspecialchars($emp_code ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="name" placeholder="Name" value="<?php echo htmlspecialchars($name ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="first_name" placeholder="First Name" value="<?php echo htmlspecialchars($first_name ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="last_name" placeholder="Last Name" value="<?php echo htmlspecialchars($last_name ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-3">
+    <input type="text" class="form-control" name="email" placeholder="Email" value="<?php echo htmlspecialchars($email ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="phone" placeholder="Phone" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
+  </div>
+  <div class="col-12 col-md-6 col-lg-4">
+    <input type="text" class="form-control" name="address" placeholder="Address" value="<?php echo htmlspecialchars($address ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="position" placeholder="Position" value="<?php echo htmlspecialchars($position ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="role" placeholder="Role" value="<?php echo htmlspecialchars($role ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="license_number" placeholder="License Number" value="<?php echo htmlspecialchars($license_number ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="date" class="form-control" name="license_from" value="<?php echo htmlspecialchars($license_from ?? ''); ?>">
+    <div class="form-text">License From</div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="date" class="form-control" name="license_to" value="<?php echo htmlspecialchars($license_to ?? ''); ?>">
+    <div class="form-text">License To</div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="vehicle" placeholder="Vehicle" value="<?php echo htmlspecialchars($vehicle_like ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <select name="branch_id" class="form-select">
+      <?php $bid = (int)($branch_id ?? 0); ?>
+      <option value="0" <?php echo ($bid===0)?'selected':''; ?>>Branch (any)</option>
+      <?php foreach (($branchesAll ?? []) as $b): ?>
+        <option value="<?php echo (int)$b['id']; ?>" <?php echo ($bid===(int)$b['id'])?'selected':''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="date" class="form-control" name="join_from" value="<?php echo htmlspecialchars($join_from ?? ''); ?>">
+    <div class="form-text">Join From</div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="date" class="form-control" name="join_to" value="<?php echo htmlspecialchars($join_to ?? ''); ?>">
+    <div class="form-text">Join To</div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <select name="status" class="form-select">
+      <?php $st = $status ?? ''; ?>
+      <option value="" <?php echo ($st==='')?'selected':''; ?>>Status (any)</option>
+      <option value="active" <?php echo ($st==='active')?'selected':''; ?>>Active</option>
+      <option value="inactive" <?php echo ($st==='inactive')?'selected':''; ?>>Inactive</option>
+    </select>
+  </div>
+  <div class="col-auto d-flex gap-2 align-items-end">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>">Clear</a>
+  </div>
+</form>
 <!-- Clean details-only view: no toolbar toggles -->
 <div class="table-responsive" style="width: 100%; overflow-x: auto;">
   <table class="table table-sm table-striped align-middle" id="employeesTable" style="width: 100%; min-width: 1100px;">

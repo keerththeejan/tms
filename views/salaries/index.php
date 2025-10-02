@@ -26,8 +26,25 @@
       <?php endforeach; ?>
     </select>
   </div>
+  <div class="col-md-3">
+    <input type="text" name="employee" class="form-control" placeholder="Employee" value="<?php echo htmlspecialchars($employeeFilter ?? ''); ?>">
+  </div>
+  <div class="col-md-3">
+    <input type="text" name="position" class="form-control" placeholder="Position" value="<?php echo htmlspecialchars($positionFilter ?? ''); ?>">
+  </div>
+  <div class="col-md-2">
+    <input type="date" name="pay_from" class="form-control" value="<?php echo htmlspecialchars($payFrom ?? ''); ?>">
+    <div class="form-text">Paid From</div>
+  </div>
+  <div class="col-md-2">
+    <input type="date" name="pay_to" class="form-control" value="<?php echo htmlspecialchars($payTo ?? ''); ?>">
+    <div class="form-text">Paid To</div>
+  </div>
   <div class="col-auto">
     <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+  </div>
+  <div class="col-auto">
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=salaries'); ?>">Clear</a>
   </div>
   <div class="col-12 small text-muted">
     Tip: You can fill any one or more fields. Leave blank to show the latest 200 entries.

@@ -3,6 +3,45 @@
   <h3 class="mb-0">Users</h3>
   <a href="<?php echo Helpers::baseUrl('index.php?page=users&action=new'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New User</a>
 </div>
+<form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+  <input type="hidden" name="page" value="users">
+  <div class="col-6 col-md-3">
+    <input type="text" name="username" class="form-control" placeholder="Username" value="<?php echo htmlspecialchars($usernameF ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3">
+    <input type="text" name="full_name" class="form-control" placeholder="Full Name" value="<?php echo htmlspecialchars($fullNameF ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="role" class="form-select">
+      <?php $rf = (string)($roleF ?? ''); ?>
+      <option value="" <?php echo $rf===''?'selected':''; ?>>Role (any)</option>
+      <?php foreach (($rolesDynamic ?? []) as $r): $val = trim((string)($r['role'] ?? '')); if ($val==='') continue; ?>
+        <option value="<?php echo htmlspecialchars($val); ?>" <?php echo ($rf===$val)?'selected':''; ?>><?php echo htmlspecialchars($val); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="branch_id" class="form-select">
+      <?php $bf = (int)($branchF ?? 0); ?>
+      <option value="0" <?php echo $bf===0?'selected':''; ?>>Branch (any)</option>
+      <?php foreach (($branchesAll ?? []) as $b): ?>
+        <option value="<?php echo (int)$b['id']; ?>" <?php echo $bf===(int)$b['id']?'selected':''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="active" class="form-select">
+      <?php $af = (string)($activeF ?? ''); ?>
+      <option value="" <?php echo $af===''?'selected':''; ?>>Active (any)</option>
+      <option value="1" <?php echo $af==='1'?'selected':''; ?>>Yes</option>
+      <option value="0" <?php echo $af==='0'?'selected':''; ?>>No</option>
+    </select>
+  </div>
+  <div class="col-auto d-flex gap-2">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>">Clear</a>
+  </div>
+</form>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>

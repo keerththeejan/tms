@@ -35,8 +35,21 @@
     <label class="form-label">Delivery Date</label>
     <input type="date" class="form-control" name="date" value="<?php echo htmlspecialchars($date ?? date('Y-m-d')); ?>">
   </div>
-  <div class="col-auto d-flex align-items-end">
+  <div class="col-6 col-md-3">
+    <label class="form-label">Customer</label>
+    <input type="text" class="form-control" name="customer" placeholder="Name" value="<?php echo htmlspecialchars($customer ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Phone</label>
+    <input type="text" class="form-control" name="phone" placeholder="Phone" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Delivery Location</label>
+    <input type="text" class="form-control" name="place" placeholder="Location" value="<?php echo htmlspecialchars($place ?? ''); ?>">
+  </div>
+  <div class="col-auto d-flex align-items-end gap-2">
     <button class="btn btn-outline-secondary"><i class="bi bi-funnel"></i> Filter</button>
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>">Clear</a>
   </div>
 </form>
 <?php if (empty($routes)): ?>

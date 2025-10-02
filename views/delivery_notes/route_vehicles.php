@@ -23,8 +23,13 @@
       <option value="to" <?php echo (($direction ?? 'from')==='to')?'selected':''; ?>>Arrival (To my branch)</option>
     </select>
   </div>
-  <div class="col-auto d-flex align-items-end">
+  <div class="col-md-3">
+    <label class="form-label">Vehicle</label>
+    <input type="text" class="form-control" name="vehicle" placeholder="Vehicle No" value="<?php echo htmlspecialchars($vehicle ?? ''); ?>">
+  </div>
+  <div class="col-auto d-flex align-items-end gap-2">
     <button class="btn btn-outline-secondary"><i class="bi bi-funnel"></i> Filter</button>
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>">Clear</a>
   </div>
 </form>
 <div class="table-responsive">

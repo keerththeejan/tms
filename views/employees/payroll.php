@@ -6,6 +6,36 @@
   </div>
 </div>
 
+<form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+  <input type="hidden" name="page" value="employees">
+  <input type="hidden" name="action" value="payroll">
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="emp_code" placeholder="Employee Code" value="<?php echo htmlspecialchars($emp_code ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="name" placeholder="Name" value="<?php echo htmlspecialchars($name ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="position" placeholder="Position" value="<?php echo htmlspecialchars($position ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <select name="branch_id" class="form-select">
+      <?php $bid = (int)($branch_id ?? 0); ?>
+      <option value="0" <?php echo ($bid===0)?'selected':''; ?>>Branch (any)</option>
+      <?php foreach (($branchesAll ?? []) as $b): ?>
+        <option value="<?php echo (int)$b['id']; ?>" <?php echo ($bid===(int)$b['id'])?'selected':''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="month" class="form-control" name="month_year" value="<?php echo htmlspecialchars($month_year ?? ''); ?>">
+  </div>
+  <div class="col-auto d-flex gap-2 align-items-end">
+    <button class="btn btn-outline-secondary"><i class="bi bi-funnel"></i> Filter</button>
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>">Clear</a>
+  </div>
+</form>
+
 <div class="table-responsive" style="width: 100%; overflow-x: auto;">
   <table class="table table-sm table-striped align-middle" id="employeesPayrollTable" style="width: 100%; min-width: 1400px;">
     <thead>

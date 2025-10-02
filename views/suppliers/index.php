@@ -5,11 +5,27 @@
 </div>
 <form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="suppliers">
-  <div class="col-sm-6 col-md-4">
-    <input type="text" class="form-control" name="q" placeholder="Search by name, phone, or code" value="<?php echo htmlspecialchars($q ?? ''); ?>">
+  <div class="col-6 col-md-3 col-lg-3">
+    <input type="text" class="form-control" name="name" placeholder="Name" value="<?php echo htmlspecialchars($name ?? ''); ?>">
   </div>
-  <div class="col-auto">
-    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="phone" placeholder="Phone" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="code" placeholder="Code" value="<?php echo htmlspecialchars($code ?? ''); ?>">
+  </div>
+  <div class="col-6 col-md-3 col-lg-3">
+    <select name="branch_id" class="form-select">
+      <?php $bid = (int)($branch_id ?? 0); ?>
+      <option value="0" <?php echo ($bid===0)?'selected':''; ?>>Branch (any)</option>
+      <?php foreach (($branchesAll ?? []) as $b): ?>
+        <option value="<?php echo (int)$b['id']; ?>" <?php echo ($bid===(int)$b['id'])?'selected':''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="col-auto d-flex gap-2">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>">Clear</a>
   </div>
 </form>
 <div class="table-responsive">

@@ -19,8 +19,29 @@
       <?php endforeach; ?>
     </select>
   </div>
-  <div class="col-auto">
+  <div class="col-md-3">
+    <input type="text" class="form-control" name="notes" placeholder="Notes" value="<?php echo htmlspecialchars($notesFilter ?? ''); ?>">
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="approved">
+      <?php $ap = $approved ?? ''; ?>
+      <option value="" <?php echo ($ap==='')?'selected':''; ?>>Approved (any)</option>
+      <option value="yes" <?php echo ($ap==='yes')?'selected':''; ?>>Yes</option>
+      <option value="no" <?php echo ($ap==='no')?'selected':''; ?>>No</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="type">
+      <?php $tf = $typeFilter ?? ''; ?>
+      <option value="" <?php echo ($tf==='')?'selected':''; ?>>Type (any)</option>
+      <?php foreach (($typesDynamic ?? []) as $t): $val = trim((string)$t['expense_type'] ?? ''); if ($val==='') continue; ?>
+        <option value="<?php echo htmlspecialchars($val); ?>" <?php echo ($tf===$val)?'selected':''; ?>><?php echo htmlspecialchars(ucwords(str_replace('_',' ', $val))); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <div class="col-auto d-flex gap-2">
     <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Clear</a>
   </div>
 </form>
 <div class="card shadow-sm mb-3">

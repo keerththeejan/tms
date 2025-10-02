@@ -486,8 +486,25 @@ switch ($page) {
             break;
         }
 
-        $users = $pdo->query('SELECT u.*, b.name AS branch_name FROM users u LEFT JOIN branches b ON b.id = u.branch_id ORDER BY u.created_at DESC')->fetchAll();
-        Helpers::view('users/index', compact('users'));
+        // index with filters
+        $usernameF = trim($_GET['username'] ?? '');
+        $fullNameF = trim($_GET['full_name'] ?? '');
+        $roleF = trim($_GET['role'] ?? '');
+        $branchF = (int)($_GET['branch_id'] ?? 0);
+        $activeF = $_GET['active'] ?? ''; // '', '1', '0'
+        $sql = 'SELECT u.*, b.name AS branch_name FROM users u LEFT JOIN branches b ON b.id = u.branch_id WHERE 1=1';
+        $params = [];
+        if ($usernameF !== '') { $sql .= ' AND u.username LIKE ?'; $params[] = "%$usernameF%"; }
+        if ($fullNameF !== '') { $sql .= ' AND u.full_name LIKE ?'; $params[] = "%$fullNameF%"; }
+        if ($roleF !== '') { $sql .= ' AND u.role = ?'; $params[] = $roleF; }
+        if ($branchF > 0) { $sql .= ' AND u.branch_id = ?'; $params[] = $branchF; }
+        if ($activeF === '1' || $activeF === '0') { $sql .= ' AND u.active = ?'; $params[] = (int)$activeF; }
+        $sql .= ' ORDER BY u.created_at DESC, u.id DESC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $users = $stmt->fetchAll();
+        $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+        Helpers::view('users/index', compact('users','branchesAll','rolesDynamic','usernameF','fullNameF','roleF','branchF','activeF'));
         break;
 
     case 'customers':
@@ -634,17 +651,36 @@ switch ($page) {
             break;
         }
 
-        // index with optional phone search
+        // index with filters (name/phone/address/delivery_location/type) and fallback to single 'q'
+        $name = trim($_GET['name'] ?? '');
+        $phone = trim($_GET['phone'] ?? '');
+        $address = trim($_GET['address'] ?? '');
+        $delivery_location = trim($_GET['delivery_location'] ?? '');
+        $type = trim($_GET['type'] ?? '');
         $q = trim($_GET['q'] ?? '');
-        if ($q !== '') {
-            $stmt = $pdo->prepare("SELECT * FROM customers WHERE phone LIKE ? OR name LIKE ? ORDER BY created_at DESC LIMIT 100");
+
+        $hasFilters = ($name !== '' || $phone !== '' || $address !== '' || $delivery_location !== '' || $type !== '');
+        if ($hasFilters) {
+            $sql = 'SELECT * FROM customers WHERE 1=1';
+            $params = [];
+            if ($name !== '') { $sql .= ' AND name LIKE ?'; $params[] = "%$name%"; }
+            if ($phone !== '') { $sql .= ' AND phone LIKE ?'; $params[] = "%$phone%"; }
+            if ($address !== '') { $sql .= ' AND address LIKE ?'; $params[] = "%$address%"; }
+            if ($delivery_location !== '') { $sql .= ' AND delivery_location LIKE ?'; $params[] = "%$delivery_location%"; }
+            if ($type !== '') { $sql .= ' AND customer_type = ?'; $params[] = $type; }
+            $sql .= ' ORDER BY created_at DESC LIMIT 100';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $customers = $stmt->fetchAll();
+        } else if ($q !== '') {
+            $stmt = $pdo->prepare("SELECT * FROM customers WHERE phone LIKE ? OR name LIKE ? OR address LIKE ? OR delivery_location LIKE ? OR customer_type LIKE ? ORDER BY created_at DESC LIMIT 100");
             $like = "%$q%";
-            $stmt->execute([$like,$like]);
+            $stmt->execute([$like,$like,$like,$like,$like]);
             $customers = $stmt->fetchAll();
         } else {
             $customers = $pdo->query('SELECT * FROM customers ORDER BY created_at DESC LIMIT 100')->fetchAll();
         }
-        Helpers::view('customers/index', compact('customers','q'));
+        Helpers::view('customers/index', compact('customers','q','name','phone','address','delivery_location','type'));
         break;
 
     case 'vehicles':
@@ -739,9 +775,26 @@ switch ($page) {
             break;
         }
 
-        // index with optional search by name/code/phone
+        // index with filters (name/phone/code/branch_id) and fallback to single 'q'
+        $name = trim($_GET['name'] ?? '');
+        $phone = trim($_GET['phone'] ?? '');
+        $code = trim($_GET['code'] ?? '');
+        $branch_id = (int)($_GET['branch_id'] ?? 0);
         $q = trim($_GET['q'] ?? '');
-        if ($q !== '') {
+
+        $hasFilters = ($name !== '' || $phone !== '' || $code !== '' || $branch_id > 0);
+        if ($hasFilters) {
+            $sql = 'SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id WHERE 1=1';
+            $params = [];
+            if ($name !== '') { $sql .= ' AND s.name LIKE ?'; $params[] = "%$name%"; }
+            if ($phone !== '') { $sql .= ' AND s.phone LIKE ?'; $params[] = "%$phone%"; }
+            if ($code !== '') { $sql .= ' AND s.supplier_code LIKE ?'; $params[] = "%$code%"; }
+            if ($branch_id > 0) { $sql .= ' AND s.branch_id = ?'; $params[] = $branch_id; }
+            $sql .= ' ORDER BY s.created_at DESC LIMIT 100';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $suppliers = $stmt->fetchAll();
+        } else if ($q !== '') {
             $stmt = $pdo->prepare("SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id WHERE s.name LIKE ? OR s.phone LIKE ? OR s.supplier_code LIKE ? ORDER BY s.created_at DESC LIMIT 100");
             $like = "%$q%";
             $stmt->execute([$like,$like,$like]);
@@ -749,7 +802,7 @@ switch ($page) {
         } else {
             $suppliers = $pdo->query('SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id ORDER BY s.created_at DESC LIMIT 100')->fetchAll();
         }
-        Helpers::view('suppliers/index', compact('suppliers','q'));
+        Helpers::view('suppliers/index', compact('suppliers','q','name','phone','code','branch_id','branchesAll'));
         break;
 
     case 'parcels':
@@ -1228,6 +1281,11 @@ switch ($page) {
         if ($action === 'route') {
             // Planning screen: customers with pending parcels to deliver from THIS branch
             $date = $_GET['date'] ?? date('Y-m-d');
+            // New optional filters
+            $customer = trim($_GET['customer'] ?? '');
+            $phone = trim($_GET['phone'] ?? '');
+            $place = trim($_GET['place'] ?? '');
+
             $sql = "SELECT c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
                            COALESCE(c.delivery_location, '') AS delivery_location,
                            COUNT(*) AS parcels_count,
@@ -1235,11 +1293,14 @@ switch ($page) {
                     FROM parcels p
                     JOIN customers c ON c.id = p.customer_id
                     LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
-                    WHERE p.to_branch_id = ? AND (p.status IS NULL OR p.status <> 'delivered') AND dnp.id IS NULL
-                    GROUP BY c.id, c.name, c.phone, c.delivery_location
-                    ORDER BY c.name";
+                    WHERE p.to_branch_id = ? AND (p.status IS NULL OR p.status <> 'delivered') AND dnp.id IS NULL";
+            $params = [$branchId];
+            if ($customer !== '') { $sql .= ' AND c.name LIKE ?'; $params[] = "%$customer%"; }
+            if ($phone !== '') { $sql .= ' AND c.phone LIKE ?'; $params[] = "%$phone%"; }
+            if ($place !== '') { $sql .= ' AND COALESCE(c.delivery_location, "") LIKE ?'; $params[] = "%$place%"; }
+            $sql .= ' GROUP BY c.id, c.name, c.phone, c.delivery_location ORDER BY c.name';
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$branchId]);
+            $stmt->execute($params);
             $routes = $stmt->fetchAll();
             // Totals for quick glance
             $totalsStmt = $pdo->prepare('SELECT COUNT(*) AS parcels FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id=p.id WHERE p.to_branch_id=? AND (p.status IS NULL OR p.status<>"delivered") AND dnp.id IS NULL');
@@ -1247,7 +1308,7 @@ switch ($page) {
             $parcels_total = (int)($totalsStmt->fetch()['parcels'] ?? 0);
             $customers_total = count($routes);
             $branchName = (string)($user['branch_name'] ?? '');
-            Helpers::view('delivery_notes/route', compact('routes','date','parcels_total','customers_total','branchName'));
+            Helpers::view('delivery_notes/route', compact('routes','date','parcels_total','customers_total','branchName','customer','phone','place'));
             break;
         }
 
@@ -1256,19 +1317,23 @@ switch ($page) {
             $from = $_GET['from'] ?? date('Y-m-01');
             $to = $_GET['to'] ?? date('Y-m-d');
             $direction = $_GET['direction'] ?? 'from'; // 'from' (dispatch) or 'to' (arrivals)
+            $vehicle = trim($_GET['vehicle'] ?? '');
             $branchColumn = ($direction === 'to') ? 'p.to_branch_id' : 'p.from_branch_id';
             $sql = "SELECT COALESCE(p.vehicle_no,'—') AS vehicle_no,
                            COUNT(*) AS parcels_count,
                            SUM(CASE WHEN p.status='delivered' THEN 1 ELSE 0 END) AS delivered_count
                     FROM parcels p
                     LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
-                    WHERE $branchColumn = ? AND DATE(p.created_at) BETWEEN ? AND ?
+                    WHERE $branchColumn = ? AND DATE(p.created_at) BETWEEN ? AND ?";
+            $params = [$branchId, $from, $to];
+            if ($vehicle !== '') { $sql .= ' AND COALESCE(p.vehicle_no, "") LIKE ?'; $params[] = "%$vehicle%"; }
+            $sql .= "
                     GROUP BY COALESCE(p.vehicle_no,'—')
                     ORDER BY MAX(p.created_at) DESC";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$branchId, $from, $to]);
+            $stmt->execute($params);
             $routes = $stmt->fetchAll();
-            Helpers::view('delivery_notes/route_vehicles', compact('routes','from','to','direction'));
+            Helpers::view('delivery_notes/route_vehicles', compact('routes','from','to','direction','vehicle'));
             break;
         }
 
@@ -1694,22 +1759,30 @@ switch ($page) {
         $from = $_GET['from'] ?? date('Y-m-01');
         $to = $_GET['to'] ?? date('Y-m-d');
         $branchFilter = (int)($_GET["branch_id"] ?? 0);
-        $where = ['expense_date BETWEEN ? AND ?'];
+        $notesFilter = trim($_GET['notes'] ?? '');
+        $approved = trim($_GET['approved'] ?? ''); // '', 'yes', 'no'
+        $typeFilter = trim($_GET['type'] ?? '');
+        $where = ['e.expense_date BETWEEN ? AND ?'];
         $params = [$from, $to];
-        if ($branchFilter > 0) { $where[] = 'branch_id = ?'; $params[] = $branchFilter; }
+        if ($branchFilter > 0) { $where[] = 'e.branch_id = ?'; $params[] = $branchFilter; }
+        if ($typeFilter !== '') { $where[] = 'e.expense_type = ?'; $params[] = $typeFilter; }
+        if ($notesFilter !== '') { $where[] = 'COALESCE(e.notes, "") LIKE ?'; $params[] = "%$notesFilter%"; }
+        if ($approved === 'yes') { $where[] = 'e.approved_by IS NOT NULL'; }
+        else if ($approved === 'no') { $where[] = 'e.approved_by IS NULL'; }
         $sql = 'SELECT e.*, b.name AS branch_name FROM expenses e LEFT JOIN branches b ON b.id = e.branch_id WHERE ' . implode(' AND ', $where) . ' ORDER BY e.expense_date DESC, e.id DESC LIMIT 300';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $expenses = $stmt->fetchAll();
 
-        // summaries
-        $sumSql = 'SELECT branch_id, SUM(amount) AS total FROM expenses WHERE ' . implode(' AND ', $where) . ' GROUP BY branch_id';
+        // summaries (apply same filters)
+        $sumSql = 'SELECT branch_id, SUM(amount) AS total FROM expenses e WHERE ' . implode(' AND ', $where) . ' GROUP BY branch_id';
         $sumStmt = $pdo->prepare($sumSql);
         $sumStmt->execute($params);
         $byBranch = $sumStmt->fetchAll();
         $overall = 0; foreach ($byBranch as $r) { $overall += (float)$r['total']; }
         $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-        Helpers::view('expenses/index', compact('expenses','from','to','branchFilter','byBranch','overall','branchesAll','isAdmin'));
+        $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
+        Helpers::view('expenses/index', compact('expenses','from','to','branchFilter','byBranch','overall','branchesAll','isAdmin','notesFilter','approved','typeFilter','typesDynamic'));
         break;
 
     case 'employees':
@@ -1855,8 +1928,15 @@ switch ($page) {
             break;
         }
 
-        // payroll sub-view: list latest payroll row per employee
+        // payroll sub-view: list latest payroll row per employee (with simple filters)
         if ($action === 'payroll') {
+            // Filters
+            $emp_code = trim($_GET['emp_code'] ?? '');
+            $name = trim($_GET['name'] ?? '');
+            $position = trim($_GET['position'] ?? '');
+            $branch_id = (int)($_GET['branch_id'] ?? 0);
+            $month_year = trim($_GET['month_year'] ?? ''); // YYYY-MM
+
             $sql = "SELECT e.id, e.emp_code, e.name, e.position, b.name AS branch_name,
                            p.id AS payroll_id, p.basic_salary, p.epf_employee, p.epf_employer, p.etf, p.allowance, p.deductions, p.net_salary, p.month_year
                     FROM employees e
@@ -1867,9 +1947,19 @@ switch ($page) {
                         SELECT employee_id, MAX(month_year) AS mm FROM employee_payroll GROUP BY employee_id
                       ) m ON m.employee_id = ep.employee_id AND m.mm = ep.month_year
                     ) p ON p.employee_id = e.id
-                    ORDER BY e.created_at DESC, e.id DESC LIMIT 300";
-            $employees = $pdo->query($sql)->fetchAll();
-            Helpers::view('employees/payroll', compact('employees'));
+                    WHERE 1=1";
+            $params = [];
+            if ($emp_code !== '') { $sql .= ' AND e.emp_code LIKE ?'; $params[] = "%$emp_code%"; }
+            if ($name !== '') { $sql .= ' AND e.name LIKE ?'; $params[] = "%$name%"; }
+            if ($position !== '') { $sql .= ' AND e.position LIKE ?'; $params[] = "%$position%"; }
+            if ($branch_id > 0) { $sql .= ' AND e.branch_id = ?'; $params[] = $branch_id; }
+            if ($month_year !== '') { $sql .= ' AND COALESCE(p.month_year, "") = ?'; $params[] = $month_year; }
+            $sql .= ' ORDER BY e.created_at DESC, e.id DESC LIMIT 500';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $employees = $stmt->fetchAll();
+            $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            Helpers::view('employees/payroll', compact('employees','emp_code','name','position','branch_id','month_year','branchesAll'));
             break;
         }
         // new payroll entry form (choose employee and enter payroll fields)
@@ -1960,9 +2050,54 @@ switch ($page) {
             return;
         }
 
-        // index - fetch all employee DETAIL fields + branch name + vehicle registration
-        $employees = $pdo->query('SELECT e.*, b.name AS branch_name, v.id AS vehicle_id_join, v.reg_number AS vehicle_no_join FROM employees e LEFT JOIN branches b ON b.id=e.branch_id LEFT JOIN vehicles v ON v.id = e.vehicle_id ORDER BY e.created_at DESC, e.id DESC LIMIT 300')->fetchAll();
-        Helpers::view('employees/index', compact('employees'));
+        // index - filters for many fields
+        $emp_code = trim($_GET['emp_code'] ?? '');
+        $name = trim($_GET['name'] ?? '');
+        $first_name = trim($_GET['first_name'] ?? '');
+        $last_name = trim($_GET['last_name'] ?? '');
+        $email = trim($_GET['email'] ?? '');
+        $phone = trim($_GET['phone'] ?? '');
+        $address = trim($_GET['address'] ?? '');
+        $position = trim($_GET['position'] ?? '');
+        $role = trim($_GET['role'] ?? '');
+        $license_number = trim($_GET['license_number'] ?? '');
+        $license_from = trim($_GET['license_from'] ?? '');
+        $license_to = trim($_GET['license_to'] ?? '');
+        $vehicle_like = trim($_GET['vehicle'] ?? '');
+        $branch_id = (int)($_GET['branch_id'] ?? 0);
+        $join_from = trim($_GET['join_from'] ?? '');
+        $join_to = trim($_GET['join_to'] ?? '');
+        $status = trim($_GET['status'] ?? ''); // '', 'active', 'inactive'
+
+        $sql = 'SELECT e.*, b.name AS branch_name, v.id AS vehicle_id_join, v.reg_number AS vehicle_no_join
+                FROM employees e
+                LEFT JOIN branches b ON b.id = e.branch_id
+                LEFT JOIN vehicles v ON v.id = e.vehicle_id
+                WHERE 1=1';
+        $params = [];
+        if ($emp_code !== '') { $sql .= ' AND e.emp_code LIKE ?'; $params[] = "%$emp_code%"; }
+        if ($name !== '') { $sql .= ' AND e.name LIKE ?'; $params[] = "%$name%"; }
+        if ($first_name !== '') { $sql .= ' AND e.first_name LIKE ?'; $params[] = "%$first_name%"; }
+        if ($last_name !== '') { $sql .= ' AND e.last_name LIKE ?'; $params[] = "%$last_name%"; }
+        if ($email !== '') { $sql .= ' AND e.email LIKE ?'; $params[] = "%$email%"; }
+        if ($phone !== '') { $sql .= ' AND e.phone LIKE ?'; $params[] = "%$phone%"; }
+        if ($address !== '') { $sql .= ' AND e.address LIKE ?'; $params[] = "%$address%"; }
+        if ($position !== '') { $sql .= ' AND e.position LIKE ?'; $params[] = "%$position%"; }
+        if ($role !== '') { $sql .= ' AND e.role LIKE ?'; $params[] = "%$role%"; }
+        if ($license_number !== '') { $sql .= ' AND e.license_number LIKE ?'; $params[] = "%$license_number%"; }
+        if ($license_from !== '') { $sql .= ' AND e.license_expiry >= ?'; $params[] = $license_from; }
+        if ($license_to !== '') { $sql .= ' AND e.license_expiry <= ?'; $params[] = $license_to; }
+        if ($vehicle_like !== '') { $sql .= ' AND COALESCE(v.reg_number, v.plate_no, v.vehicle_no, "") LIKE ?'; $params[] = "%$vehicle_like%"; }
+        if ($branch_id > 0) { $sql .= ' AND e.branch_id = ?'; $params[] = $branch_id; }
+        if ($join_from !== '') { $sql .= ' AND e.join_date >= ?'; $params[] = $join_from; }
+        if ($join_to !== '') { $sql .= ' AND e.join_date <= ?'; $params[] = $join_to; }
+        if ($status !== '') { $sql .= ' AND e.status = ?'; $params[] = $status; }
+        $sql .= ' ORDER BY e.created_at DESC, e.id DESC LIMIT 500';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $employees = $stmt->fetchAll();
+        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        Helpers::view('employees/index', compact('employees','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_from','license_to','vehicle_like','branch_id','join_from','join_to','status','branchesAll'));
         break;
 
     case 'salaries':
@@ -2016,17 +2151,25 @@ switch ($page) {
             break;
         }
 
-        // index with OPTIONAL filters: Year, Month, Branch
+        // index with OPTIONAL filters: Year, Month, Branch, Employee, Position, Payment Date range
         $year = (int)($_GET['year'] ?? 0);
         $month_num = (int)($_GET['month_num'] ?? 0);
         if ($year <= 0) { $year = (int)date('Y'); }
         if ($month_num <= 0) { $month_num = (int)date('n'); }
         $branchFilter = (int)($_GET['branch_id'] ?? 0);
+        $employeeFilter = trim($_GET['employee'] ?? '');
+        $positionFilter = trim($_GET['position'] ?? '');
+        $payFrom = trim($_GET['pay_from'] ?? '');
+        $payTo = trim($_GET['pay_to'] ?? '');
         $where = [];
         $params = [];
         if ($year > 0) { $where[] = 's.month = ?'; $params[] = $year; }
         if ($month_num > 0) { $where[] = 's.month_num = ?'; $params[] = $month_num; }
         if ($branchFilter > 0) { $where[] = 'e.branch_id = ?'; $params[] = $branchFilter; }
+        if ($employeeFilter !== '') { $where[] = 'e.name LIKE ?'; $params[] = "%$employeeFilter%"; }
+        if ($positionFilter !== '') { $where[] = 'e.position LIKE ?'; $params[] = "%$positionFilter%"; }
+        if ($payFrom !== '') { $where[] = '(s.payment_date IS NOT NULL AND s.payment_date >= ?)'; $params[] = $payFrom; }
+        if ($payTo !== '') { $where[] = '(s.payment_date IS NOT NULL AND s.payment_date <= ?)'; $params[] = $payTo; }
 
         // Ensure salaries exist for selected Year/Month so that all employees show up
         if ($year > 0 && $month_num > 0) {
@@ -2125,7 +2268,7 @@ switch ($page) {
         $stmtT->execute($trendParams);
         $trend = $stmtT->fetchAll();
 
-        Helpers::view('salaries/index', compact('rows','year','month_num','branchFilter','branchesAll','total','paid','countTotal','countPaid','countPending','byBranchTotals','statusCounts','trend'));
+        Helpers::view('salaries/index', compact('rows','year','month_num','branchFilter','branchesAll','total','paid','countTotal','countPaid','countPending','byBranchTotals','statusCounts','trend','employeeFilter','positionFilter','payFrom','payTo'));
         break;
 
     case 'search':
