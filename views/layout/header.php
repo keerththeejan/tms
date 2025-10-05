@@ -10,6 +10,7 @@ $user = Auth::user();
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/css/dataTables.bootstrap5.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <style>
     html, body { height: 100%; }
     body { padding-top: 0; margin: 0; }
@@ -43,6 +44,17 @@ $user = Auth::user();
     /* Close button inside sidebar (mobile only) */
     .sidebar-close-btn { display: none; }
     @media (max-width: 992px) { .sidebar-close-btn { display: inline-flex; } }
+    /* Choices.js tweaks to match Bootstrap sizing */
+    .choices__inner { min-height: calc(2.25rem + 2px); padding-top: .375rem; padding-bottom: .375rem; }
+    .choices[data-type*=select-one] .choices__inner { padding-bottom: .375rem; }
+    .choices__list--dropdown { z-index: 1050; }
+    /* Darker text for select and dropdown */
+    .form-select,
+    .choices__inner,
+    .choices__input,
+    .choices__list--dropdown .choices__item { color: #212529; }
+    .choices__placeholder { color: #495057 !important; opacity: 1 !important; }
+    .choices[data-type*=select-one] .choices__button { color: #212529; }
   </style>
 </head>
 <body>

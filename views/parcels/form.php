@@ -438,6 +438,9 @@
       <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button></td>
     `;
     tbody.appendChild(tr);
+    // Focus Description of the newly added row for quick typing
+    const desc = tr.querySelector(`input[name="items[${idx}][description]"]`);
+    if (desc) { desc.focus(); desc.select(); }
   });
 
   recalc();

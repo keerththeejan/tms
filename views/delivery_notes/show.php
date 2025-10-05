@@ -13,6 +13,10 @@
       <div class="col-md-4"><strong>Phone:</strong> <?php echo htmlspecialchars($dn['customer_phone']); ?></div>
       <div class="col-md-4"><strong>Date:</strong> <?php echo htmlspecialchars($dn['delivery_date']); ?></div>
     </div>
+    <div class="row g-2 mt-1">
+      <div class="col-md-6"><strong>Supplier(s):</strong> <?php echo htmlspecialchars($dn['suppliers_agg'] ?? ''); ?></div>
+      <div class="col-md-6"><strong>Supplier Phone(s):</strong> <?php echo htmlspecialchars($dn['supplier_phones_agg'] ?? ''); ?></div>
+    </div>
   </div>
 </div>
 <div class="table-responsive mt-3">
@@ -21,6 +25,7 @@
       <tr>
         <th>#</th>
         <th>Supplier</th>
+        <th>Supplier Phone</th>
         <th>Tracking</th>
         <th>Weight</th>
         <th class="text-end">Amount</th>
@@ -31,6 +36,7 @@
         <tr>
           <td><?php echo (int)$i['parcel_id']; ?></td>
           <td><?php echo htmlspecialchars($i['supplier_name'] ?? ''); ?></td>
+          <td><?php echo htmlspecialchars($i['supplier_phone'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($i['tracking_number'] ?? ''); ?></td>
           <td><?php echo number_format((float)($i['weight'] ?? 0), 2); ?></td>
           <td class="text-end"><?php echo number_format((float)$i['amount'], 2); ?></td>

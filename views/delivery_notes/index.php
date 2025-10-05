@@ -29,6 +29,8 @@
         <th>Delivery Date</th>
         <th>Customer</th>
         <th>Phone</th>
+        <th>Supplier</th>
+        <th>Supplier Phone</th>
         <th>Total</th>
         <th class="text-end">Actions</th>
       </tr>
@@ -40,6 +42,8 @@
           <td><?php echo htmlspecialchars($n['delivery_date']); ?></td>
           <td><?php echo htmlspecialchars($n['customer_name'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($n['customer_phone'] ?? ''); ?></td>
+          <td><?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?></td>
+          <td><?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?></td>
           <td><?php echo number_format((float)$n['total_amount'], 2); ?></td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='.(int)$n['id']); ?>"><i class="bi bi-eye"></i> View</a>

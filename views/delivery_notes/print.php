@@ -11,40 +11,43 @@
     body { padding: 20px; }
   </style>
 </head>
-<body>
 <div class="no-print mb-3">
   <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
 </div>
-<h4 class="mb-1">Delivery Note #<?php echo (int)$dn['id']; ?></h4>
-<div class="mb-3 text-muted">Branch: <?php echo htmlspecialchars($dn['branch_name'] ?? ''); ?> | Date: <?php echo htmlspecialchars($dn['delivery_date']); ?></div>
-<div class="row g-2 mb-3">
-  <div class="col-md-4"><strong>Customer:</strong> <?php echo htmlspecialchars($dn['customer_name']); ?></div>
-  <div class="col-md-4"><strong>Phone:</strong> <?php echo htmlspecialchars($dn['customer_phone']); ?></div>
-</div>
+<h4 class="mb-1">Delivery Note</h4>
+<div class="mb-2 text-muted">Branch: <?php echo htmlspecialchars($dn['branch_name'] ?? ''); ?></div>
 <table class="table table-sm table-bordered align-middle">
   <thead>
     <tr>
-      <th>#</th>
+      <th style="width:6rem;">#</th>
+      <th style="width:11rem;">Delivery Date</th>
+      <th>Customer</th>
+      <th style="width:12rem;">Phone</th>
       <th>Supplier</th>
+      <th style="width:12rem;">Supplier Phone</th>
       <th>Tracking</th>
       <th>Weight</th>
-      <th class="text-end">Amount</th>
+      <th style="width:10rem;" class="text-end">Amount</th>
     </tr>
   </thead>
   <tbody>
-    <?php $total = 0; foreach ($items as $i): $total += (float)$i['amount']; ?>
-      <tr>
-        <td><?php echo (int)$i['parcel_id']; ?></td>
-        <td><?php echo htmlspecialchars($i['supplier_name'] ?? ''); ?></td>
-        <td><?php echo htmlspecialchars($i['tracking_number'] ?? ''); ?></td>
-        <td><?php echo number_format((float)($i['weight'] ?? 0), 2); ?></td>
-        <td class="text-end"><?php echo number_format((float)$i['amount'], 2); ?></td>
-      </tr>
-    <?php endforeach; ?>
+  <?php $total = 0; foreach ($items as $i): $total += (float)$i['amount']; ?>
+    <tr>
+      <td><?php echo (int)$dn['id']; ?></td>
+      <td><?php echo htmlspecialchars($dn['delivery_date']); ?></td>
+      <td><?php echo htmlspecialchars($dn['customer_name']); ?></td>
+      <td><?php echo htmlspecialchars($dn['customer_phone']); ?></td>
+      <td><?php echo htmlspecialchars($i['supplier_name'] ?? ''); ?></td>
+      <td><?php echo htmlspecialchars($i['supplier_phone'] ?? ''); ?></td>
+      <td><?php echo htmlspecialchars($i['tracking_number'] ?? ''); ?></td>
+      <td><?php echo number_format((float)($i['weight'] ?? 0), 2); ?></td>
+      <td class="text-end"><?php echo number_format((float)$i['amount'], 2); ?></td>
+    </tr>
+  <?php endforeach; ?>
   </tbody>
   <tfoot>
     <tr>
-      <th colspan="4" class="text-end">Total</th>
+      <th colspan="8" class="text-end">Total</th>
       <th class="text-end"><?php 
         $grand = (float)$total; 
         if ($grand <= 0 && isset($dn['total_amount'])) { $grand = (float)$dn['total_amount']; }
@@ -58,7 +61,7 @@
   window.addEventListener('load', function(){
     setTimeout(function(){
       if (window.matchMedia) { window.print(); }
-    }, 300);
+{{ ... }}
   });
   // Optional: close the tab after printing if the browser supports it
   window.addEventListener('afterprint', function(){ /* window.close(); */ });

@@ -1386,7 +1386,7 @@ switch ($page) {
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }
-            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, s.name AS supplier_name FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
+            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, s.name AS supplier_name, s.phone AS supplier_phone FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
             $itemsStmt->execute([$id]);
             $items = $itemsStmt->fetchAll();
             // Backfill if empty
@@ -1415,6 +1415,15 @@ switch ($page) {
                     $items = $itemsStmt->fetchAll();
                 }
             }
+            // Aggregate suppliers for summary
+            $supNames = [];
+            $supPhones = [];
+            foreach ($items as $row) {
+                if (!empty($row['supplier_name'])) { $supNames[$row['supplier_name']] = true; }
+                if (!empty($row['supplier_phone'])) { $supPhones[$row['supplier_phone']] = true; }
+            }
+            $dn['suppliers_agg'] = implode(', ', array_keys($supNames));
+            $dn['supplier_phones_agg'] = implode(', ', array_keys($supPhones));
             Helpers::view('delivery_notes/show', compact('dn','items'));
             break;
         }
@@ -1425,7 +1434,7 @@ switch ($page) {
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }
-            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, s.name AS supplier_name FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
+            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, s.name AS supplier_name, s.phone AS supplier_phone FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
             $itemsStmt->execute([$id]);
             $items = $itemsStmt->fetchAll();
             // Backfill if empty
@@ -1452,6 +1461,15 @@ switch ($page) {
                     $items = $itemsStmt->fetchAll();
                 }
             }
+            // Aggregate suppliers for summary
+            $supNames = [];
+            $supPhones = [];
+            foreach ($items as $row) {
+                if (!empty($row['supplier_name'])) { $supNames[$row['supplier_name']] = true; }
+                if (!empty($row['supplier_phone'])) { $supPhones[$row['supplier_phone']] = true; }
+            }
+            $dn['suppliers_agg'] = implode(', ', array_keys($supNames));
+            $dn['supplier_phones_agg'] = implode(', ', array_keys($supPhones));
             include __DIR__ . '/../views/delivery_notes/print.php';
             break;
         }
@@ -1493,7 +1511,18 @@ switch ($page) {
             $like = "%$q%";
             array_push($params, $like, $like);
         }
-        $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id WHERE ' . implode(' AND ', $where) . ' ORDER BY dn.delivery_date DESC, dn.id DESC LIMIT 200';
+        $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone,
+                       TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ", ")) AS suppliers,
+                       TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(s.phone, "") ORDER BY s.phone SEPARATOR ", ")) AS supplier_phones
+                FROM delivery_notes dn
+                LEFT JOIN customers c ON c.id = dn.customer_id
+                LEFT JOIN delivery_note_parcels dnp ON dnp.delivery_note_id = dn.id
+                LEFT JOIN parcels p ON p.id = dnp.parcel_id
+                LEFT JOIN suppliers s ON s.id = p.supplier_id
+                WHERE ' . implode(' AND ', $where) . '
+                GROUP BY dn.id
+                ORDER BY dn.delivery_date DESC, dn.id DESC
+                LIMIT 200';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $notes = $stmt->fetchAll();
