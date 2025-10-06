@@ -164,6 +164,52 @@ switch ($page) {
         Helpers::view('dashboard', compact('pendingParcels','totalDue','todayParcels','today','collectionsToday','expensesToday','recentPayments','isMain','branchesAll','pendingByBranch','dueByBranch','todayParcelsByBranch','collectionsTodayByBranch','expensesTodayByBranch','df','dt','fb','tb','cust','customersAll','statusStats'));
         break;
 
+    case 'accounts':
+        if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdo = Database::pdo();
+        $from = $_GET['from'] ?? date('Y-m-01');
+        $to = $_GET['to'] ?? date('Y-m-d');
+        $branchId = (int)(Auth::user()['branch_id'] ?? 0);
+        // Placeholder: summary totals
+        $totalPayments = (float)($pdo->query("SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) BETWEEN '".$from."' AND '".$to."'")->fetch()['s'] ?? 0);
+        $totalExpenses = (float)($pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?')->execute([$from,$to]) || 0);
+        // Use safer separate statements
+        $expStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?');
+        $expStmt->execute([$from,$to]);
+        $totalExpenses = (float)($expStmt->fetch()['s'] ?? 0);
+        Helpers::view('accounts/index', compact('from','to','totalPayments','totalExpenses','branchId'));
+        break;
+
+    case 'daybook':
+        if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdo = Database::pdo();
+        $date = $_GET['date'] ?? date('Y-m-d');
+        // Collect payments and expenses for the day
+        $pb = $pdo->prepare("SELECT p.id, p.amount, p.paid_at, 'Payment' AS type FROM payments p WHERE DATE(p.paid_at)=? ORDER BY p.paid_at, p.id");
+        $pb->execute([$date]);
+        $payments = $pb->fetchAll();
+        $eb = $pdo->prepare("SELECT e.id, e.amount, e.expense_date AS paid_at, 'Expense' AS type FROM expenses e WHERE e.expense_date=? ORDER BY e.expense_date, e.id");
+        $eb->execute([$date]);
+        $expenses = $eb->fetchAll();
+        Helpers::view('daybook/index', compact('date','payments','expenses'));
+        break;
+
+    case 'ledger':
+        if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdo = Database::pdo();
+        $from = $_GET['from'] ?? date('Y-m-01');
+        $to = $_GET['to'] ?? date('Y-m-d');
+        $account = $_GET['account'] ?? 'customers'; // placeholder selector
+        // For now, show payments vs expenses in range
+        $pStmt = $pdo->prepare("SELECT DATE(paid_at) AS d, SUM(amount) AS s FROM payments WHERE DATE(paid_at) BETWEEN ? AND ? GROUP BY DATE(paid_at) ORDER BY d");
+        $pStmt->execute([$from,$to]);
+        $pSeries = $pStmt->fetchAll();
+        $eStmt = $pdo->prepare("SELECT expense_date AS d, SUM(amount) AS s FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY expense_date ORDER BY d");
+        $eStmt->execute([$from,$to]);
+        $eSeries = $eStmt->fetchAll();
+        Helpers::view('ledger/index', compact('from','to','account','pSeries','eSeries'));
+        break;
+
     case 'routes':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
@@ -839,6 +885,10 @@ switch ($page) {
             if ($supplier_id <= 0) { $supplier_id = null; }
             $from_branch_id = (int)($_POST['from_branch_id'] ?? 0);
             $to_branch_id = (int)($_POST['to_branch_id'] ?? 0);
+            // If From Branch not provided, default to current user's branch
+            if ($from_branch_id <= 0) {
+                $from_branch_id = (int)($user['branch_id'] ?? 0);
+            }
             $weight = (float)($_POST['weight'] ?? 0);
             $status = $_POST['status'] ?? 'pending';
             $tracking_number = trim($_POST['tracking_number'] ?? '');

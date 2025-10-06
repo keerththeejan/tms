@@ -215,6 +215,19 @@
     </div>
   </div>
 
+  <!-- Full-width Previous Bill Preview (moved outside left column) -->
+  <div id="billPreview" class="mb-3" style="display:none;">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <span class="fw-semibold">Previous Bill</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="billPreviewClose">Close</button>
+      </div>
+      <div class="card-body p-0" style="height:700px; max-height:75vh;">
+        <iframe id="billPreviewFrame" src="about:blank" style="border:0; width:100%; height:100%;"></iframe>
+      </div>
+    </div>
+  </div>
+
   <!-- Receipt-like box -->
   <div class="receipt-box mb-3">
     <div class="receipt-header p-3 d-flex justify-content-between align-items-center">
@@ -353,8 +366,9 @@
 
   function recalc(){
     if (lockAll) { return; }
-    // When item amounts are allowed (Kilinochchi), always derive total from RS/CTS even on edit
-    if (canEnterItemAmounts) {
+    // When item amounts are allowed (Kilinochchi), derive from RS/CTS
+    // EXCEPT during price-only edit (user types price manually)
+    if (canEnterItemAmounts && !(isEdit && priceOnly)) {
       let total = 0;
       const rows = table.querySelectorAll('tbody tr');
       rows.forEach(row => {
@@ -372,7 +386,10 @@
         if (totalPrice) totalPrice.value = total.toFixed(2);
       } else {
         totalDisplay.textContent = '—';
-        if (totalPrice) totalPrice.value = '';
+        // Do not clear manual price during price-only edit
+        if (!(isEdit && priceOnly)) {
+          if (totalPrice) totalPrice.value = '';
+        }
       }
       return;
     }
@@ -387,6 +404,14 @@
     // Default fallback for create in other branches
     totalDisplay.textContent = totalPrice?.value ? String(totalPrice.value) : '—';
   }
+
+  // Keep total display in sync while typing manual price in price-only mode
+  totalPrice?.addEventListener('input', function(){
+    if (priceOnly) {
+      const v = parseFloat(totalPrice.value || '0');
+      totalDisplay.textContent = v > 0 ? v.toFixed(2) : '—';
+    }
+  });
 
   async function quickAdd(name, code, isMain){
     const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
@@ -560,8 +585,44 @@
   customerSelect?.addEventListener('change', fetchCustomerSummary);
   fromBranchSelect?.addEventListener('change', updateMeta);
   toBranchSelect?.addEventListener('change', updateMeta);
+  // If From Branch is empty on load, default to current user's branch
+  const userBranchId = <?php echo (int)((Auth::user()['branch_id'] ?? 0)); ?>;
+  if (fromBranchSelect && (!fromBranchSelect.value || fromBranchSelect.value === '0') && userBranchId > 0) {
+    const opt = Array.from(fromBranchSelect.options).find(o => parseInt(o.value||'0') === userBranchId);
+    if (opt) { fromBranchSelect.value = String(userBranchId); fromBranchSelect.dispatchEvent(new Event('change')); }
+  }
   updateMeta();
   fetchCustomerSummary();
+
+  // Intercept 'Open ... Bill' links to show inline preview instead of navigating
+  (function(){
+    const summary = document.getElementById('customerSummary');
+    const wrap = document.getElementById('billPreview');
+    const frame = document.getElementById('billPreviewFrame');
+    const closeBtn = document.getElementById('billPreviewClose');
+    if (!summary || !wrap || !frame) return;
+    summary.addEventListener('click', function(e){
+      const a = e.target.closest('a[href*="page=delivery_notes"][href*="action="]');
+      if (!a) return;
+      e.preventDefault();
+      let href = a.getAttribute('href');
+      try {
+        const u = new URL(href, window.location.origin);
+        // Use print layout for clean embed
+        u.searchParams.set('action','print');
+        u.searchParams.set('embed','1');
+        href = u.toString();
+      } catch(_) { /* keep href */ }
+      frame.src = href;
+      wrap.style.display = '';
+      // Scroll into view for convenience
+      wrap.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+    closeBtn?.addEventListener('click', function(){
+      wrap.style.display = 'none';
+      frame.src = 'about:blank';
+    });
+  })();
 
   // Handle clicking suggestion links
   toBranchSuggest?.addEventListener('click', function(e){

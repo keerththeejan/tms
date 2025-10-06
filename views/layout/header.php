@@ -110,6 +110,10 @@ $user = Auth::user();
         <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action!=='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>"><i class="bi bi-person-badge me-1"></i> Employee Details</a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action==='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>"><i class="bi bi-clipboard-data me-1"></i> Salary Report</a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='salaries'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=salaries'); ?>"><i class="bi bi-cash-coin me-1"></i> Salaries</a></li>
+        <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Accounts</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='accounts'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts'); ?>"><i class="bi bi-journal-richtext me-1"></i> Accounts</a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='daybook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=daybook'); ?>"><i class="bi bi-journal-text me-1"></i> Daybook</a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='ledger'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=ledger'); ?>"><i class="bi bi-journal-check me-1"></i> Account Ledger</a></li>
       <?php endif; ?>
       <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Tools</li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='search'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>"><i class="bi bi-search me-1"></i> Search</a></li>

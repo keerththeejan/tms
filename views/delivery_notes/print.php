@@ -1,4 +1,4 @@
-<?php /** @var array $dn */ /** @var array $items */ ?>
+<?php /** @var array $dn */ /** @var array $items */ $isEmbed = (($_GET['embed'] ?? '') === '1'); ?>
 <!doctype html>
 <html>
 <head>
@@ -8,12 +8,19 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
     @media print { .no-print { display: none !important; } }
-    body { padding: 20px; }
+    body { padding: <?php echo $isEmbed ? '8px' : '20px'; ?>; }
+    <?php if ($isEmbed): ?>
+    /* Tighter tables when embedded */
+    .table { margin-bottom: .75rem; }
+    h4 { margin-bottom: .25rem; }
+    <?php endif; ?>
   </style>
 </head>
-<div class="no-print mb-3">
-  <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
-</div>
+<?php if (!$isEmbed): ?>
+  <div class="no-print mb-3">
+    <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  </div>
+<?php endif; ?>
 <h4 class="mb-1">Delivery Note</h4>
 <div class="mb-2 text-muted">Branch: <?php echo htmlspecialchars($dn['branch_name'] ?? ''); ?></div>
 <table class="table table-sm table-bordered align-middle">
@@ -56,15 +63,17 @@
     </tr>
   </tfoot>
 </table>
+<?php if (!$isEmbed): ?>
 <script>
-  // Auto-trigger print on load for faster workflow
+  // Auto-trigger print on load for faster workflow (disabled when embedded)
   window.addEventListener('load', function(){
     setTimeout(function(){
       if (window.matchMedia) { window.print(); }
-{{ ... }}
+    }, 50);
   });
   // Optional: close the tab after printing if the browser supports it
   window.addEventListener('afterprint', function(){ /* window.close(); */ });
 </script>
+<?php endif; ?>
 </body>
 </html>
