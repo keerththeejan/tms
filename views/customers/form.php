@@ -111,6 +111,10 @@
         <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>">
       </div>
       <div class="col-md-6">
+        <label class="form-label">Email <span class="text-muted small">(optional)</span></label>
+        <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email'] ?? ''); ?>">
+      </div>
+      <div class="col-md-6">
         <label class="form-label">Address</label>
         <input type="text" name="address" class="form-control" value="<?php echo htmlspecialchars($customer['address']); ?>">
       </div>

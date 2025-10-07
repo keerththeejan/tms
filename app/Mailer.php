@@ -4,6 +4,7 @@ class Mailer
 {
     private array $config;
     private string $lastError = '';
+
     public function __construct(array $config)
     {
         $this->config = $config;
@@ -13,7 +14,7 @@ class Mailer
     {
         $this->lastError = '';
         // Try PHPMailer if available
-        if (class_exists('\\PHPMailer\PHPMailer\PHPMailer')) {
+        if (class_exists('\\PHPMailer\\PHPMailer\\PHPMailer')) {
             if (($this->config['use_smtp'] ?? false)) {
                 return $this->sendViaPHPMailer($toEmail, $toName, $subject, $htmlBody, $textBody);
             }
@@ -36,8 +37,12 @@ class Mailer
             if ($enc === 'ssl') { $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS; }
             elseif ($enc === 'tls') { $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS; }
             $mail->SMTPAuth = true;
-            // Optional debug level from config: 0 (off), 1 (client msg), 2 (client+server)
-            $mail->SMTPDebug = (int)($this->config['debug'] ?? 0);
+            if (!empty($this->config['auth_type'])) {
+                $mail->AuthType = (string)$this->config['auth_type'];
+            }
+            // Optional debug level from config: prefer 'smtpDebug', fallback to 'debug'
+            $mail->SMTPDebug = (int)($this->config['smtpDebug'] ?? ($this->config['debug'] ?? 0));
+            if (isset($this->config['debugoutput'])) { $mail->Debugoutput = $this->config['debugoutput']; }
             // Optional: allow self-signed certs (not recommended for production)
             if (!empty($this->config['allow_self_signed'])) {
                 $mail->SMTPOptions = [
@@ -48,10 +53,18 @@ class Mailer
                     ],
                 ];
             }
-            // IMPORTANT: set SMTP credentials (were missing)
+            // Credentials
             $mail->Username = (string)($this->config['username'] ?? '');
             $mail->Password = (string)($this->config['password'] ?? '');
             $mail->setFrom((string)($this->config['from_email'] ?? 'no-reply@example.com'), (string)($this->config['from_name'] ?? 'TMS'));
+            // Optional reply-to
+            if (!empty($this->config['reply_to'])) {
+                $mail->addReplyTo((string)$this->config['reply_to']);
+            }
+            // Timeouts
+            $mail->Timeout = (int)($this->config['timeout'] ?? 30);
+            $mail->SMTPKeepAlive = false;
+
             $mail->addAddress($toEmail, $toName);
             $mail->isHTML(true);
             $mail->Subject = $subject;
@@ -60,6 +73,7 @@ class Mailer
             return $mail->send();
         } catch (\Throwable $e) {
             $this->lastError = $e->getMessage();
+            @error_log('[TMS Mailer] send error: ' . $this->lastError);
             return false;
         }
     }
@@ -77,6 +91,16 @@ class Mailer
         if (!$ok) {
             $this->lastError = 'mail() returned false (local mail transport not configured).';
         }
+        return $ok;
+    }
+
+    private function sendViaMail(string $toEmail, string $toName, string $subject, string $htmlBody): bool
+    {
+        $headers = 'MIME-Version: 1.0' . "\r\n" .
+                   'Content-type: text/html; charset=utf-8' . "\r\n" .
+                   'From: TMS <no-reply@example.com>';
+        $ok = @mail($toEmail, $subject, $htmlBody, $headers);
+        if (!$ok) { $this->lastError = 'mail() returned false (no PHPMailer and no SMTP).'; }
         return $ok;
     }
 

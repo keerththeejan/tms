@@ -618,6 +618,7 @@ switch ($page) {
             $id = (int)($_POST['id'] ?? 0);
             $name = trim($_POST['name'] ?? '');
             $phone = trim($_POST['phone'] ?? '');
+            $email = trim($_POST['email'] ?? '');
             if ($phone === '') {
                 // Ensure fallback fits VARCHAR(20)
                 // Format: NA<epoch>-<3digits> (max length 2 + 10 + 1 + 3 = 16)
@@ -638,14 +639,14 @@ switch ($page) {
             $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
                          || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
                          || (($_POST['ajax'] ?? '') === '1');
-            if ($name === '') { $error = 'Name is required.'; $customer = compact('id','name','phone','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break; }
+            if ($name === '') { $error = 'Name is required.'; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break; }
             try {
                 if ($id > 0) {
-                    $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
-                    $stmt->execute([$name,$phone,$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
+                    $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, email=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
+                    $stmt->execute([$name,$phone,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
                 } else {
-                    $stmt = $pdo->prepare('INSERT INTO customers (name, phone, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?)');
-                    $stmt->execute([$name,$phone,$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
+                    $stmt = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?,?)');
+                    $stmt->execute([$name,$phone,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
                     $id = (int)$pdo->lastInsertId();
                 }
             } catch (Throwable $e) {
@@ -663,9 +664,9 @@ switch ($page) {
                     }
                 }
                 if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>$msg]); return; }
-                $error = $msg; $customer = compact('id','name','phone','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
+                $error = $msg; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
             }
-            if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone]); return; }
+            if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone,'email'=>$email]); return; }
             Helpers::redirect('index.php?page=customers');
             break;
         }
@@ -701,16 +702,18 @@ switch ($page) {
         $name = trim($_GET['name'] ?? '');
         $phone = trim($_GET['phone'] ?? '');
         $address = trim($_GET['address'] ?? '');
+        $email = trim($_GET['email'] ?? '');
         $delivery_location = trim($_GET['delivery_location'] ?? '');
         $type = trim($_GET['type'] ?? '');
         $q = trim($_GET['q'] ?? '');
 
-        $hasFilters = ($name !== '' || $phone !== '' || $address !== '' || $delivery_location !== '' || $type !== '');
+        $hasFilters = ($name !== '' || $phone !== '' || $email !== '' || $address !== '' || $delivery_location !== '' || $type !== '');
         if ($hasFilters) {
             $sql = 'SELECT * FROM customers WHERE 1=1';
             $params = [];
             if ($name !== '') { $sql .= ' AND name LIKE ?'; $params[] = "%$name%"; }
             if ($phone !== '') { $sql .= ' AND phone LIKE ?'; $params[] = "%$phone%"; }
+            if ($email !== '') { $sql .= ' AND email LIKE ?'; $params[] = "%$email%"; }
             if ($address !== '') { $sql .= ' AND address LIKE ?'; $params[] = "%$address%"; }
             if ($delivery_location !== '') { $sql .= ' AND delivery_location LIKE ?'; $params[] = "%$delivery_location%"; }
             if ($type !== '') { $sql .= ' AND customer_type = ?'; $params[] = $type; }
@@ -719,14 +722,14 @@ switch ($page) {
             $stmt->execute($params);
             $customers = $stmt->fetchAll();
         } else if ($q !== '') {
-            $stmt = $pdo->prepare("SELECT * FROM customers WHERE phone LIKE ? OR name LIKE ? OR address LIKE ? OR delivery_location LIKE ? OR customer_type LIKE ? ORDER BY created_at DESC LIMIT 100");
+            $stmt = $pdo->prepare("SELECT * FROM customers WHERE phone LIKE ? OR name LIKE ? OR email LIKE ? OR address LIKE ? OR delivery_location LIKE ? OR customer_type LIKE ? ORDER BY created_at DESC LIMIT 100");
             $like = "%$q%";
-            $stmt->execute([$like,$like,$like,$like,$like]);
+            $stmt->execute([$like,$like,$like,$like,$like,$like]);
             $customers = $stmt->fetchAll();
         } else {
             $customers = $pdo->query('SELECT * FROM customers ORDER BY created_at DESC LIMIT 100')->fetchAll();
         }
-        Helpers::view('customers/index', compact('customers','q','name','phone','address','delivery_location','type'));
+        Helpers::view('customers/index', compact('customers','q','name','phone','email','address','delivery_location','type'));
         break;
 
     case 'vehicles':
@@ -1071,6 +1074,55 @@ switch ($page) {
                 }
             }
             $pdo->commit();
+            // Send customer notification email (best-effort, ignore failures)
+            try {
+                // Fetch customer email/name
+                $cStmt = $pdo->prepare('SELECT name, email FROM customers WHERE id=? LIMIT 1');
+                $cStmt->execute([$customer_id]);
+                $cRow = $cStmt->fetch();
+                $toEmail = trim((string)($cRow['email'] ?? ''));
+                if ($toEmail !== '' && isset($GLOBALS['mailer']) && $GLOBALS['mailer'] instanceof Mailer) {
+                    // Current parcel items
+                    $itStmt = $pdo->prepare('SELECT description, qty, COALESCE(rate,0) AS rate FROM parcel_items WHERE parcel_id=? ORDER BY id');
+                    $itStmt->execute([(int)$id]);
+                    $itemsNow = $itStmt->fetchAll();
+                    $rowsHtml = '';
+                    $totalNow = 0.0;
+                    foreach ($itemsNow as $it) {
+                        $desc = (string)($it['description'] ?? '');
+                        $qty = (float)($it['qty'] ?? 0);
+                        $rate = (float)($it['rate'] ?? 0);
+                        $amt = $qty * $rate; $totalNow += $amt;
+                        $rowsHtml .= '<tr><td>'.htmlspecialchars($desc).'</td><td>'.number_format($qty,2).'</td><td class="text-end">'.number_format($rate,2).'</td><td class="text-end">'.number_format($amt,2).'</td></tr>';
+                    }
+                    if ($rowsHtml === '') { $rowsHtml = '<tr><td colspan="4">No item details available.</td></tr>'; }
+                    // Recent history
+                    $hStmt = $pdo->prepare('SELECT id, created_at, COALESCE(price,0) AS price FROM parcels WHERE customer_id=? ORDER BY created_at DESC, id DESC LIMIT 10');
+                    $hStmt->execute([$customer_id]);
+                    $histHtml = '';
+                    foreach ($hStmt->fetchAll() as $h) {
+                        $histHtml .= '<tr><td>#'.(int)$h['id'].'</td><td>'.htmlspecialchars((string)$h['created_at']).'</td><td class="text-end">'.number_format((float)$h['price'],2).'</td></tr>';
+                    }
+                    if ($histHtml === '') { $histHtml = '<tr><td colspan="3">No previous parcels.</td></tr>'; }
+                    $custName = (string)($cRow['name'] ?? 'Customer');
+                    $subject = 'Your Parcel Update';
+                    $html = '<div style="font-family:Arial,sans-serif">'
+                          . '<h3>Parcel Updated</h3>'
+                          . '<p>Dear '.htmlspecialchars($custName).', the following item(s) were recorded for your parcel:</p>'
+                          . '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">'
+                          . '<thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>'
+                          . $rowsHtml
+                          . '</tbody><tfoot><tr><th colspan="3" style="text-align:right">Total</th><th class="text-end">'.number_format($totalNow,2).'</th></tr></tfoot></table>'
+                          . '<h4 style="margin-top:16px">Recent History</h4>'
+                          . '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">'
+                          . '<thead><tr><th>Parcel</th><th>Date</th><th>Total Price</th></tr></thead><tbody>'
+                          . $histHtml
+                          . '</tbody></table>'
+                          . '</div>';
+                    $GLOBALS['mailer']->send($toEmail, $custName, $subject, $html, strip_tags($html));
+                }
+            } catch (Throwable $e) { /* ignore */ }
+
             // Remember this record's lorry_full state for edit form rendering in this session
             if (!isset($_SESSION['lorry_full_saved']) || !is_array($_SESSION['lorry_full_saved'])) {
                 $_SESSION['lorry_full_saved'] = [];

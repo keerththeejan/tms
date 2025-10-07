@@ -27,9 +27,10 @@ $config = require __DIR__ . '/../config/config.php';
 Database::init($config);
 
 // Initialize Mailer (available as $GLOBALS['mailer'])
-try {
-    $mailConfig = require __DIR__ . '/../config/mail.php';
-} catch (Throwable $e) {
+$mailCfgPath = __DIR__ . '/../config/mail.php';
+if (file_exists($mailCfgPath)) {
+    $mailConfig = require $mailCfgPath;
+} else {
     $mailConfig = [
         'use_smtp' => false,
         'from_email' => 'no-reply@example.com',

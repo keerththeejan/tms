@@ -11,6 +11,9 @@
   <div class="col-6 col-md-3 col-lg-2">
     <input type="text" class="form-control" name="phone" placeholder="Phone" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
   </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <input type="text" class="form-control" name="email" placeholder="Email" value="<?php echo htmlspecialchars($email ?? ''); ?>">
+  </div>
   <div class="col-6 col-md-3 col-lg-3">
     <input type="text" class="form-control" name="address" placeholder="Address" value="<?php echo htmlspecialchars($address ?? ''); ?>">
   </div>
@@ -37,6 +40,7 @@
         <th>#</th>
         <th>Name</th>
         <th>Phone</th>
+        <th>Email</th>
         <th>Address</th>
         <th>Delivery Location</th>
         <th>Type</th>
@@ -49,6 +53,7 @@
           <td><?php echo (int)$c['id']; ?></td>
           <td><?php echo htmlspecialchars($c['name']); ?></td>
           <td><?php echo htmlspecialchars($c['phone']); ?></td>
+          <td><?php echo htmlspecialchars($c['email'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($c['address']); ?></td>
           <td><?php echo htmlspecialchars($c['delivery_location']); ?></td>
           <td><?php echo htmlspecialchars($c['customer_type'] ?? ''); ?></td>
