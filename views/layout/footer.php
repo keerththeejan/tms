@@ -7,7 +7,17 @@
   (function(){
     if (typeof DataTable !== 'undefined') {
       document.querySelectorAll('table.datatable').forEach(function(tbl){
-        new DataTable(tbl, { paging: true, searching: true, order: [] });
+        // Ensure responsive container
+        if (!tbl.closest('.table-responsive')) {
+          var wrap = document.createElement('div');
+          wrap.className = 'table-responsive';
+          tbl.parentNode.insertBefore(wrap, tbl);
+          wrap.appendChild(tbl);
+        }
+        // Ensure Bootstrap table classes for better mobile readability
+        tbl.classList.add('table','table-striped','table-hover','align-middle');
+        // Initialize DataTable with horizontal scroll support
+        new DataTable(tbl, { paging: true, searching: true, order: [], scrollX: true });
       });
     }
   })();
@@ -31,7 +41,7 @@
     function handleResize(){ if (window.innerWidth >= 992) { body.classList.remove('sidebar-open'); } }
     window.addEventListener('resize', handleResize);
   })();
-  </script>
+</script>
 <script>
   // Enhance all Bootstrap selects with search using Choices.js
   (function(){
@@ -52,6 +62,20 @@
         removeItemButton: sel.multiple === true
       });
       sel.dataset.enhanced = '1';
+    });
+  })();
+</script>
+<script>
+  // Make non-DataTables tables responsive as well
+  (function(){
+    document.querySelectorAll('table:not(.datatable)').forEach(function(tbl){
+      if (!tbl.closest('.table-responsive')) {
+        var wrap = document.createElement('div');
+        wrap.className = 'table-responsive';
+        tbl.parentNode.insertBefore(wrap, tbl);
+        wrap.appendChild(tbl);
+      }
+      tbl.classList.add('table','table-striped','align-middle');
     });
   })();
 </script>

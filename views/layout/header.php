@@ -55,6 +55,34 @@ $user = Auth::user();
     .choices__list--dropdown .choices__item { color: #212529; }
     .choices__placeholder { color: #495057 !important; opacity: 1 !important; }
     .choices[data-type*=select-one] .choices__button { color: #212529; }
+    /* Tables: prevent layout breaks on mobile */
+    .table td, .table th { white-space: nowrap; }
+    .table .text-wrap, .text-wrap { white-space: normal; word-break: break-word; }
+    /* General container and typography tuning for small screens */
+    @media (max-width: 576px) {
+      .container-fluid { padding-left: .75rem; padding-right: .75rem; }
+      .navbar .navbar-brand { font-size: .95rem; }
+      .navbar .nav-link, .navbar .navbar-text { font-size: .85rem; }
+      .table { font-size: .9rem; }
+      .btn { padding: .35rem .6rem; font-size: .9rem; }
+      .form-control, .form-select { font-size: .95rem; }
+    }
+    /* Form rows: stack labels/inputs nicely on narrow screens */
+    @media (max-width: 768px) {
+      .form-label { margin-bottom: .25rem; }
+      .row.g-3 > [class^="col-"], .row.g-2 > [class^="col-"], .row.g-1 > [class^="col-"] { margin-bottom: .5rem; }
+      .btn-group { flex-wrap: wrap; }
+      .btn-toolbar { gap: .5rem; flex-wrap: wrap; }
+    }
+    /* DataTables wrapper adjustments */
+    .dataTables_wrapper .dataTables_filter input { max-width: 160px; }
+    @media (max-width: 576px) {
+      .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter { float: none; text-align: left; }
+      .dataTables_wrapper .dataTables_filter input { width: 100%; max-width: none; }
+    }
+    /* Utility helpers */
+    .w-100-sm { width: auto; }
+    @media (max-width: 576px) { .w-100-sm { width: 100% !important; } }
   </style>
 </head>
 <body>
