@@ -112,13 +112,41 @@
       <div id="customerSummary" class="mt-2"></div>
     </div>
     <div class="col-md-4">
-      <label class="form-label">Supplier (Optional)</label>
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>Supplier (Optional)</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddSupplier" aria-expanded="false"><i class="bi bi-person-plus"></i> Quick Add</button>
+      </label>
       <select name="supplier_id" class="form-select" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="0">-- None --</option>
         <?php foreach (($suppliersAll ?? []) as $s): ?>
-          <option value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($parcel['supplier_id'] ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($s['name']); ?></option>
+          <?php 
+            $raw = (string)($s['name'] ?? '');
+            $nm = trim($raw);
+            // Build a normalized token to detect placeholder-like entries such as '-- None --', 'none', ' - none - '
+            $norm = strtolower(preg_replace('/[^a-z0-9]+/i','', $nm)); // remove non-alnum
+            if ($nm === '' || $norm === 'none' || $norm === 'nonenone') { continue; }
+          ?>
+          <option value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($parcel['supplier_id'] ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($nm); ?></option>
         <?php endforeach; ?>
       </select>
+      <div class="collapse mt-2" id="quickAddSupplier">
+        <div class="border rounded p-2 bg-light">
+          <div class="row g-2">
+            <div class="col-6"><input type="text" id="qs_name" class="form-control form-control-sm" placeholder="Supplier name"></div>
+            <div class="col-6"><input type="text" id="qs_phone" class="form-control form-control-sm" placeholder="Phone (optional)"></div>
+            <div class="col-6">
+              <select id="qs_branch" class="form-select form-select-sm">
+                <option value="0">-- Select Branch --</option>
+                <?php foreach (($branchesAll ?? []) as $b): ?>
+                  <option value="<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['name']); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-6"><input type="text" id="qs_code" class="form-control form-control-sm" placeholder="Code (optional)"></div>
+            <div class="col-12 text-end"><button type="button" id="qs_submit" class="btn btn-sm btn-primary"><i class="bi bi-save"></i> Save & Use</button></div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="col-md-4">
       <label class="form-label">Date</label>
@@ -381,6 +409,58 @@
         const line = (qty > 0 && perUnit > 0) ? (qty * perUnit) : 0;
         total += line;
       });
+  // Quick Add Supplier handlers
+  const qsBtn = document.getElementById('qs_submit');
+  qsBtn?.addEventListener('click', async function(){
+    const name = (document.getElementById('qs_name')?.value || '').trim();
+    const phone = (document.getElementById('qs_phone')?.value || '').trim();
+    let branchId = parseInt(document.getElementById('qs_branch')?.value || '0');
+    const code = (document.getElementById('qs_code')?.value || '').trim();
+    if (!name) { alert('Enter supplier name'); return; }
+    const norm = name.toLowerCase().replace(/[^a-z0-9]+/g,'');
+    if (norm === 'none' || norm === 'nonenone') { alert('Invalid supplier name'); return; }
+    if (!branchId || branchId <= 0) {
+      // Try to fallback to selected From Branch, else to user's branch
+      const fb = parseInt(document.querySelector('select[name="from_branch_id"]')?.value || '0');
+      branchId = fb > 0 ? fb : (userBranchId || 0);
+    }
+    if (!branchId || branchId <= 0) { alert('Select a branch'); return; }
+    try {
+      const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+      const fd = new FormData();
+      fd.append('csrf_token', csrf);
+      fd.append('ajax', '1');
+      fd.append('id', '0');
+      fd.append('name', name);
+      fd.append('phone', phone);
+      fd.append('branch_id', String(branchId));
+      fd.append('supplier_code', code);
+      const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=suppliers&action=save'); ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+        body: fd
+      });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      if (!data || !data.id) throw new Error('Invalid response');
+      const sel = document.querySelector('select[name="supplier_id"]');
+      if (sel) {
+        // Add option if missing
+        let exists = false;
+        Array.from(sel.options).forEach(o=>{ if (parseInt(o.value||'0') === parseInt(data.id)) exists = true; });
+        if (!exists) { const opt=document.createElement('option'); opt.value=String(data.id); opt.textContent=String(data.name||name); sel.appendChild(opt); }
+        sel.value = String(data.id);
+        sel.dispatchEvent(new Event('change'));
+      }
+      // Clear inputs
+      const ids = ['qs_name','qs_phone','qs_code']; ids.forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
+      const qsBranch = document.getElementById('qs_branch'); if (qsBranch) qsBranch.value='0';
+      // Close collapse
+      const collapseEl = document.getElementById('quickAddSupplier'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
+    } catch (e) {
+      alert('Failed to add supplier');
+    }
+  });
       if (total > 0) {
         totalDisplay.textContent = total.toFixed(2);
         if (totalPrice) totalPrice.value = total.toFixed(2);

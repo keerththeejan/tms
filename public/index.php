@@ -777,11 +777,21 @@ switch ($page) {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
             $name = trim($_POST['name'] ?? '');
+            // Disallow placeholder-like names such as 'none' or '-- none --'
+            $nameNorm = strtolower(preg_replace('/[^a-z0-9]+/i','', $name));
             $phone = trim($_POST['phone'] ?? '');
             $branch_id = (int)($_POST['branch_id'] ?? 0);
             $supplier_code = trim($_POST['supplier_code'] ?? '');
-            if ($name === '' || $branch_id <= 0) {
-                $error = 'Name and Branch are required.';
+            $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
+                         || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
+                         || (($_POST['ajax'] ?? '') === '1');
+            if ($name === '' || $nameNorm === 'none' || $nameNorm === 'nonenone' || $branch_id <= 0) {
+                if ($wantsJson) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'Valid Name and Branch are required.']);
+                    return;
+                }
+                $error = 'Valid Name and Branch are required.';
                 $supplier = compact('id','name','phone','branch_id','supplier_code');
                 Helpers::view('suppliers/form', compact('supplier','branchesAll','error'));
                 break;
@@ -793,6 +803,11 @@ switch ($page) {
                 $stmt = $pdo->prepare('INSERT INTO suppliers (name, phone, branch_id, supplier_code) VALUES (?,?,?,?)');
                 $stmt->execute([$name,$phone,$branch_id,$supplier_code]);
                 $id = (int)$pdo->lastInsertId();
+            }
+            if ($wantsJson) {
+                header('Content-Type: application/json');
+                echo json_encode(['id'=>$id, 'name'=>$name, 'phone'=>$phone, 'branch_id'=>$branch_id, 'supplier_code'=>$supplier_code]);
+                return;
             }
             Helpers::redirect('index.php?page=suppliers');
             break;
