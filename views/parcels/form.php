@@ -409,6 +409,57 @@
         const line = (qty > 0 && perUnit > 0) ? (qty * perUnit) : 0;
         total += line;
       });
+  // Quick Add Branch: From Branch (fab_*)
+  const fabBtn = document.getElementById('fab_submit');
+  fabBtn?.addEventListener('click', async function(){
+    const name = (document.getElementById('fab_name')?.value || '').trim();
+    const code = (document.getElementById('fab_code')?.value || '').trim();
+    const isMain = !!document.getElementById('fab_main')?.checked;
+    if (!name || !code) { alert('Enter branch name and code'); return; }
+    try {
+      const created = await quickAdd(name, code, isMain);
+      const sel = document.querySelector('select[name="from_branch_id"]');
+      if (sel) {
+        // Avoid duplicate option
+        let exists = false;
+        Array.from(sel.options).forEach(o=>{ if (parseInt(o.value||'0') === parseInt(created.id)) exists = true; });
+        if (!exists) { const opt=document.createElement('option'); opt.value=String(created.id); opt.textContent=String(created.name||name); sel.appendChild(opt); }
+        sel.value = String(created.id);
+        sel.dispatchEvent(new Event('change'));
+      }
+      // Clear inputs and close collapse
+      ['fab_name','fab_code'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
+      const fabMain = document.getElementById('fab_main'); if (fabMain) fabMain.checked = false;
+      const collapseEl = document.getElementById('quickAddFromBranch'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
+    } catch (e) {
+      alert('Failed to add branch');
+    }
+  });
+
+  // Quick Add Branch: To Branch (tab_*)
+  const tabBtn = document.getElementById('tab_submit');
+  tabBtn?.addEventListener('click', async function(){
+    const name = (document.getElementById('tab_name')?.value || '').trim();
+    const code = (document.getElementById('tab_code')?.value || '').trim();
+    const isMain = !!document.getElementById('tab_main')?.checked;
+    if (!name || !code) { alert('Enter branch name and code'); return; }
+    try {
+      const created = await quickAdd(name, code, isMain);
+      const sel = document.querySelector('select[name="to_branch_id"]');
+      if (sel) {
+        let exists = false;
+        Array.from(sel.options).forEach(o=>{ if (parseInt(o.value||'0') === parseInt(created.id)) exists = true; });
+        if (!exists) { const opt=document.createElement('option'); opt.value=String(created.id); opt.textContent=String(created.name||name); sel.appendChild(opt); }
+        sel.value = String(created.id);
+        sel.dispatchEvent(new Event('change'));
+      }
+      ['tab_name','tab_code'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
+      const tabMain = document.getElementById('tab_main'); if (tabMain) tabMain.checked = false;
+      const collapseEl = document.getElementById('quickAddToBranch'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
+    } catch (e) {
+      alert('Failed to add branch');
+    }
+  });
   // Quick Add Supplier handlers
   const qsBtn = document.getElementById('qs_submit');
   qsBtn?.addEventListener('click', async function(){

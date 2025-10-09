@@ -53,15 +53,28 @@
       if (sel.dataset.enhance === 'false') return;
       var optionCount = sel.options ? sel.options.length : 0;
       var searchEnabled = optionCount >= 5; // auto-disable search for very small lists
-      var instance = new Choices(sel, {
+      var cfg = {
         searchEnabled: searchEnabled,
         searchResultLimit: 50,
         shouldSort: true,
         itemSelectText: '',
         allowHTML: false,
         removeItemButton: sel.multiple === true
-      });
+      };
+      // Keep placeholder at top for supplier select by disabling sort
+      if ((sel.getAttribute('name')||'').toLowerCase() === 'supplier_id') {
+        cfg.shouldSort = false;
+      }
+      var instance = new Choices(sel, cfg);
       sel.dataset.enhanced = '1';
+      // Hide placeholder option in dropdown for Supplier select so '-- None --' won't appear in the middle
+      try {
+        if ((sel.getAttribute('name')||'').toLowerCase() === 'supplier_id') {
+          var container = sel.closest('.choices');
+          var toHide = container && (container.querySelector('.choices__list--dropdown [data-value="0"]') || container.querySelector('.choices__list--dropdown [data-value=""]'));
+          if (toHide) { toHide.style.display = 'none'; }
+        }
+      } catch (e) { /* ignore */ }
     });
   })();
 </script>
