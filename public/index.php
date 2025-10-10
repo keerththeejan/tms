@@ -1436,12 +1436,14 @@ switch ($page) {
             $direction = $_GET['direction'] ?? 'from'; // 'from' (dispatch) or 'to' (arrivals)
             $vehicle = trim($_GET['vehicle'] ?? '');
             $branchColumn = ($direction === 'to') ? 'p.to_branch_id' : 'p.from_branch_id';
+            // For arrivals (to-branch), consider last update time; for dispatch (from-branch), use created_at
+            $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(p.updated_at, p.created_at))' : 'DATE(p.created_at)';
             $sql = "SELECT COALESCE(p.vehicle_no,'—') AS vehicle_no,
                            COUNT(*) AS parcels_count,
                            SUM(CASE WHEN p.status='delivered' THEN 1 ELSE 0 END) AS delivered_count
                     FROM parcels p
                     LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
-                    WHERE $branchColumn = ? AND DATE(p.created_at) BETWEEN ? AND ?";
+                    WHERE $branchColumn = ? AND $dateExpr BETWEEN ? AND ?";
             $params = [$branchId, $from, $to];
             if ($vehicle !== '') { $sql .= ' AND COALESCE(p.vehicle_no, "") LIKE ?'; $params[] = "%$vehicle%"; }
             $sql .= "
@@ -1462,7 +1464,9 @@ switch ($page) {
             $direction = $_GET['direction'] ?? 'from';
             $placeFilter = trim($_GET['place'] ?? '');
             $branchColumn = ($direction === 'to') ? 'p.to_branch_id' : 'p.from_branch_id';
-            $where = ["$branchColumn = ?",'DATE(p.created_at) BETWEEN ? AND ?'];
+            // Date range uses last update time for arrivals
+            $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(p.updated_at, p.created_at))' : 'DATE(p.created_at)';
+            $where = ["$branchColumn = ?", "$dateExpr BETWEEN ? AND ?"];
             $params = [$branchId, $from, $to];
             if ($vehicle_no !== '') { $where[] = 'COALESCE(p.vehicle_no,"") = ?'; $params[] = $vehicle_no; }
             if ($placeFilter !== '') { $where[] = 'COALESCE(c.delivery_location,"") LIKE ?'; $params[] = '%'.$placeFilter.'%'; }
