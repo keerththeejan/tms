@@ -51,6 +51,7 @@
               <th>To</th>
               <th>Weight</th>
               <th>Price</th>
+              <th>Vehicle</th>
               <th>Status</th>
               <th>Tracking</th>
             </tr>
@@ -64,6 +65,7 @@
               <td><?php echo (int)$p['to_branch_id']; ?></td>
               <td><?php echo number_format((float)$p['weight'], 2); ?></td>
               <td><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
+              <td><?php echo ($p['vehicle_no'] ?? '') !== '' ? htmlspecialchars($p['vehicle_no']) : '—'; ?></td>
               <td><?php echo htmlspecialchars($p['status']); ?></td>
               <td><?php echo htmlspecialchars($p['tracking_number'] ?? ''); ?></td>
             </tr>

@@ -14,6 +14,19 @@
   $priceOnly = !empty($policy['priceOnly']);
   $lockAll = !empty($policy['lockAll']);
   $canEnterItemAmounts = !empty($policy['canEnterItemAmounts']);
+  // Build unique branch list by case-insensitive name, prefer main branch
+  $branchesUnique = [];
+  foreach (($branchesAll ?? []) as $b) {
+    $nm = trim((string)($b['name'] ?? ''));
+    if ($nm === '') { continue; }
+    $key = strtolower($nm);
+    if (!isset($branchesUnique[$key])) { $branchesUnique[$key] = $b; continue; }
+    $curr = $branchesUnique[$key];
+    $isMainNew = !empty($b['is_main']);
+    $isMainCurr = !empty($curr['is_main']);
+    if ($isMainNew && !$isMainCurr) { $branchesUnique[$key] = $b; }
+  }
+  $branchesList = array_values($branchesUnique);
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h3>
@@ -137,7 +150,7 @@
             <div class="col-6">
               <select id="qs_branch" class="form-select form-select-sm">
                 <option value="0">-- Select Branch --</option>
-                <?php foreach (($branchesAll ?? []) as $b): ?>
+                <?php foreach (($branchesList ?? []) as $b): ?>
                   <option value="<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['name']); ?></option>
                 <?php endforeach; ?>
               </select>
@@ -159,7 +172,7 @@
       </label>
       <select name="from_branch_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Branch --</option>
-        <?php foreach (($branchesAll ?? []) as $b): ?>
+        <?php foreach (($branchesList ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['from_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
         <?php endforeach; ?>
       </select>
@@ -181,7 +194,7 @@
       </label>
       <select name="to_branch_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Branch --</option>
-        <?php foreach (($branchesAll ?? []) as $b): ?>
+        <?php foreach (($branchesList ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['to_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
         <?php endforeach; ?>
       </select>

@@ -135,6 +135,7 @@
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=edit&id='.(int)$e['id']); ?>" title="Edit"><i class="bi bi-pencil-square"></i></a>
             <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=employees&action=delete'); ?>" class="d-inline" onsubmit="return confirm('Delete this employee?');">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+              <input type="hidden" name="id" value="<?php echo (int)$e['id']; ?>">
               <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
             </form>
           </td>

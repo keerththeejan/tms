@@ -122,7 +122,6 @@ $user = Auth::user();
       <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsListActive?'active':''; ?>" href="<?php echo $parcelsListUrl; ?>"><i class="bi bi-card-list me-1"></i> Parcel Details</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='customers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=customers'); ?>"><i class="bi bi-person-lines-fill me-1"></i> Customers</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='suppliers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>"><i class="bi bi-truck me-1"></i> Suppliers</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='routes'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=routes'); ?>"><i class="bi bi-signpost me-1"></i> Routes</a></li>
       <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Delivery</li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>"><i class="bi bi-geo-alt me-1"></i> Route Planning</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteVehiclesActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>"><i class="bi bi-truck-front me-1"></i> Vehicle Routes</a></li>

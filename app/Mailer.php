@@ -4,7 +4,6 @@ class Mailer
 {
     private array $config;
     private string $lastError = '';
-
     public function __construct(array $config)
     {
         $this->config = $config;
@@ -14,7 +13,7 @@ class Mailer
     {
         $this->lastError = '';
         // Try PHPMailer if available
-        if (class_exists('\\PHPMailer\\PHPMailer\\PHPMailer')) {
+        if (class_exists('\\PHPMailer\PHPMailer\PHPMailer')) {
             if (($this->config['use_smtp'] ?? false)) {
                 return $this->sendViaPHPMailer($toEmail, $toName, $subject, $htmlBody, $textBody);
             }
@@ -53,7 +52,7 @@ class Mailer
                     ],
                 ];
             }
-            // Credentials
+            // IMPORTANT: set SMTP credentials (were missing)
             $mail->Username = (string)($this->config['username'] ?? '');
             $mail->Password = (string)($this->config['password'] ?? '');
             $mail->setFrom((string)($this->config['from_email'] ?? 'no-reply@example.com'), (string)($this->config['from_name'] ?? 'TMS'));
@@ -61,10 +60,9 @@ class Mailer
             if (!empty($this->config['reply_to'])) {
                 $mail->addReplyTo((string)$this->config['reply_to']);
             }
-            // Timeouts
+            // Reasonable timeouts
             $mail->Timeout = (int)($this->config['timeout'] ?? 30);
             $mail->SMTPKeepAlive = false;
-
             $mail->addAddress($toEmail, $toName);
             $mail->isHTML(true);
             $mail->Subject = $subject;
@@ -73,6 +71,7 @@ class Mailer
             return $mail->send();
         } catch (\Throwable $e) {
             $this->lastError = $e->getMessage();
+            // Log basic details for troubleshooting
             @error_log('[TMS Mailer] send error: ' . $this->lastError);
             return false;
         }
@@ -91,16 +90,6 @@ class Mailer
         if (!$ok) {
             $this->lastError = 'mail() returned false (local mail transport not configured).';
         }
-        return $ok;
-    }
-
-    private function sendViaMail(string $toEmail, string $toName, string $subject, string $htmlBody): bool
-    {
-        $headers = 'MIME-Version: 1.0' . "\r\n" .
-                   'Content-type: text/html; charset=utf-8' . "\r\n" .
-                   'From: TMS <no-reply@example.com>';
-        $ok = @mail($toEmail, $subject, $htmlBody, $headers);
-        if (!$ok) { $this->lastError = 'mail() returned false (no PHPMailer and no SMTP).'; }
         return $ok;
     }
 

@@ -211,78 +211,8 @@ switch ($page) {
         break;
 
     case 'routes':
-        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
-        $pdo = Database::pdo();
-        // Ensure table exists
-        try {
-            $pdo->exec("CREATE TABLE IF NOT EXISTS routes (
-                id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-                name VARCHAR(120) NOT NULL UNIQUE,
-                notes VARCHAR(255) NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB");
-        } catch (Throwable $e) { /* ignore */ }
-        $action = $_GET['action'] ?? 'index';
-
-        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $id = (int)($_POST['id'] ?? 0);
-            $name = trim($_POST['name'] ?? '');
-            $notes = trim($_POST['notes'] ?? '');
-            if ($name === '') { $error = 'Route name is required.'; $route = compact('id','name','notes'); Helpers::view('routes/form', compact('route','error')); break; }
-            try {
-                if ($id > 0) {
-                    $stmt = $pdo->prepare('UPDATE routes SET name=?, notes=? WHERE id=?');
-                    $stmt->execute([$name, ($notes !== '' ? $notes : null), $id]);
-                } else {
-                    $stmt = $pdo->prepare('INSERT INTO routes (name, notes) VALUES (?, ?)');
-                    $stmt->execute([$name, ($notes !== '' ? $notes : null)]);
-                    $id = (int)$pdo->lastInsertId();
-                }
-                Helpers::redirect('index.php?page=routes');
-                break;
-            } catch (PDOException $e) {
-                $msg = 'Failed to save route.';
-                if ($e->getCode() === '23000') { $msg = 'Route name already exists.'; }
-                $error = $msg; $route = compact('id','name','notes'); Helpers::view('routes/form', compact('route','error')); break;
-            }
-        }
-
-        if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $id = (int)($_POST['id'] ?? 0);
-            if ($id > 0) { $pdo->prepare('DELETE FROM routes WHERE id=?')->execute([$id]); }
-            Helpers::redirect('index.php?page=routes');
-            break;
-        }
-
-        if ($action === 'new') {
-            $route = ['id'=>0,'name'=>'','notes'=>''];
-            Helpers::view('routes/form', compact('route'));
-            break;
-        }
-
-        if ($action === 'edit') {
-            $id = (int)($_GET['id'] ?? 0);
-            $stmt = $pdo->prepare('SELECT * FROM routes WHERE id=?');
-            $stmt->execute([$id]);
-            $route = $stmt->fetch();
-            if (!$route) { http_response_code(404); echo 'Not found'; break; }
-            Helpers::view('routes/form', compact('route'));
-            break;
-        }
-
-        // index
-        $q = trim($_GET['q'] ?? '');
-        if ($q !== '') {
-            $stmt = $pdo->prepare('SELECT * FROM routes WHERE name LIKE ? OR notes LIKE ? ORDER BY name LIMIT 200');
-            $like = "%$q%"; $stmt->execute([$like,$like]);
-            $routes = $stmt->fetchAll();
-        } else {
-            $routes = $pdo->query('SELECT * FROM routes ORDER BY name LIMIT 200')->fetchAll();
-        }
-        Helpers::view('routes/index', compact('routes','q'));
+        // Page removed as requested; redirect users to Delivery Route Planning
+        Helpers::redirect('index.php?page=delivery_notes&action=route');
         break;
 
     case 'change_password':
@@ -384,7 +314,18 @@ switch ($page) {
                         break;
                     }
                 }
-                $pdo->prepare('DELETE FROM branches WHERE id=?')->execute([$id]);
+                try {
+                    $pdo->prepare('DELETE FROM branches WHERE id=?')->execute([$id]);
+                } catch (PDOException $e) {
+                    // Integrity constraint (e.g., referenced by expenses, users, parcels, etc.)
+                    if ($e->getCode() === '23000') {
+                        $error = 'Cannot delete this branch because it is used by other records (e.g., expenses, users, parcels). Delete or reassign those records first.';
+                        $branches = $pdo->query('SELECT * FROM branches ORDER BY is_main DESC, name')->fetchAll();
+                        Helpers::view('branches/index', compact('branches','error'));
+                        break;
+                    }
+                    throw $e;
+                }
             }
             Helpers::redirect('index.php?page=branches');
             break;
@@ -675,8 +616,53 @@ switch ($page) {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                // Consider FK constraints with parcels; this may fail if referenced
-                $pdo->prepare('DELETE FROM customers WHERE id=?')->execute([$id]);
+                // Guard against FK violations: check references before delete
+                $refParcels = 0; $refDN = 0;
+                try {
+                    $st1 = $pdo->prepare('SELECT COUNT(*) FROM parcels WHERE customer_id=?');
+                    $st1->execute([$id]);
+                    $refParcels = (int)$st1->fetchColumn();
+                } catch (Throwable $e) { $refParcels = 0; }
+                try {
+                    $st2 = $pdo->prepare('SELECT COUNT(*) FROM delivery_notes WHERE customer_id=?');
+                    $st2->execute([$id]);
+                    $refDN = (int)$st2->fetchColumn();
+                } catch (Throwable $e) { $refDN = 0; }
+
+                if ($refParcels > 0 || $refDN > 0) {
+                    http_response_code(400);
+                    $totalRefs = $refParcels + $refDN;
+                    $msg = 'Cannot delete this customer because it is referenced by existing records: '
+                         . $refParcels . ' parcel(s) and ' . $refDN . ' delivery note(s).';
+                    echo '<!doctype html><html><head><meta charset="utf-8"><title>Delete Customer</title>'
+                       . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                       . '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"></head><body>'
+                       . '<div class="container" style="max-width:780px;">'
+                       . '<div class="alert alert-danger mt-4" role="alert">' . htmlspecialchars($msg) . ' '
+                       . 'Please reassign or remove those records first.</div>'
+                       . '<a class="btn btn-outline-secondary" href="' . Helpers::baseUrl('index.php?page=customers') . '">← Back to Customers</a>'
+                       . '</div></body></html>';
+                    break;
+                }
+
+                // Safe to delete
+                try {
+                    $pdo->prepare('DELETE FROM customers WHERE id=?')->execute([$id]);
+                } catch (PDOException $e) {
+                    if ($e->getCode() === '23000') {
+                        http_response_code(400);
+                        $msg = 'Cannot delete this customer because it is referenced by existing records.';
+                        echo '<!doctype html><html><head><meta charset="utf-8"><title>Delete Customer</title>'
+                           . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                           . '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"></head><body>'
+                           . '<div class="container" style="max-width:780px;">'
+                           . '<div class="alert alert-danger mt-4" role="alert">' . htmlspecialchars($msg) . '</div>'
+                           . '<a class="btn btn-outline-secondary" href="' . Helpers::baseUrl('index.php?page=customers') . '">← Back to Customers</a>'
+                           . '</div></body></html>';
+                        break;
+                    }
+                    throw $e;
+                }
             }
             Helpers::redirect('index.php?page=customers');
             break;
@@ -1331,6 +1317,11 @@ switch ($page) {
         $branchFilterId = Auth::isMainBranch() ? (int)($_GET['branch_id'] ?? $branchId) : $branchId;
         $action = $_GET['action'] ?? 'index';
 
+        // Ensure discount column exists on delivery_notes
+        try {
+            $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN discount DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_amount");
+        } catch (Throwable $e) { /* ignore if exists */ }
+
         if ($action === 'generate') {
             // show form to pick customer and date, and POST to create
             if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -1398,23 +1389,69 @@ switch ($page) {
         if ($action === 'route') {
             // Planning screen: customers with pending parcels to deliver from THIS branch
             $date = $_GET['date'] ?? date('Y-m-d');
-            // New optional filters
+            // Filters (text + new dropdowns)
             $customer = trim($_GET['customer'] ?? '');
             $phone = trim($_GET['phone'] ?? '');
             $place = trim($_GET['place'] ?? '');
+            $customer_id = (int)($_GET['customer_id'] ?? 0);
+            $place_sel = trim($_GET['place_sel'] ?? '');
+            // If 'All Customers' is selected, ignore name/phone text filters
+            if ($customer_id === 0) { $customer = ''; $phone = ''; }
+
+            // If user targeted a specific customer but didn't pick a location, auto-pick when only one location exists
+            if ($place === '' && $place_sel === '' && ($customer_id > 0 || $customer !== '' || $phone !== '')) {
+                $autoWhere = ['p.to_branch_id = ?','(p.status IS NULL OR p.status <> "delivered")','dnp.id IS NULL'];
+                $autoParams = [$branchId];
+                if ($customer_id > 0) { $autoWhere[] = 'c.id = ?'; $autoParams[] = $customer_id; }
+                elseif ($customer !== '') { $autoWhere[] = 'c.name LIKE ?'; $autoParams[] = "%$customer%"; }
+                if ($phone !== '') { $autoWhere[] = 'c.phone LIKE ?'; $autoParams[] = "%$phone%"; }
+                $autoSql = 'SELECT DISTINCT TRIM(COALESCE(c.delivery_location, "")) AS loc
+                            FROM parcels p JOIN customers c ON c.id=p.customer_id
+                            LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id=p.id
+                            WHERE ' . implode(' AND ', $autoWhere) . ' AND TRIM(COALESCE(c.delivery_location, "")) <> ""';
+                $autoStmt = $pdo->prepare($autoSql);
+                $autoStmt->execute($autoParams);
+                $locs = $autoStmt->fetchAll();
+                if (count($locs) === 1) { $place_sel = (string)($locs[0]['loc'] ?? ''); }
+            }
+
+            // Build from customers, LEFT JOIN pending/not-in-DN parcels for this branch so even 0-parcel customers are listed
+            // Also LEFT JOIN planned vehicle assignments (per customer/date/branch)
+            // Ensure table for planned vehicle assignments exists (for zero-parcel cases too)
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS delivery_route_assignments (
+                    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+                    customer_id BIGINT UNSIGNED NOT NULL,
+                    branch_id BIGINT UNSIGNED NOT NULL,
+                    delivery_date DATE NOT NULL,
+                    vehicle_no VARCHAR(60) NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_customer_branch_date (customer_id, branch_id, delivery_date)
+                ) ENGINE=InnoDB");
+            } catch (Throwable $e) { /* ignore */ }
 
             $sql = "SELECT c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
                            COALESCE(c.delivery_location, '') AS delivery_location,
-                           COUNT(*) AS parcels_count,
-                           COALESCE(SUM(p.price),0) AS est_total
-                    FROM parcels p
-                    JOIN customers c ON c.id = p.customer_id
+                           COUNT(p.id) AS parcels_count,
+                           COALESCE(SUM(p.price),0) AS est_total,
+                           GROUP_CONCAT(DISTINCT COALESCE(p.vehicle_no, '')) AS veh_list,
+                           SUM(CASE WHEN COALESCE(p.vehicle_no,'')<>'' THEN 1 ELSE 0 END) AS with_vehicle,
+                           COALESCE(MAX(dra.vehicle_no), '') AS planned_vehicle
+                    FROM customers c
+                    LEFT JOIN parcels p
+                      ON p.customer_id = c.id
+                     AND p.to_branch_id = ?
+                     AND (p.status IS NULL OR p.status <> 'delivered')
                     LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
-                    WHERE p.to_branch_id = ? AND (p.status IS NULL OR p.status <> 'delivered') AND dnp.id IS NULL";
-            $params = [$branchId];
-            if ($customer !== '') { $sql .= ' AND c.name LIKE ?'; $params[] = "%$customer%"; }
+                    LEFT JOIN delivery_route_assignments dra
+                      ON dra.customer_id = c.id AND dra.branch_id = ? AND dra.delivery_date = ?
+                    WHERE (dnp.id IS NULL OR dnp.id IS NULL)"; // keep rows when there are no parcels or parcel not in any DN yet
+            $params = [$branchId, $branchId, ($date ?? date('Y-m-d'))];
+            if ($customer_id > 0) { $sql .= ' AND c.id = ?'; $params[] = $customer_id; }
+            elseif ($customer !== '') { $sql .= ' AND c.name LIKE ?'; $params[] = "%$customer%"; }
             if ($phone !== '') { $sql .= ' AND c.phone LIKE ?'; $params[] = "%$phone%"; }
-            if ($place !== '') { $sql .= ' AND COALESCE(c.delivery_location, "") LIKE ?'; $params[] = "%$place%"; }
+            if ($place_sel !== '') { $sql .= ' AND COALESCE(c.delivery_location, "") = ?'; $params[] = $place_sel; }
+            elseif ($place !== '') { $sql .= ' AND COALESCE(c.delivery_location, "") LIKE ?'; $params[] = "%$place%"; }
             $sql .= ' GROUP BY c.id, c.name, c.phone, c.delivery_location ORDER BY c.name';
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
@@ -1425,7 +1462,62 @@ switch ($page) {
             $parcels_total = (int)($totalsStmt->fetch()['parcels'] ?? 0);
             $customers_total = count($routes);
             $branchName = (string)($user['branch_name'] ?? '');
-            Helpers::view('delivery_notes/route', compact('routes','date','parcels_total','customers_total','branchName','customer','phone','place'));
+            // Build dropdown filter lists (all customers and all places)
+            $customersFilter = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 1000')->fetchAll();
+            $pf = $pdo->query('SELECT DISTINCT COALESCE(delivery_location, "") AS place FROM customers WHERE COALESCE(delivery_location, "") <> "" ORDER BY place')->fetchAll();
+            $placesFilter = array_map(function($r){ return $r['place']; }, $pf);
+            Helpers::view('delivery_notes/route', compact('routes','date','parcels_total','customers_total','branchName','customer','phone','place','customer_id','place_sel','customersFilter','placesFilter'));
+            break;
+        }
+
+        if ($action === 'assign_vehicle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $customer_id = (int)($_POST['customer_id'] ?? 0);
+            $vehicle_no = trim((string)($_POST['vehicle_no'] ?? ''));
+            $delivery_date = $_POST['delivery_date'] ?? date('Y-m-d');
+            if ($customer_id <= 0 || $vehicle_no === '') {
+                http_response_code(400);
+                // If ajax request, return JSON error
+                if (strcasecmp($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '', 'XMLHttpRequest') === 0) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['ok'=>0,'error'=>'Customer and Vehicle No are required.']);
+                    break;
+                } else {
+                    echo 'Customer and Vehicle No are required.'; break;
+                }
+            }
+            // Update pending parcels for this customer to this branch that are not in any DN yet
+            $upd = $pdo->prepare('UPDATE parcels p
+                                   LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
+                                   SET p.vehicle_no = ?
+                                   WHERE p.customer_id = ? AND p.to_branch_id = ?
+                                     AND (p.status IS NULL OR p.status <> "delivered")
+                                     AND dnp.id IS NULL');
+            $upd->execute([$vehicle_no, $customer_id, $branchId]);
+            // Also upsert a planned assignment so the badge shows even if there are zero parcels
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS delivery_route_assignments (
+                    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+                    customer_id BIGINT UNSIGNED NOT NULL,
+                    branch_id BIGINT UNSIGNED NOT NULL,
+                    delivery_date DATE NOT NULL,
+                    vehicle_no VARCHAR(60) NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_customer_branch_date (customer_id, branch_id, delivery_date)
+                ) ENGINE=InnoDB");
+            } catch (Throwable $e) { /* ignore */ }
+            $ins = $pdo->prepare('INSERT INTO delivery_route_assignments (customer_id, branch_id, delivery_date, vehicle_no) VALUES (?,?,?,?)
+                                  ON DUPLICATE KEY UPDATE vehicle_no=VALUES(vehicle_no), updated_at=CURRENT_TIMESTAMP');
+            $ins->execute([$customer_id, $branchId, $delivery_date, $vehicle_no]);
+            // If AJAX, return JSON success to allow inline update without full refresh
+            if (strcasecmp($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '', 'XMLHttpRequest') === 0) {
+                header('Content-Type: application/json');
+                echo json_encode(['ok'=>1,'vehicle_no'=>$vehicle_no,'customer_id'=>$customer_id,'delivery_date'=>$delivery_date]);
+                break;
+            }
+            // Otherwise, stay on the same planning page with a success flag
+            $redir = 'index.php?page=delivery_notes&action=route&customer_id=' . $customer_id . '&date=' . urlencode($delivery_date) . '&saved=1';
+            Helpers::redirect($redir);
             break;
         }
 
@@ -1448,11 +1540,50 @@ switch ($page) {
             if ($vehicle !== '') { $sql .= ' AND COALESCE(p.vehicle_no, "") LIKE ?'; $params[] = "%$vehicle%"; }
             $sql .= "
                     GROUP BY COALESCE(p.vehicle_no,'—')
-                    ORDER BY MAX(p.created_at) DESC";
+                    ORDER BY (COALESCE(p.vehicle_no,'')='') ASC, MAX(p.created_at) DESC";
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $routes = $stmt->fetchAll();
             Helpers::view('delivery_notes/route_vehicles', compact('routes','from','to','direction','vehicle'));
+            break;
+        }
+
+        if ($action === 'route_vehicles_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $from = $_POST['from'] ?? date('Y-m-01');
+            $to = $_POST['to'] ?? date('Y-m-d');
+            $direction = $_POST['direction'] ?? 'from';
+            $old_vehicle = (string)($_POST['old_vehicle'] ?? '');
+            $new_vehicle = trim((string)($_POST['new_vehicle'] ?? ''));
+            if ($new_vehicle === '') {
+                Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&err=vehicle_required');
+                break;
+            }
+            $branchColumn = ($direction === 'to') ? 'to_branch_id' : 'from_branch_id';
+            $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(updated_at, created_at))' : 'DATE(created_at)';
+            $sql = "UPDATE parcels SET vehicle_no = ? WHERE $branchColumn = ? AND $dateExpr BETWEEN ? AND ? AND COALESCE(vehicle_no,'') = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$new_vehicle, $branchId, $from, $to, $old_vehicle]);
+            Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&saved=1');
+            break;
+        }
+
+        if ($action === 'route_vehicles_clear' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $from = $_POST['from'] ?? date('Y-m-01');
+            $to = $_POST['to'] ?? date('Y-m-d');
+            $direction = $_POST['direction'] ?? 'from';
+            $old_vehicle = trim((string)($_POST['old_vehicle'] ?? ''));
+            if ($old_vehicle === '') {
+                Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&err=vehicle_required');
+                break;
+            }
+            $branchColumn = ($direction === 'to') ? 'to_branch_id' : 'from_branch_id';
+            $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(updated_at, created_at))' : 'DATE(created_at)';
+            $sql = "UPDATE parcels SET vehicle_no = '' WHERE $branchColumn = ? AND $dateExpr BETWEEN ? AND ? AND COALESCE(vehicle_no,'') = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$branchId, $from, $to, $old_vehicle]);
+            Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&saved=1');
             break;
         }
 
@@ -1507,7 +1638,7 @@ switch ($page) {
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }
-            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, s.name AS supplier_name, s.phone AS supplier_phone FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
+            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, p.vehicle_no, s.name AS supplier_name, s.phone AS supplier_phone FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
             $itemsStmt->execute([$id]);
             $items = $itemsStmt->fetchAll();
             // Backfill if empty
@@ -1595,6 +1726,103 @@ switch ($page) {
             break;
         }
 
+        // Update discount (+/-) for a DN
+        if ($action === 'dn_update_discount' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $discount = (float)($_POST['discount'] ?? 0);
+            $from = $_POST['from'] ?? date('Y-m-01');
+            $to = $_POST['to'] ?? date('Y-m-d');
+            $q = trim((string)($_POST['q'] ?? ''));
+            if ($id <= 0) {
+                Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&err=invalid_input');
+                break;
+            }
+            $stmt = $pdo->prepare('UPDATE delivery_notes SET discount=? WHERE id=? AND branch_id=?');
+            $stmt->execute([$discount, $id, $branchId]);
+            Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&saved=1');
+            break;
+        }
+
+        // Update delivery note fields (delivery_date) and optionally vehicle number for all items
+        if ($action === 'dn_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $delivery_date = trim((string)($_POST['delivery_date'] ?? ''));
+            $vehicle_no = isset($_POST['vehicle_no']) ? trim((string)$_POST['vehicle_no']) : '';
+            $from = $_POST['from'] ?? date('Y-m-01');
+            $to = $_POST['to'] ?? date('Y-m-d');
+            $q = trim((string)($_POST['q'] ?? ''));
+            if ($id <= 0 || $delivery_date === '') {
+                Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&err=invalid_input');
+                break;
+            }
+            $stmt = $pdo->prepare('UPDATE delivery_notes SET delivery_date=? WHERE id=? AND branch_id=?');
+            $stmt->execute([$delivery_date, $id, $branchId]);
+            if ($vehicle_no !== '') {
+                // Update vehicle for all parcels in this DN
+                $upd = $pdo->prepare('UPDATE parcels p JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id SET p.vehicle_no = ? WHERE dnp.delivery_note_id = ?');
+                $upd->execute([$vehicle_no, $id]);
+            }
+            Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&saved=1');
+            break;
+        }
+
+        // Update vehicle number for all parcels attached to a Delivery Note
+        if ($action === 'dn_update_vehicle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $new_vehicle = trim((string)($_POST['vehicle_no'] ?? ''));
+            $from = $_POST['from'] ?? date('Y-m-01');
+            $to = $_POST['to'] ?? date('Y-m-d');
+            $q = trim((string)($_POST['q'] ?? ''));
+            if ($id <= 0 || $new_vehicle === '') {
+                Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&err=invalid_input');
+                break;
+            }
+            // ensure DN belongs to this branch
+            $own = $pdo->prepare('SELECT branch_id FROM delivery_notes WHERE id=?');
+            $own->execute([$id]);
+            $row = $own->fetch();
+            if (!$row || (int)$row['branch_id'] !== (int)$branchId) { http_response_code(403); echo 'Forbidden'; break; }
+            // update parcels in this DN
+            $upd = $pdo->prepare('UPDATE parcels p
+                                   JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
+                                   SET p.vehicle_no = ?
+                                   WHERE dnp.delivery_note_id = ?');
+            $upd->execute([$new_vehicle, $id]);
+            Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&saved=1');
+            break;
+        }
+
+        // Delete a delivery note and its items
+        if ($action === 'dn_delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $from = $_POST['from'] ?? date('Y-m-01');
+            $to = $_POST['to'] ?? date('Y-m-d');
+            $q = trim((string)($_POST['q'] ?? ''));
+            if ($id <= 0) {
+                Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&err=invalid_input');
+                break;
+            }
+            try {
+                $pdo->beginTransaction();
+                $chk = $pdo->prepare('SELECT branch_id FROM delivery_notes WHERE id=? FOR UPDATE');
+                $chk->execute([$id]);
+                $row = $chk->fetch();
+                if (!$row || (int)$row['branch_id'] !== (int)$branchId) { $pdo->rollBack(); Helpers::redirect('index.php?page=delivery_notes&err=not_allowed'); break; }
+                $pdo->prepare('DELETE FROM delivery_note_parcels WHERE delivery_note_id=?')->execute([$id]);
+                $pdo->prepare('DELETE FROM delivery_notes WHERE id=?')->execute([$id]);
+                $pdo->commit();
+                Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&deleted=1');
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) { $pdo->rollBack(); }
+                Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&err=delete_failed');
+            }
+            break;
+        }
+
         if ($action === 'customer_summary') {
             // Summary report: invoice count per customer for current branch, with date range
             $from = $_GET['from'] ?? date('Y-m-01');
@@ -1632,9 +1860,10 @@ switch ($page) {
             $like = "%$q%";
             array_push($params, $like, $like);
         }
-        $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone,
+        $sql = 'SELECT dn.*, (dn.total_amount + COALESCE(dn.discount,0)) AS net_total, c.name AS customer_name, c.phone AS customer_phone,
                        TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ", ")) AS suppliers,
-                       TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(s.phone, "") ORDER BY s.phone SEPARATOR ", ")) AS supplier_phones
+                       TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(s.phone, "") ORDER BY s.phone SEPARATOR ", ")) AS supplier_phones,
+                       TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(p.vehicle_no, "") ORDER BY p.vehicle_no SEPARATOR ", ")) AS vehicles
                 FROM delivery_notes dn
                 LEFT JOIN customers c ON c.id = dn.customer_id
                 LEFT JOIN delivery_note_parcels dnp ON dnp.delivery_note_id = dn.id

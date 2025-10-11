@@ -1,0 +1,57 @@
+TMS UAT Feedback Form - Google Forms Blueprint
+
+Instructions: Create a new Google Form and add the following sections and questions.
+
+Section 1: Tester Details
+- Short answer: Tester Name (Required)
+- Short answer: Role (Admin/Staff/Accountant) (Required)
+- Short answer: Branch (e.g., MAIN/BR-A/BR-B)
+- Date: Test Date (Required)
+
+Section 2: Test Execution Context
+- Short answer: Build/Version or Commit ID
+- Short answer: Environment (e.g., WAMP PHP8 MySQL8)
+- Short answer: Browser & Version
+
+Section 3: Module Coverage (Checkboxes)
+- Checkboxes (select all that apply): Modules Tested
+  Options:
+  - Dashboard
+  - Branches
+  - Users
+  - Customers
+  - Vehicles
+  - Suppliers
+  - Parcels
+  - Parcel Print
+  - Delivery Notes
+  - Payments
+  - Expenses
+  - Employees
+  - Salaries
+  - Search
+  - Reports
+
+Section 4: Per-Test Result Capture (Repeat as needed)
+- Short answer: TestID (e.g., TC-026)
+- Short answer: Module
+- Short answer: Action / Page (e.g., parcels new/save)
+- Paragraph: Steps Performed
+- Paragraph: Expected Result
+- Paragraph: Actual Result
+- Multiple choice: Result
+  Options: PASS, FAIL, BLOCKED, NA
+- Multiple choice: Severity (if FAIL)
+  Options: S1-Blocker, S2-Critical, S3-Major, S4-Minor, S5-Cosmetic
+- Short answer: Screenshot/Artifact Link (optional)
+
+Section 5: Overall Feedback
+- Linear scale (1-5): Overall Stability (1=Poor, 5=Excellent)
+- Linear scale (1-5): Performance (1=Slow, 5=Fast)
+- Paragraph: Usability Notes
+- Paragraph: Suggestions/Improvements
+
+Settings
+- Collect email (optional)
+- Allow edit after submit: Enabled
+- Confirmation message: "Thanks! Your responses help improve TMS quality."
