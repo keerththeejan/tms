@@ -17,6 +17,20 @@
       <div class="col-md-6"><strong>Supplier(s):</strong> <?php echo htmlspecialchars($dn['suppliers_agg'] ?? ''); ?></div>
       <div class="col-md-6"><strong>Supplier Phone(s):</strong> <?php echo htmlspecialchars($dn['supplier_phones_agg'] ?? ''); ?></div>
     </div>
+    <?php 
+      // Aggregate distinct vehicle numbers from items, if any
+      $vehSet = [];
+      foreach (($items ?? []) as $it) {
+        $v = trim((string)($it['vehicle_no'] ?? ''));
+        if ($v !== '') { $vehSet[$v] = true; }
+      }
+      $vehList = implode(', ', array_keys($vehSet));
+    ?>
+    <?php if ($vehList !== ''): ?>
+    <div class="row g-2 mt-1">
+      <div class="col-md-6"><strong>Vehicle(s):</strong> <?php echo htmlspecialchars($vehList); ?></div>
+    </div>
+    <?php endif; ?>
   </div>
 </div>
 <div class="table-responsive mt-3">
@@ -44,13 +58,25 @@
       <?php endforeach; ?>
     </tbody>
     <tfoot>
+      <?php 
+        $disc = (float)($dn['discount'] ?? 0);
+        $subtotal = (float)$total;
+        if ($subtotal <= 0 && isset($dn['total_amount'])) { $subtotal = (float)$dn['total_amount']; }
+        $net = $subtotal + $disc;
+      ?>
       <tr>
-        <th colspan="4" class="text-end">Total</th>
-        <th class="text-end"><?php 
-          $grand = (float)$total; 
-          if ($grand <= 0 && isset($dn['total_amount'])) { $grand = (float)$dn['total_amount']; }
-          echo number_format($grand, 2); 
-        ?></th>
+        <th colspan="4" class="text-end">Subtotal</th>
+        <th class="text-end"><?php echo number_format($subtotal, 2); ?></th>
+      </tr>
+      <?php if ($disc != 0): ?>
+      <tr>
+        <th colspan="4" class="text-end">Discount</th>
+        <th class="text-end"><?php echo ($disc>0?'+':'').number_format($disc, 2); ?></th>
+      </tr>
+      <?php endif; ?>
+      <tr>
+        <th colspan="4" class="text-end">Net Total</th>
+        <th class="text-end"><?php echo number_format($net, 2); ?></th>
       </tr>
     </tfoot>
   </table>

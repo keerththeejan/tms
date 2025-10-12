@@ -1,4 +1,17 @@
 <?php /** @var array $notes */ ?>
+<style>
+  /* Delivery Notes list polish */
+  #dnTable td, #dnTable th { vertical-align: middle; }
+  #dnTable .text-truncate { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #dnTable .nowrap { white-space: nowrap; }
+  #dnTable .amount { text-align: right; font-weight: 600; }
+  #dnTable .disc { color: #6c757d; }
+  @media (max-width: 992px) { #dnTable .text-truncate { max-width: 160px; } }
+  @media (max-width: 768px) { #dnTable .text-truncate { max-width: 120px; } }
+  .dn-actions .btn { padding: .15rem .45rem; }
+  .dn-actions { gap: .25rem; }
+  .dn-veh { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+</style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0">Delivery Notes</h3>
   <div class="d-flex gap-2">
@@ -43,7 +56,7 @@
   </div>
 </form>
 <div class="table-responsive">
-  <table class="table table-sm table-striped align-middle">
+  <table id="dnTable" class="table table-sm table-striped align-middle">
     <thead>
       <tr>
         <th>#</th>
@@ -53,7 +66,7 @@
         <th>Supplier</th>
         <th>Supplier Phone</th>
         <th>Vehicles</th>
-        <th>Total</th>
+        <th class="text-end">Total</th>
         <th class="text-end">Actions</th>
       </tr>
     </thead>
@@ -62,16 +75,16 @@
         <tr>
           <td><?php echo (int)$n['id']; ?></td>
           <td><?php echo htmlspecialchars($n['delivery_date']); ?></td>
-          <td><?php echo htmlspecialchars($n['customer_name'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($n['customer_phone'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?></td>
-          <td><?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?></td>
-          <td><?php echo ($n['vehicles'] ?? '') !== '' ? htmlspecialchars($n['vehicles']) : '—'; ?></td>
-          <td>
+          <td class="text-truncate" title="<?php echo htmlspecialchars($n['customer_name'] ?? ''); ?>"><?php echo htmlspecialchars($n['customer_name'] ?? ''); ?></td>
+          <td class="nowrap">&lrm;<?php echo htmlspecialchars($n['customer_phone'] ?? ''); ?></td>
+          <td class="text-truncate" title="<?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?>"><?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?></td>
+          <td class="text-truncate" title="<?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?>"><?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?></td>
+          <td><span class="dn-veh" title="<?php echo htmlspecialchars($n['vehicles'] ?? '—'); ?>"><?php echo ($n['vehicles'] ?? '') !== '' ? htmlspecialchars($n['vehicles']) : '—'; ?></span></td>
+          <td class="amount">
             <?php $disc = (float)($n['discount'] ?? 0); $net = isset($n['net_total']) ? (float)$n['net_total'] : ((float)$n['total_amount'] + $disc); ?>
             <div><?php echo number_format($net, 2); ?></div>
             <?php if ($disc != 0): ?>
-              <div class="text-muted small">Disc: <?php echo ($disc>0?'+':'').number_format($disc,2); ?></div>
+              <div class="disc small">Disc: <?php echo ($disc>0?'+':'').number_format($disc,2); ?></div>
             <?php endif; ?>
           </td>
           <td class="text-end">
@@ -84,7 +97,8 @@
               <input type="hidden" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>">
               <input type="hidden" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>">
             </form>
-            <button type="button" class="btn btn-sm btn-outline-success me-1" onclick="(function(f){
+            <div class="dn-actions d-inline-flex">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="(function(f){
               var d=prompt('Edit delivery date (YYYY-MM-DD)', f.delivery_date.value);
               if(d===null) return; d=d.trim(); if(!d){alert('Enter date'); return;}
               var cur=(f.vehicle_no.value||'').toString().split(',')[0].trim();
@@ -101,7 +115,7 @@
               <input type="hidden" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>">
               <input type="hidden" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>">
             </form>
-            <button type="button" class="btn btn-sm btn-outline-dark me-1" onclick="(function(f){var v=prompt('Set discount (+ to add, - to reduce total)', f.discount.value || '0'); if(v!==null){v=v.trim(); if(v!=='' && !isNaN(v)){f.discount.value=v; f.submit();} else {alert('Enter a number');}}})(document.getElementById('dn-disc-<?php echo (int)$n['id']; ?>'));"><i class="bi bi-percent"></i> Discount</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="(function(f){var v=prompt('Set discount (+ to add, - to reduce total)', f.discount.value || '0'); if(v!==null){v=v.trim(); if(v!=='' && !isNaN(v)){f.discount.value=v; f.submit();} else {alert('Enter a number');}}})(document.getElementById('dn-disc-<?php echo (int)$n['id']; ?>'));"><i class="bi bi-percent"></i> Discount</button>
 
             <form id="dn-del-<?php echo (int)$n['id']; ?>" class="d-inline" method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=dn_delete'); ?>">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
@@ -110,10 +124,11 @@
               <input type="hidden" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>">
               <input type="hidden" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>">
             </form>
-            <button type="button" class="btn btn-sm btn-outline-danger me-1" onclick="(function(f){ if(confirm('Delete this delivery note? This cannot be undone.')) f.submit();})(document.getElementById('dn-del-<?php echo (int)$n['id']; ?>'));"><i class="bi bi-trash"></i> Delete</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="(function(f){ if(confirm('Delete this delivery note? This cannot be undone.')) f.submit();})(document.getElementById('dn-del-<?php echo (int)$n['id']; ?>'));"><i class="bi bi-trash"></i> Delete</button>
 
-            <a class="btn btn-sm btn-outline-secondary me-1" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='.(int)$n['id']); ?>"><i class="bi bi-eye"></i> View</a>
+            <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='.(int)$n['id']); ?>"><i class="bi bi-eye"></i> View</a>
             <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=print&id='.(int)$n['id']); ?>" target="_blank"><i class="bi bi-printer"></i> Print</a>
+            </div>
           </td>
         </tr>
       <?php endforeach; ?>
