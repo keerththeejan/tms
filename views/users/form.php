@@ -137,7 +137,18 @@
     if (!name || !code) { alert('Name and Code are required.'); return; }
     try {
       const b = await quickAdd(name, code, isMain);
-      if (select) { const opt = document.createElement('option'); opt.value=String(b.id); opt.textContent=b.name || name; select.appendChild(opt); select.value=String(b.id); }
+      if (select) {
+        const idStr = String(b.id);
+        const label = String(b.name || name);
+        let exists = false;
+        Array.from(select.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; exists = true; } });
+        if (!exists) { const opt = document.createElement('option'); opt.value = idStr; opt.textContent = label; select.appendChild(opt); }
+        const wasDisabled = select.disabled; if (wasDisabled) select.disabled = false;
+        select.value = idStr;
+        select.dispatchEvent(new Event('change'));
+        select.dispatchEvent(new Event('input'));
+        if (wasDisabled) select.disabled = true;
+      }
       if (nameEl) nameEl.value=''; if (codeEl) codeEl.value=''; if (mainEl) mainEl.checked=false;
       const collapseEl = document.getElementById('quickAddUserBranch'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
     } catch(e){ alert('Failed to add branch.'); }
@@ -159,7 +170,11 @@
       opt.textContent = raw;
       roleSelect.appendChild(opt);
     }
+    const wasDisabled = roleSelect.disabled; if (wasDisabled) roleSelect.disabled = false;
     roleSelect.value = key;
+    roleSelect.dispatchEvent(new Event('change'));
+    roleSelect.dispatchEvent(new Event('input'));
+    if (wasDisabled) roleSelect.disabled = true;
     input.value = '';
     const collapseEl = document.getElementById('quickAddRole'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
   });

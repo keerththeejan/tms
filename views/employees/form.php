@@ -201,16 +201,16 @@
       const sel = document.getElementById('empVehicleSelect');
       const inp = document.getElementById('empVehicleInput');
       if (sel) {
-        // Add if not present
+        const idStr = String(data.id);
+        const label = (data.vehicle_no || v) + ' (ID ' + idStr + ')';
         let exists = false;
-        Array.from(sel.options).forEach(o=>{ if (String(o.value) === String(data.id)) exists = true; });
-        if (!exists) {
-          const opt = document.createElement('option');
-          opt.value = String(data.id);
-          opt.textContent = (data.vehicle_no || v) + ' (ID ' + data.id + ')';
-          sel.appendChild(opt);
-        }
-        sel.value = String(data.id);
+        Array.from(sel.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; exists = true; } });
+        if (!exists) { const opt = document.createElement('option'); opt.value = idStr; opt.textContent = label; sel.appendChild(opt); }
+        const wasDisabled = sel.disabled; if (wasDisabled) sel.disabled = false;
+        sel.value = idStr;
+        sel.dispatchEvent(new Event('change'));
+        sel.dispatchEvent(new Event('input'));
+        if (wasDisabled) sel.disabled = true;
       } else if (inp) {
         inp.value = String(data.id);
       }

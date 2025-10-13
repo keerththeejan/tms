@@ -77,6 +77,14 @@ function assignVehicleAjax(form) {
   <input type="hidden" name="page" value="delivery_notes">
   <input type="hidden" name="action" value="route">
   <div class="col-md-3">
+    <label class="form-label">Direction</label>
+    <?php $dir = ($direction ?? 'to'); ?>
+    <select class="form-select" name="direction">
+      <option value="to" <?php echo ($dir==='to'?'selected':''); ?>>Arrivals (to this branch)</option>
+      <option value="from" <?php echo ($dir==='from'?'selected':''); ?>>Dispatch (from this branch)</option>
+    </select>
+  </div>
+  <div class="col-md-3">
     <label class="form-label">Delivery Date</label>
     <input type="date" class="form-control" name="date" value="<?php echo htmlspecialchars($date ?? date('Y-m-d')); ?>">
   </div>
@@ -151,6 +159,7 @@ function assignVehicleAjax(form) {
                 <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
                 <input type="hidden" name="customer_id" value="<?php echo (int)$r['customer_id']; ?>">
                 <input type="hidden" name="delivery_date" value="<?php echo htmlspecialchars($date ?? date('Y-m-d')); ?>">
+                <input type="hidden" name="direction" value="<?php echo htmlspecialchars($dir); ?>">
                 <input type="hidden" name="vehicle_no" value="<?php echo htmlspecialchars($vehCurrent); ?>">
               </form>
               <button id="veh-btn-<?php echo (int)$r['customer_id']; ?>" type="button" class="btn btn-sm btn-outline-success me-1" onclick="(function(f){var v=prompt('Edit vehicle number', f.vehicle_no.value); if(v!==null){v=v.trim(); if(v){f.vehicle_no.value=v; assignVehicleAjax(f);} else {alert('Enter vehicle number');}}})(document.getElementById('veh-edit-<?php echo (int)$r['customer_id']; ?>'));"><i class="bi bi-pencil-square"></i> Edit</button>
@@ -160,6 +169,7 @@ function assignVehicleAjax(form) {
                 <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
                 <input type="hidden" name="customer_id" value="<?php echo (int)$r['customer_id']; ?>">
                 <input type="hidden" name="delivery_date" value="<?php echo htmlspecialchars($date ?? date('Y-m-d')); ?>">
+                <input type="hidden" name="direction" value="<?php echo htmlspecialchars($dir); ?>">
                 <input type="hidden" name="vehicle_no" value="">
               </form>
               <button id="veh-btn-<?php echo (int)$r['customer_id']; ?>" type="button" class="btn btn-sm btn-success" onclick="(function(f){var v=prompt('Enter vehicle number'); if(v!==null){v=v.trim(); if(v){f.vehicle_no.value=v; assignVehicleAjax(f);} else {alert('Enter vehicle number');}}})(document.getElementById('veh-add-<?php echo (int)$r['customer_id']; ?>'));"><i class="bi bi-truck"></i> Add Vehicle</button>
@@ -177,6 +187,7 @@ function assignVehicleAjax(form) {
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
               <input type="hidden" name="customer_id" value="<?php echo (int)$r['customer_id']; ?>">
               <input type="hidden" name="delivery_date" value="<?php echo htmlspecialchars($date ?? date('Y-m-d')); ?>">
+              <input type="hidden" name="direction" value="<?php echo htmlspecialchars($dir); ?>">
               <button class="btn btn-sm btn-primary"><i class="bi bi-clipboard-check"></i> Generate</button>
             </form>
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=search&phone=' . urlencode($r['customer_phone'] ?? '')); ?>" target="_blank"><i class="bi bi-person"></i> View</a>

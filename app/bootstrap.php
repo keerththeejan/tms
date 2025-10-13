@@ -21,6 +21,7 @@ require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Mailer.php';
+require_once __DIR__ . '/Sms.php';
 
 // Load config and initialize DB
 $config = require __DIR__ . '/../config/config.php';
@@ -38,3 +39,12 @@ if (file_exists($mailCfgPath)) {
     ];
 }
 $GLOBALS['mailer'] = new Mailer($mailConfig);
+
+// Initialize SMS service
+$smsCfgPath = __DIR__ . '/../config/sms.php';
+if (file_exists($smsCfgPath)) {
+    $smsConfig = require $smsCfgPath;
+} else {
+    $smsConfig = ['enabled' => false, 'provider' => 'http'];
+}
+$GLOBALS['sms'] = new Sms($smsConfig);

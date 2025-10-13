@@ -84,10 +84,13 @@
               <input type="text" id="qa_phone" class="form-control form-control-sm" placeholder="Phone (optional)">
             </div>
             <div class="col-6">
+              <input type="email" id="qa_email" class="form-control form-control-sm" placeholder="Email (optional)">
+            </div>
+            <div class="col-6">
               <input type="text" id="qa_address" class="form-control form-control-sm" placeholder="Address">
             </div>
             <div class="col-6">
-              <input type="text" id="qa_delivery_location" class="form-control form-control-sm" placeholder="Delivery Location" list="dl_locations">
+              <input type="text" id="qa_delivery_location" name="delivery_location" class="form-control form-control-sm" placeholder="Delivery Location" list="dl_locations">
               <datalist id="dl_locations">
                 <?php 
                   $locs = [];
@@ -129,7 +132,7 @@
         <span>Supplier (Optional)</span>
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddSupplier" aria-expanded="false"><i class="bi bi-person-plus"></i> Quick Add</button>
       </label>
-      <select name="supplier_id" class="form-select" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+      <select name="supplier_id" id="supplierSelect" class="form-select" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="0">-- None --</option>
         <?php foreach (($suppliersAll ?? []) as $s): ?>
           <?php 
@@ -138,10 +141,13 @@
             // Build a normalized token to detect placeholder-like entries such as '-- None --', 'none', ' - none - '
             $norm = strtolower(preg_replace('/[^a-z0-9]+/i','', $nm)); // remove non-alnum
             if ($nm === '' || $norm === 'none' || $norm === 'nonenone') { continue; }
+            $ph = trim((string)($s['phone'] ?? ''));
+            $label = $nm . ($ph !== '' ? ' (' . htmlspecialchars($ph) . ')' : '');
           ?>
-          <option value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($parcel['supplier_id'] ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($nm); ?></option>
+          <option data-phone="<?php echo htmlspecialchars($ph); ?>" value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($parcel['supplier_id'] ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
         <?php endforeach; ?>
       </select>
+      <div id="supplierPhoneHint" class="form-text"></div>
       <div class="collapse mt-2" id="quickAddSupplier">
         <div class="border rounded p-2 bg-light">
           <div class="row g-2">
@@ -270,13 +276,16 @@
   </div>
 
   <!-- Receipt-like box -->
-  <div class="receipt-box mb-3">
-    <div class="receipt-header p-3 d-flex justify-content-between align-items-center">
-      <div>
-        <div class="fw-bold">TS Transport</div>
-        <small class="text-muted">Consignment Entry</small>
-      </div>
-      <div class="serial-badge">Serial: <?php echo $parcel['id'] ? (int)$parcel['id'] : '—'; ?></div>
+  <div class="receipt-box mt-4">
+    <div class="receipt-header p-2 d-flex justify-content-between">
+      <div>TS Transport</div>
+      <div class="serial-badge">Serial: —</div>
+    </div>
+    <div class="p-2">
+      <div><strong>Customer:</strong> <span id="recCustomer">-- Select Customer --</span></div>
+      <div><strong>Date:</strong> <span id="recDate"><?php echo date('Y-m-d'); ?></span></div>
+      <div><strong>From:</strong> <span id="recFrom">—</span>&nbsp;&nbsp; <strong>To:</strong> <span id="recTo">—</span></div>
+      <div><strong>Vehicle:</strong> <span id="recVehicle">—</span></div>
     </div>
 
     <div class="p-3">
@@ -422,6 +431,65 @@
         const line = (qty > 0 && perUnit > 0) ? (qty * perUnit) : 0;
         total += line;
       });
+  // Supplier phone hint + Vehicle display
+  const supplierSelect = document.getElementById('supplierSelect');
+  const supplierPhoneHint = document.getElementById('supplierPhoneHint');
+  function updateSupplierHint(){
+    if (!supplierSelect || !supplierPhoneHint) return;
+    const opt = supplierSelect.options[supplierSelect.selectedIndex];
+    const ph = opt ? (opt.getAttribute('data-phone') || '') : '';
+    supplierPhoneHint.textContent = ph ? ('Supplier Phone: ' + ph) : '';
+  }
+  supplierSelect?.addEventListener('change', updateSupplierHint);
+  updateSupplierHint();
+
+  const vehicleSelect = document.getElementById('vehicleSelect');
+  const vehicleInput = document.getElementById('vehicleInput');
+  const recVehicle = document.getElementById('recVehicle');
+  function updateVehicle(){
+    if (!recVehicle) return;
+    const v = vehicleSelect ? (vehicleSelect.value || '') : (vehicleInput?.value || '');
+    recVehicle.textContent = v && v.trim() !== '' ? v : '—';
+  }
+  vehicleSelect?.addEventListener('change', updateVehicle);
+  vehicleInput?.addEventListener('input', updateVehicle);
+  updateVehicle();
+
+  // Quick Add Vehicle in parcel form
+  document.getElementById('qv_submit')?.addEventListener('click', async function(){
+    const vInput = document.getElementById('qv_no');
+    const v = (vInput?.value || '').trim();
+    if (!v) { alert('Enter a vehicle number'); return; }
+    try {
+      const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+      const fd = new FormData();
+      fd.append('csrf_token', csrf);
+      fd.append('vehicle_no', v);
+      const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=vehicles&action=save'); ?>', {
+        method: 'POST', headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' }, body: fd
+      });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      if (vehicleSelect) {
+        const idLabel = String(data.vehicle_no || v);
+        let exists = false;
+        Array.from(vehicleSelect.options).forEach(o=>{ if ((o.value||'') === idLabel) exists = true; });
+        if (!exists) { const opt = document.createElement('option'); opt.value = idLabel; opt.textContent = idLabel; vehicleSelect.appendChild(opt); }
+        const wasDisabled = vehicleSelect.disabled; if (wasDisabled) vehicleSelect.disabled = false;
+        vehicleSelect.value = idLabel;
+        vehicleSelect.dispatchEvent(new Event('change'));
+        vehicleSelect.dispatchEvent(new Event('input'));
+        if (wasDisabled) vehicleSelect.disabled = true;
+      } else if (vehicleInput) {
+        vehicleInput.value = String(data.vehicle_no || v);
+        vehicleInput.dispatchEvent(new Event('input'));
+      }
+      if (vInput) vInput.value = '';
+      const c = document.getElementById('quickAddVehicle'); if (c && window.bootstrap) new bootstrap.Collapse(c, {toggle:true});
+    } catch(e) {
+      alert('Failed to add vehicle');
+    }
+  });
   // Quick Add Branch: From Branch (fab_*)
   const fabBtn = document.getElementById('fab_submit');
   fabBtn?.addEventListener('click', async function(){
@@ -433,12 +501,17 @@
       const created = await quickAdd(name, code, isMain);
       const sel = document.querySelector('select[name="from_branch_id"]');
       if (sel) {
-        // Avoid duplicate option
+        // Avoid duplicate option and update label if present
+        const idStr = String(created.id);
+        const label = String(created.name||name);
         let exists = false;
-        Array.from(sel.options).forEach(o=>{ if (parseInt(o.value||'0') === parseInt(created.id)) exists = true; });
-        if (!exists) { const opt=document.createElement('option'); opt.value=String(created.id); opt.textContent=String(created.name||name); sel.appendChild(opt); }
-        sel.value = String(created.id);
+        Array.from(sel.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; exists = true; } });
+        if (!exists) { const opt=document.createElement('option'); opt.value=idStr; opt.textContent=label; sel.appendChild(opt); }
+        const wasDisabled = sel.disabled; if (wasDisabled) sel.disabled = false;
+        sel.value = idStr;
         sel.dispatchEvent(new Event('change'));
+        sel.dispatchEvent(new Event('input'));
+        if (wasDisabled) sel.disabled = true;
       }
       // Clear inputs and close collapse
       ['fab_name','fab_code'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
@@ -460,11 +533,16 @@
       const created = await quickAdd(name, code, isMain);
       const sel = document.querySelector('select[name="to_branch_id"]');
       if (sel) {
+        const idStr = String(created.id);
+        const label = String(created.name||name);
         let exists = false;
-        Array.from(sel.options).forEach(o=>{ if (parseInt(o.value||'0') === parseInt(created.id)) exists = true; });
-        if (!exists) { const opt=document.createElement('option'); opt.value=String(created.id); opt.textContent=String(created.name||name); sel.appendChild(opt); }
-        sel.value = String(created.id);
+        Array.from(sel.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; exists = true; } });
+        if (!exists) { const opt=document.createElement('option'); opt.value=idStr; opt.textContent=label; sel.appendChild(opt); }
+        const wasDisabled = sel.disabled; if (wasDisabled) sel.disabled = false;
+        sel.value = idStr;
         sel.dispatchEvent(new Event('change'));
+        sel.dispatchEvent(new Event('input'));
+        if (wasDisabled) sel.disabled = true;
       }
       ['tab_name','tab_code'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
       const tabMain = document.getElementById('tab_main'); if (tabMain) tabMain.checked = false;
@@ -506,15 +584,20 @@
       });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
+      if (data && data.error) { alert(data.error); return; }
       if (!data || !data.id) throw new Error('Invalid response');
       const sel = document.querySelector('select[name="supplier_id"]');
       if (sel) {
-        // Add option if missing
+        const idStr = String(data.id);
+        const label = String(data.name||name) + (data.phone ? ' (' + String(data.phone).trim() + ')' : (phone ? ' (' + phone + ')' : ''));
         let exists = false;
-        Array.from(sel.options).forEach(o=>{ if (parseInt(o.value||'0') === parseInt(data.id)) exists = true; });
-        if (!exists) { const opt=document.createElement('option'); opt.value=String(data.id); opt.textContent=String(data.name||name); sel.appendChild(opt); }
-        sel.value = String(data.id);
+        Array.from(sel.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; o.setAttribute('data-phone', data.phone || phone || ''); exists = true; } });
+        if (!exists) { const opt=document.createElement('option'); opt.value=idStr; opt.textContent=label; opt.setAttribute('data-phone', data.phone || phone || ''); sel.appendChild(opt); }
+        const wasDisabled = sel.disabled; if (wasDisabled) sel.disabled = false;
+        sel.value = idStr;
         sel.dispatchEvent(new Event('change'));
+        sel.dispatchEvent(new Event('input'));
+        if (wasDisabled) sel.disabled = true;
       }
       // Clear inputs
       const ids = ['qs_name','qs_phone','qs_code']; ids.forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
@@ -837,10 +920,17 @@
   document.getElementById('qa_submit')?.addEventListener('click', async function(){
     const name = (document.getElementById('qa_name')?.value || '').trim();
     const phone = (document.getElementById('qa_phone')?.value || '').trim();
+    const email = (document.getElementById('qa_email')?.value || '').trim();
     const address = (document.getElementById('qa_address')?.value || '').trim();
     const delivery_location = (document.getElementById('qa_delivery_location')?.value || '').trim();
     const type = (document.getElementById('qa_type')?.value || '').trim();
-    if (!name) { alert('Enter a customer name'); return; }
+    // Require all fields for Quick Add as requested
+    if (!name || !phone || !email || !address || !delivery_location || !type) {
+      alert('Please fill Name, Phone, Email, Address, Delivery Location and Type before saving.');
+      return;
+    }
+    // Basic email pattern check
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Enter a valid email'); return; }
     try {
       const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
       const fd = new FormData();
@@ -849,6 +939,7 @@
       fd.append('id', '0');
       fd.append('name', name);
       fd.append('phone', phone);
+      fd.append('email', email);
       fd.append('address', address);
       fd.append('delivery_location', delivery_location);
       fd.append('customer_type', type);
@@ -860,20 +951,37 @@
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       if (!data || !data.id) throw new Error('Invalid response');
-      // Append to customer select
+      // Ensure it shows up in the Customer dropdown immediately
       const sel = document.querySelector('select[name="customer_id"]');
       if (sel) {
-        const opt = document.createElement('option');
-        opt.value = String(data.id);
-        opt.textContent = data.name + (data.phone ? ' ('+data.phone+')' : '');
-        sel.appendChild(opt);
-        sel.value = String(data.id);
+        const idStr = String(data.id);
+        const phonePart = (data.phone ? ' (' + String(data.phone).trim() + ')' : '');
+        const emailPart = (data.email ? ' [' + String(data.email).trim() + ']' : '');
+        const label = String(data.name || '').trim() + phonePart + emailPart;
+        // Avoid duplicate options; update text if exists
+        let found = false;
+        Array.from(sel.options).forEach(o => {
+          if (String(o.value) === idStr) { o.textContent = label; found = true; }
+        });
+        if (!found) {
+          const opt = document.createElement('option');
+          opt.value = idStr;
+          opt.textContent = label;
+          sel.appendChild(opt);
+        }
+        // If select is disabled, temporarily enable to set value so UI reflects change
+        const wasDisabled = sel.disabled;
+        if (wasDisabled) sel.disabled = false;
+        sel.value = idStr;
+        // Trigger common events so any enhancers/listeners refresh
         sel.dispatchEvent(new Event('change'));
+        sel.dispatchEvent(new Event('input'));
+        if (wasDisabled) sel.disabled = true;
       }
       // Close the collapse
       const collapseEl = document.getElementById('quickAddCustomer'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
       // Clear inputs
-      ['qa_name','qa_phone','qa_address','qa_delivery_location'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
+      ['qa_name','qa_phone','qa_email','qa_address','qa_delivery_location'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
     } catch (e) {
       alert('Failed to add customer');
     }

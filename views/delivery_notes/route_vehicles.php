@@ -49,6 +49,7 @@
       <tr>
         <th>#</th>
         <th>Vehicle</th>
+        <th>Date</th>
         <th class="text-center">Parcels</th>
         <th class="text-center">Delivered</th>
         <th class="text-end">Actions</th>
@@ -64,6 +65,7 @@
       <tr>
         <td><?php echo $i; ?></td>
         <td><?php echo htmlspecialchars($r['vehicle_no'] ?? '—'); ?></td>
+        <td><?php echo htmlspecialchars((string)($r['last_date'] ?? '')); ?></td>
         <td class="text-center"><?php echo (int)($r['parcels_count'] ?? 0); ?></td>
         <td class="text-center"><?php echo (int)($r['delivered_count'] ?? 0); ?></td>
         <td class="text-end">
