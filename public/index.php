@@ -13,7 +13,8 @@ if ($page === 'login') {
             return;
         }
 
-        $username = trim($_POST['username'] ?? '');
+
+      $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
         if (Auth::attempt($username, $password)) {
             Helpers::redirect('index.php?page=dashboard');
@@ -294,6 +295,60 @@ switch ($page) {
                 return;
             }
             Helpers::redirect('index.php?page=branches');
+            break;
+        }
+
+        if ($action === 'email' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                try {
+                    // Load parcel, customer and branch names
+                    $sel = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.email AS customer_email, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id = p.customer_id LEFT JOIN branches bf ON bf.id = p.from_branch_id LEFT JOIN branches bt ON bt.id = p.to_branch_id WHERE p.id = ? LIMIT 1');
+                    $sel->execute([$id]);
+                    $row = $sel->fetch();
+                    if ($row) {
+                        $toEmail = trim((string)($row['customer_email'] ?? ''));
+                        $toName  = (string)($row['customer_name'] ?? 'Customer');
+                        if ($toEmail !== '' && isset($GLOBALS['mailer']) && $GLOBALS['mailer'] instanceof Mailer) {
+                            // Items
+                            $itStmt = $pdo->prepare('SELECT description, qty, COALESCE(rate,0) AS rate FROM parcel_items WHERE parcel_id=? ORDER BY id');
+                            $itStmt->execute([$id]);
+                            $itemsNow = $itStmt->fetchAll();
+                            $rowsHtml = '';
+                            $totalNow = 0.0;
+                            foreach ($itemsNow as $it) {
+                                $desc = (string)($it['description'] ?? '');
+                                $qty = (float)($it['qty'] ?? 0);
+                                $rate = (float)($it['rate'] ?? 0);
+                                $amt = $qty * $rate; $totalNow += $amt;
+                                $rowsHtml .= '<tr><td>'.htmlspecialchars($desc).'</td><td>'.number_format($qty,2).'</td><td class="text-end">'.number_format($rate,2).'</td><td class="text-end">'.number_format($amt,2).'</td></tr>';
+                            }
+                            if ($rowsHtml === '') { $rowsHtml = '<tr><td colspan="4">No item details available.</td></tr>'; }
+                            $createdAt = (string)($row['created_at'] ?? date('Y-m-d H:i:s'));
+                            $vehNo = trim((string)($row['vehicle_no'] ?? ''));
+                            $fromName = (string)($row['from_branch'] ?? '');
+                            $toNameBr = (string)($row['to_branch'] ?? '');
+                            $itemCount = is_array($itemsNow) ? count($itemsNow) : 0;
+                            $priceNow = isset($row['price']) ? (float)$row['price'] : (float)$totalNow;
+                            $subject = 'Parcel Order #' . (int)$id . ' — ' . number_format($priceNow,2);
+                            $html = '<div style="font-family:Arial,sans-serif">'
+                                  . '<h3 style="margin:0 0 8px;">Parcel Order #' . (int)$id . '</h3>'
+                                  . '<div style="color:#555;margin:0 0 6px;">Order Time: ' . htmlspecialchars($createdAt) . '</div>'
+                                  . '<div style="color:#555;margin:0 0 6px;">From: ' . htmlspecialchars($fromName) . ' &rarr; To: ' . htmlspecialchars($toNameBr) . '</div>'
+                                  . '<div style="color:#555;margin:0 0 12px;">Vehicle: ' . htmlspecialchars($vehNo) . ' | Items: ' . (int)$itemCount . ' | Price: ' . number_format($priceNow,2) . '</div>'
+                                  . '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">'
+                                  . '<thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>'
+                                  . $rowsHtml
+                                  . '</tbody><tfoot><tr><th colspan="3" style="text-align:right">Total</th><th class="text-end">'.number_format($totalNow,2).'</th></tr></tfoot></table>'
+                                  . '</div>';
+                            $alt = "Parcel Order #" . (int)$id . "\nOrder Time: " . $createdAt . "\nFrom: " . $fromName . " -> To: " . $toNameBr . "\nVehicle: " . $vehNo . "\nItems: " . (int)$itemCount . "\nPrice: " . number_format($priceNow,2);
+                            try { $GLOBALS['mailer']->send($toEmail, $toName, $subject, $html, $alt); } catch (Throwable $e) { /* ignore send failures */ }
+                        }
+                    }
+                } catch (Throwable $e) { /* ignore and continue */ }
+            }
+            Helpers::redirect('index.php?page=parcels');
             break;
         }
 
@@ -880,6 +935,109 @@ switch ($page) {
         $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
         $customersAll = $pdo->query('SELECT id, name, phone, delivery_location, lat, lng FROM customers ORDER BY created_at DESC LIMIT 500')->fetchAll();
         $suppliersAll = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name')->fetchAll();
+        // Ensure email log table exists
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS parcel_emails (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                parcel_id INT NOT NULL,
+                to_email VARCHAR(255) NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                status ENUM('sent','failed') NOT NULL,
+                error TEXT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_parcel (parcel_id),
+                CONSTRAINT fk_parcel_emails_parcel FOREIGN KEY (parcel_id) REFERENCES parcels(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (Throwable $e) { /* ignore */ }
+        // Ensure persistent status columns exist on parcels for fallback display
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_email_status VARCHAR(10) NULL AFTER updated_at"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_emailed_at DATETIME NULL AFTER last_email_status"); } catch (Throwable $e) { /* ignore if exists */ }
+
+        if ($action === 'email_form') {
+            $id = (int)($_GET['id'] ?? 0);
+            if ($id <= 0) { Helpers::redirect('index.php?page=parcels'); break; }
+            $sel = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.email AS customer_email, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id = p.customer_id LEFT JOIN branches bf ON bf.id = p.from_branch_id LEFT JOIN branches bt ON bt.id = p.to_branch_id WHERE p.id = ? LIMIT 1');
+            $sel->execute([$id]);
+            $row = $sel->fetch();
+            if (!$row) { Helpers::redirect("index.php?page=parcels"); break; }
+            $toEmail = trim((string)($row['customer_email'] ?? ''));
+            $toName  = (string)($row['customer_name'] ?? 'Customer');
+            $createdAt = (string)($row['created_at'] ?? date('Y-m-d H:i:s'));
+            $vehNo = trim((string)($row['vehicle_no'] ?? ''));
+            $fromName = (string)($row['from_branch'] ?? '');
+            $toNameBr = (string)($row['to_branch'] ?? '');
+            $itStmt = $pdo->prepare('SELECT description, qty, COALESCE(rate,0) AS rate FROM parcel_items WHERE parcel_id=? ORDER BY id');
+            $itStmt->execute([$id]);
+            $itemsNow = $itStmt->fetchAll();
+            $rowsHtml = '';
+            $totalNow = 0.0;
+            foreach ($itemsNow as $it) {
+                $desc = (string)($it['description'] ?? '');
+                $qty = (float)($it['qty'] ?? 0);
+                $rate = (float)($it['rate'] ?? 0);
+                $amt = $qty * $rate; $totalNow += $amt;
+                $rowsHtml .= '<tr><td>'.htmlspecialchars($desc).'</td><td>'.number_format($qty,2).'</td><td class="text-end">'.number_format($rate,2).'</td><td class="text-end">'.number_format($amt,2).'</td></tr>';
+            }
+            if ($rowsHtml === '') { $rowsHtml = '<tr><td colspan="4">No item details available.</td></tr>'; }
+            $priceNow = isset($row['price']) ? (float)$row['price'] : (float)$totalNow;
+            $itemCount = is_array($itemsNow) ? count($itemsNow) : 0;
+            $defaultSubject = 'Parcel Order #' . (int)$id . ' — ' . number_format($priceNow,2);
+            $defaultHtml = '<div style="font-family:Arial,sans-serif">'
+                         . '<h3 style="margin:0 0 8px;">Parcel Order #' . (int)$id . '</h3>'
+                         . '<div style="color:#555;margin:0 0 6px;">Order Time: ' . htmlspecialchars($createdAt) . '</div>'
+                         . '<div style="color:#555;margin:0 0 6px;">From: ' . htmlspecialchars($fromName) . ' &rarr; To: ' . htmlspecialchars($toNameBr) . '</div>'
+                         . '<div style="color:#555;margin:0 0 12px;">Vehicle: ' . htmlspecialchars($vehNo) . ' | Items: ' . (int)$itemCount . ' | Price: ' . number_format($priceNow,2) . '</div>'
+                         . '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">'
+                         . '<thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>'
+                         . $rowsHtml
+                         . '</tbody><tfoot><tr><th colspan="3" style="text-align:right">Total</th><th class="text-end">'.number_format($totalNow,2).'</th></tr></tfoot></table>'
+                         . '</div>';
+            $prefill = ['id'=>(int)$id,'to_email'=>$toEmail,'to_name'=>$toName,'subject'=>$defaultSubject,'html'=>$defaultHtml];
+            $flash_msg = $_SESSION['flash_msg'] ?? null; unset($_SESSION['flash_msg']);
+            $flash_err = $_SESSION['flash_err'] ?? null; unset($_SESSION['flash_err']);
+            Helpers::view('parcels/email_form', compact('prefill','flash_msg','flash_err'));
+            break;
+        }
+
+        if ($action === 'email_send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $toEmail = trim((string)($_POST['to_email'] ?? ''));
+            $toName = trim((string)($_POST['to_name'] ?? 'Customer'));
+            $subject = trim((string)($_POST['subject'] ?? ''));
+            $html = (string)($_POST['html'] ?? '');
+            $alt = strip_tags($html);
+            if ($toEmail === '' || $subject === '') {
+                $_SESSION['flash_err'] = 'Please provide both To Email and Subject.';
+                Helpers::redirect('index.php?page=parcels&action=email_form&id='.(int)$id);
+                break;
+            }
+            $ok = false;
+            if (isset($GLOBALS['mailer']) && $GLOBALS['mailer'] instanceof Mailer) {
+                try { $ok = $GLOBALS['mailer']->send($toEmail, $toName, $subject, $html, $alt); } catch (Throwable $e) { $ok = false; }
+            }
+            // Log result
+            try {
+                $ins = $pdo->prepare('INSERT INTO parcel_emails (parcel_id, to_email, subject, status, error) VALUES (?,?,?,?,?)');
+                $err = '';
+                if (!$ok && isset($GLOBALS['mailer']) && method_exists($GLOBALS['mailer'], 'getLastError')) { $err = (string)$GLOBALS['mailer']->getLastError(); }
+                $ins->execute([$id, $toEmail, $subject, ($ok?'sent':'failed'), ($err!==''?$err:null)]);
+            } catch (Throwable $e) { /* ignore */ }
+            // Persist status on parcel row
+            try {
+                $up = $pdo->prepare('UPDATE parcels SET last_email_status=?, last_emailed_at=NOW() WHERE id=?');
+                $up->execute([ $ok ? 'sent' : 'failed', (int)$id ]);
+            } catch (Throwable $e) { /* ignore */ }
+            if ($ok) {
+                $_SESSION['email_sent_parcel_id'] = (int)$id;
+                $_SESSION['flash_msg'] = 'Email sent to ' . htmlspecialchars($toEmail);
+                Helpers::redirect('index.php?page=parcels');
+            } else {
+                $_SESSION['flash_err'] = 'Failed to send email. Please check SMTP config or recipient address.';
+                Helpers::redirect('index.php?page=parcels&action=email_form&id='.(int)$id);
+            }
+            break;
+        }
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
@@ -1075,7 +1233,7 @@ switch ($page) {
                 }
             }
             $pdo->commit();
-            // Send customer notification email (best-effort, ignore failures) with enriched details
+            // Send customer notification email (best-effort) with enriched details
             try {
                 $cStmt = $pdo->prepare('SELECT name, email, phone FROM customers WHERE id=? LIMIT 1');
                 $cStmt->execute([$customer_id]);
@@ -1132,7 +1290,19 @@ switch ($page) {
                           . '</tbody></table>'
                           . '</div>';
                     $alt = "Parcel Order #" . (int)$id . "\nOrder Time: " . (string)$createdAt . "\nFrom: " . $fromName . " -> To: " . $toName . "\nVehicle: " . $vehNo . "\nItems: " . (int)$itemCount . "\nPrice: " . number_format($priceNow,2);
-                    $GLOBALS['mailer']->send($toEmail, $custName, $subject, $html, $alt);
+                    $okMail = $GLOBALS['mailer']->send($toEmail, $custName, $subject, $html, $alt);
+                    // Log result
+                    try {
+                        $ins = $pdo->prepare('INSERT INTO parcel_emails (parcel_id, to_email, subject, status, error) VALUES (?,?,?,?,?)');
+                        $err = '';
+                        if (!$okMail && isset($GLOBALS['mailer']) && method_exists($GLOBALS['mailer'], 'getLastError')) { $err = (string)$GLOBALS['mailer']->getLastError(); }
+                        $ins->execute([(int)$id, $toEmail, $subject, ($okMail?'sent':'failed'), ($err!==''?$err:null)]);
+                    } catch (Throwable $eLog) { /* ignore */ }
+                    // Persist status on parcel row
+                    try {
+                        $up = $pdo->prepare('UPDATE parcels SET last_email_status=?, last_emailed_at=NOW() WHERE id=?');
+                        $up->execute([ $okMail ? 'sent' : 'failed', (int)$id ]);
+                    } catch (Throwable $e3) { /* ignore */ }
                 }
                 $toPhone = trim((string)($cRow['phone'] ?? ''));
                 if ($toPhone !== '' && isset($GLOBALS['sms']) && method_exists($GLOBALS['sms'], 'sendText') && $GLOBALS['sms']->isEnabled()) {
@@ -1293,22 +1463,85 @@ switch ($page) {
             $where[] = 'DATE(p.created_at) BETWEEN ? AND ?';
             array_push($params, $from, $to);
         }
-        $sql = 'SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch
-                FROM parcels p
-                LEFT JOIN customers c ON c.id = p.customer_id
-                LEFT JOIN suppliers s ON s.id = p.supplier_id
-                LEFT JOIN branches bf ON bf.id = p.from_branch_id
-                LEFT JOIN branches bt ON bt.id = p.to_branch_id';
+        // Build list query, optionally joining email status if table exists
+        $hasEmailLog = false;
+        try { $pdo->query('SELECT 1 FROM parcel_emails LIMIT 1'); $hasEmailLog = true; } catch (Throwable $e) { $hasEmailLog = false; }
+        if ($hasEmailLog) {
+            $sql = 'SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
+                           COALESCE(pe.status, p.last_email_status) AS email_status,
+                           COALESCE(pe.created_at, p.last_emailed_at) AS emailed_at
+                    FROM parcels p
+                    LEFT JOIN customers c ON c.id = p.customer_id
+                    LEFT JOIN suppliers s ON s.id = p.supplier_id
+                    LEFT JOIN branches bf ON bf.id = p.from_branch_id
+                    LEFT JOIN branches bt ON bt.id = p.to_branch_id
+                    LEFT JOIN (
+                        SELECT pe1.* FROM parcel_emails pe1
+                        INNER JOIN (
+                            SELECT parcel_id, MAX(id) AS max_id FROM parcel_emails GROUP BY parcel_id
+                        ) x ON x.parcel_id = pe1.parcel_id AND x.max_id = pe1.id
+                    ) pe ON pe.parcel_id = p.id';
+        } else {
+            $sql = 'SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
+                           p.last_email_status AS email_status, p.last_emailed_at AS emailed_at
+                    FROM parcels p
+                    LEFT JOIN customers c ON c.id = p.customer_id
+                    LEFT JOIN suppliers s ON s.id = p.supplier_id
+                    LEFT JOIN branches bf ON bf.id = p.from_branch_id
+                    LEFT JOIN branches bt ON bt.id = p.to_branch_id';
+        }
         if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
         $sql .= ' ORDER BY p.created_at DESC LIMIT 200';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $parcels = $stmt->fetchAll();
+        // If we just sent an email and DB join isn't available, mark that parcel as sent in-memory
+        if (!empty($_SESSION['email_sent_parcel_id'])) {
+            $lastSentId = (int)$_SESSION['email_sent_parcel_id'];
+            foreach ($parcels as &$row) {
+                if ((int)$row['id'] === $lastSentId && empty($row['email_status'])) {
+                    $row['email_status'] = 'sent';
+                    $row['emailed_at'] = date('Y-m-d H:i:s');
+                    break;
+                }
+            }
+            unset($row);
+            unset($_SESSION['email_sent_parcel_id']);
+        }
         // customers for filter
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
         // branches for filter
         $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
         Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels','isKilinochchi'));
+        break;
+
+    case 'email_log':
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdo = Database::pdo();
+        $id = (int)($_GET['id'] ?? 0);
+        if ($id <= 0) { Helpers::redirect('index.php?page=parcels'); break; }
+        $p = $pdo->prepare('SELECT p.id, p.last_email_status, p.last_emailed_at, c.name AS customer_name, c.email AS customer_email FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id WHERE p.id=?');
+        $p->execute([$id]);
+        $parcelHdr = $p->fetch();
+        $logs = [];
+        try {
+            $pdo->query('SELECT 1 FROM parcel_emails LIMIT 1');
+            $st = $pdo->prepare('SELECT id, to_email, subject, status, error, created_at FROM parcel_emails WHERE parcel_id=? ORDER BY id DESC');
+            $st->execute([$id]);
+            $logs = $st->fetchAll();
+        } catch (Throwable $e) { $logs = []; }
+        // Fallback: if no DB logs exist, but parcel has last_email_status/time, show one synthesized row
+        if (empty($logs) && !empty($parcelHdr) && !empty($parcelHdr['last_email_status'])) {
+            $logs[] = [
+                'id' => 0,
+                'to_email' => (string)($parcelHdr['customer_email'] ?? ''),
+                'subject' => '(not recorded)',
+                'status' => (string)$parcelHdr['last_email_status'],
+                'error' => null,
+                'created_at' => (string)($parcelHdr['last_emailed_at'] ?? '')
+            ];
+        }
+        Helpers::view('parcels/email_log', compact('parcelHdr','logs'));
         break;
 
     case 'parcel_print':
@@ -1333,6 +1566,56 @@ switch ($page) {
         $branchId = (int)($user['branch_id'] ?? 0);
         $branchFilterId = Auth::isMainBranch() ? (int)($_GET['branch_id'] ?? $branchId) : $branchId;
         $action = $_GET['action'] ?? 'index';
+
+        if ($action === 'email_form') {
+            $id = (int)($_GET['id'] ?? 0);
+            if ($id <= 0) { Helpers::redirect('index.php?page=delivery_notes'); break; }
+            $st = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.email AS customer_email, b.name AS branch_name FROM delivery_notes dn LEFT JOIN customers c ON c.id=dn.customer_id LEFT JOIN branches b ON b.id=dn.branch_id WHERE dn.id=? LIMIT 1');
+            $st->execute([$id]);
+            $dnRow = $st->fetch();
+            if (!$dnRow) { Helpers::redirect('index.php?page=delivery_notes'); break; }
+            $it = $pdo->prepare('SELECT dnp.parcel_id, dnp.amount FROM delivery_note_parcels dnp WHERE dnp.delivery_note_id=? ORDER BY dnp.id');
+            $it->execute([$id]);
+            $lines = $it->fetchAll();
+            $rowsHtml=''; $total=0.0; foreach ($lines as $ln){ $total+=(float)$ln['amount']; $rowsHtml.='<tr><td>#'.(int)$ln['parcel_id'].'</td><td class="text-end">'.number_format((float)$ln['amount'],2).'</td></tr>'; }
+            if ($rowsHtml===''){ $rowsHtml='<tr><td colspan="2">No lines.</td></tr>'; }
+            $disc=(float)($dnRow['discount']??0); $net=$total+$disc;
+            $subject='Delivery Note #'.$id.' — '.number_format($net,2);
+            $html = '<div style="font-family:Arial,sans-serif">'
+                  . '<h3 style="margin:0 0 8px;">Delivery Note #'.$id.'</h3>'
+                  . '<div style="color:#555;margin:0 0 6px;">Customer: '.htmlspecialchars((string)$dnRow['customer_name']).'</div>'
+                  . '<div style="color:#555;margin:0 12px 12px 0;">Date: '.htmlspecialchars((string)$dnRow['delivery_date']).'</div>'
+                  . '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">'
+                  . '<thead><tr><th>Parcel</th><th>Amount</th></tr></thead><tbody>'
+                  . $rowsHtml
+                  . '</tbody><tfoot><tr><th class="text-end">Net</th><th class="text-end">'.number_format($net,2).'</th></tr></tfoot></table>'
+                  . '</div>';
+            $prefill = [
+                'id'=>(int)$id,
+                'to_email'=>trim((string)($dnRow['customer_email']??'')),
+                'to_name'=>(string)($dnRow['customer_name']??'Customer'),
+                'subject'=>$subject,
+                'html'=>$html
+            ];
+            Helpers::view('delivery_notes/email_form', compact('prefill'));
+            break;
+        }
+
+        if ($action === 'email_send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $toEmail = trim((string)($_POST['to_email'] ?? ''));
+            $toName = trim((string)($_POST['to_name'] ?? 'Customer'));
+            $subject = trim((string)($_POST['subject'] ?? ''));
+            $html = (string)($_POST['html'] ?? '');
+            $alt = strip_tags($html);
+            if ($toEmail === '' || $subject === '') { Helpers::redirect('index.php?page=delivery_notes&action=email_form&id='.(int)$id); break; }
+            if (isset($GLOBALS['mailer']) && $GLOBALS['mailer'] instanceof Mailer) {
+                try { $GLOBALS['mailer']->send($toEmail, $toName, $subject, $html, $alt); } catch (Throwable $e) { /* ignore */ }
+            }
+            Helpers::redirect('index.php?page=delivery_notes');
+            break;
+        }
 
         // Ensure discount column exists on delivery_notes
         try {
@@ -1412,7 +1695,7 @@ switch ($page) {
                     $toEmail = trim((string)($cr['email'] ?? ''));
                     if ($toEmail !== '' && isset($GLOBALS['mailer']) && $GLOBALS['mailer'] instanceof Mailer) {
                         // Fetch DN row + paid/due
-                        $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, c.address AS customer_address, b.name AS branch_name,
+                        $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, b.name AS branch_name,
                                        COALESCE(paid.total_paid,0) AS paid, (dn.total_amount - COALESCE(paid.total_paid,0)) AS due
                                 FROM delivery_notes dn
                                 LEFT JOIN customers c ON c.id = dn.customer_id
@@ -1420,40 +1703,31 @@ switch ($page) {
                                 LEFT JOIN (SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id) paid ON paid.delivery_note_id = dn.id
                                 WHERE dn.id=? LIMIT 1';
                         $st = $pdo->prepare($sql); $st->execute([$dnId]); $dnRow = $st->fetch();
-                        // Items list
-                        $its = $pdo->prepare('SELECT dnp.amount, p.id AS parcel_id, p.tracking_number, p.status, p.vehicle_no FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? ORDER BY p.id');
-                        $its->execute([$dnId]); $items = $its->fetchAll();
-                        ob_start(); ?>
-                        <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;">
-                          <h3 style="margin:0 0 8px;">Delivery Note #<?php echo (int)$dnRow['id']; ?></h3>
-                          <div style="margin:0 0 6px;color:#555;">Date: <?php echo htmlspecialchars((string)$dnRow['delivery_date']); ?></div>
-                          <div style="margin:0 0 6px;color:#555;">Branch: <?php echo htmlspecialchars((string)($dnRow['branch_name'] ?? '')); ?></div>
-                          <div style="margin:0 0 12px;color:#555;">Customer: <?php echo htmlspecialchars((string)($dnRow['customer_name'] ?? '')); ?> (<?php echo htmlspecialchars((string)($dnRow['customer_phone'] ?? '')); ?>)</div>
-                          <table cellspacing="0" cellpadding="6" border="1" style="border-collapse:collapse;width:100%;">
-                            <thead style="background:#f1f1f1;"><tr>
-                              <th align="left">Parcel ID</th><th align="left">Tracking</th><th align="left">Status</th><th align="left">Vehicle</th><th align="right">Amount</th>
-                            </tr></thead>
-                            <tbody>
-                              <?php if (!$items): ?><tr><td colspan="5" align="center">No items</td></tr><?php else: foreach($items as $it): ?>
-                                <tr>
-                                  <td>#<?php echo (int)$it['parcel_id']; ?></td>
-                                  <td><?php echo htmlspecialchars((string)($it['tracking_number'] ?? '')); ?></td>
-                                  <td><?php echo htmlspecialchars((string)($it['status'] ?? '')); ?></td>
-                                  <td><?php echo htmlspecialchars((string)($it['vehicle_no'] ?? '')); ?></td>
-                                  <td align="right"><?php echo number_format((float)($it['amount'] ?? 0), 2); ?></td>
-                                </tr>
-                              <?php endforeach; endif; ?>
-                            </tbody>
-                            <tfoot>
-                              <tr style="background:#fafafa;"><td colspan="4" align="right"><strong>Total</strong></td><td align="right"><strong><?php echo number_format((float)$dnRow['total_amount'],2); ?></strong></td></tr>
-                              <tr><td colspan="4" align="right">Paid</td><td align="right"><?php echo number_format((float)($dnRow['paid'] ?? 0),2); ?></td></tr>
-                              <tr><td colspan="4" align="right">Due</td><td align="right"><?php echo number_format((float)($dnRow['due'] ?? 0),2); ?></td></tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                        <?php $html = ob_get_clean();
-                        $text = 'Delivery Note #' . (int)$dnRow['id'] . "\nDate: " . (string)$dnRow['delivery_date'] . "\nTotal: " . number_format((float)$dnRow['total_amount'],2);
-                        $GLOBALS['mailer']->send($toEmail, (string)($cr['name'] ?? $toEmail), 'Your Delivery Note', $html, $text);
+                        // Build DN items rows
+                        $it = $pdo->prepare('SELECT dnp.parcel_id, dnp.amount FROM delivery_note_parcels dnp WHERE dnp.delivery_note_id=? ORDER BY dnp.id');
+                        $it->execute([$dnId]);
+                        $items = $it->fetchAll();
+                        $rowsHtml = '';
+                        foreach ($items as $ln) {
+                            $rowsHtml .= '<tr><td>#'.(int)$ln['parcel_id'].'</td><td class="text-end">'.number_format((float)$ln['amount'],2).'</td></tr>';
+                        }
+                        if ($rowsHtml === '') { $rowsHtml = '<tr><td colspan="2">No items</td></tr>'; }
+                        $subject = 'Delivery Note #'.$dnId.' — '.number_format((float)$dnRow['total_amount'],2);
+                        $html = '<div style="font-family:Arial,sans-serif">'
+                              . '<h3 style="margin:0 0 8px;">Delivery Note #'.$dnId.'</h3>'
+                              . '<div style="margin:0 0 6px;color:#555;">Branch: '.htmlspecialchars((string)($dnRow['branch_name'] ?? '')).'</div>'
+                              . '<div style="margin:0 0 12px;color:#555;">Customer: '.htmlspecialchars((string)($dnRow['customer_name'] ?? '')).'</div>'
+                              . '<table cellspacing="0" cellpadding="6" border="1" style="border-collapse:collapse;width:100%;">'
+                              . '<thead style="background:#f1f1f1;"><tr><th align="left">Parcel</th><th align="right">Amount</th></tr></thead>'
+                              . '<tbody>'.$rowsHtml.'</tbody>'
+                              . '<tfoot>'
+                              . '<tr style="background:#fafafa;"><td align="right"><strong>Total</strong></td><td align="right"><strong>'.number_format((float)$dnRow['total_amount'],2).'</strong></td></tr>'
+                              . '<tr><td align="right">Paid</td><td align="right">'.number_format((float)($dnRow['paid'] ?? 0),2).'</td></tr>'
+                              . '<tr><td align="right">Due</td><td align="right">'.number_format((float)($dnRow['due'] ?? 0),2).'</td></tr>'
+                              . '</tfoot></table>'
+                              . '</div>';
+                        $text = 'Delivery Note #'.$dnId.'\nTotal: '.number_format((float)$dnRow['total_amount'],2);
+                        try { $GLOBALS['mailer']->send($toEmail, (string)($cr['name'] ?? $toEmail), $subject, $html, $text); } catch (Throwable $eSend) { /* ignore */ }
                     }
                     // SMS notification (concise)
                     $toPhone = trim((string)($cr['phone'] ?? ''));

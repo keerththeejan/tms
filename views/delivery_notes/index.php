@@ -128,6 +128,7 @@
 
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='.(int)$n['id']); ?>"><i class="bi bi-eye"></i> View</a>
             <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=print&id='.(int)$n['id']); ?>" target="_blank"><i class="bi bi-printer"></i> Print</a>
+            <a class="btn btn-sm btn-outline-info" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=email_form&id='.(int)$n['id']); ?>"><i class="bi bi-envelope"></i> Email</a>
             </div>
           </td>
         </tr>

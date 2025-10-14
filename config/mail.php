@@ -4,13 +4,18 @@
 return [
     'use_smtp'   => true,
     'host'       => 'smtp.gmail.com',
-    'port'       => 465,
-    'encryption' => 'ssl',
-    'username'   => 'yathunilayathu@gmail.com',
-    'password'   => 'psowxwilxpvfwgwz',
-   'from_email' => 'yathunilayathu@gmail.com',
+    // Gmail recommended: TLS on 587
+    'port'       => 587,
+    'encryption' => 'tls',
+    'username'   => 'yathunila2001@gmail.com',
+    'password'   => 'zrtsswtiwjhaefyf',
+    'from_email' => 'yathunila2001@gmail.com',
     'from_name'  => 'TMS',
-    'smtpDebug'  => 2,
-    'debugoutput' => 'html',
+    // Optional: set a reply-to address
+    'reply_to'   => 'yathunila2001@gmail.com',
+    // Reduce debug level in production (0 = off)
+    'smtpDebug'  => 0,
+    'debugoutput' => 'error_log',
+    'auth_type'  => 'LOGIN',
+    'timeout'    => 20,
   ];
-

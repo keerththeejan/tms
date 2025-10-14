@@ -57,6 +57,7 @@
         <th>Weight</th>
         <th>Price</th>
         <th>Status</th>
+        <th>Email</th>
         <th class="text-end">Actions</th>
       </tr>
     </thead>
@@ -85,6 +86,21 @@
           <td><?php echo number_format((float)$p['weight'], 2); ?></td>
           <td><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
           <td><span class="badge bg-<?php echo $p['status']==='delivered'?'success':($p['status']==='in_transit'?'info':'secondary'); ?>"><?php echo htmlspecialchars($p['status']); ?></span></td>
+          <td>
+            <?php if (!empty($p['email_status'])): ?>
+              <?php if ($p['email_status'] === 'sent'): ?>
+                <span class="badge bg-success">Sent</span>
+              <?php else: ?>
+                <span class="badge bg-danger">Failed</span>
+              <?php endif; ?>
+              <small class="text-muted d-block"><?php echo htmlspecialchars($p['emailed_at'] ?? ''); ?></small>
+            <?php else: ?>
+              <span class="badge bg-secondary">Not sent</span>
+            <?php endif; ?>
+            <div>
+              <a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=email_log&id='.(int)$p['id']); ?>">View log</a>
+            </div>
+          </td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-primary" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer"></i> Print</a>
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square"></i> Edit</a>
@@ -97,6 +113,7 @@
                 <button class="btn btn-sm btn-primary"><i class="bi bi-receipt"></i> Generate Invoice</button>
               </form>
             <?php endif; ?>
+            <a class="btn btn-sm btn-outline-info" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id='.(int)$p['id']); ?>"><i class="bi bi-envelope"></i> Email</a>
             <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" class="d-inline" onsubmit="return confirm('Delete this parcel?');">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
               <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
