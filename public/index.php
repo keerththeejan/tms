@@ -13,7 +13,7 @@ if ($page === 'login') {
             return;
         }
 
-
+        
       $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
         if (Auth::attempt($username, $password)) {
@@ -1467,7 +1467,9 @@ switch ($page) {
         $hasEmailLog = false;
         try { $pdo->query('SELECT 1 FROM parcel_emails LIMIT 1'); $hasEmailLog = true; } catch (Throwable $e) { $hasEmailLog = false; }
         if ($hasEmailLog) {
-            $sql = 'SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
+            $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
+                           COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
+                           c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            COALESCE(pe.status, p.last_email_status) AS email_status,
                            COALESCE(pe.created_at, p.last_emailed_at) AS emailed_at
                     FROM parcels p
@@ -1480,15 +1482,36 @@ switch ($page) {
                         INNER JOIN (
                             SELECT parcel_id, MAX(id) AS max_id FROM parcel_emails GROUP BY parcel_id
                         ) x ON x.parcel_id = pe1.parcel_id AND x.max_id = pe1.id
-                    ) pe ON pe.parcel_id = p.id';
+                    ) pe ON pe.parcel_id = p.id
+                    LEFT JOIN delivery_route_assignments dra_to
+                      ON dra_to.customer_id = p.customer_id
+                     AND dra_to.branch_id = p.to_branch_id
+                     AND dra_to.delivery_date BETWEEN ? AND ?
+                    LEFT JOIN delivery_route_assignments dra_from
+                      ON dra_from.customer_id = p.customer_id
+                     AND dra_from.branch_id = p.from_branch_id
+                     AND dra_from.delivery_date BETWEEN ? AND ?';
+            // add params for dra joins at the beginning of params later
+            array_unshift($params, $from, $to, $from, $to);
         } else {
-            $sql = 'SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
+            $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
+                           COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
+                           c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            p.last_email_status AS email_status, p.last_emailed_at AS emailed_at
                     FROM parcels p
                     LEFT JOIN customers c ON c.id = p.customer_id
                     LEFT JOIN suppliers s ON s.id = p.supplier_id
                     LEFT JOIN branches bf ON bf.id = p.from_branch_id
-                    LEFT JOIN branches bt ON bt.id = p.to_branch_id';
+                    LEFT JOIN branches bt ON bt.id = p.to_branch_id
+                    LEFT JOIN delivery_route_assignments dra_to
+                      ON dra_to.customer_id = p.customer_id
+                     AND dra_to.branch_id = p.to_branch_id
+                     AND dra_to.delivery_date BETWEEN ? AND ?
+                    LEFT JOIN delivery_route_assignments dra_from
+                      ON dra_from.customer_id = p.customer_id
+                     AND dra_from.branch_id = p.from_branch_id
+                     AND dra_from.delivery_date BETWEEN ? AND ?';
+            array_unshift($params, $from, $to, $from, $to);
         }
         if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
         $sql .= ' ORDER BY p.created_at DESC LIMIT 200';
@@ -1566,6 +1589,9 @@ switch ($page) {
         $branchId = (int)($user['branch_id'] ?? 0);
         $branchFilterId = Auth::isMainBranch() ? (int)($_GET['branch_id'] ?? $branchId) : $branchId;
         $action = $_GET['action'] ?? 'index';
+        // Ensure per-DN email status columns exist
+        try { $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN last_email_status VARCHAR(10) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN last_emailed_at DATETIME NULL"); } catch (Throwable $e) { /* ignore if exists */ }
 
         if ($action === 'email_form') {
             $id = (int)($_GET['id'] ?? 0);
@@ -1610,9 +1636,12 @@ switch ($page) {
             $html = (string)($_POST['html'] ?? '');
             $alt = strip_tags($html);
             if ($toEmail === '' || $subject === '') { Helpers::redirect('index.php?page=delivery_notes&action=email_form&id='.(int)$id); break; }
+            $ok = false;
             if (isset($GLOBALS['mailer']) && $GLOBALS['mailer'] instanceof Mailer) {
-                try { $GLOBALS['mailer']->send($toEmail, $toName, $subject, $html, $alt); } catch (Throwable $e) { /* ignore */ }
+                try { $ok = (bool)$GLOBALS['mailer']->send($toEmail, $toName, $subject, $html, $alt); } catch (Throwable $e) { $ok = false; }
             }
+            // Persist status on DN
+            try { $pdo->prepare('UPDATE delivery_notes SET last_email_status=?, last_emailed_at=NOW() WHERE id=?')->execute([($ok?'sent':'failed'), (int)$id]); } catch (Throwable $e) { /* ignore */ }
             Helpers::redirect('index.php?page=delivery_notes');
             break;
         }
@@ -1727,23 +1756,24 @@ switch ($page) {
                               . '</tfoot></table>'
                               . '</div>';
                         $text = 'Delivery Note #'.$dnId.'\nTotal: '.number_format((float)$dnRow['total_amount'],2);
-                        try { $GLOBALS['mailer']->send($toEmail, (string)($cr['name'] ?? $toEmail), $subject, $html, $text); } catch (Throwable $eSend) { /* ignore */ }
-                    }
-                    // SMS notification (concise)
-                    $toPhone = trim((string)($cr['phone'] ?? ''));
-                    if ($toPhone !== '' && isset($GLOBALS['sms']) && method_exists($GLOBALS['sms'], 'sendText') && $GLOBALS['sms']->isEnabled()) {
-                        $vehArr = [];
-                        foreach (($items ?? []) as $it) {
-                            $v = trim((string)($it['vehicle_no'] ?? ''));
-                            if ($v !== '') { $vehArr[$v] = true; }
-                        }
-                        $vehices = implode(', ', array_keys($vehArr));
-                        $msg = 'Delivery Note #' . (int)$dnRow['id'] . ' | Date: ' . (string)$dnRow['delivery_date']
-                             . ($vehices !== '' ? ' | Vehicles: ' . $vehices : '')
-                             . ' | Total: ' . number_format((float)$dnRow['total_amount'],2);
-                        $GLOBALS['sms']->sendText($toPhone, $msg);
+                        $okDn = false; try { $okDn = (bool)$GLOBALS['mailer']->send($toEmail, (string)($cr['name'] ?? $toEmail), $subject, $html, $text); } catch (Throwable $eSend) { $okDn=false; }
+                        try { $pdo->prepare('UPDATE delivery_notes SET last_email_status=?, last_emailed_at=NOW() WHERE id=?')->execute([($okDn?'sent':'failed'), $dnId]); } catch (Throwable $e4) { /* ignore */ }
                     }
                 } catch (Throwable $e) { /* ignore */ }
+                // SMS notification (concise)
+                $toPhone = trim((string)($cr['phone'] ?? ''));
+                if ($toPhone !== '' && isset($GLOBALS['sms']) && method_exists($GLOBALS['sms'], 'sendText') && $GLOBALS['sms']->isEnabled()) {
+                    $vehArr = [];
+                    foreach (($items ?? []) as $it) {
+                        $v = trim((string)($it['vehicle_no'] ?? ''));
+                        if ($v !== '') { $vehArr[$v] = true; }
+                    }
+                    $vehices = implode(', ', array_keys($vehArr));
+                    $msg = 'Delivery Note #' . (int)$dnRow['id'] . ' | Date: ' . (string)$dnRow['delivery_date']
+                         . ($vehices !== '' ? ' | Vehicles: ' . $vehices : '')
+                         . ' | Total: ' . number_format((float)$dnRow['total_amount'],2);
+                    $GLOBALS['sms']->sendText($toPhone, $msg);
+                }
                 Helpers::redirect('index.php?page=delivery_notes&action=view&id=' . $dnId);
                 break;
             }
@@ -2094,6 +2124,21 @@ switch ($page) {
             }
             $dn['suppliers_agg'] = implode(', ', array_keys($supNames));
             $dn['supplier_phones_agg'] = implode(', ', array_keys($supPhones));
+            // Aggregate vehicles from items; fallback to planned assignment for this DN
+            $vehSet = [];
+            foreach ($items as $row) {
+                $v = trim((string)($row['vehicle_no'] ?? ''));
+                if ($v !== '') { $vehSet[$v] = true; }
+            }
+            $vehList = implode(', ', array_keys($vehSet));
+            if ($vehList === '') {
+                try {
+                    $drv = $pdo->prepare('SELECT vehicle_no FROM delivery_route_assignments WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
+                    $drv->execute([(int)$dn['customer_id'], (int)$dn['branch_id'], (string)$dn['delivery_date']]);
+                    $vehList = (string)($drv->fetch()['vehicle_no'] ?? '');
+                } catch (Throwable $e) { /* ignore */ }
+            }
+            $dn['vehicles_agg'] = $vehList;
             Helpers::view('delivery_notes/show', compact('dn','items'));
             break;
         }
@@ -2141,6 +2186,16 @@ switch ($page) {
             $dn['suppliers_agg'] = implode(', ', array_keys($supNames));
             $dn['supplier_phones_agg'] = implode(', ', array_keys($supPhones));
             include __DIR__ . '/../views/delivery_notes/print.php';
+            break;
+        }
+
+        if ($action === 'email_log') {
+            $id = (int)($_GET['id'] ?? 0);
+            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.email AS customer_email FROM delivery_notes dn LEFT JOIN customers c ON c.id=dn.customer_id WHERE dn.id=?');
+            $stmt->execute([$id]);
+            $dn = $stmt->fetch();
+            if (!$dn) { http_response_code(404); echo 'Not found'; break; }
+            Helpers::view('delivery_notes/email_log', compact('dn'));
             break;
         }
 
@@ -2310,14 +2365,16 @@ switch ($page) {
         } catch (Throwable $e) { /* ignore */ }
 
         $sql = 'SELECT dn.*, (dn.total_amount + COALESCE(dn.discount,0)) AS net_total, c.name AS customer_name, c.phone AS customer_phone,
+                       dn.last_email_status AS email_status, dn.last_emailed_at AS emailed_at,
                        TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ", ")) AS suppliers,
                        TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(s.phone, "") ORDER BY s.phone SEPARATOR ", ")) AS supplier_phones,
-                       TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(p.vehicle_no, "") ORDER BY p.vehicle_no SEPARATOR ", ")) AS vehicles
+                       COALESCE(NULLIF(TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(p.vehicle_no, "") ORDER BY p.vehicle_no SEPARATOR ", ")), ""), dra.vehicle_no, "") AS vehicles
                 FROM delivery_notes dn
                 LEFT JOIN customers c ON c.id = dn.customer_id
                 LEFT JOIN delivery_note_parcels dnp ON dnp.delivery_note_id = dn.id
                 LEFT JOIN parcels p ON p.id = dnp.parcel_id
                 LEFT JOIN suppliers s ON s.id = p.supplier_id
+                LEFT JOIN delivery_route_assignments dra ON dra.customer_id = dn.customer_id AND dra.branch_id = dn.branch_id AND dra.delivery_date = dn.delivery_date
                 WHERE ' . implode(' AND ', $where) . '
                 GROUP BY dn.id
                 ORDER BY dn.delivery_date DESC, dn.id DESC

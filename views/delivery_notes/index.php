@@ -66,6 +66,7 @@
         <th>Supplier</th>
         <th>Supplier Phone</th>
         <th>Vehicles</th>
+        <th>Email</th>
         <th class="text-end">Total</th>
         <th class="text-end">Actions</th>
       </tr>
@@ -80,6 +81,19 @@
           <td class="text-truncate" title="<?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?>"><?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?></td>
           <td class="text-truncate" title="<?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?>"><?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?></td>
           <td><span class="dn-veh" title="<?php echo htmlspecialchars($n['vehicles'] ?? '—'); ?>"><?php echo ($n['vehicles'] ?? '') !== '' ? htmlspecialchars($n['vehicles']) : '—'; ?></span></td>
+          <td class="nowrap">
+            <?php $st = strtolower(trim((string)($n['email_status'] ?? ''))); ?>
+            <?php if ($st === 'sent'): ?>
+              <span class="badge bg-success">Sent</span>
+              <?php if (!empty($n['emailed_at'])): ?><small class="text-muted ms-1"><?php echo htmlspecialchars($n['emailed_at']); ?></small><?php endif; ?>
+            <?php elseif ($st === 'failed'): ?>
+              <span class="badge bg-danger">Failed</span>
+              <?php if (!empty($n['emailed_at'])): ?><small class="text-muted ms-1"><?php echo htmlspecialchars($n['emailed_at']); ?></small><?php endif; ?>
+            <?php else: ?>
+              <span class="badge bg-secondary">Not sent</span>
+            <?php endif; ?>
+            <div><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=email_log&id='.(int)$n['id']); ?>">View log</a></div>
+          </td>
           <td class="amount">
             <?php $disc = (float)($n['discount'] ?? 0); $net = isset($n['net_total']) ? (float)$n['net_total'] : ((float)$n['total_amount'] + $disc); ?>
             <div><?php echo number_format($net, 2); ?></div>

@@ -18,13 +18,16 @@
       <div class="col-md-6"><strong>Supplier Phone(s):</strong> <?php echo htmlspecialchars($dn['supplier_phones_agg'] ?? ''); ?></div>
     </div>
     <?php 
-      // Aggregate distinct vehicle numbers from items, if any
-      $vehSet = [];
-      foreach (($items ?? []) as $it) {
-        $v = trim((string)($it['vehicle_no'] ?? ''));
-        if ($v !== '') { $vehSet[$v] = true; }
+      // Prefer controller-provided vehicles_agg; otherwise aggregate from items
+      $vehList = trim((string)($dn['vehicles_agg'] ?? ''));
+      if ($vehList === '') {
+        $vehSet = [];
+        foreach (($items ?? []) as $it) {
+          $v = trim((string)($it['vehicle_no'] ?? ''));
+          if ($v !== '') { $vehSet[$v] = true; }
+        }
+        $vehList = implode(', ', array_keys($vehSet));
       }
-      $vehList = implode(', ', array_keys($vehSet));
     ?>
     <?php if ($vehList !== ''): ?>
     <div class="row g-2 mt-1">
