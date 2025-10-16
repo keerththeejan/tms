@@ -55,7 +55,8 @@
     <div class="row mt-2 meta g-2">
       <div class="col-md-3"><small><strong>Vehicle No:</strong> <?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?></small></div>
       <div class="col-md-3"><small><strong>Date:</strong> <?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?></small></div>
-      <div class="col-md-6"><small><strong>Customer:</strong> <?php echo htmlspecialchars($parcel['customer_name'] ?? ''); ?> (<?php echo htmlspecialchars($parcel['customer_phone'] ?? ''); ?>)</small></div>
+      <div class="col-md-3"><small><strong>Customer:</strong> <?php echo htmlspecialchars($parcel['customer_name'] ?? ''); ?> (<?php echo htmlspecialchars($parcel['customer_phone'] ?? ''); ?>)</small></div>
+      <div class="col-md-3"><small><strong>Supplier:</strong> <?php echo htmlspecialchars($parcel['supplier_name'] ?? ''); ?><?php echo !empty($parcel['supplier_phone']) ? ' ('.htmlspecialchars($parcel['supplier_phone']).')' : ''; ?></small></div>
     </div>
   </div>
 

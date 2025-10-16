@@ -1571,7 +1571,7 @@ switch ($page) {
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
         $id = (int)($_GET['id'] ?? 0);
-        $stmt = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id LEFT JOIN branches bf ON bf.id=p.from_branch_id LEFT JOIN branches bt ON bt.id=p.to_branch_id WHERE p.id=?');
+        $stmt = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, s.phone AS supplier_phone, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id LEFT JOIN suppliers s ON s.id = p.supplier_id LEFT JOIN branches bf ON bf.id=p.from_branch_id LEFT JOIN branches bt ON bt.id=p.to_branch_id WHERE p.id=?');
         $stmt->execute([$id]);
         $parcel = $stmt->fetch();
         if (!$parcel) { http_response_code(404); echo 'Not found'; break; }
@@ -2211,6 +2211,8 @@ switch ($page) {
                 Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&err=invalid_input');
                 break;
             }
+            // Only allow negative discounts (reduce total); coerce any positive to negative absolute
+            $discount = -abs($discount);
             $stmt = $pdo->prepare('UPDATE delivery_notes SET discount=? WHERE id=? AND branch_id=?');
             $stmt->execute([$discount, $id, $branchId]);
             Helpers::redirect('index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q!==''?('&q='.urlencode($q)):'') . '&saved=1');

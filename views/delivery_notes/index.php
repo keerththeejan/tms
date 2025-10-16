@@ -129,7 +129,7 @@
               <input type="hidden" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>">
               <input type="hidden" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>">
             </form>
-            <button type="button" class="btn btn-sm btn-outline-dark" onclick="(function(f){var v=prompt('Set discount (+ to add, - to reduce total)', f.discount.value || '0'); if(v!==null){v=v.trim(); if(v!=='' && !isNaN(v)){f.discount.value=v; f.submit();} else {alert('Enter a number');}}})(document.getElementById('dn-disc-<?php echo (int)$n['id']; ?>'));"><i class="bi bi-percent"></i> Discount</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="(function(f){var v=prompt('Set discount (negative only, e.g., -500)', f.discount.value || '0'); if(v!==null){v=v.trim(); if(v!=='' && !isNaN(v)){f.discount.value=v; f.submit();} else {alert('Enter a number');}}})(document.getElementById('dn-disc-<?php echo (int)$n['id']; ?>'));"><i class="bi bi-percent"></i> Discount</button>
 
             <form id="dn-del-<?php echo (int)$n['id']; ?>" class="d-inline" method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=dn_delete'); ?>">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
