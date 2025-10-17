@@ -61,6 +61,14 @@
         <label class="form-label">Date</label>
         <input type="date" name="expense_date" class="form-control" required value="<?php echo htmlspecialchars($expense['expense_date']); ?>">
       </div>
+      <div class="col-md-4">
+        <label class="form-label">Payment Mode</label>
+        <?php $pm = ($expense['payment_mode'] ?? 'cash') === 'credit' ? 'credit' : 'cash'; ?>
+        <select name="payment_mode" id="paymentMode" class="form-select">
+          <option value="cash" <?php echo $pm==='cash'?'selected':''; ?>>Cash</option>
+          <option value="credit" <?php echo $pm==='credit'?'selected':''; ?>>Credit</option>
+        </select>
+      </div>
       <div class="col-md-6">
         <label class="form-label">Branch</label>
         <select name="branch_id" class="form-select" required>
@@ -72,6 +80,14 @@
       <div class="col-md-6">
         <label class="form-label">Notes</label>
         <input type="text" name="notes" class="form-control" value="<?php echo htmlspecialchars($expense['notes'] ?? ''); ?>">
+      </div>
+      <div class="col-md-6 credit-only">
+        <label class="form-label">Credit Party</label>
+        <input type="text" name="credit_party" class="form-control" value="<?php echo htmlspecialchars($expense['credit_party'] ?? ''); ?>">
+      </div>
+      <div class="col-md-6 credit-only">
+        <label class="form-label">Credit Due Date</label>
+        <input type="date" name="credit_due_date" class="form-control" value="<?php echo htmlspecialchars($expense['credit_due_date'] ?? ''); ?>">
       </div>
     </div>
   </div>
@@ -103,5 +119,12 @@
     input.value = '';
     const collapseEl = document.getElementById('quickAddExpType'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
   });
+  const pmSel = document.getElementById('paymentMode');
+  const toggleCredit = ()=>{
+    const isCred = pmSel && pmSel.value === 'credit';
+    document.querySelectorAll('.credit-only').forEach(function(el){ el.style.display = isCred ? '' : 'none'; });
+  };
+  pmSel?.addEventListener('change', toggleCredit);
+  toggleCredit();
 })();
 </script>

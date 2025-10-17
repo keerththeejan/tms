@@ -2566,22 +2566,83 @@ switch ($page) {
             $branch_id = (int)($_POST['branch_id'] ?? $branchId);
             $expense_date = $_POST['expense_date'] ?? date('Y-m-d');
             $notes = trim($_POST['notes'] ?? '');
+            $payment_mode = ($_POST['payment_mode'] ?? 'cash') === 'credit' ? 'credit' : 'cash';
+            $credit_party = trim($_POST['credit_party'] ?? '');
+            $credit_due_date = $_POST['credit_due_date'] ?? null;
+            // Normalize dates to YYYY-MM-DD
+            try { if ($expense_date) { $ts = strtotime($expense_date); if ($ts) { $expense_date = date('Y-m-d', $ts); } } } catch (Throwable $dtEx) {}
+            try { if ($credit_due_date) { $ts2 = strtotime($credit_due_date); if ($ts2) { $credit_due_date = date('Y-m-d', $ts2); } } } catch (Throwable $dtEx2) {}
             if ($expense_type === '') { $expense_type = 'other'; }
+            if ($payment_mode === 'credit') {
+                if ($credit_party === '' || ($credit_due_date === null || $credit_due_date === '')) {
+                    $error = 'For Credit expenses, Credit Party and Due Date are required.';
+                }
+            }
             if ($amount <= 0 || $branch_id <= 0) { $error = 'Amount and Branch are required.'; }
             if (!empty($error)) {
                 $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-                $expense = compact('id','expense_type','amount','branch_id','expense_date','notes');
+                $expense = compact('id','expense_type','amount','branch_id','expense_date','notes','payment_mode','credit_party','credit_due_date');
                 $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
                 Helpers::view('expenses/form', compact('expense','branchesAll','error','typesDynamic'));
                 break;
             }
             try {
+                // Check if new credit columns exist; if not, try to add them once
+                $hasNewCols = true;
+                try { $pdo->query("SELECT payment_mode, credit_party, credit_due_date, credit_settled FROM expenses LIMIT 1"); }
+                catch (Throwable $exCols) {
+                    $hasNewCols = false;
+                    try {
+                        $pdo->exec("ALTER TABLE expenses
+                          ADD COLUMN payment_mode ENUM('cash','credit') NOT NULL DEFAULT 'cash' AFTER expense_type,
+                          ADD COLUMN credit_party VARCHAR(150) NULL AFTER notes,
+                          ADD COLUMN credit_due_date DATE NULL AFTER credit_party,
+                          ADD COLUMN credit_settled TINYINT(1) NOT NULL DEFAULT 0 AFTER credit_due_date");
+                        $hasNewCols = true;
+                    } catch (Throwable $ign) { /* leave as false and fall back */ }
+                }
+
                 if ($id > 0) {
-                    $stmt = $pdo->prepare('UPDATE expenses SET expense_type=?, amount=?, branch_id=?, expense_date=?, notes=? WHERE id=?');
-                    $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes,$id]);
+                    if ($hasNewCols) {
+                        $stmt = $pdo->prepare('UPDATE expenses SET expense_type=?, amount=?, branch_id=?, expense_date=?, notes=?, payment_mode=?, credit_party=?, credit_due_date=?, credit_settled = CASE WHEN ? = "cash" THEN 1 ELSE credit_settled END WHERE id=?');
+                        $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes,$payment_mode,($credit_party?:null),($credit_due_date?:null),$payment_mode,$id]);
+                    } else {
+                        // Legacy fallback without new columns
+                        $stmt = $pdo->prepare('UPDATE expenses SET expense_type=?, amount=?, branch_id=?, expense_date=?, notes=? WHERE id=?');
+                        $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes,$id]);
+                        // Try to add columns now and backfill this row
+                        try {
+                            $pdo->exec("ALTER TABLE expenses
+                              ADD COLUMN payment_mode ENUM('cash','credit') NOT NULL DEFAULT 'cash' AFTER expense_type,
+                              ADD COLUMN credit_party VARCHAR(150) NULL AFTER notes,
+                              ADD COLUMN credit_due_date DATE NULL AFTER credit_party,
+                              ADD COLUMN credit_settled TINYINT(1) NOT NULL DEFAULT 0 AFTER credit_due_date");
+                            $upd2 = $pdo->prepare('UPDATE expenses SET payment_mode=?, credit_party=?, credit_due_date=?, credit_settled=? WHERE id=?');
+                            $upd2->execute([$payment_mode, ($credit_party?:null), ($credit_due_date?:null), ($payment_mode==='cash'?1:0), $id]);
+                        } catch (Throwable $ign2) { /* ignore */ }
+                    }
                 } else {
-                    $stmt = $pdo->prepare('INSERT INTO expenses (expense_type, amount, branch_id, expense_date, notes) VALUES (?,?,?,?,?)');
-                    $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes]);
+                    if ($hasNewCols) {
+                        $stmt = $pdo->prepare('INSERT INTO expenses (expense_type, amount, branch_id, expense_date, notes, payment_mode, credit_party, credit_due_date, credit_settled) VALUES (?,?,?,?,?,?,?,?,?)');
+                        $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes,$payment_mode,($credit_party?:null),($credit_due_date?:null),($payment_mode==='cash'?1:0)]);
+                    } else {
+                        // Legacy fallback without new columns
+                        $stmt = $pdo->prepare('INSERT INTO expenses (expense_type, amount, branch_id, expense_date, notes) VALUES (?,?,?,?,?)');
+                        $stmt->execute([$expense_type,$amount,$branch_id,$expense_date,$notes]);
+                        $newId = (int)$pdo->lastInsertId();
+                        // Try to add columns and then update this newly inserted row
+                        try {
+                            $pdo->exec("ALTER TABLE expenses
+                              ADD COLUMN payment_mode ENUM('cash','credit') NOT NULL DEFAULT 'cash' AFTER expense_type,
+                              ADD COLUMN credit_party VARCHAR(150) NULL AFTER notes,
+                              ADD COLUMN credit_due_date DATE NULL AFTER credit_party,
+                              ADD COLUMN credit_settled TINYINT(1) NOT NULL DEFAULT 0 AFTER credit_due_date");
+                            if ($newId > 0) {
+                                $upd3 = $pdo->prepare('UPDATE expenses SET payment_mode=?, credit_party=?, credit_due_date=?, credit_settled=? WHERE id=?');
+                                $upd3->execute([$payment_mode, ($credit_party?:null), ($credit_due_date?:null), ($payment_mode==='cash'?1:0), $newId]);
+                            }
+                        } catch (Throwable $ign3) { /* ignore */ }
+                    }
                 }
                 Helpers::redirect('index.php?page=expenses');
             } catch (PDOException $e) {
@@ -2593,8 +2654,10 @@ switch ($page) {
                         $msg = 'This database does not allow new Expense Types. Please change expenses.expense_type to VARCHAR(50), or choose an existing type.';
                     }
                 }
+                // Append DB error for visibility
+                $msg .= ' (' . $e->getMessage() . ')';
                 $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-                $expense = compact('id','expense_type','amount','branch_id','expense_date','notes');
+                $expense = compact('id','expense_type','amount','branch_id','expense_date','notes','payment_mode','credit_party','credit_due_date');
                 $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
                 $error = $msg;
                 Helpers::view('expenses/form', compact('expense','branchesAll','error','typesDynamic'));
@@ -2622,9 +2685,72 @@ switch ($page) {
             break;
         }
 
+        // Mark an expense explicitly as Credit
+        if ($action === 'mark_credit' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                try {
+                    $pdo->query("SELECT payment_mode, credit_settled FROM expenses LIMIT 1");
+                    $pdo->prepare("UPDATE expenses SET payment_mode='credit', credit_settled=0 WHERE id=?")->execute([$id]);
+                } catch (Throwable $e) { /* ignore */ }
+            }
+            Helpers::redirect('index.php?page=expenses');
+            break;
+        }
+
+        // Record a settlement payment against a credit expense
+        if ($action === 'settle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $expense_id = (int)($_POST['id'] ?? 0);
+            $pay_amount = (float)($_POST['pay_amount'] ?? 0);
+            $pay_notes = trim($_POST['pay_notes'] ?? '');
+            if ($expense_id <= 0) { http_response_code(400); echo 'Invalid request'; break; }
+            if ($pay_amount < 0) { $pay_amount = 0; }
+            // Compute current balance
+            $row = null;
+            $sel = $pdo->prepare('SELECT e.amount, e.payment_mode FROM expenses e WHERE e.id=? LIMIT 1');
+            $sel->execute([$expense_id]);
+            $row = $sel->fetch();
+            if (!$row) { http_response_code(404); echo 'Not found'; break; }
+            if (($row['payment_mode'] ?? 'cash') !== 'credit') { Helpers::redirect('index.php?page=expenses'); break; }
+            // Ensure expense_payments table exists (in case migration not run)
+            try { $pdo->query('SELECT 1 FROM expense_payments LIMIT 1'); }
+            catch (Throwable $e) {
+                try {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS expense_payments (
+                      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+                      expense_id BIGINT UNSIGNED NOT NULL,
+                      amount DECIMAL(12,2) NOT NULL,
+                      paid_at DATETIME NOT NULL,
+                      paid_by BIGINT UNSIGNED NULL,
+                      notes VARCHAR(255) NULL,
+                      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                      CONSTRAINT fk_exp_pay_expense FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+                      CONSTRAINT fk_exp_pay_user FOREIGN KEY (paid_by) REFERENCES users(id)
+                    ) ENGINE=InnoDB;");
+                } catch (Throwable $e2) { /* ignore create failure and continue */ }
+            }
+            $agg = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS paid_total FROM expense_payments WHERE expense_id=?');
+            $agg->execute([$expense_id]);
+            $paid_total = (float)($agg->fetch()['paid_total'] ?? 0);
+            $balance = max(0.0, (float)$row['amount'] - $paid_total);
+            // Default to full balance if no amount provided
+            $apply = ($pay_amount <= 0) ? $balance : min($pay_amount, $balance);
+            if ($apply <= 0) { Helpers::redirect('index.php?page=expenses'); break; }
+            // Insert payment and update settled flag if needed
+            $ins = $pdo->prepare('INSERT INTO expense_payments (expense_id, amount, paid_at, paid_by, notes) VALUES (?,?,?,?,?)');
+            $ins->execute([$expense_id, $apply, date('Y-m-d H:i:s'), (int)($user['id'] ?? 0), ($pay_notes?:null)]);
+            $newPaid = $paid_total + $apply;
+            $settled = ($newPaid + 0.0001) >= (float)$row['amount'] ? 1 : 0;
+            if ($settled) { $pdo->prepare('UPDATE expenses SET credit_settled=1 WHERE id=?')->execute([$expense_id]); }
+            Helpers::redirect('index.php?page=expenses');
+            break;
+        }
+
         if ($action === 'new') {
             $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-            $expense = ['id'=>0,'expense_type'=>'other','amount'=>'','branch_id'=>$branchId,'expense_date'=>date('Y-m-d'),'notes'=>''];
+            $expense = ['id'=>0,'expense_type'=>'other','amount'=>'','branch_id'=>$branchId,'expense_date'=>date('Y-m-d'),'notes'=>'','payment_mode'=>'cash','credit_party'=>'','credit_due_date'=>''];
             $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
             Helpers::view('expenses/form', compact('expense','branchesAll','typesDynamic'));
             break;
@@ -2649,6 +2775,20 @@ switch ($page) {
         $notesFilter = trim($_GET['notes'] ?? '');
         $approved = trim($_GET['approved'] ?? ''); // '', 'yes', 'no'
         $typeFilter = trim($_GET['type'] ?? '');
+        $modeFilter = trim($_GET['mode'] ?? ''); // '', 'cash', 'credit'
+        $creditStatus = trim($_GET['credit_status'] ?? ''); // '', 'open', 'settled', 'overdue'
+        // Detect if credit columns exist
+        $hasCreditCols = true;
+        try { $pdo->query("SELECT payment_mode, credit_party, credit_due_date FROM expenses LIMIT 1"); }
+        catch (Throwable $e) { $hasCreditCols = false; }
+        // One-time data correction only if columns exist
+        if ($hasCreditCols) {
+            try {
+                $pdo->exec("UPDATE expenses SET payment_mode='credit' WHERE payment_mode IS NULL AND (credit_party IS NOT NULL OR credit_due_date IS NOT NULL)");
+                $pdo->exec("UPDATE expenses SET payment_mode='cash' WHERE payment_mode IS NULL AND credit_party IS NULL AND credit_due_date IS NULL");
+            } catch (Throwable $e2) { /* ignore */ }
+        }
+
         $where = ['e.expense_date BETWEEN ? AND ?'];
         $params = [$from, $to];
         if ($branchFilter > 0) { $where[] = 'e.branch_id = ?'; $params[] = $branchFilter; }
@@ -2656,7 +2796,41 @@ switch ($page) {
         if ($notesFilter !== '') { $where[] = 'COALESCE(e.notes, "") LIKE ?'; $params[] = "%$notesFilter%"; }
         if ($approved === 'yes') { $where[] = 'e.approved_by IS NOT NULL'; }
         else if ($approved === 'no') { $where[] = 'e.approved_by IS NULL'; }
-        $sql = 'SELECT e.*, b.name AS branch_name FROM expenses e LEFT JOIN branches b ON b.id = e.branch_id WHERE ' . implode(' AND ', $where) . ' ORDER BY e.expense_date DESC, e.id DESC LIMIT 300';
+        $creditHintExpr = $hasCreditCols ? "(e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL)" : "0";
+        if ($modeFilter === 'cash') {
+            $where[] = "(COALESCE(e.payment_mode,'cash')='cash' AND NOT (" . $creditHintExpr . "))";
+        } else if ($modeFilter === 'credit') {
+            $where[] = "(e.payment_mode='credit' OR " . $creditHintExpr . ")";
+        }
+        if ($creditStatus !== '') {
+            if ($creditStatus === 'settled') { $where[] = "(e.payment_mode='credit' AND e.credit_settled=1)"; }
+            else if ($creditStatus === 'open') { $where[] = "(e.payment_mode='credit' AND e.credit_settled=0)"; }
+            else if ($creditStatus === 'overdue') { $where[] = "(e.payment_mode='credit' AND e.credit_settled=0 AND e.credit_due_date IS NOT NULL AND e.credit_due_date < CURDATE())"; }
+        }
+        $hasPayments = true;
+        try { $pdo->query('SELECT 1 FROM expense_payments LIMIT 1'); } catch (Throwable $e) { $hasPayments = false; }
+        if ($hasPayments) {
+            $sql = "SELECT e.*, b.name AS branch_name,
+                           COALESCE(paid.paid_total,0) AS paid_total,
+                           (e.amount - COALESCE(paid.paid_total,0)) AS balance,
+                           " . ($hasCreditCols ? "CASE WHEN e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL) THEN 'credit' ELSE 'cash' END" : "CASE WHEN e.payment_mode='credit' THEN 'credit' ELSE 'cash' END") . " AS mode_effective
+                    FROM expenses e
+                    LEFT JOIN branches b ON b.id = e.branch_id
+                    LEFT JOIN (
+                      SELECT expense_id, SUM(amount) AS paid_total
+                      FROM expense_payments
+                      GROUP BY expense_id
+                    ) paid ON paid.expense_id = e.id
+                    WHERE " . implode(' AND ', $where) . " ORDER BY e.expense_date DESC, e.id DESC LIMIT 300";
+        } else {
+            $sql = "SELECT e.*, b.name AS branch_name,
+                           0.0 AS paid_total,
+                           e.amount AS balance,
+                           " . ($hasCreditCols ? "CASE WHEN e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL) THEN 'credit' ELSE 'cash' END" : "CASE WHEN e.payment_mode='credit' THEN 'credit' ELSE 'cash' END") . " AS mode_effective
+                    FROM expenses e
+                    LEFT JOIN branches b ON b.id = e.branch_id
+                    WHERE " . implode(' AND ', $where) . " ORDER BY e.expense_date DESC, e.id DESC LIMIT 300";
+        }
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $expenses = $stmt->fetchAll();
@@ -2669,9 +2843,276 @@ switch ($page) {
         $overall = 0; foreach ($byBranch as $r) { $overall += (float)$r['total']; }
         $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
         $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
-        Helpers::view('expenses/index', compact('expenses','from','to','branchFilter','byBranch','overall','branchesAll','isAdmin','notesFilter','approved','typeFilter','typesDynamic'));
+        // Totals card: Cash purchases, Credit purchases, Settlements paid in range (use effective mode)
+        $cashWhere = $where; $cashParams = $params;
+        $creditWhere = $where; $creditParams = $params;
+        if ($hasCreditCols) {
+            $cashWhere[] = "NOT (e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL))";
+            $creditWhere[] = "(e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL))";
+        } else {
+            $cashWhere[] = "e.payment_mode<>'credit'";
+            $creditWhere[] = "e.payment_mode='credit'";
+        }
+        $cashTotalStmt = $pdo->prepare('SELECT COALESCE(SUM(e.amount),0) AS s FROM expenses e WHERE ' . implode(' AND ', $cashWhere));
+        $cashTotalStmt->execute($cashParams); $cashTotal = (float)($cashTotalStmt->fetch()['s'] ?? 0);
+
+        $creditTotalStmt = $pdo->prepare('SELECT COALESCE(SUM(e.amount),0) AS s FROM expenses e WHERE ' . implode(' AND ', $creditWhere));
+        $creditTotalStmt->execute($creditParams); $creditTotal = (float)($creditTotalStmt->fetch()['s'] ?? 0);
+
+        // Settlements use paid_at date range; apply branch/type/notes/approval filters (mapped where possible)
+        $hasPayments2 = true; try { $pdo->query('SELECT 1 FROM expense_payments LIMIT 1'); } catch (Throwable $e) { $hasPayments2 = false; }
+        $settlementsTotal = 0.0;
+        if ($hasPayments2) {
+            $setSql = 'SELECT COALESCE(SUM(ep.amount),0) AS s
+                       FROM expense_payments ep
+                       JOIN expenses e ON e.id = ep.expense_id
+                       WHERE DATE(ep.paid_at) BETWEEN ? AND ?';
+            $setParams = [$from, $to];
+            if ($branchFilter > 0) { $setSql .= ' AND e.branch_id = ?'; $setParams[] = $branchFilter; }
+            if ($typeFilter !== '') { $setSql .= ' AND e.expense_type = ?'; $setParams[] = $typeFilter; }
+            if ($notesFilter !== '') { $setSql .= ' AND COALESCE(e.notes, "") LIKE ?'; $setParams[] = "%$notesFilter%"; }
+            if ($approved === 'yes') { $setSql .= ' AND e.approved_by IS NOT NULL'; }
+            else if ($approved === 'no') { $setSql .= ' AND e.approved_by IS NULL'; }
+            if ($modeFilter === 'cash') { $setSql .= " AND e.payment_mode='cash'"; }
+            else if ($modeFilter === 'credit') { $setSql .= " AND e.payment_mode='credit'"; }
+            $st = $pdo->prepare($setSql);
+            $st->execute($setParams);
+            $settlementsTotal = (float)($st->fetch()['s'] ?? 0);
+        }
+
+        Helpers::view('expenses/index', compact('expenses','from','to','branchFilter','byBranch','overall','branchesAll','isAdmin','notesFilter','approved','typeFilter','typesDynamic','modeFilter','creditStatus','cashTotal','creditTotal','settlementsTotal'));
         break;
 
+    case 'advances':
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdo = Database::pdo();
+        $user = Auth::user();
+        $isAdmin = Auth::hasRole('admin');
+        $isAccountant = (isset($user['role']) && $user['role'] === 'accountant');
+        if (!($isAdmin || $isAccountant)) { http_response_code(403); echo 'Forbidden'; break; }
+        $branchId = (int)($user['branch_id'] ?? 0);
+        $action = $_GET['action'] ?? 'index';
+
+        // Best-effort ensure tables exist
+        try { $pdo->query('SELECT 1 FROM employee_advances LIMIT 1'); } catch (Throwable $e) {
+            try { $pdo->exec("CREATE TABLE IF NOT EXISTS employee_advances (id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, employee_id BIGINT UNSIGNED NOT NULL, branch_id BIGINT UNSIGNED NOT NULL, amount DECIMAL(12,2) NOT NULL, advance_date DATE NOT NULL, purpose VARCHAR(255) NULL, settled TINYINT(1) NOT NULL DEFAULT 0, created_by BIGINT UNSIGNED NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"); } catch (Throwable $e2) {}
+        }
+        try { $pdo->query('SELECT 1 FROM employee_advance_payments LIMIT 1'); } catch (Throwable $e) {
+            try { $pdo->exec("CREATE TABLE IF NOT EXISTS employee_advance_payments (id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, advance_id BIGINT UNSIGNED NOT NULL, amount DECIMAL(12,2) NOT NULL, paid_at DATETIME NOT NULL, notes VARCHAR(255) NULL, created_by BIGINT UNSIGNED NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"); } catch (Throwable $e2) {}
+        }
+
+        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $employee_id = (int)($_POST['employee_id'] ?? 0);
+            $amount = (float)($_POST['amount'] ?? 0);
+            $advance_date = $_POST['advance_date'] ?? date('Y-m-d');
+            $purpose = trim($_POST['purpose'] ?? '');
+            try { if ($advance_date) { $ts = strtotime($advance_date); if ($ts) { $advance_date = date('Y-m-d', $ts); } } } catch (Throwable $dt) {}
+            if ($employee_id<=0 || $amount<=0) {
+                $error = 'Employee and Amount are required.';
+                $employeesAll = $pdo->query('SELECT id, name FROM employees ORDER BY name')->fetchAll();
+                $advance = compact('id','employee_id','amount','advance_date','purpose');
+                Helpers::view('advances/form', compact('advance','employeesAll','error'));
+                break;
+            }
+            if ($id>0) {
+                $stmt = $pdo->prepare('UPDATE employee_advances SET employee_id=?, branch_id=?, amount=?, advance_date=?, purpose=? WHERE id=?');
+                $stmt->execute([$employee_id,$branchId,$amount,$advance_date,($purpose?:null),$id]);
+            } else {
+                $stmt = $pdo->prepare('INSERT INTO employee_advances (employee_id, branch_id, amount, advance_date, purpose, created_by) VALUES (?,?,?,?,?,?)');
+                $stmt->execute([$employee_id,$branchId,$amount,$advance_date,($purpose?:null),(int)($user['id'] ?? 0)]);
+            }
+            Helpers::redirect('index.php?page=advances');
+            break;
+        }
+
+        if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id>0) { $pdo->prepare('DELETE FROM employee_advances WHERE id=?')->execute([$id]); }
+            Helpers::redirect('index.php?page=advances');
+            break;
+        }
+
+        if ($action === 'settle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $pay_amount = (float)($_POST['pay_amount'] ?? 0);
+            $pay_notes = trim($_POST['pay_notes'] ?? '');
+            if ($id<=0) { http_response_code(400); echo 'Invalid'; break; }
+            $row = $pdo->prepare('SELECT amount FROM employee_advances WHERE id=?');
+            $row->execute([$id]); $adv = $row->fetch(); if (!$adv) { http_response_code(404); echo 'Not found'; break; }
+            $agg = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS paid_total FROM employee_advance_payments WHERE advance_id=?');
+            $agg->execute([$id]); $paid = (float)($agg->fetch()['paid_total'] ?? 0);
+            $balance = max(0.0, (float)$adv['amount'] - $paid);
+            $apply = ($pay_amount<=0) ? $balance : min($pay_amount,$balance);
+            if ($apply>0) {
+                $pdo->prepare('INSERT INTO employee_advance_payments (advance_id, amount, paid_at, notes, created_by) VALUES (?,?,?,?,?)')
+                    ->execute([$id,$apply,date('Y-m-d H:i:s'),($pay_notes?:null),(int)($user['id'] ?? 0)]);
+                if (($paid + $apply + 0.0001) >= (float)$adv['amount']) { $pdo->prepare('UPDATE employee_advances SET settled=1 WHERE id=?')->execute([$id]); }
+            }
+            Helpers::redirect('index.php?page=advances');
+            break;
+        }
+
+        if ($action === 'new') {
+            $employeesAll = $pdo->query('SELECT id, name FROM employees ORDER BY name')->fetchAll();
+            $advance = ['id'=>0,'employee_id'=>0,'amount'=>'','advance_date'=>date('Y-m-d'),'purpose'=>''];
+            Helpers::view('advances/form', compact('advance','employeesAll'));
+            break;
+        }
+        if ($action === 'edit') {
+            $id = (int)($_GET['id'] ?? 0);
+            $stmt = $pdo->prepare('SELECT * FROM employee_advances WHERE id=?');
+            $stmt->execute([$id]); $advance = $stmt->fetch();
+            if (!$advance) { http_response_code(404); echo 'Not found'; break; }
+            $employeesAll = $pdo->query('SELECT id, name FROM employees ORDER BY name')->fetchAll();
+            Helpers::view('advances/form', compact('advance','employeesAll'));
+            break;
+        }
+
+        // index
+        $from = $_GET['from'] ?? date('Y-m-01');
+        $to = $_GET['to'] ?? date('Y-m-d');
+        $empFilter = (int)($_GET['employee_id'] ?? 0);
+        $where = ['a.advance_date BETWEEN ? AND ?'];
+        $params = [$from,$to];
+        if ($empFilter>0) { $where[] = 'a.employee_id=?'; $params[] = $empFilter; }
+        $sql = 'SELECT a.*, e.name AS employee_name, COALESCE(p.paid_total,0) AS paid_total, (a.amount - COALESCE(p.paid_total,0)) AS balance
+                FROM employee_advances a
+                LEFT JOIN employees e ON e.id = a.employee_id
+                LEFT JOIN (SELECT advance_id, SUM(amount) AS paid_total FROM employee_advance_payments GROUP BY advance_id) p ON p.advance_id = a.id
+                WHERE ' . implode(' AND ', $where) . ' ORDER BY a.advance_date DESC, a.id DESC LIMIT 300';
+        $stmt = $pdo->prepare($sql); $stmt->execute($params); $advances = $stmt->fetchAll();
+        $employeesAll = $pdo->query('SELECT id, name FROM employees ORDER BY name')->fetchAll();
+        Helpers::view('advances/index', compact('advances','from','to','employeesAll','empFilter'));
+        break;
+
+    case 'reminders':
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdo = Database::pdo();
+        $user = Auth::user();
+        $isAdmin = Auth::hasRole('admin');
+        $isAccountant = (isset($user['role']) && $user['role'] === 'accountant');
+        if (!($isAdmin || $isAccountant)) { http_response_code(403); echo 'Forbidden'; break; }
+        $action = $_GET['action'] ?? 'index';
+
+        // Ensure table exists best-effort
+        try { $pdo->query('SELECT 1 FROM reminders LIMIT 1'); }
+        catch (Throwable $e) {
+            try { $pdo->exec("CREATE TABLE IF NOT EXISTS reminders (id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT, title VARCHAR(180) NOT NULL, category VARCHAR(60) NULL, due_date DATE NOT NULL, repeat_interval ENUM('none','monthly','quarterly','yearly') NOT NULL DEFAULT 'none', notify_before_days INT NOT NULL DEFAULT 7, notes VARCHAR(255) NULL, status ENUM('open','done') NOT NULL DEFAULT 'open', created_by BIGINT UNSIGNED NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"); } catch (Throwable $e2) {}
+        }
+
+        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            $title = trim($_POST['title'] ?? '');
+            $category = trim($_POST['category'] ?? '');
+            $due_date = $_POST['due_date'] ?? date('Y-m-d');
+            $repeat = $_POST['repeat_interval'] ?? 'none';
+            $repeat_every_days = (int)($_POST['repeat_every_days'] ?? 0);
+            $notify_days = (int)($_POST['notify_before_days'] ?? 7);
+            $notes = trim($_POST['notes'] ?? '');
+            try { if ($due_date) { $ts = strtotime($due_date); if ($ts) { $due_date = date('Y-m-d', $ts); } } } catch (Throwable $dt) {}
+            if ($title==='') { $error = 'Title is required.'; }
+            if (!empty($error ?? '')) {
+                $reminder = compact('id','title','category','due_date','repeat','notify_days','notes');
+                Helpers::view('reminders/form', compact('reminder','error'));
+                break;
+            }
+            if ($id>0) {
+                // Try to include repeat_every_days if column exists
+                $hasDays = true; try { $pdo->query('SELECT repeat_every_days FROM reminders LIMIT 1'); } catch (Throwable $e) { $hasDays = false; }
+                if ($hasDays) {
+                    $stmt = $pdo->prepare('UPDATE reminders SET title=?, category=?, due_date=?, repeat_interval=?, repeat_every_days=?, notify_before_days=?, notes=? WHERE id=?');
+                    $stmt->execute([$title,($category?:null),$due_date,$repeat,($repeat_every_days>0?$repeat_every_days:null),$notify_days,($notes?:null),$id]);
+                } else {
+                    $stmt = $pdo->prepare('UPDATE reminders SET title=?, category=?, due_date=?, repeat_interval=?, notify_before_days=?, notes=? WHERE id=?');
+                    $stmt->execute([$title,($category?:null),$due_date,$repeat,$notify_days,($notes?:null),$id]);
+                }
+            } else {
+                $hasDays = true; try { $pdo->query('SELECT repeat_every_days FROM reminders LIMIT 1'); } catch (Throwable $e) { $hasDays = false; }
+                if ($hasDays) {
+                    $stmt = $pdo->prepare('INSERT INTO reminders (title, category, due_date, repeat_interval, repeat_every_days, notify_before_days, notes, created_by) VALUES (?,?,?,?,?,?,?,?)');
+                    $stmt->execute([$title,($category?:null),$due_date,$repeat,($repeat_every_days>0?$repeat_every_days:null),$notify_days,($notes?:null),(int)($user['id'] ?? 0)]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO reminders (title, category, due_date, repeat_interval, notify_before_days, notes, created_by) VALUES (?,?,?,?,?,?,?)');
+                    $stmt->execute([$title,($category?:null),$due_date,$repeat,$notify_days,($notes?:null),(int)($user['id'] ?? 0)]);
+                }
+            }
+            Helpers::redirect('index.php?page=reminders');
+            break;
+        }
+
+        if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id>0) { $pdo->prepare('DELETE FROM reminders WHERE id=?')->execute([$id]); }
+            Helpers::redirect('index.php?page=reminders');
+            break;
+        }
+
+        if ($action === 'mark_done' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id>0) {
+                $pdo->prepare("UPDATE reminders SET status='done' WHERE id=?")->execute([$id]);
+                // Auto-create next occurrence if repeating
+                $rowS = $pdo->prepare('SELECT title, category, due_date, repeat_interval, repeat_every_days, notify_before_days, notes FROM reminders WHERE id=?');
+                $rowS->execute([$id]); $r = $rowS->fetch();
+                $next = null;
+                if ($r) {
+                    if (!empty($r['repeat_every_days'])) {
+                        $d = (int)$r['repeat_every_days']; if ($d>0) { $next = date('Y-m-d', strtotime($r['due_date'].' +'.$d.' days')); }
+                    } else if (in_array($r['repeat_interval'], ['monthly','quarterly','yearly'], true)) {
+                        if ($r['repeat_interval']==='monthly') { $next = date('Y-m-d', strtotime($r['due_date'].' +1 month')); }
+                        else if ($r['repeat_interval']==='quarterly') { $next = date('Y-m-d', strtotime($r['due_date'].' +3 months')); }
+                        else if ($r['repeat_interval']==='yearly') { $next = date('Y-m-d', strtotime($r['due_date'].' +1 year')); }
+                    }
+                    if ($next) {
+                        $hasDays = true; try { $pdo->query('SELECT repeat_every_days FROM reminders LIMIT 1'); } catch (Throwable $e) { $hasDays = false; }
+                        if ($hasDays) {
+                            $pdo->prepare('INSERT INTO reminders (title, category, due_date, repeat_interval, repeat_every_days, notify_before_days, notes, created_by) VALUES (?,?,?,?,?,?,?,?)')
+                                ->execute([$r['title'],($r['category']?:null),$next,$r['repeat_interval'],($r['repeat_every_days'] ?? null),(int)$r['notify_before_days'],($r['notes']?:null),(int)($user['id'] ?? 0)]);
+                        } else {
+                            $pdo->prepare('INSERT INTO reminders (title, category, due_date, repeat_interval, notify_before_days, notes, created_by) VALUES (?,?,?,?,?,?,?)')
+                                ->execute([$r['title'],($r['category']?:null),$next,$r['repeat_interval'],(int)$r['notify_before_days'],($r['notes']?:null),(int)($user['id'] ?? 0)]);
+                        }
+                    }
+                }
+            }
+            Helpers::redirect('index.php?page=reminders');
+            break;
+        }
+
+        if ($action === 'new') {
+            $reminder = ['id'=>0,'title'=>'','category'=>'','due_date'=>date('Y-m-d'),'repeat'=>'none','notify_days'=>7,'repeat_every_days'=>'','notes'=>''];
+            Helpers::view('reminders/form', compact('reminder'));
+            break;
+        }
+        if ($action === 'edit') {
+            $id = (int)($_GET['id'] ?? 0);
+            $stmt = $pdo->prepare('SELECT * FROM reminders WHERE id=?');
+            $stmt->execute([$id]); $reminder = $stmt->fetch();
+            if (!$reminder) { http_response_code(404); echo 'Not found'; break; }
+            Helpers::view('reminders/form', compact('reminder'));
+            break;
+        }
+
+        // index
+        $from = $_GET['from'] ?? date('Y-m-01');
+        $to = $_GET['to'] ?? date('Y-m-d');
+        $cat = trim($_GET['category'] ?? '');
+        $status = trim($_GET['status'] ?? ''); // '', open, done
+        $where = ['r.due_date BETWEEN ? AND ?']; $params = [$from,$to];
+        if ($cat!=='') { $where[] = 'COALESCE(r.category,"") = ?'; $params[] = $cat; }
+        if ($status==='open') { $where[] = "r.status='open'"; }
+        else if ($status==='done') { $where[] = "r.status='done'"; }
+        $sql = 'SELECT r.* FROM reminders r WHERE ' . implode(' AND ', $where) . ' ORDER BY r.due_date ASC, r.id DESC LIMIT 500';
+        $stmt = $pdo->prepare($sql); $stmt->execute($params); $reminders = $stmt->fetchAll();
+        Helpers::view('reminders/index', compact('reminders','from','to','cat','status'));
+        break;
     case 'employees':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
