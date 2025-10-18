@@ -1,4 +1,4 @@
-<?php /** @var string $from */ /** @var string $to */ /** @var string $account */ /** @var array $pSeries */ /** @var array $eSeries */ ?>
+<?php /** @var string $from */ /** @var string $to */ /** @var string $account */ /** @var array $pSeries */ /** @var array $eSeries */ /** @var float $openingBalance */ /** @var float $netMovement */ /** @var float $closingBalance */ /** @var float $totalPayments */ /** @var float $totalExpenses */ ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0">Account Ledger</h3>
 </div>
@@ -15,6 +15,40 @@
   </div>
   <div class="col-auto align-self-end"><button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button></div>
 </form>
+<div class="row g-3 mb-2">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-6 col-md-3 mb-2"> 
+            <div class="text-muted small">Opening Balance</div>
+            <?php $ob = (float)($openingBalance ?? 0); $obSign = $ob>=0 ? 'CR' : 'DR'; ?>
+            <div class="h5 mb-0">Rs. <?php echo number_format(abs($ob), 2); ?> <span class="badge <?php echo $ob>=0?'text-bg-success':'text-bg-danger'; ?>"><?php echo $obSign; ?></span></div>
+          </div>
+          <div class="col-6 col-md-3 mb-2">
+            <div class="text-muted small">Collections (Period)</div>
+            <div class="h5 mb-0">Rs. <?php echo number_format((float)($totalPayments ?? 0), 2); ?></div>
+          </div>
+          <div class="col-6 col-md-3 mb-2">
+            <div class="text-muted small">Expenses (Period)</div>
+            <div class="h5 mb-0">Rs. <?php echo number_format((float)($totalExpenses ?? 0), 2); ?></div>
+          </div>
+          <div class="col-6 col-md-3 mb-2">
+            <div class="text-muted small">Net Movement</div>
+            <div class="h5 mb-0">Rs. <?php echo number_format((float)($netMovement ?? 0), 2); ?></div>
+          </div>
+        </div>
+        <hr class="my-3">
+        <?php $cb = (float)($closingBalance ?? 0); $cbSign = $cb>=0 ? 'CR' : 'DR'; ?>
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="fw-semibold">Closing Balance</div>
+          <div class="h5 mb-0">Rs. <?php echo number_format(abs($cb), 2); ?> <span class="badge <?php echo $cb>=0?'text-bg-success':'text-bg-danger'; ?>"><?php echo $cbSign; ?></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+</div>
 <div class="row g-3">
   <div class="col-md-6">
     <div class="card shadow-sm">

@@ -202,13 +202,34 @@ switch ($page) {
         $to = $_GET['to'] ?? date('Y-m-d');
         $account = $_GET['account'] ?? 'customers'; // placeholder selector
         // For now, show payments vs expenses in range
+        // Daily series
         $pStmt = $pdo->prepare("SELECT DATE(paid_at) AS d, SUM(amount) AS s FROM payments WHERE DATE(paid_at) BETWEEN ? AND ? GROUP BY DATE(paid_at) ORDER BY d");
         $pStmt->execute([$from,$to]);
         $pSeries = $pStmt->fetchAll();
         $eStmt = $pdo->prepare("SELECT expense_date AS d, SUM(amount) AS s FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY expense_date ORDER BY d");
         $eStmt->execute([$from,$to]);
         $eSeries = $eStmt->fetchAll();
-        Helpers::view('ledger/index', compact('from','to','account','pSeries','eSeries'));
+
+        // Opening balance before From date: collections - expenses
+        $stmtOpP = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) < ?");
+        $stmtOpP->execute([$from]);
+        $openingPayments = (float)($stmtOpP->fetch()['s'] ?? 0);
+        $stmtOpE = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date < ?");
+        $stmtOpE->execute([$from]);
+        $openingExpenses = (float)($stmtOpE->fetch()['s'] ?? 0);
+        $openingBalance = $openingPayments - $openingExpenses;
+
+        // Period totals and net
+        $stmtTP = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) BETWEEN ? AND ?");
+        $stmtTP->execute([$from,$to]);
+        $totalPayments = (float)($stmtTP->fetch()['s'] ?? 0);
+        $stmtTE = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?");
+        $stmtTE->execute([$from,$to]);
+        $totalExpenses = (float)($stmtTE->fetch()['s'] ?? 0);
+        $netMovement = $totalPayments - $totalExpenses;
+        $closingBalance = $openingBalance + $netMovement;
+
+        Helpers::view('ledger/index', compact('from','to','account','pSeries','eSeries','openingBalance','netMovement','closingBalance','totalPayments','totalExpenses'));
         break;
 
     case 'routes':
