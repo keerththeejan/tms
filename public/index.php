@@ -963,6 +963,8 @@ switch ($page) {
                 parcel_id INT NOT NULL,
                 to_email VARCHAR(255) NOT NULL,
                 subject VARCHAR(255) NOT NULL,
+                html_body MEDIUMTEXT NULL,
+                text_body MEDIUMTEXT NULL,
                 status ENUM('sent','failed') NOT NULL,
                 error TEXT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -970,9 +972,15 @@ switch ($page) {
                 CONSTRAINT fk_parcel_emails_parcel FOREIGN KEY (parcel_id) REFERENCES parcels(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (Throwable $e) { /* ignore */ }
+        // Ensure new body columns exist on older databases
+        try { $pdo->exec("ALTER TABLE parcel_emails ADD COLUMN html_body MEDIUMTEXT NULL AFTER subject"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE parcel_emails ADD COLUMN text_body MEDIUMTEXT NULL AFTER html_body"); } catch (Throwable $e) { /* ignore if exists */ }
         // Ensure persistent status columns exist on parcels for fallback display
         try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_email_status VARCHAR(10) NULL AFTER updated_at"); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_emailed_at DATETIME NULL AFTER last_email_status"); } catch (Throwable $e) { /* ignore if exists */ }
+        // Also store last email subject and text for synthesized display when logs are unavailable
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_email_subject VARCHAR(255) NULL AFTER last_emailed_at"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_email_text MEDIUMTEXT NULL AFTER last_email_subject"); } catch (Throwable $e) { /* ignore if exists */ }
 
         if ($action === 'email_form') {
             $id = (int)($_GET['id'] ?? 0);
@@ -1039,15 +1047,15 @@ switch ($page) {
             }
             // Log result
             try {
-                $ins = $pdo->prepare('INSERT INTO parcel_emails (parcel_id, to_email, subject, status, error) VALUES (?,?,?,?,?)');
+                $ins = $pdo->prepare('INSERT INTO parcel_emails (parcel_id, to_email, subject, html_body, text_body, status, error) VALUES (?,?,?,?,?,?,?)');
                 $err = '';
                 if (!$ok && isset($GLOBALS['mailer']) && method_exists($GLOBALS['mailer'], 'getLastError')) { $err = (string)$GLOBALS['mailer']->getLastError(); }
-                $ins->execute([$id, $toEmail, $subject, ($ok?'sent':'failed'), ($err!==''?$err:null)]);
+                $ins->execute([$id, $toEmail, $subject, $html, $alt, ($ok?'sent':'failed'), ($err!==''?$err:null)]);
             } catch (Throwable $e) { /* ignore */ }
-            // Persist status on parcel row
+            // Persist status and simple content on parcel row
             try {
-                $up = $pdo->prepare('UPDATE parcels SET last_email_status=?, last_emailed_at=NOW() WHERE id=?');
-                $up->execute([ $ok ? 'sent' : 'failed', (int)$id ]);
+                $up = $pdo->prepare('UPDATE parcels SET last_email_status=?, last_emailed_at=NOW(), last_email_subject=?, last_email_text=? WHERE id=?');
+                $up->execute([ $ok ? 'sent' : 'failed', (string)$subject, (string)$alt, (int)$id ]);
             } catch (Throwable $e) { /* ignore */ }
             if ($ok) {
                 $_SESSION['email_sent_parcel_id'] = (int)$id;
@@ -1314,15 +1322,15 @@ switch ($page) {
                     $okMail = $GLOBALS['mailer']->send($toEmail, $custName, $subject, $html, $alt);
                     // Log result
                     try {
-                        $ins = $pdo->prepare('INSERT INTO parcel_emails (parcel_id, to_email, subject, status, error) VALUES (?,?,?,?,?)');
+                        $ins = $pdo->prepare('INSERT INTO parcel_emails (parcel_id, to_email, subject, html_body, text_body, status, error) VALUES (?,?,?,?,?,?,?)');
                         $err = '';
                         if (!$okMail && isset($GLOBALS['mailer']) && method_exists($GLOBALS['mailer'], 'getLastError')) { $err = (string)$GLOBALS['mailer']->getLastError(); }
-                        $ins->execute([(int)$id, $toEmail, $subject, ($okMail?'sent':'failed'), ($err!==''?$err:null)]);
-                    } catch (Throwable $eLog) { /* ignore */ }
-                    // Persist status on parcel row
+                        $ins->execute([(int)$id, $toEmail, $subject, $html, $alt, ($okMail?'sent':'failed'), ($err!==''?$err:null)]);
+                    } catch (Throwable $e) { /* ignore */ }
+                    // Persist status and simple content on parcel row
                     try {
-                        $up = $pdo->prepare('UPDATE parcels SET last_email_status=?, last_emailed_at=NOW() WHERE id=?');
-                        $up->execute([ $okMail ? 'sent' : 'failed', (int)$id ]);
+                        $up = $pdo->prepare('UPDATE parcels SET last_email_status=?, last_emailed_at=NOW(), last_email_subject=?, last_email_text=? WHERE id=?');
+                        $up->execute([ $okMail ? 'sent' : 'failed', (string)$subject, (string)$alt, (int)$id ]);
                     } catch (Throwable $e3) { /* ignore */ }
                 }
                 $toPhone = trim((string)($cRow['phone'] ?? ''));
@@ -1562,15 +1570,35 @@ switch ($page) {
     case 'email_log':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
+        // Ensure required tables/columns exist even if user lands directly here
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS parcel_emails (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                parcel_id INT NOT NULL,
+                to_email VARCHAR(255) NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                html_body MEDIUMTEXT NULL,
+                text_body MEDIUMTEXT NULL,
+                status ENUM('sent','failed') NOT NULL,
+                error TEXT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_parcel (parcel_id),
+                CONSTRAINT fk_parcel_emails_parcel FOREIGN KEY (parcel_id) REFERENCES parcels(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (Throwable $e) { /* ignore */ }
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_email_status VARCHAR(10) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_emailed_at DATETIME NULL"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_email_subject VARCHAR(255) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN last_email_text MEDIUMTEXT NULL"); } catch (Throwable $e) { /* ignore if exists */ }
         $id = (int)($_GET['id'] ?? 0);
         if ($id <= 0) { Helpers::redirect('index.php?page=parcels'); break; }
-        $p = $pdo->prepare('SELECT p.id, p.last_email_status, p.last_emailed_at, c.name AS customer_name, c.email AS customer_email FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id WHERE p.id=?');
+        $p = $pdo->prepare('SELECT p.id, p.last_email_status, p.last_emailed_at, p.last_email_subject, p.last_email_text, c.name AS customer_name, c.email AS customer_email FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id WHERE p.id=?');
         $p->execute([$id]);
         $parcelHdr = $p->fetch();
         $logs = [];
         try {
             $pdo->query('SELECT 1 FROM parcel_emails LIMIT 1');
-            $st = $pdo->prepare('SELECT id, to_email, subject, status, error, created_at FROM parcel_emails WHERE parcel_id=? ORDER BY id DESC');
+            $st = $pdo->prepare('SELECT id, to_email, subject, html_body, text_body, status, error, created_at FROM parcel_emails WHERE parcel_id=? ORDER BY id DESC');
             $st->execute([$id]);
             $logs = $st->fetchAll();
         } catch (Throwable $e) { $logs = []; }
@@ -1579,7 +1607,9 @@ switch ($page) {
             $logs[] = [
                 'id' => 0,
                 'to_email' => (string)($parcelHdr['customer_email'] ?? ''),
-                'subject' => '(not recorded)',
+                'subject' => (string)($parcelHdr['last_email_subject'] ?? '(not recorded)'),
+                'html_body' => null,
+                'text_body' => (string)($parcelHdr['last_email_text'] ?? ''),
                 'status' => (string)$parcelHdr['last_email_status'],
                 'error' => null,
                 'created_at' => (string)($parcelHdr['last_emailed_at'] ?? '')
@@ -1613,6 +1643,25 @@ switch ($page) {
         // Ensure per-DN email status columns exist
         try { $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN last_email_status VARCHAR(10) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN last_emailed_at DATETIME NULL"); } catch (Throwable $e) { /* ignore if exists */ }
+        // Also store last email subject/text as fallback for logs
+        try { $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN last_email_subject VARCHAR(255) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN last_email_text MEDIUMTEXT NULL"); } catch (Throwable $e) { /* ignore if exists */ }
+        // Ensure DN email log table exists
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS delivery_note_emails (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                delivery_note_id BIGINT UNSIGNED NOT NULL,
+                to_email VARCHAR(255) NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                html_body MEDIUMTEXT NULL,
+                text_body MEDIUMTEXT NULL,
+                status ENUM('sent','failed') NOT NULL,
+                error TEXT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_dn (delivery_note_id),
+                CONSTRAINT fk_dn_emails_dn FOREIGN KEY (delivery_note_id) REFERENCES delivery_notes(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (Throwable $e) { /* ignore */ }
 
         if ($action === 'email_form') {
             $id = (int)($_GET['id'] ?? 0);
@@ -1661,8 +1710,15 @@ switch ($page) {
             if (isset($GLOBALS['mailer']) && $GLOBALS['mailer'] instanceof Mailer) {
                 try { $ok = (bool)$GLOBALS['mailer']->send($toEmail, $toName, $subject, $html, $alt); } catch (Throwable $e) { $ok = false; }
             }
-            // Persist status on DN
-            try { $pdo->prepare('UPDATE delivery_notes SET last_email_status=?, last_emailed_at=NOW() WHERE id=?')->execute([($ok?'sent':'failed'), (int)$id]); } catch (Throwable $e) { /* ignore */ }
+            // Log result in delivery_note_emails
+            try {
+                $ins = $pdo->prepare('INSERT INTO delivery_note_emails (delivery_note_id, to_email, subject, html_body, text_body, status, error) VALUES (?,?,?,?,?,?,?)');
+                $err = '';
+                if (!$ok && isset($GLOBALS['mailer']) && method_exists($GLOBALS['mailer'], 'getLastError')) { $err = (string)$GLOBALS['mailer']->getLastError(); }
+                $ins->execute([(int)$id, $toEmail, $subject, $html, $alt, ($ok?'sent':'failed'), ($err!==''?$err:null)]);
+            } catch (Throwable $e) { /* ignore */ }
+            // Persist status and fallback content on DN
+            try { $pdo->prepare('UPDATE delivery_notes SET last_email_status=?, last_emailed_at=NOW(), last_email_subject=?, last_email_text=? WHERE id=?')->execute([($ok?'sent':'failed'), (string)$subject, (string)$alt, (int)$id]); } catch (Throwable $e) { /* ignore */ }
             Helpers::redirect('index.php?page=delivery_notes');
             break;
         }
@@ -1778,7 +1834,14 @@ switch ($page) {
                               . '</div>';
                         $text = 'Delivery Note #'.$dnId.'\nTotal: '.number_format((float)$dnRow['total_amount'],2);
                         $okDn = false; try { $okDn = (bool)$GLOBALS['mailer']->send($toEmail, (string)($cr['name'] ?? $toEmail), $subject, $html, $text); } catch (Throwable $eSend) { $okDn=false; }
-                        try { $pdo->prepare('UPDATE delivery_notes SET last_email_status=?, last_emailed_at=NOW() WHERE id=?')->execute([($okDn?'sent':'failed'), $dnId]); } catch (Throwable $e4) { /* ignore */ }
+                        // Log result in delivery_note_emails
+                        try {
+                            $ins = $pdo->prepare('INSERT INTO delivery_note_emails (delivery_note_id, to_email, subject, html_body, text_body, status, error) VALUES (?,?,?,?,?,?,?)');
+                            $err = '';
+                            if (!$okDn && isset($GLOBALS['mailer']) && method_exists($GLOBALS['mailer'], 'getLastError')) { $err = (string)$GLOBALS['mailer']->getLastError(); }
+                            $ins->execute([$dnId, $toEmail, $subject, $html, $text, ($okDn?'sent':'failed'), ($err!==''?$err:null)]);
+                        } catch (Throwable $eIns) { /* ignore */ }
+                        try { $pdo->prepare('UPDATE delivery_notes SET last_email_status=?, last_emailed_at=NOW(), last_email_subject=?, last_email_text=? WHERE id=?')->execute([($okDn?'sent':'failed'), (string)$subject, (string)$text, $dnId]); } catch (Throwable $e4) { /* ignore */ }
                     }
                 } catch (Throwable $e) { /* ignore */ }
                 // SMS notification (concise)
@@ -2216,7 +2279,28 @@ switch ($page) {
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }
-            Helpers::view('delivery_notes/email_log', compact('dn'));
+            // Fetch logs if table exists
+            $logs = [];
+            try {
+                $pdo->query('SELECT 1 FROM delivery_note_emails LIMIT 1');
+                $st = $pdo->prepare('SELECT id, to_email, subject, html_body, text_body, status, error, created_at FROM delivery_note_emails WHERE delivery_note_id=? ORDER BY id DESC');
+                $st->execute([$id]);
+                $logs = $st->fetchAll();
+            } catch (Throwable $e) { $logs = []; }
+            // Fallback synthesized row from last_* on dn
+            if (empty($logs) && !empty($dn['last_email_status'])) {
+                $logs[] = [
+                    'id' => 0,
+                    'to_email' => (string)($dn['customer_email'] ?? ''),
+                    'subject' => (string)($dn['last_email_subject'] ?? '(not recorded)'),
+                    'html_body' => null,
+                    'text_body' => (string)($dn['last_email_text'] ?? ''),
+                    'status' => (string)$dn['last_email_status'],
+                    'error' => null,
+                    'created_at' => (string)($dn['last_emailed_at'] ?? '')
+                ];
+            }
+            Helpers::view('delivery_notes/email_log', compact('dn','logs'));
             break;
         }
 
