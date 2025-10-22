@@ -3,6 +3,7 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Delivery Note #<?php echo (int)$dn['id']; ?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -14,6 +15,10 @@
     .muted { color: #6c757d; }
     .amount { text-align: right; }
     .table-sm th, .table-sm td { padding-top: .35rem; padding-bottom: .35rem; }
+    @media (max-width: 576px) {
+      .doc-header { flex-direction: column; gap: .5rem; }
+      .table { font-size: .9rem; }
+    }
     <?php if ($isEmbed): ?>
     /* Tighter tables when embedded */
     .table { margin-bottom: .75rem; }
@@ -47,18 +52,19 @@
     <?php if ($vehList !== ''): ?><div class="muted"><strong>Vehicle(s):</strong> <?php echo htmlspecialchars($vehList); ?></div><?php endif; ?>
   </div>
 </div>
-<table class="table table-sm table-bordered align-middle">
+<div class="table-responsive">
+<table class="table table-sm table-bordered align-middle mb-0">
   <thead>
     <tr>
-      <th style="width:6rem;">#</th>
-      <th style="width:11rem;">Delivery Date</th>
+      <th>#</th>
+      <th>Delivery Date</th>
       <th>Customer</th>
-      <th style="width:12rem;">Phone</th>
+      <th>Phone</th>
       <th>Supplier</th>
-      <th style="width:12rem;">Supplier Phone</th>
+      <th>Supplier Phone</th>
       <th>Tracking</th>
       <th>Weight</th>
-      <th style="width:10rem;" class="text-end">Amount</th>
+      <th class="text-end">Amount</th>
     </tr>
   </thead>
   <tbody>
@@ -99,6 +105,7 @@
     </tr>
   </tfoot>
 </table>
+</div>
 <?php if (!$isEmbed): ?>
 <script>
   // Auto-trigger print on load for faster workflow (disabled when embedded)
