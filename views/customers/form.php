@@ -107,11 +107,11 @@
         <input type="text" name="name" class="form-control" required value="<?php echo htmlspecialchars($customer['name']); ?>">
       </div>
       <div class="col-md-6">
-        <label class="form-label">Phone <span class="text-muted small">(optional)</span></label>
+        <label class="form-label">Phone</label>
         <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>">
       </div>
       <div class="col-md-6">
-        <label class="form-label">Email <span class="text-muted small">(optional)</span></label>
+        <label class="form-label">Email</label>
         <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email'] ?? ''); ?>">
       </div>
       <div class="col-md-6">
@@ -134,7 +134,7 @@
       <div class="col-md-4">
         <label class="form-label">Customer Type</label>
         <select name="customer_type" class="form-select">
-          <option value="">-- Optional --</option>
+          <option value="">-- Select --</option>
           <option value="regular" <?php echo ($customer['customer_type'] ?? '') === 'regular' ? 'selected' : ''; ?>>Regular</option>
           <option value="corporate" <?php echo ($customer['customer_type'] ?? '') === 'corporate' ? 'selected' : ''; ?>>Corporate</option>
         </select>

@@ -56,6 +56,8 @@
               <th>Customer</th>
               <th>Phone</th>
               <th class="text-end">Total</th>
+              <th class="text-end">Discount</th>
+              <th class="text-end">After Discount</th>
               <th class="text-end">Paid</th>
               <th class="text-end">Due</th>
               <th class="text-end">Actions</th>
@@ -66,7 +68,17 @@
               <tr class="table-dark">
                 <td><strong><?php echo htmlspecialchars($g['customer_name']); ?></strong></td>
                 <td><?php echo htmlspecialchars($g['customer_phone']); ?></td>
-                <td class="text-end"><?php echo number_format((float)$g['total_amount'],2); ?></td>
+                <td class="text-end"><?php 
+                    $disc = (float)($g['discount'] ?? 0); // negative for discounts
+                    $amountAfterDiscount = (float)$g['total_amount'] + $disc;
+                    echo number_format($amountAfterDiscount, 2); 
+                ?></td>
+                <td class="text-end text-danger"><?php $disc=(float)($g['discount']??0); echo number_format(abs($disc),2); ?></td>
+                <td class="text-end"><?php 
+                    $disc = (float)($g['discount'] ?? 0);
+                    $amountAfterDiscount = isset($g['amount_after_discount']) ? (float)$g['amount_after_discount'] : (float)$g['total_amount'] + $disc;
+                    echo number_format($amountAfterDiscount, 2); 
+                ?></td>
                 <td class="text-end"><?php echo number_format((float)$g['paid'],2); ?></td>
                 <td class="text-end"><strong><?php echo number_format((float)$g['due'],2); ?></strong></td>
                 <td class="text-end">
@@ -76,7 +88,17 @@
               <?php foreach ($g['bills'] as $n): ?>
                 <tr>
                   <td colspan="2" class="ps-4">DN #<?php echo (int)$n['id']; ?> — <?php echo htmlspecialchars($n['delivery_date']); ?></td>
-                  <td class="text-end"><?php echo number_format((float)$n['total_amount'],2); ?></td>
+                  <td class="text-end"><?php 
+                      $disc = (float)($n['discount'] ?? 0);
+                      $amountAfterDiscount = (float)$n['total_amount'] + $disc;
+                      echo number_format($amountAfterDiscount, 2); 
+                  ?></td>
+                  <td class="text-end text-danger"><?php $disc=(float)($n['discount']??0); echo number_format(abs($disc),2); ?></td>
+                  <td class="text-end"><?php 
+                      $disc = (float)($n['discount'] ?? 0);
+                      $amountAfterDiscount = isset($n['amount_after_discount']) ? (float)$n['amount_after_discount'] : (float)$n['total_amount'] + $disc;
+                      echo number_format($amountAfterDiscount, 2); 
+                  ?></td>
                   <td class="text-end"><?php echo number_format((float)$n['paid'],2); ?></td>
                   <td class="text-end"><strong><?php echo number_format((float)$n['due'],2); ?></strong></td>
                   <td class="text-end">
@@ -101,6 +123,8 @@
               <th>Customer</th>
               <th>Phone</th>
               <th>Total</th>
+              <th>Discount</th>
+              <th>After Discount</th>
               <th>Paid</th>
               <th>Due</th>
               <th class="text-end">Actions</th>
@@ -113,9 +137,15 @@
                 <td><?php echo htmlspecialchars($n['delivery_date']); ?></td>
                 <td><?php echo htmlspecialchars($n['customer_name'] ?? ''); ?></td>
                 <td><?php echo htmlspecialchars($n['customer_phone'] ?? ''); ?></td>
-                <td><?php echo number_format((float)$n['total_amount'], 2); ?></td>
-                <td><?php echo number_format((float)$n['paid'], 2); ?></td>
-                <td><strong><?php echo number_format((float)$n['due'], 2); ?></strong></td>
+                <td class="text-end"><?php echo number_format((float)($n['display_total'] ?? $n['total_amount']), 2); ?></td>
+                <td class="text-end text-danger"><?php $disc=(float)($n['discount']??0); echo number_format(abs($disc), 2); ?></td>
+                <td class="text-end"><?php 
+                    $disc = (float)($n['discount'] ?? 0);
+                    $amountAfterDiscount = isset($n['amount_after_discount']) ? (float)$n['amount_after_discount'] : (float)$n['total_amount'] + $disc;
+                    echo number_format($amountAfterDiscount, 2); 
+                ?></td>
+                <td class="text-end"><?php echo number_format((float)$n['paid'], 2); ?></td>
+                <td class="text-end"><strong><?php echo number_format((float)$n['due'], 2); ?></strong></td>
                 <td class="text-end">
                   <?php if (!empty($isMain)): ?>
                     <a class="btn btn-sm btn-primary" href="<?php echo Helpers::baseUrl('index.php?page=payments&action=new&id='.(int)$n['id']); ?>"><i class="bi bi-cash-coin"></i> Collect</a>

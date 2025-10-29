@@ -57,7 +57,7 @@
   <?php unset($_SESSION['flash_parcel_saved']); ?>
 <?php endif; ?>
 
-<form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>">
+<form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>" autocomplete="off">
   <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
   <input type="hidden" name="id" value="<?php echo (int)$parcel['id']; ?>">
 
@@ -71,26 +71,33 @@
       <select name="customer_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Customer --</option>
         <?php foreach (($customersAll ?? []) as $c): ?>
-          <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($parcel['customer_id'] ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($c['name'].' ('.$c['phone'].')'); ?></option>
+          <?php 
+            $nm = (string)($c['name'] ?? '');
+            $phRaw = trim((string)($c['phone'] ?? ''));
+            // Hide internal placeholder phones like NA<epoch>-<3digits>
+            $isPlaceholder = preg_match('/^NA\d{10}-\d{3}$/', $phRaw) === 1;
+            $label = $nm . (!$isPlaceholder && $phRaw !== '' ? ' (' . $phRaw . ')' : '');
+          ?>
+          <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($parcel['customer_id'] ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
         <?php endforeach; ?>
       </select>
       <div class="collapse mt-2" id="quickAddCustomer">
         <div class="border rounded p-2 bg-light">
           <div class="row g-2">
             <div class="col-6">
-              <input type="text" id="qa_name" class="form-control form-control-sm" placeholder="Name">
+              <input type="text" id="qa_name" class="form-control form-control-sm" placeholder="Name" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             </div>
             <div class="col-6">
-              <input type="text" id="qa_phone" class="form-control form-control-sm" placeholder="Phone (optional)">
+              <input type="text" id="qa_phone_input" class="form-control form-control-sm" placeholder="Phone" autocomplete="new-password" inputmode="tel" autocapitalize="off" autocorrect="off" spellcheck="false">
             </div>
             <div class="col-6">
-              <input type="email" id="qa_email" class="form-control form-control-sm" placeholder="Email (optional)">
+              <input type="email" id="qa_email" class="form-control form-control-sm" placeholder="Email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             </div>
             <div class="col-6">
-              <input type="text" id="qa_address" class="form-control form-control-sm" placeholder="Address">
+              <input type="text" id="qa_address" class="form-control form-control-sm" placeholder="Address" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             </div>
             <div class="col-6">
-              <input type="text" id="qa_delivery_location" name="delivery_location" class="form-control form-control-sm" placeholder="Delivery Location" list="dl_locations">
+              <input type="text" id="qa_delivery_location" name="delivery_location" class="form-control form-control-sm" placeholder="Delivery Location" list="dl_locations" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
               <datalist id="dl_locations">
                 <?php 
                   $locs = [];
@@ -105,7 +112,7 @@
             </div>
             <div class="col-6">
               <select id="qa_type" class="form-select form-select-sm">
-                <option value="">Type (optional)</option>
+                <option value="">Type</option>
                 <option value="regular">Regular</option>
                 <option value="corporate">Corporate</option>
               </select>
@@ -129,7 +136,7 @@
     </div>
     <div class="col-md-4">
       <label class="form-label d-flex justify-content-between align-items-center">
-        <span>Supplier (Optional)</span>
+        <span>Supplier</span>
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddSupplier" aria-expanded="false"><i class="bi bi-person-plus"></i> Quick Add</button>
       </label>
       <select name="supplier_id" id="supplierSelect" class="form-select" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
@@ -152,7 +159,7 @@
         <div class="border rounded p-2 bg-light">
           <div class="row g-2">
             <div class="col-6"><input type="text" id="qs_name" class="form-control form-control-sm" placeholder="Supplier name"></div>
-            <div class="col-6"><input type="text" id="qs_phone" class="form-control form-control-sm" placeholder="Phone (optional)"></div>
+            <div class="col-6"><input type="text" id="qs_phone" class="form-control form-control-sm" placeholder="Phone"></div>
             <div class="col-6">
               <select id="qs_branch" class="form-select form-select-sm">
                 <option value="0">-- Select Branch --</option>
@@ -169,7 +176,7 @@
     </div>
     <div class="col-md-4">
       <label class="form-label">Date</label>
-      <input type="date" class="form-control" value="<?php echo date('Y-m-d'); ?>" disabled>
+      <input type="date" class="form-control" id="parcelDate" name="created_date" value="<?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?>">
     </div>
     <div class="col-md-4">
       <label class="form-label d-flex justify-content-between align-items-center">
@@ -218,7 +225,7 @@
     </div>
     <div class="col-md-4">
       <label class="form-label d-flex justify-content-between align-items-center">
-        <span>Vehicle No. (Optional)</span>
+        <span>Vehicle No.</span>
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddVehicle" aria-expanded="false"><i class="bi bi-truck"></i> Quick Add</button>
       </label>
       <?php if (!empty($vehiclesAll)): ?>
@@ -277,13 +284,16 @@
 
   <!-- Receipt-like box -->
   <div class="receipt-box mt-4">
-    <div class="receipt-header p-2 d-flex justify-content-between">
+    <div class="receipt-header p-2 d-flex justify-content-between align-items-center">
       <div>TS Transport</div>
-      <div class="serial-badge">Serial: —</div>
+      <div class="serial-badge d-flex align-items-center gap-2">
+        <label for="serialInput" class="mb-0 me-1">Serial:</label>
+        <input type="text" id="serialInput" name="tracking_number" class="form-control form-control-sm" style="max-width: 180px;" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" />
+      </div>
     </div>
     <div class="p-2">
       <div><strong>Customer:</strong> <span id="recCustomer">-- Select Customer --</span></div>
-      <div><strong>Date:</strong> <span id="recDate"><?php echo date('Y-m-d'); ?></span></div>
+      <div><strong>Date:</strong> <span id="recDate"><?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?></span></div>
       <div><strong>From:</strong> <span id="recFrom">—</span>&nbsp;&nbsp; <strong>To:</strong> <span id="recTo">—</span></div>
       <div><strong>Vehicle:</strong> <span id="recVehicle">—</span></div>
     </div>
@@ -919,18 +929,15 @@
   // Quick Add Customer via AJAX
   document.getElementById('qa_submit')?.addEventListener('click', async function(){
     const name = (document.getElementById('qa_name')?.value || '').trim();
-    const phone = (document.getElementById('qa_phone')?.value || '').trim();
+    const phone = (document.getElementById('qa_phone_input')?.value || '').trim();
     const email = (document.getElementById('qa_email')?.value || '').trim();
     const address = (document.getElementById('qa_address')?.value || '').trim();
     const delivery_location = (document.getElementById('qa_delivery_location')?.value || '').trim();
     const type = (document.getElementById('qa_type')?.value || '').trim();
-    // Require all fields for Quick Add as requested
-    if (!name || !phone || !email || !address || !delivery_location || !type) {
-      alert('Please fill Name, Phone, Email, Address, Delivery Location and Type before saving.');
-      return;
-    }
-    // Basic email pattern check
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Enter a valid email'); return; }
+    // Only require Name; others optional
+    if (!name) { alert('Please enter Name before saving.'); return; }
+    // Basic email pattern check only if email provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Enter a valid email'); return; }
     try {
       const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
       const fd = new FormData();
@@ -977,11 +984,22 @@
         sel.dispatchEvent(new Event('change'));
         sel.dispatchEvent(new Event('input'));
         if (wasDisabled) sel.disabled = true;
+        // Update in-memory customersData so delivery location and suggestions work without refresh
+        try {
+          if (Array.isArray(customersData)) {
+            const cid = parseInt(idStr, 10);
+            const existing = customersData.find(c => c.id === cid);
+            if (!existing) customersData.push({ id: cid, delivery_location: (data.delivery_location || '').trim() });
+          }
+        } catch(_) { /* ignore */ }
+        // Ensure header labels and summary update immediately
+        try { if (typeof updateMeta === 'function') updateMeta(); } catch(_) {}
+        try { if (typeof fetchCustomerSummary === 'function') fetchCustomerSummary(); } catch(_) {}
       }
       // Close the collapse
       const collapseEl = document.getElementById('quickAddCustomer'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
       // Clear inputs
-      ['qa_name','qa_phone','qa_email','qa_address','qa_delivery_location'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
+      ['qa_name','qa_phone_input','qa_email','qa_address','qa_delivery_location'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
     } catch (e) {
       alert('Failed to add customer');
     }

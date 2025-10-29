@@ -13,9 +13,20 @@
       <div class="col-md-3"><strong>Date</strong> <?php echo htmlspecialchars($dn['delivery_date']); ?></div>
       <div class="col-md-3"><strong>Customer</strong> <?php echo htmlspecialchars($dn['customer_name']); ?></div>
       <div class="col-md-3"><strong>Phone</strong> <?php echo htmlspecialchars($dn['customer_phone']); ?></div>
-      <div class="col-md-3"><strong>Total</strong> <?php echo number_format((float)$dn['total_amount'],2); ?></div>
-      <div class="col-md-3"><strong>Paid</strong> <?php echo number_format((float)$dn['paid'],2); ?></div>
-      <div class="col-md-3"><strong>Due</strong> <span class="text-danger"><?php echo number_format(max(0,(float)$dn['total_amount']-(float)$dn['paid']),2); ?></span></div>
+      <div class="col-md-2"><strong>Total</strong> <?php 
+          $amountAfterDiscount = (float)$dn['total_amount'] - (float)($dn['discount'] ?? 0);
+          echo number_format($amountAfterDiscount, 2); 
+      ?></div>
+      <div class="col-md-2"><strong>Discount</strong> <span class="text-danger"><?php echo number_format((float)($dn['discount'] ?? 0), 2); ?></span></div>
+      <div class="col-md-2"><strong>After Discount</strong> <?php 
+          $amountAfterDiscount = (float)$dn['total_amount'] - (float)($dn['discount'] ?? 0);
+          echo number_format($amountAfterDiscount, 2); 
+      ?></div>
+      <div class="col-md-2"><strong>Paid</strong> <?php echo number_format((float)$dn['paid'],2); ?></div>
+      <div class="col-md-2"><strong>Due</strong> <span class="text-danger"><?php 
+          $dueAmount = max(0, $amountAfterDiscount - (float)$dn['paid']);
+          echo number_format($dueAmount, 2); 
+      ?></span></div>
     </div>
   </div>
 </div>
@@ -26,7 +37,19 @@
     <div class="row g-3">
       <div class="col-md-4">
         <label class="form-label">Amount</label>
-        <input type="number" step="0.01" class="form-control" name="amount" value="<?php echo htmlspecialchars((string)$payment['amount']); ?>" required>
+        <?php
+        $discount = (float)($dn['discount'] ?? 0);
+        $total = (float)$dn['total_amount'];
+        $paid = (float)$dn['paid'];
+        $amountAfterDiscount = $total - $discount;
+        $dueAmount = max(0, $amountAfterDiscount - $paid);
+        // Ensure we don't allow paying more than the due amount
+        $defaultAmount = $dueAmount > 0 ? $dueAmount : 0;
+        // Ensure the amount doesn't exceed the discounted total minus any payments
+        $maxAmount = max(0, $amountAfterDiscount - $paid);
+        $defaultAmount = min($defaultAmount, $maxAmount);
+        ?>
+        <input type="number" step="0.01" class="form-control" name="amount" value="<?php echo number_format($defaultAmount, 2, '.', ''); ?>" required>
       </div>
       <div class="col-md-4">
         <label class="form-label">Paid At</label>

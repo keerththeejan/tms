@@ -52,7 +52,9 @@
         <tr>
           <td><?php echo (int)$c['id']; ?></td>
           <td><?php echo htmlspecialchars($c['name']); ?></td>
-          <td><?php echo htmlspecialchars($c['phone']); ?></td>
+          <td>
+            <?php $ph = trim((string)($c['phone'] ?? '')); $showPh = (preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1) ? '' : $ph; echo htmlspecialchars($showPh); ?>
+          </td>
           <td><?php echo htmlspecialchars($c['email'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($c['address']); ?></td>
           <td><?php echo htmlspecialchars($c['delivery_location']); ?></td>

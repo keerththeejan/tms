@@ -60,7 +60,7 @@ switch ($page) {
         $pendingParcels = (int)($row['c'] ?? 0);
 
         // Total payment due for selected branch (or current branch)
-        $dueSql = "SELECT COALESCE(SUM(dn.total_amount - COALESCE(paid.total_paid,0)),0) AS total_due
+        $dueSql = "SELECT COALESCE(SUM((dn.total_amount + COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)),0) AS total_due
                    FROM delivery_notes dn
                    LEFT JOIN (
                      SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id
@@ -124,7 +124,7 @@ switch ($page) {
         // Always compute these simple branch summaries for dashboard
         $q1 = $pdo->query("SELECT to_branch_id AS branch_id, COUNT(*) AS c FROM parcels WHERE status='pending' GROUP BY to_branch_id");
         foreach ($q1->fetchAll() as $r) { $pendingByBranch[(int)$r['branch_id']] = (int)$r['c']; }
-        $q2 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM(dn.total_amount - COALESCE(paid.total_paid,0)),0) AS due
+        $q2 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM((dn.total_amount + COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)),0) AS due
                               FROM delivery_notes dn
                               LEFT JOIN (SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id) paid
                                 ON paid.delivery_note_id = dn.id
@@ -636,11 +636,10 @@ switch ($page) {
             $name = trim($_POST['name'] ?? '');
             $phone = trim($_POST['phone'] ?? '');
             $email = trim($_POST['email'] ?? '');
-            if ($phone === '') {
-                // Ensure fallback fits VARCHAR(20)
-                // Format: NA<epoch>-<3digits> (max length 2 + 10 + 1 + 3 = 16)
-                $phone = 'NA' . time() . '-' . str_pad((string)random_int(0,999), 3, '0', STR_PAD_LEFT);
-            }
+            // Do not generate any placeholder; prefer NULL when empty.
+            $phoneDb = ($phone === '') ? null : $phone;
+            // Try to relax schema to allow NULL phones if needed
+            try { $pdo->exec("ALTER TABLE customers MODIFY phone VARCHAR(20) NULL"); } catch (Throwable $e) { /* ignore if already NULL or insufficient privileges */ }
             $address = trim($_POST['address'] ?? '');
             $delivery_location = trim($_POST['delivery_location'] ?? '');
             $place_id = trim($_POST['place_id'] ?? '');
@@ -660,10 +659,10 @@ switch ($page) {
             try {
                 if ($id > 0) {
                     $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, email=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
-                    $stmt->execute([$name,$phone,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
+                    $stmt->execute([$name,$phoneDb,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
                 } else {
                     $stmt = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?,?)');
-                    $stmt->execute([$name,$phone,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
+                    $stmt->execute([$name,$phoneDb,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
                     $id = (int)$pdo->lastInsertId();
                 }
             } catch (Throwable $e) {
@@ -683,7 +682,7 @@ switch ($page) {
                 if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>$msg]); return; }
                 $error = $msg; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
             }
-            if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone,'email'=>$email]); return; }
+            if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone,'email'=>$email,'delivery_location'=>$delivery_location]); return; }
             Helpers::redirect('index.php?page=customers');
             break;
         }
@@ -1082,10 +1081,10 @@ switch ($page) {
             }
             $weight = (float)($_POST['weight'] ?? 0);
             $status = $_POST['status'] ?? 'pending';
-            $tracking_number = trim($_POST['tracking_number'] ?? '');
+            // Serial/tracking number handling
+            $tracking_number_raw = trim($_POST['tracking_number'] ?? '');
+            $tracking_number = $tracking_number_raw; // keep as-is for update/insert
             $vehicle_no = trim($_POST['vehicle_no'] ?? '');
-            // Normalize empty tracking number to NULL so UNIQUE allows multiple NULLs and avoids duplicate ''
-            if ($tracking_number === '') { $tracking_number = null; }
             // Lorry full flag
             $lorry_full = isset($_POST['lorry_full']) && ($_POST['lorry_full'] === '1' || $_POST['lorry_full'] === 'on');
             // Remember preference in session so the form can keep the checkbox state on next load
@@ -1239,29 +1238,55 @@ switch ($page) {
                         $p = max(0.0, $p - max(0.0, $d));
                     }
                     $price = $p;
-                    $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?)");
-                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no]);
+                    $createdAtOverride = trim($_POST['created_date'] ?? '');
+                    if ($createdAtOverride) {
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, created_at) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$createdAtOverride]);
+                    } else {
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no]);
+                    }
                 } else {
                     // Other branches: do not set price at create
-                    $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?)");
-                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no]);
+                    $createdAtOverride = trim($_POST['created_date'] ?? '');
+                    if ($createdAtOverride) {
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, created_at) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$createdAtOverride]);
+                    } else {
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no]);
+                    }
                 }
                 $id = (int)$pdo->lastInsertId();
-                if (is_array($items)) {
-                    $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate) VALUES (?,?,?,?)');
-                    foreach ($items as $it) {
-                        $desc = trim($it['description'] ?? '');
-                        $qty = (float)($it['qty'] ?? 0);
-                        $rs = (float)($it['rs'] ?? 0);
-                        $cts = (float)($it['cts'] ?? 0);
-                        $rate = $canEnterItemAmounts ? ($rs + ($cts/100.0)) : null;
-                        if ($desc !== '' || $qty > 0) {
-                            $insItem->execute([$id, $qty, $desc, $rate]);
-                        }
-                    }
+                // Auto-generate tracking number if not provided by user at create
+                if (($tracking_number_raw === '' || $tracking_number_raw === null) && $id > 0) {
+                    try {
+                        $autoSerial = 'SR' . date('ymd') . '-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
+                        $pdo->prepare('UPDATE parcels SET tracking_number=? WHERE id=?')->execute([$autoSerial, $id]);
+                    } catch (Throwable $e) { /* ignore serial errors */ }
                 }
             }
             $pdo->commit();
+            
+            // Include RouteHelper for automatic route assignment
+            require_once __DIR__ . '/../app/helpers/RouteHelper.php';
+            
+            // Auto-assign route and load number for the parcel
+            if ($id > 0) {
+                try {
+                    // Assign route and load number for the main trip
+                    RouteHelper::assignRouteAndLoadNumber($pdo, $id, $from_branch_id, $to_branch_id);
+                    
+                    // If this is a delivery to Kilinochchi, assign a return load
+                    if ($to_branch_id == 1) { // Kilinochchi is branch ID 1
+                        RouteHelper::checkAndAssignReturnLoad($pdo, $id, $from_branch_id, $to_branch_id);
+                    }
+                } catch (Exception $e) {
+                    // Log the error but don't fail the entire operation
+                    error_log('Error assigning route/load number: ' . $e->getMessage());
+                }
+            }
+            
             // Send customer notification email (best-effort) with enriched details
             try {
                 $cStmt = $pdo->prepare('SELECT name, email, phone FROM customers WHERE id=? LIMIT 1');
@@ -1720,6 +1745,26 @@ switch ($page) {
             // Persist status and fallback content on DN
             try { $pdo->prepare('UPDATE delivery_notes SET last_email_status=?, last_emailed_at=NOW(), last_email_subject=?, last_email_text=? WHERE id=?')->execute([($ok?'sent':'failed'), (string)$subject, (string)$alt, (int)$id]); } catch (Throwable $e) { /* ignore */ }
             Helpers::redirect('index.php?page=delivery_notes');
+            break;
+        }
+
+        // Inline update customer's delivery location (AJAX from route page)
+        if ($action === 'update_location' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $cid = (int)($_POST['customer_id'] ?? 0);
+            $delivery_location = trim((string)($_POST['delivery_location'] ?? ''));
+            $ok = false;
+            if ($cid > 0) {
+                try {
+                    $st = $pdo->prepare('UPDATE customers SET delivery_location=? WHERE id=?');
+                    $ok = $st->execute([$delivery_location, $cid]);
+                } catch (Throwable $e) { $ok = false; }
+            }
+            if (strcasecmp($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '', 'XMLHttpRequest') === 0) {
+                header('Content-Type: application/json'); echo json_encode(['ok'=>$ok?1:0,'delivery_location'=>$delivery_location]);
+                break;
+            }
+            Helpers::redirect('index.php?page=delivery_notes&action=route&saved=' . ($ok?1:0));
             break;
         }
 
@@ -2523,7 +2568,8 @@ switch ($page) {
                 $error = 'Payments are allowed only after delivery. Some parcels in this delivery note are not delivered yet.';
             }
             // Recompute current due and prevent overpayment
-            $due = (float)$dn['total_amount'] - (float)$dn['paid'];
+            $netTotal = (float)$dn['total_amount'] + (float)($dn['discount'] ?? 0);
+            $due = $netTotal - (float)$dn['paid'];
             if ($amount > $due) {
                 $error = 'Amount exceeds due. Please enter an amount up to the current due.';
             }
@@ -2553,7 +2599,8 @@ switch ($page) {
             if ($undelCnt > 0) {
                 $error = 'Payments are allowed only after delivery. Some parcels in this delivery note are not delivered yet.';
             }
-            $payment = ['delivery_note_id'=>$id,'amount'=>max(0, (float)$dn['total_amount'] - (float)$dn['paid']),'paid_at'=>date('Y-m-d H:i:s')];
+            $netTotal = (float)$dn['total_amount'] + (float)($dn['discount'] ?? 0);
+            $payment = ['delivery_note_id'=>$id,'amount'=>max(0, $netTotal - (float)$dn['paid']),'paid_at'=>date('Y-m-d H:i:s')];
             Helpers::view('payments/form', compact('payment','dn','isMain','error'));
             break;
         }
@@ -2564,9 +2611,12 @@ switch ($page) {
         $to = $_GET['to'] ?? date('Y-m-d');
         $groupMode = $_GET['group'] ?? 'customer'; // 'customer' (default) or 'dn'
         $q = trim($_GET['q'] ?? '');
-        $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone,
-                       (dn.total_amount - COALESCE(paid.total_paid,0)) AS due,
-                       COALESCE(paid.total_paid,0) AS paid
+            $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone,
+                       ((dn.total_amount + COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)) AS due,
+                       COALESCE(paid.total_paid,0) AS paid,
+                       COALESCE(dn.discount, 0) AS discount,
+                       (dn.total_amount + COALESCE(dn.discount, 0)) AS amount_after_discount,
+                       dn.total_amount AS display_total
                 FROM delivery_notes dn
                 LEFT JOIN customers c ON c.id = dn.customer_id
                 LEFT JOIN (
