@@ -143,6 +143,23 @@
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='.(int)$n['id']); ?>"><i class="bi bi-eye"></i> View</a>
             <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=print&id='.(int)$n['id']); ?>" target="_blank"><i class="bi bi-printer"></i> Print</a>
             <a class="btn btn-sm btn-outline-info" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=email_form&id='.(int)$n['id']); ?>"><i class="bi bi-envelope"></i> Email</a>
+            
+            <?php if (Auth::canCollectPayments()): ?>
+            <form id="dn-pay-<?php echo (int)$n['id']; ?>" class="d-inline" method="post" action="<?php echo Helpers::baseUrl('index.php?page=payments&action=save'); ?>">
+              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+              <input type="hidden" name="delivery_note_id" value="<?php echo (int)$n['id']; ?>">
+              <input type="hidden" name="amount" value="0">
+            </form>
+            <button type="button" class="btn btn-sm btn-warning" onclick="(function(f){
+              var maxDue = <?php $disc=(float)($n['discount']??0); $net=(float)$n['total_amount'] - $disc; $paid=(float)($n['paid']??0); $due=max(0,$net-$paid); echo json_encode((float)$due); ?>;
+              var v = prompt('Enter card amount to collect (max '+ maxDue.toFixed(2) +')', maxDue.toFixed(2));
+              if(v===null) return; v=v.trim(); if(v===''||isNaN(v)){ alert('Enter a valid amount'); return; }
+              var num = parseFloat(v); if(num<=0){ alert('Amount must be greater than 0'); return; }
+              if(num>maxDue){ alert('Amount exceeds current due'); return; }
+              f.amount.value = num.toFixed(2);
+              f.submit();
+            })(document.getElementById('dn-pay-<?php echo (int)$n['id']; ?>'));"><i class="bi bi-credit-card"></i> Card Pay</button>
+            <?php endif; ?>
             </div>
           </td>
         </tr>

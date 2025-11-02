@@ -201,21 +201,6 @@ function updateLocationAjax(form) {
               </form>
               <button id="veh-btn-<?php echo (int)$r['customer_id']; ?>" type="button" class="btn btn-sm btn-success" onclick="(function(f){var v=prompt('Enter vehicle number'); if(v!==null){v=v.trim(); if(v){f.vehicle_no.value=v; assignVehicleAjax(f);} else {alert('Enter vehicle number');}}})(document.getElementById('veh-add-<?php echo (int)$r['customer_id']; ?>'));"><i class="bi bi-truck"></i> Add Vehicle</button>
             <?php endif; ?>
-            <!-- Inline add/edit Delivery Location -->
-            <form id="loc-edit-<?php echo (int)$r['customer_id']; ?>" class="d-none" method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=update_location'); ?>">
-              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-              <input type="hidden" name="customer_id" value="<?php echo (int)$r['customer_id']; ?>">
-              <input type="hidden" name="delivery_location" value="<?php echo htmlspecialchars((string)($r['delivery_location'] ?? '')); ?>">
-            </form>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="(function(f){var cur=(f.delivery_location.value||'').trim(); var v=prompt('Enter delivery location', cur); if(v!==null){v=v.trim(); f.delivery_location.value=v; updateLocationAjax(f);}})(document.getElementById('loc-edit-<?php echo (int)$r['customer_id']; ?>'));"><i class="bi bi-geo-alt"></i> <?php echo ($r['delivery_location'] ?? '')!=='' ? 'Edit' : 'Add'; ?> Location</button>
-
-            <!-- Inline add/edit Phone -->
-            <form id="phone-edit-<?php echo (int)$r['customer_id']; ?>" class="d-none" method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=update_phone'); ?>">
-              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-              <input type="hidden" name="customer_id" value="<?php echo (int)$r['customer_id']; ?>">
-              <input type="hidden" name="phone" value="<?php echo htmlspecialchars((string)$showPh); ?>">
-            </form>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="(function(f){var cur=(f.phone.value||'').trim(); var v=prompt('Enter phone', cur); if(v!==null){v=v.trim(); f.phone.value=v; (function(fd){fetch(f.action,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:fd}).then(r=>r.json()).then(function(res){ if(res&&res.ok){ location.reload(); } else { alert(res&&res.error?res.error:'Failed to save phone'); } }).catch(function(){ alert('Failed to save phone'); });})(new FormData(f)); }})(document.getElementById('phone-edit-<?php echo (int)$r['customer_id']; ?>'));"><i class="bi bi-telephone"></i> <?php echo ($showPh !== '') ? 'Edit' : 'Add'; ?> Phone</button>
 
             <!-- Full customer edit page -->
             <a class="btn btn-sm btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=edit&id='.(int)$r['customer_id']); ?>" target="_blank"><i class="bi bi-person-lines-fill"></i> Edit</a>

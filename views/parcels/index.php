@@ -106,14 +106,7 @@
             <a class="btn btn-sm btn-outline-primary" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer"></i> Print</a>
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square"></i> Edit</a>
             <a class="btn btn-sm btn-outline-success" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route&customer_id='.(int)$p['customer_id']); ?>"><i class="bi bi-signpost"></i> Delivery Route</a>
-            <?php if (!empty($isKilinochchi)): ?>
-              <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=generate'); ?>" class="d-inline" onsubmit="return confirm('Generate invoice for this customer?');">
-                <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-                <input type="hidden" name="customer_id" value="<?php echo (int)$p['customer_id']; ?>">
-                <input type="hidden" name="delivery_date" value="<?php echo date('Y-m-d'); ?>">
-                <button class="btn btn-sm btn-primary"><i class="bi bi-receipt"></i> Generate Invoice</button>
-              </form>
-            <?php endif; ?>
+            
             <a class="btn btn-sm btn-outline-info" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id='.(int)$p['id']); ?>"><i class="bi bi-envelope"></i> Email</a>
             <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" class="d-inline" onsubmit="return confirm('Delete this parcel?');">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">

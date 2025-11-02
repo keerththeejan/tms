@@ -9,9 +9,9 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="row g-2">
-      <div class="col-md-4"><strong>Customer:</strong> <?php echo htmlspecialchars($dn['customer_name']); ?></div>
-      <div class="col-md-4"><strong>Phone:</strong> <?php echo htmlspecialchars($dn['customer_phone']); ?></div>
-      <div class="col-md-4"><strong>Date:</strong> <?php echo htmlspecialchars($dn['delivery_date']); ?></div>
+      <div class="col-md-4"><strong>Customer:</strong> <?php echo htmlspecialchars((string)($dn['customer_name'] ?? '')); ?></div>
+      <div class="col-md-4"><strong>Phone:</strong> <?php echo htmlspecialchars((string)($dn['customer_phone'] ?? '')); ?></div>
+      <div class="col-md-4"><strong>Date:</strong> <?php echo htmlspecialchars((string)($dn['delivery_date'] ?? '')); ?></div>
     </div>
     <div class="row g-2 mt-1">
       <div class="col-md-6"><strong>Supplier(s):</strong> <?php echo htmlspecialchars($dn['suppliers_agg'] ?? ''); ?></div>

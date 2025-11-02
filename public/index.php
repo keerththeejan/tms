@@ -60,7 +60,7 @@ switch ($page) {
         $pendingParcels = (int)($row['c'] ?? 0);
 
         // Total payment due for selected branch (or current branch)
-        $dueSql = "SELECT COALESCE(SUM((dn.total_amount + COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)),0) AS total_due
+        $dueSql = "SELECT COALESCE(SUM((dn.total_amount - COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)),0) AS total_due
                    FROM delivery_notes dn
                    LEFT JOIN (
                      SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id
@@ -124,7 +124,7 @@ switch ($page) {
         // Always compute these simple branch summaries for dashboard
         $q1 = $pdo->query("SELECT to_branch_id AS branch_id, COUNT(*) AS c FROM parcels WHERE status='pending' GROUP BY to_branch_id");
         foreach ($q1->fetchAll() as $r) { $pendingByBranch[(int)$r['branch_id']] = (int)$r['c']; }
-        $q2 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM((dn.total_amount + COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)),0) AS due
+        $q2 = $pdo->prepare("SELECT dn.branch_id, COALESCE(SUM((dn.total_amount - COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)),0) AS due
                               FROM delivery_notes dn
                               LEFT JOIN (SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id) paid
                                 ON paid.delivery_note_id = dn.id
@@ -1768,6 +1768,52 @@ switch ($page) {
             break;
         }
 
+        // Bulk print manifest for selected customers on a route/date range
+        if ($action === 'print_manifest' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $vehicle_no = trim((string)($_POST['vehicle_no'] ?? ''));
+            $from = trim((string)($_POST['from'] ?? date('Y-m-d')));
+            $to = trim((string)($_POST['to'] ?? date('Y-m-d')));
+            // normalize dates
+            try { if ($from) { $ts = strtotime($from); if ($ts) { $from = date('Y-m-d', $ts); } } } catch (Throwable $e) {}
+            try { if ($to) { $ts2 = strtotime($to); if ($ts2) { $to = date('Y-m-d', $ts2); } } } catch (Throwable $e) {}
+            $ids = $_POST['customer_ids'] ?? [];
+            if (!is_array($ids)) { $ids = []; }
+            $ids = array_values(array_unique(array_map(function($v){ return (int)$v; }, $ids)));
+            if (count($ids) === 0) { Helpers::redirect('index.php?page=delivery_notes&action=route_detail&vehicle_no='.urlencode($vehicle_no).'&from='.$from.'&to='.$to); break; }
+
+            // Fetch parcels for selected customers and filters
+            $pdo = Database::pdo();
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $params = [$from.' 00:00:00', $to.' 23:59:59'];
+            $sql = "SELECT p.*, c.name AS customer_name, c.phone AS customer_phone
+                    FROM parcels p
+                    LEFT JOIN customers c ON c.id = p.customer_id
+                    WHERE p.customer_id IN ($in) AND p.created_at BETWEEN ? AND ?";
+            // move ids first in params list to match placeholders
+            $params = array_merge($ids, $params);
+            if ($vehicle_no !== '') { $sql .= " AND p.vehicle_no = ?"; $params[] = $vehicle_no; }
+            $sql .= " ORDER BY c.name, p.created_at, p.id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+
+            // Group by customer
+            $grouped = [];
+            $customers = [];
+            foreach ($rows as $r) {
+                $cid = (int)($r['customer_id'] ?? 0);
+                if (!isset($grouped[$cid])) { $grouped[$cid] = []; }
+                $grouped[$cid][] = $r;
+                if (!isset($customers[$cid])) {
+                    $customers[$cid] = ['name' => (string)($r['customer_name'] ?? ''), 'phone' => (string)($r['customer_phone'] ?? '')];
+                }
+            }
+
+            Helpers::view('delivery_notes/manifest', compact('vehicle_no','from','to','grouped','customers'));
+            break;
+        }
+
         // Ensure discount column exists on delivery_notes
         try {
             $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN discount DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_amount");
@@ -2652,6 +2698,8 @@ switch ($page) {
                         'customer_phone' => (string)($row['customer_phone'] ?? ''),
                         'bills' => [],
                         'total_amount' => 0.0,
+                        'discount' => 0.0,
+                        'amount_after_discount' => 0.0,
                         'paid' => 0.0,
                         'due' => 0.0,
                     ];
@@ -2660,10 +2708,14 @@ switch ($page) {
                     'id' => (int)$row['id'],
                     'delivery_date' => (string)$row['delivery_date'],
                     'total_amount' => (float)$row['total_amount'],
+                    'discount' => (float)($row['discount'] ?? 0),
+                    'amount_after_discount' => (float)($row['amount_after_discount'] ?? ((float)$row['total_amount'] + (float)($row['discount'] ?? 0))),
                     'paid' => (float)$row['paid'],
                     'due' => (float)$row['due'],
                 ];
                 $dueGroups[$cid]['total_amount'] += (float)$row['total_amount'];
+                $dueGroups[$cid]['discount'] += (float)($row['discount'] ?? 0);
+                $dueGroups[$cid]['amount_after_discount'] += (float)($row['amount_after_discount'] ?? ((float)$row['total_amount'] + (float)($row['discount'] ?? 0)));
                 $dueGroups[$cid]['paid'] += (float)$row['paid'];
                 $dueGroups[$cid]['due'] += (float)$row['due'];
             }
