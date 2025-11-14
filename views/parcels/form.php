@@ -368,7 +368,7 @@
       </div>
 
       <div class="receipt-total p-2 d-flex justify-content-end">
-        <div class="text-end" style="min-width: 360px;">
+        <div class="text-end w-100-sm">
           <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
           <div class="row g-2 align-items-center">
             <div class="col-auto">
