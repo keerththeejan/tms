@@ -39,6 +39,81 @@ if (!Auth::check()) {
 }
 
 switch ($page) {
+    case 'backup':
+        // Admin only
+        if (!Auth::hasRole('admin')) { http_response_code(403); echo 'Forbidden'; break; }
+        $action = $_GET['action'] ?? 'index';
+        $config = Helpers::config();
+        $db = $config['db'] ?? [];
+        $backupDir = realpath(__DIR__ . '/../') . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'backups';
+        if (!is_dir($backupDir)) {
+            @mkdir($backupDir, 0775, true);
+        }
+        if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $ts = date('Ymd_His');
+            $filename = "tms_backup_{$ts}.sql";
+            $outfile = $backupDir . DIRECTORY_SEPARATOR . $filename;
+            $host = (string)($db['host'] ?? '127.0.0.1');
+            $port = (int)($db['port'] ?? 3306);
+            $user = (string)($db['username'] ?? 'root');
+            $pass = (string)($db['password'] ?? '');
+            $dbname = (string)($db['database'] ?? '');
+            // Optional override path in config: $config['mysqldump_path']
+            $mysqldump = $config['mysqldump_path'] ?? 'mysqldump';
+            // Build command
+            $cmd = '"' . $mysqldump . '"'
+                 . ' --host=' . escapeshellarg($host)
+                 . ' --port=' . escapeshellarg((string)$port)
+                 . ' --user=' . escapeshellarg($user)
+                 . ' --password=' . escapeshellarg($pass)
+                 . ' --routines --triggers --events '
+                 . escapeshellarg($dbname)
+                 . ' > ' . escapeshellarg($outfile);
+            $ok = false; $output = []; $ret = 0;
+            @exec($cmd, $output, $ret);
+            if ($ret === 0 && file_exists($outfile) && filesize($outfile) > 0) {
+                $success = 'Backup created: ' . htmlspecialchars($filename);
+            } else {
+                $error = 'Backup failed. Ensure mysqldump is installed and configure mysqldump_path in config.php if needed.';
+            }
+            // List files for view
+            $files = [];
+            foreach (glob($backupDir . DIRECTORY_SEPARATOR . 'tms_backup_*.sql') as $f) {
+                $files[] = [
+                    'name' => basename($f),
+                    'size' => filesize($f),
+                    'mtime' => filemtime($f),
+                ];
+            }
+            usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
+            Helpers::view('admin/backup', compact('files','error','success'));
+            break;
+        }
+        if ($action === 'download') {
+            // Admin-only secure download
+            $file = basename((string)($_GET['file'] ?? ''));
+            if (!preg_match('/^tms_backup_\d{8}_\d{6}\.sql$/', $file)) { http_response_code(400); echo 'Invalid file.'; break; }
+            $path = $backupDir . DIRECTORY_SEPARATOR . $file;
+            if (!is_file($path)) { http_response_code(404); echo 'Not found'; break; }
+            header('Content-Type: application/sql');
+            header('Content-Disposition: attachment; filename="' . $file . '"');
+            header('Content-Length: ' . filesize($path));
+            readfile($path);
+            return;
+        }
+        // index: list existing backups
+        $files = [];
+        foreach (glob($backupDir . DIRECTORY_SEPARATOR . 'tms_backup_*.sql') as $f) {
+            $files[] = [
+                'name' => basename($f),
+                'size' => filesize($f),
+                'mtime' => filemtime($f),
+            ];
+        }
+        usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
+        Helpers::view('admin/backup', compact('files'));
+        break;
     case 'dashboard':
         $pdo = Database::pdo();
         $user = Auth::user();
@@ -3018,8 +3093,14 @@ switch ($page) {
         try { $pdo->query('SELECT 1 FROM expense_payments LIMIT 1'); } catch (Throwable $e) { $hasPayments = false; }
         if ($hasPayments) {
             $sql = "SELECT e.*, b.name AS branch_name,
-                           COALESCE(paid.paid_total,0) AS paid_total,
-                           (e.amount - COALESCE(paid.paid_total,0)) AS balance,
+                           CASE 
+                             WHEN " . ($hasCreditCols ? "(e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL))" : "e.payment_mode='credit'") . " THEN COALESCE(paid.paid_total,0)
+                             ELSE e.amount
+                           END AS paid_total,
+                           CASE 
+                             WHEN " . ($hasCreditCols ? "(e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL))" : "e.payment_mode='credit'") . " THEN (e.amount - COALESCE(paid.paid_total,0))
+                             ELSE 0
+                           END AS balance,
                            " . ($hasCreditCols ? "CASE WHEN e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL) THEN 'credit' ELSE 'cash' END" : "CASE WHEN e.payment_mode='credit' THEN 'credit' ELSE 'cash' END") . " AS mode_effective
                     FROM expenses e
                     LEFT JOIN branches b ON b.id = e.branch_id
@@ -3031,8 +3112,14 @@ switch ($page) {
                     WHERE " . implode(' AND ', $where) . " ORDER BY e.expense_date DESC, e.id DESC LIMIT 300";
         } else {
             $sql = "SELECT e.*, b.name AS branch_name,
-                           0.0 AS paid_total,
-                           e.amount AS balance,
+                           CASE 
+                             WHEN " . ($hasCreditCols ? "(e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL))" : "e.payment_mode='credit'") . " THEN 0.0
+                             ELSE e.amount
+                           END AS paid_total,
+                           CASE 
+                             WHEN " . ($hasCreditCols ? "(e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL))" : "e.payment_mode='credit'") . " THEN e.amount
+                             ELSE 0.0
+                           END AS balance,
                            " . ($hasCreditCols ? "CASE WHEN e.payment_mode='credit' OR (e.credit_party IS NOT NULL OR e.credit_due_date IS NOT NULL) THEN 'credit' ELSE 'cash' END" : "CASE WHEN e.payment_mode='credit' THEN 'credit' ELSE 'cash' END") . " AS mode_effective
                     FROM expenses e
                     LEFT JOIN branches b ON b.id = e.branch_id

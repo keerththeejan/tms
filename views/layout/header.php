@@ -66,6 +66,9 @@ $user = Auth::user();
       .table { font-size: .9rem; }
       .btn { padding: .35rem .6rem; font-size: .9rem; }
       .form-control, .form-select { font-size: .95rem; }
+      .table td, .table th { white-space: normal; word-break: break-word; }
+      .btn { white-space: normal; }
+      .form-control, .form-select { min-width: 0; }
     }
     /* Form rows: stack labels/inputs nicely on narrow screens */
     @media (max-width: 768px) {
@@ -147,6 +150,10 @@ $user = Auth::user();
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='search'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>"><i class="bi bi-search me-1"></i> Search</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reminders'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reminders'); ?>"><i class="bi bi-bell me-1"></i> Reminders</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reports'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reports'); ?>"><i class="bi bi-bar-chart-line me-1"></i> Reports</a></li>
+      <?php if (($user['role'] ?? '') === 'admin'): ?>
+        <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Admin</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='backup'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=backup'); ?>"><i class="bi bi-hdd me-1"></i> Backups</a></li>
+      <?php endif; ?>
       <?php if ($user): ?>
         <li class="nav-item mt-2 px-2"><hr class="border-secondary opacity-50"></li>
         <li class="nav-item px-2 mb-2 text-secondary small">Branch: <?php echo htmlspecialchars($user['branch_name'] ?? ''); ?> (<?php echo $user['is_main_branch'] ? 'Main' : 'Branch'; ?>)</li>
