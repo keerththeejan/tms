@@ -44,6 +44,7 @@
         <th>Supplier</th>
         <th>Supplier Phone</th>
         <th>Tracking</th>
+        <th>Items</th>
         <th>Weight</th>
         <th class="text-end">Amount</th>
       </tr>
@@ -55,6 +56,7 @@
           <td><?php echo htmlspecialchars($i['supplier_name'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($i['supplier_phone'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($i['tracking_number'] ?? ''); ?></td>
+          <td><?php $desc = trim((string)($i['item_descriptions'] ?? '')); echo $desc !== '' ? htmlspecialchars($desc) : '—'; ?></td>
           <td><?php echo number_format((float)($i['weight'] ?? 0), 2); ?></td>
           <td class="text-end"><?php echo number_format((float)$i['amount'], 2); ?></td>
         </tr>

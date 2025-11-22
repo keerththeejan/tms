@@ -66,6 +66,7 @@
         <th>Supplier</th>
         <th>Supplier Phone</th>
         <th>Vehicles</th>
+        <th>Items</th>
         <th>Email</th>
         <th class="text-end">Total</th>
         <th class="text-end">Actions</th>
@@ -81,6 +82,9 @@
           <td class="text-truncate" title="<?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?>"><?php echo htmlspecialchars($n['suppliers'] ?? '—'); ?></td>
           <td class="text-truncate" title="<?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?>"><?php echo htmlspecialchars($n['supplier_phones'] ?? '—'); ?></td>
           <td><span class="dn-veh" title="<?php echo htmlspecialchars($n['vehicles'] ?? '—'); ?>"><?php echo ($n['vehicles'] ?? '') !== '' ? htmlspecialchars($n['vehicles']) : '—'; ?></span></td>
+          <td class="text-truncate" title="<?php echo htmlspecialchars($n['item_descriptions'] ?? '—'); ?>">
+            <?php $it = trim((string)($n['item_descriptions'] ?? '')); echo $it !== '' ? htmlspecialchars($it) : '—'; ?>
+          </td>
           <td class="nowrap">
             <?php $st = strtolower(trim((string)($n['email_status'] ?? ''))); ?>
             <?php if ($st === 'sent'): ?>

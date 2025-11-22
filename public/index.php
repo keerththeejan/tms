@@ -1340,6 +1340,22 @@ switch ($page) {
                         $pdo->prepare('UPDATE parcels SET tracking_number=? WHERE id=?')->execute([$autoSerial, $id]);
                     } catch (Throwable $e) { /* ignore serial errors */ }
                 }
+                // Insert item rows on create so list can show descriptions immediately
+                if ($id > 0 && is_array($items)) {
+                    try {
+                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate) VALUES (?,?,?,?)');
+                        foreach ($items as $it) {
+                            $desc = trim($it['description'] ?? '');
+                            $qty = (float)($it['qty'] ?? 0);
+                            $rs = (float)($it['rs'] ?? 0);
+                            $cts = (float)($it['cts'] ?? 0);
+                            $rate = $canEnterItemAmounts ? ($rs + ($cts/100.0)) : null;
+                            if ($desc !== '' || $qty > 0) {
+                                $insItem->execute([$id, $qty, $desc, $rate]);
+                            }
+                        }
+                    } catch (Throwable $e) { /* ignore if table missing */ }
+                }
             }
             $pdo->commit();
             
@@ -1600,12 +1616,18 @@ switch ($page) {
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
                            c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            COALESCE(pe.status, p.last_email_status) AS email_status,
-                           COALESCE(pe.created_at, p.last_emailed_at) AS emailed_at
+                           COALESCE(pe.created_at, p.last_emailed_at) AS emailed_at,
+                           pit.item_descriptions
                     FROM parcels p
                     LEFT JOIN customers c ON c.id = p.customer_id
                     LEFT JOIN suppliers s ON s.id = p.supplier_id
                     LEFT JOIN branches bf ON bf.id = p.from_branch_id
                     LEFT JOIN branches bt ON bt.id = p.to_branch_id
+                    LEFT JOIN (
+                        SELECT parcel_id, GROUP_CONCAT(TRIM(description) ORDER BY id SEPARATOR ", ") AS item_descriptions
+                        FROM parcel_items
+                        GROUP BY parcel_id
+                    ) pit ON pit.parcel_id = p.id
                     LEFT JOIN (
                         SELECT pe1.* FROM parcel_emails pe1
                         INNER JOIN (
@@ -1626,12 +1648,18 @@ switch ($page) {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
                            c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
-                           p.last_email_status AS email_status, p.last_emailed_at AS emailed_at
+                           p.last_email_status AS email_status, p.last_emailed_at AS emailed_at,
+                           pit.item_descriptions
                     FROM parcels p
                     LEFT JOIN customers c ON c.id = p.customer_id
                     LEFT JOIN suppliers s ON s.id = p.supplier_id
                     LEFT JOIN branches bf ON bf.id = p.from_branch_id
                     LEFT JOIN branches bt ON bt.id = p.to_branch_id
+                    LEFT JOIN (
+                        SELECT parcel_id, GROUP_CONCAT(TRIM(description) ORDER BY id SEPARATOR ", ") AS item_descriptions
+                        FROM parcel_items
+                        GROUP BY parcel_id
+                    ) pit ON pit.parcel_id = p.id
                     LEFT JOIN delivery_route_assignments dra_to
                       ON dra_to.customer_id = p.customer_id
                      AND dra_to.branch_id = p.to_branch_id
@@ -1643,7 +1671,7 @@ switch ($page) {
             array_unshift($params, $from, $to, $from, $to);
         }
         if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
-        $sql .= ' ORDER BY p.created_at DESC LIMIT 200';
+        $sql .= ' ORDER BY p.created_at DESC, p.id DESC LIMIT 200';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $parcels = $stmt->fetchAll();
@@ -2328,7 +2356,18 @@ switch ($page) {
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }
-            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, p.vehicle_no, s.name AS supplier_name, s.phone AS supplier_phone FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
+            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, p.vehicle_no,
+                                               s.name AS supplier_name, s.phone AS supplier_phone,
+                                               pit.item_descriptions
+                                        FROM delivery_note_parcels dnp
+                                        LEFT JOIN parcels p ON p.id = dnp.parcel_id
+                                        LEFT JOIN suppliers s ON s.id = p.supplier_id
+                                        LEFT JOIN (
+                                          SELECT parcel_id, GROUP_CONCAT(TRIM(description) ORDER BY id SEPARATOR ", ") AS item_descriptions
+                                          FROM parcel_items
+                                          GROUP BY parcel_id
+                                        ) pit ON pit.parcel_id = p.id
+                                        WHERE dnp.delivery_note_id=?');
             $itemsStmt->execute([$id]);
             $items = $itemsStmt->fetchAll();
             // Backfill if empty
@@ -2399,7 +2438,18 @@ switch ($page) {
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }
-            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, s.name AS supplier_name, s.phone AS supplier_phone FROM delivery_note_parcels dnp LEFT JOIN parcels p ON p.id = dnp.parcel_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE dnp.delivery_note_id=?');
+            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight,
+                                               s.name AS supplier_name, s.phone AS supplier_phone,
+                                               pit.item_descriptions
+                                        FROM delivery_note_parcels dnp
+                                        LEFT JOIN parcels p ON p.id = dnp.parcel_id
+                                        LEFT JOIN suppliers s ON s.id = p.supplier_id
+                                        LEFT JOIN (
+                                          SELECT parcel_id, GROUP_CONCAT(TRIM(description) ORDER BY id SEPARATOR ", ") AS item_descriptions
+                                          FROM parcel_items
+                                          GROUP BY parcel_id
+                                        ) pit ON pit.parcel_id = p.id
+                                        WHERE dnp.delivery_note_id=?');
             $itemsStmt->execute([$id]);
             $items = $itemsStmt->fetchAll();
             // Backfill if empty
@@ -2641,12 +2691,14 @@ switch ($page) {
                        dn.last_email_status AS email_status, dn.last_emailed_at AS emailed_at,
                        TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ", ")) AS suppliers,
                        TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(s.phone, "") ORDER BY s.phone SEPARATOR ", ")) AS supplier_phones,
-                       COALESCE(NULLIF(TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(p.vehicle_no, "") ORDER BY p.vehicle_no SEPARATOR ", ")), ""), dra.vehicle_no, "") AS vehicles
+                       COALESCE(NULLIF(TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT COALESCE(p.vehicle_no, "") ORDER BY p.vehicle_no SEPARATOR ", ")), ""), dra.vehicle_no, "") AS vehicles,
+                       TRIM(BOTH "," FROM GROUP_CONCAT(DISTINCT TRIM(pit.description) ORDER BY pit.id SEPARATOR ", ")) AS item_descriptions
                 FROM delivery_notes dn
                 LEFT JOIN customers c ON c.id = dn.customer_id
                 LEFT JOIN delivery_note_parcels dnp ON dnp.delivery_note_id = dn.id
                 LEFT JOIN parcels p ON p.id = dnp.parcel_id
                 LEFT JOIN suppliers s ON s.id = p.supplier_id
+                LEFT JOIN parcel_items pit ON pit.parcel_id = p.id
                 LEFT JOIN delivery_route_assignments dra ON dra.customer_id = dn.customer_id AND dra.branch_id = dn.branch_id AND dra.delivery_date = dn.delivery_date
                 WHERE ' . implode(' AND ', $where) . '
                 GROUP BY dn.id

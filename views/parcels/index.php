@@ -55,6 +55,7 @@
         <th>From Branch</th>
         <th>To Branch</th>
         <th>Vehicle</th>
+        <th>Items</th>
         <th>Weight</th>
         <th>Price</th>
         <th>Status</th>
@@ -83,6 +84,12 @@
             <?php else: ?>
               —
             <?php endif; ?>
+          </td>
+          <td>
+            <?php 
+              $desc = trim((string)($p['item_descriptions'] ?? ''));
+              echo $desc === '' ? '—' : htmlspecialchars($desc);
+            ?>
           </td>
           <td><?php echo number_format((float)$p['weight'], 2); ?></td>
           <td><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
