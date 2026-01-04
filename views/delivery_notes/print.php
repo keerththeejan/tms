@@ -32,6 +32,27 @@
   </div>
 <?php endif; ?>
 <?php 
+  // Company branding for print header
+  $cfg = (require __DIR__ . '/../../config/config.php'); 
+  $brand = $cfg['company'] ?? []; 
+?>
+<div class="mb-2 p-2 border rounded">
+  <div class="d-flex align-items-center gap-2">
+    <?php if (!empty($brand['logo_url'])): ?>
+      <img src="<?php echo htmlspecialchars($brand['logo_url']); ?>" alt="Logo" style="height:38px">
+    <?php endif; ?>
+    <div>
+      <div class="fw-bold"><?php echo htmlspecialchars($brand['name'] ?? ''); ?></div>
+      <div class="small text-muted">Transport and Parcel Services</div>
+    </div>
+  </div>
+  <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-1 mt-1 small text-muted">
+    <?php foreach (($brand['addresses'] ?? []) as $addr): ?>
+      <div><?php echo nl2br(htmlspecialchars($addr)); ?></div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php 
   // Build distinct vehicle list if present on items
   $vehSet = [];
   foreach (($items ?? []) as $it) {
