@@ -28,9 +28,9 @@ return [
         // Optional: place a logo image in public/ (e.g., public/logo.png) and set the URL below
         'logo_url' => '', // e.g., '/TMS/public/logo.png'
         'addresses' => [
-            'Colombo: No:71A, Welikadé, Colombo 13 | 077-2345678',
-            'Kilinochchi: Parameshwaran, Kilinochchi | 021-720 1757',
-            'Vavuniya: Oddusuddan Rd, Vavuniya | 024-222 3456',
+            'Colombo: No. 71A, Wolfendhal Street, Colombo 13 | 077 2474905, 077 2474177',
+            'Kilinochchi: Paravipanchan, Kilinochchi | 021 720 1757, 0772474605',
+            'Mullaitivu: Oddusuddan Road, Puthukudiyiruppu, Mullaitivu | 077 2474205,   077 2480830',
         ],
         'footer_note' => 'Goods received in good condition. Subject to company terms.'
     ],
