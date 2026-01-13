@@ -35,10 +35,10 @@
 <div class="card shadow-sm mb-3">
   <div class="card-body">
     <div class="row g-2">
-      <div class="col-md-3"><strong>Name:</strong> <?php echo htmlspecialchars($customer['name']); ?></div>
-      <div class="col-md-3"><strong>Phone:</strong> <?php echo htmlspecialchars($customer['phone']); ?></div>
-      <div class="col-md-3"><strong>Address:</strong> <?php echo htmlspecialchars($customer['address'] ?? ''); ?></div>
-      <div class="col-md-3"><strong>Delivery Location:</strong> <?php echo htmlspecialchars($customer['delivery_location'] ?? ''); ?></div>
+      <div class="col-md-3"><strong>Name:</strong> <?php echo htmlspecialchars((string)($customer['name'] ?? '')); ?></div>
+      <div class="col-md-3"><strong>Phone:</strong> <?php echo htmlspecialchars((string)($customer['phone'] ?? '')); ?></div>
+      <div class="col-md-3"><strong>Address:</strong> <?php echo htmlspecialchars((string)($customer['address'] ?? '')); ?></div>
+      <div class="col-md-3"><strong>Delivery Location:</strong> <?php echo htmlspecialchars((string)($customer['delivery_location'] ?? '')); ?></div>
     </div>
   </div>
 </div>

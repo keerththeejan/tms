@@ -1,7 +1,18 @@
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/datatables.net@2.1.8/js/dataTables.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/js/dataTables.bootstrap5.min.js"></script>
+ </div>
+ <!-- jQuery is required by some DataTables builds and third-party scripts -->
+ <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+ <!-- Load DataTables only if jQuery is available, to avoid 'jQuery is not defined' halting other scripts -->
+ <script>
+ (function(){
+   function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=function(){ try{ cb&&cb(); }catch(e){} }; document.head.appendChild(s); }
+   if (window.jQuery) {
+     load('https://cdn.jsdelivr.net/npm/datatables.net@2.1.8/js/dataTables.min.js', function(){
+       load('https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/js/dataTables.bootstrap5.min.js');
+     });
+   }
+ })();
+ </script>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
   (function(){
@@ -66,6 +77,8 @@
         cfg.shouldSort = false;
       }
       var instance = new Choices(sel, cfg);
+      // Expose instance for programmatic updates (e.g., after Quick Add)
+      try { sel._choices = instance; } catch(e) { /* ignore */ }
       sel.dataset.enhanced = '1';
       // Hide placeholder option in dropdown for Supplier select so '-- None --' won't appear in the middle
       try {
@@ -75,6 +88,17 @@
           if (toHide) { toHide.style.display = 'none'; }
         }
       } catch (e) { /* ignore */ }
+      // Listen for custom refresh event to sync newly added <option>s
+      sel.addEventListener('refresh-choices', function(){
+        try {
+          var inst = sel._choices; if (!inst) return;
+          // Rebuild from current <option>s
+          var choices = Array.from(sel.options).map(function(o){
+            return { value: o.value, label: o.textContent, selected: o.selected, disabled: o.disabled };
+          });
+          inst.setChoices(choices, 'value', 'label', true);
+        } catch(e) { /* ignore */ }
+      });
     });
   })();
 </script>

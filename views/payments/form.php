@@ -10,16 +10,16 @@
   <div class="card-body">
     <div class="row g-2">
       <div class="col-md-3"><strong>DN #</strong> <?php echo (int)$dn['id']; ?></div>
-      <div class="col-md-3"><strong>Date</strong> <?php echo htmlspecialchars($dn['delivery_date']); ?></div>
-      <div class="col-md-3"><strong>Customer</strong> <?php echo htmlspecialchars($dn['customer_name']); ?></div>
-      <div class="col-md-3"><strong>Phone</strong> <?php echo htmlspecialchars($dn['customer_phone']); ?></div>
+      <div class="col-md-3"><strong>Date</strong> <?php echo htmlspecialchars((string)($dn['delivery_date'] ?? '')); ?></div>
+      <div class="col-md-3"><strong>Customer</strong> <?php echo htmlspecialchars((string)($dn['customer_name'] ?? '')); ?></div>
+      <div class="col-md-3"><strong>Phone</strong> <?php echo htmlspecialchars((string)($dn['customer_phone'] ?? '')); ?></div>
       <div class="col-md-2"><strong>Total</strong> <?php 
-          $amountAfterDiscount = (float)$dn['total_amount'] - (float)($dn['discount'] ?? 0);
+          $amountAfterDiscount = (float)$dn['total_amount'] + (float)($dn['discount'] ?? 0);
           echo number_format($amountAfterDiscount, 2); 
       ?></div>
       <div class="col-md-2"><strong>Discount</strong> <span class="text-danger"><?php echo number_format((float)($dn['discount'] ?? 0), 2); ?></span></div>
       <div class="col-md-2"><strong>After Discount</strong> <?php 
-          $amountAfterDiscount = (float)$dn['total_amount'] - (float)($dn['discount'] ?? 0);
+          $amountAfterDiscount = (float)$dn['total_amount'] + (float)($dn['discount'] ?? 0);
           echo number_format($amountAfterDiscount, 2); 
       ?></div>
       <div class="col-md-2"><strong>Paid</strong> <?php echo number_format((float)$dn['paid'],2); ?></div>
@@ -41,7 +41,7 @@
         $discount = (float)($dn['discount'] ?? 0);
         $total = (float)$dn['total_amount'];
         $paid = (float)$dn['paid'];
-        $amountAfterDiscount = $total - $discount;
+        $amountAfterDiscount = $total + $discount;
         $dueAmount = max(0, $amountAfterDiscount - $paid);
         // Ensure we don't allow paying more than the due amount
         $defaultAmount = $dueAmount > 0 ? $dueAmount : 0;
@@ -49,11 +49,11 @@
         $maxAmount = max(0, $amountAfterDiscount - $paid);
         $defaultAmount = min($defaultAmount, $maxAmount);
         ?>
-        <input type="number" step="0.01" class="form-control" name="amount" value="<?php echo number_format($defaultAmount, 2, '.', ''); ?>" required>
+        <input type="number" step="0.01" class="form-control" name="amount" value="<?php echo number_format($defaultAmount, 2, '.', ''); ?>" max="<?php echo number_format($maxAmount, 2, '.', ''); ?>" required>
       </div>
       <div class="col-md-4">
         <label class="form-label">Paid At</label>
-        <input type="datetime-local" class="form-control" name="paid_at" value="<?php echo htmlspecialchars(date('Y-m-d\TH:i', strtotime($payment['paid_at']))); ?>">
+        <input type="datetime-local" class="form-control" name="paid_at" value="<?php echo htmlspecialchars(date('Y-m-d\TH:i', strtotime($payment['paid_at'] ?? date('Y-m-d H:i:s')))); ?>">
       </div>
     </div>
   </div>

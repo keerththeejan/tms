@@ -1268,6 +1268,31 @@ switch ($page) {
                     // Kilinochchi: price-only update
                     $stmt = $pdo->prepare("UPDATE parcels SET price=? WHERE id=?");
                     $stmt->execute([$price, $id]);
+                    // Sync any linked delivery note amounts to the updated parcel price
+                    try {
+                        $newAmount = (float)($price ?? 0);
+                        if ($newAmount <= 0) {
+                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
+                            $sumItems->execute([$id]);
+                            $newAmount = (float)($sumItems->fetch()['s'] ?? 0);
+                        }
+                        $selDn = $pdo->prepare('SELECT DISTINCT delivery_note_id FROM delivery_note_parcels WHERE parcel_id=?');
+                        $selDn->execute([$id]);
+                        $dnRows = $selDn->fetchAll() ?: [];
+                        if ($dnRows) {
+                            $pdo->prepare('UPDATE delivery_note_parcels SET amount=? WHERE parcel_id=?')->execute([$newAmount, $id]);
+                            $sumStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM delivery_note_parcels WHERE delivery_note_id=?');
+                            $updStmt = $pdo->prepare('UPDATE delivery_notes SET total_amount=? WHERE id=?');
+                            foreach ($dnRows as $r) {
+                                $dnId = (int)($r['delivery_note_id'] ?? 0);
+                                if ($dnId > 0) {
+                                    $sumStmt->execute([$dnId]);
+                                    $s = (float)($sumStmt->fetch()['s'] ?? 0);
+                                    $updStmt->execute([$s, $dnId]);
+                                }
+                            }
+                        }
+                    } catch (Throwable $e) { /* ignore sync errors */ }
                 } else {
                     // Other branches: full edit except price (kept same value as existing)
                     $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
@@ -1287,6 +1312,31 @@ switch ($page) {
                             }
                         }
                     }
+                    // Sync any linked delivery note amounts to the (possibly) updated computed amount
+                    try {
+                        $newAmount = (float)($price ?? 0);
+                        if ($newAmount <= 0) {
+                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
+                            $sumItems->execute([$id]);
+                            $newAmount = (float)($sumItems->fetch()['s'] ?? 0);
+                        }
+                        $selDn = $pdo->prepare('SELECT DISTINCT delivery_note_id FROM delivery_note_parcels WHERE parcel_id=?');
+                        $selDn->execute([$id]);
+                        $dnRows = $selDn->fetchAll() ?: [];
+                        if ($dnRows) {
+                            $pdo->prepare('UPDATE delivery_note_parcels SET amount=? WHERE parcel_id=?')->execute([$newAmount, $id]);
+                            $sumStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM delivery_note_parcels WHERE delivery_note_id=?');
+                            $updStmt = $pdo->prepare('UPDATE delivery_notes SET total_amount=? WHERE id=?');
+                            foreach ($dnRows as $r) {
+                                $dnId = (int)($r['delivery_note_id'] ?? 0);
+                                if ($dnId > 0) {
+                                    $sumStmt->execute([$dnId]);
+                                    $s = (float)($sumStmt->fetch()['s'] ?? 0);
+                                    $updStmt->execute([$s, $dnId]);
+                                }
+                            }
+                        }
+                    } catch (Throwable $e) { /* ignore sync errors */ }
                 }
             } else {
                 // Create
@@ -2728,8 +2778,8 @@ switch ($page) {
             $amount = (float)($_POST['amount'] ?? 0);
             $paid_at = $_POST['paid_at'] ?? date('Y-m-d H:i:s');
             if ($dnId <= 0 || $amount <= 0) { $error = 'Valid delivery note and positive amount required.'; }
-            // fetch DN and due
-            $stmt = $pdo->prepare('SELECT dn.*, COALESCE((SELECT SUM(amount) FROM payments WHERE delivery_note_id=dn.id),0) AS paid FROM delivery_notes dn WHERE dn.id=?');
+            // fetch DN with customer info and due
+            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, COALESCE((SELECT SUM(amount) FROM payments WHERE delivery_note_id=dn.id),0) AS paid FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id WHERE dn.id=?');
             $stmt->execute([$dnId]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Delivery note not found'; break; }
@@ -4103,21 +4153,30 @@ switch ($page) {
         $address = trim($_POST['address'] ?? '');
         $delivery_location = trim($_POST['delivery_location'] ?? '');
         $type = trim($_POST['customer_type'] ?? '');
-        if ($phone === '' || $name === '') {
+        $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
+                     || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
+                     || (($_POST['ajax'] ?? '') === '1');
+        if ($name === '') {
+            if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>'Name is required.']); return; }
             Helpers::redirect('index.php?page=parcels&action=new');
             break;
         }
         // Check if exists
-        $stmt = $pdo->prepare('SELECT id FROM customers WHERE phone=? LIMIT 1');
-        $stmt->execute([$phone]);
-        $existing = $stmt->fetch();
-        if ($existing) {
-            $cid = (int)$existing['id'];
-        } else {
+        $cid = 0;
+        if ($phone !== '') {
+            $stmt = $pdo->prepare('SELECT id FROM customers WHERE phone=? LIMIT 1');
+            $stmt->execute([$phone]);
+            $existing = $stmt->fetch();
+            if ($existing) { $cid = (int)$existing['id']; }
+        }
+        if ($cid === 0) {
+            // allow null phone
+            try { $pdo->exec("ALTER TABLE customers MODIFY phone VARCHAR(20) NULL"); } catch (Throwable $e) { /* ignore */ }
             $ins = $pdo->prepare('INSERT INTO customers (name, phone, address, delivery_location, customer_type) VALUES (?,?,?,?,?)');
-            $ins->execute([$name, $phone, $address, $delivery_location, $type !== '' ? $type : null]);
+            $ins->execute([$name, ($phone!==''?$phone:null), $address, $delivery_location, $type !== '' ? $type : null]);
             $cid = (int)$pdo->lastInsertId();
         }
+        if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$cid,'name'=>$name,'phone'=>$phone,'address'=>$address,'delivery_location'=>$delivery_location]); return; }
         Helpers::redirect('index.php?page=parcels&action=new&customer_id=' . $cid);
         break;
 

@@ -39,3 +39,4 @@ return [
     // Provide your Google Maps API key to enable Places Autocomplete on Delivery Location fields
     'google_maps_api_key' => '', // e.g., 'AIza...'
 ];
+    

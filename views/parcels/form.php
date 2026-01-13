@@ -805,13 +805,23 @@
         if (data.last_delivery_note_id && data.last_delivery_note_id !== data.today_delivery_note_id) {
           links.push(`<a class=\"btn btn-sm btn-outline-primary\" target=\"_blank\" href=\"<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=view&id='); ?>${data.last_delivery_note_id}\">Open Last Bill</a>`);
         }
+        // View Details link: prefer phone when available, else fall back to name
+        const baseSearch = '<?php echo Helpers::baseUrl('index.php?page=search'); ?>';
+        const qPhone = (data.phone || '').trim();
+        const qName = (data.name || '').trim();
+        let detailsUrl = baseSearch;
+        if (qPhone) {
+          detailsUrl += '&phone=' + encodeURIComponent(qPhone);
+        } else if (qName) {
+          detailsUrl += '&name=' + encodeURIComponent(qName);
+        }
+        links.unshift(`<a class=\"btn btn-sm btn-outline-primary me-1\" href=\"${detailsUrl}\" target=\"_blank\">View Details</a>`);
         box.innerHTML = `
           <div class="alert ${cls} py-2">
             <div class="fw-semibold">Previous activity found for ${data.name} (${data.phone})</div>
             <div class="small text-muted">Delivery Notes: ${data.total_delivery_notes}, Parcels: ${data.total_parcels}${data.last_delivery_date ? ', Last: ' + data.last_delivery_date : ''}</div>
             ${dueHtml}
             <div class="mt-1 d-flex flex-wrap gap-1">
-              <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>&phone=${encodeURIComponent(data.phone)}" target="_blank">View Details</a>
               ${links.join('')}
             </div>
           </div>`;
@@ -950,14 +960,27 @@
       fd.append('address', address);
       fd.append('delivery_location', delivery_location);
       fd.append('customer_type', type);
-      const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=customers&action=save'); ?>', {
+      let res = await fetch('<?php echo Helpers::baseUrl('index.php?page=customers&action=save'); ?>', {
         method: 'POST',
         headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
         body: fd
       });
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
-      if (!data || !data.id) throw new Error('Invalid response');
+      let data = null;
+      if (res.ok) {
+        try { data = await res.json(); } catch(_) { /* fall through to fallback */ }
+      }
+      if (!res.ok || !data || data.error || !data.id) {
+        // Fallback to quick_add_customer endpoint
+        fd.set('ajax','1');
+        res = await fetch('<?php echo Helpers::baseUrl('index.php?page=quick_add_customer'); ?>', {
+          method: 'POST',
+          headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+          body: fd
+        });
+        if (!res.ok) throw new Error('Failed');
+        data = await res.json();
+        if (!data || !data.id) throw new Error('Invalid response');
+      }
       // Ensure it shows up in the Customer dropdown immediately
       const sel = document.querySelector('select[name="customer_id"]');
       if (sel) {
@@ -980,9 +1003,20 @@
         const wasDisabled = sel.disabled;
         if (wasDisabled) sel.disabled = false;
         sel.value = idStr;
-        // Trigger common events so any enhancers/listeners refresh
+        // If enhanced by Choices.js, sync and select via API
+        try {
+          if (sel._choices) {
+            // Re-sync choices from current <option>s and select new value
+            const choices = Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, selected: o.selected, disabled: o.disabled }));
+            sel._choices.setChoices(choices, 'value', 'label', true);
+            sel._choices.setChoiceByValue(idStr);
+          }
+        } catch(_) { /* ignore */ }
+        // Trigger common events so any listeners refresh, and notify Choices via custom event
         sel.dispatchEvent(new Event('change'));
         sel.dispatchEvent(new Event('input'));
+        // Ask any Choices initializer to refresh if needed
+        sel.dispatchEvent(new Event('refresh-choices'));
         if (wasDisabled) sel.disabled = true;
         // Update in-memory customersData so delivery location and suggestions work without refresh
         try {
@@ -1001,7 +1035,9 @@
       // Clear inputs
       ['qa_name','qa_phone_input','qa_email','qa_address','qa_delivery_location'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
     } catch (e) {
-      alert('Failed to add customer');
+      // As a last resort, reload minimal to reflect saved state if server saved but JSON failed
+      const wantsHardRefresh = confirm('Failed to add customer without refresh. Reload page to see the new customer?');
+      if (wantsHardRefresh) { window.location.reload(); }
     }
   });
   document.getElementById('fab_submit')?.addEventListener('click', async function(){
