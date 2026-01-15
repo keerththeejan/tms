@@ -92,7 +92,14 @@
         <?php endif; ?>
       </tbody>
       <tfoot>
-        <?php $grand = ($items && count($items)>0) ? $total : (float)($parcel['price'] ?? 0); $grs=floor($grand); $gcts=(int)round(($grand-$grs)*100); ?>
+        <?php 
+          // If items exist but their computed total is 0, fall back to parcel price
+          $grand = ($items && count($items)>0) ? $total : (float)($parcel['price'] ?? 0);
+          if (($items && count($items)>0) && ($grand <= 0)) {
+            $grand = (float)($parcel['price'] ?? 0);
+          }
+          $grs=floor($grand); $gcts=(int)round(($grand-$grs)*100); 
+        ?>
         <tr class="totals">
           <td colspan="3" class="text-end">Total</td>
           <td class="text-end"><?php echo number_format($grs); ?></td>
