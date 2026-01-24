@@ -28,13 +28,36 @@
 </head>
 <?php if (!$isEmbed): ?>
   <div class="no-print mb-3">
-    <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+      <button id="toggleAddrEditor" class="btn btn-outline-secondary" type="button"><i class="bi bi-pencil-square"></i> Edit Header Addresses</button>
+    </div>
+    <div id="addrEditor" style="display:none">
+      <div class="card card-body p-2">
+        <div class="mb-2 small text-muted">Enter one address per line. Changes affect only this print.</div>
+        <textarea id="addrTextarea" class="form-control" rows="4"></textarea>
+        <div class="mt-2 d-flex gap-2">
+          <button id="applyAddr" class="btn btn-success" type="button"><i class="bi bi-check"></i> Apply</button>
+          <button id="applyAndPrint" class="btn btn-primary" type="button"><i class="bi bi-printer"></i> Apply & Print</button>
+        </div>
+      </div>
+    </div>
   </div>
 <?php endif; ?>
 <?php 
   // Company branding for print header
   $cfg = (require __DIR__ . '/../../config/config.php'); 
   $brand = $cfg['company'] ?? []; 
+  // Optional one-off address override via query (?addr=line1\nline2)
+  $addrParam = (string)($_GET['addr'] ?? '');
+  if ($addrParam !== '') { $addrParam = str_replace(["\r"], '', $addrParam); }
+  $addresses = [];
+  if ($addrParam !== '') {
+    $tmp = explode("\n", $addrParam);
+    foreach ($tmp as $a) { $a = trim($a); if ($a !== '') { $addresses[] = $a; } }
+  } else {
+    foreach (($brand['addresses'] ?? []) as $a) { $a = trim((string)$a); if ($a !== '') { $addresses[] = $a; } }
+  }
 ?>
 <div class="mb-2 p-2 border rounded">
   <div class="d-flex align-items-center gap-2">
@@ -46,9 +69,9 @@
       <div class="small text-muted">Transport and Parcel Services</div>
     </div>
   </div>
-  <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-1 mt-1 small text-muted">
-    <?php foreach (($brand['addresses'] ?? []) as $addr): ?>
-      <div><?php echo nl2br(htmlspecialchars($addr)); ?></div>
+  <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-1 mt-1 small text-muted" id="addrContainer">
+    <?php foreach ($addresses as $addr): ?>
+      <div class="addr-line"><?php echo nl2br(htmlspecialchars($addr)); ?></div>
     <?php endforeach; ?>
   </div>
 </div>
@@ -139,6 +162,38 @@
   });
   // Optional: close the tab after printing if the browser supports it
   window.addEventListener('afterprint', function(){ /* window.close(); */ });
+
+  // Address editor logic
+  (function(){
+    var toggleBtn = document.getElementById('toggleAddrEditor');
+    var ed = document.getElementById('addrEditor');
+    var ta = document.getElementById('addrTextarea');
+    if (!toggleBtn || !ed || !ta) return;
+    function getCurrentLines(){
+      var nodes = document.querySelectorAll('#addrContainer .addr-line');
+      var arr = [];
+      for (var i=0;i<nodes.length;i++){ var t = nodes[i].textContent.trim(); if(t) arr.push(t); }
+      return arr;
+    }
+    // Prefill
+    ta.value = getCurrentLines().join('\n');
+    toggleBtn.addEventListener('click', function(){ ed.style.display = (ed.style.display==='none' || ed.style.display==='') ? 'block' : 'none'; });
+    function applyAddrs(){
+      var cont = document.getElementById('addrContainer');
+      if (!cont) return;
+      var val = ta.value.replace(/\r/g,'');
+      var parts = val.split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s.length>0; });
+      cont.innerHTML = '';
+      parts.forEach(function(line){
+        var d = document.createElement('div');
+        d.className = 'addr-line';
+        d.textContent = line;
+        cont.appendChild(d);
+      });
+    }
+    document.getElementById('applyAddr').addEventListener('click', function(){ applyAddrs(); });
+    document.getElementById('applyAndPrint').addEventListener('click', function(){ applyAddrs(); window.print(); });
+  })();
 </script>
 <?php endif; ?>
 </body>
