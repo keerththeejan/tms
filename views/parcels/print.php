@@ -24,12 +24,25 @@
   </style>
   </head>
 <body>
-<div class="no-print mb-3 d-flex gap-2">
-  <a class="btn btn-secondary" href="javascript:history.back()">Back</a>
-  <button class="btn btn-primary" onclick="window.print()">Print</button>
+<div class="no-print mb-3 d-flex flex-column gap-2">
+  <div class="d-flex gap-2">
+    <a class="btn btn-secondary" href="javascript:history.back()">Back</a>
+    <button class="btn btn-primary" onclick="window.print()">Print</button>
+    <button id="toggleAddrEditor" class="btn btn-outline-secondary" type="button">Edit Header Addresses</button>
+  </div>
+  <div id="addrEditor" style="display:none">
+    <div class="card card-body p-2">
+      <div class="mb-2 small text-muted">Enter one address per line. Changes affect only this print.</div>
+      <textarea id="addrTextarea" class="form-control" rows="4"></textarea>
+      <div class="mt-2 d-flex gap-2">
+        <button id="applyAddr" class="btn btn-success" type="button">Apply</button>
+        <button id="applyAndPrint" class="btn btn-primary" type="button">Apply & Print</button>
+      </div>
+    </div>
+  </div>
   </div>
 
-<?php $cfg = (require __DIR__ . '/../../config/config.php'); $brand = $cfg['company'] ?? []; ?>
+<?php $cfg = (require __DIR__ . '/../../config/config.php'); $brand = $cfg['company'] ?? []; $addrParam = (string)($_GET['addr'] ?? ''); if ($addrParam !== '') { $addrParam = str_replace(["\r"], '', $addrParam); } $addresses = []; if ($addrParam !== '') { $tmp = explode("\n", $addrParam); foreach ($tmp as $a) { $a = trim($a); if ($a !== '') { $addresses[] = $a; } } } else { foreach (($brand['addresses'] ?? []) as $a) { $a = trim((string)$a); if ($a !== '') { $addresses[] = $a; } } } ?>
 <div class="sheet">
   <div class="sheet-header p-3">
     <div class="row align-items-center">
@@ -45,9 +58,9 @@
         </div>
       </div>
       <div class="col-md-8">
-        <div class="row g-1 addr">
-          <?php foreach (($brand['addresses'] ?? []) as $addr): ?>
-            <div class="col-md-4"><?php echo nl2br(htmlspecialchars($addr)); ?></div>
+        <div class="row g-1 addr" id="addrContainer">
+          <?php foreach ($addresses as $addr): ?>
+            <div class="col-md-4 addr-line"><?php echo nl2br(htmlspecialchars($addr)); ?></div>
           <?php endforeach; ?>
         </div>
       </div>
@@ -121,5 +134,28 @@
   </div>
 </div>
 
+<script>
+  (function(){
+    var t = document.getElementById('toggleAddrEditor');
+    var ed = document.getElementById('addrEditor');
+    var ta = document.getElementById('addrTextarea');
+    if (!t || !ed || !ta) return;
+    function getLines(){
+      var nodes = document.querySelectorAll('#addrContainer .addr-line');
+      var arr=[]; for (var i=0;i<nodes.length;i++){ var s=nodes[i].textContent.trim(); if(s) arr.push(s); }
+      return arr;
+    }
+    ta.value = getLines().join('\n');
+    t.addEventListener('click', function(){ ed.style.display = (ed.style.display==='none'||ed.style.display==='')?'block':'none'; });
+    function apply(){
+      var cont = document.getElementById('addrContainer'); if(!cont) return;
+      var parts = ta.value.replace(/\r/g,'').split('\n').map(function(s){return s.trim();}).filter(Boolean);
+      cont.innerHTML = '';
+      parts.forEach(function(line){ var d=document.createElement('div'); d.className='col-md-4 addr-line'; d.textContent=line; cont.appendChild(d); });
+    }
+    document.getElementById('applyAddr').addEventListener('click', apply);
+    document.getElementById('applyAndPrint').addEventListener('click', function(){ apply(); window.print(); });
+  })();
+</script>
 </body>
 </html>
