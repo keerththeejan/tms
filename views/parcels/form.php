@@ -57,9 +57,16 @@
   <?php unset($_SESSION['flash_parcel_saved']); ?>
 <?php endif; ?>
 
+<?php if (isset($_GET['duplicate']) && (int)$_GET['duplicate'] > 0): ?>
+  <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> Duplicate entry prevented. A similar parcel (#<?php echo (int)$_GET['duplicate']; ?>) was created recently. Please check if this is the same parcel.
+  </div>
+<?php endif; ?>
+
 <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>" autocomplete="off">
   <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
   <input type="hidden" name="id" value="<?php echo (int)$parcel['id']; ?>">
+  <input type="hidden" name="idempotency_key" value="<?php echo bin2hex(random_bytes(16)); ?>">
 
   <!-- Top controls (data fields required by system) -->
   <div class="row g-3 mb-3">
@@ -407,7 +414,7 @@
       </select>
     </div>
     <div class="col-sm-8 text-end">
-      <button class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+      <button type="submit" id="parcelSubmitBtn" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
     </div>
   </div>
 </form>
@@ -423,6 +430,30 @@
   const totalDisplay = document.getElementById('totalDisplay');
   const totalPrice = document.getElementById('totalPrice');
   const discountInput = document.getElementById('discountInput');
+  
+  // Prevent double submission
+  const form = document.querySelector('form[action*="parcels&action=save"]');
+  const submitBtn = document.getElementById('parcelSubmitBtn');
+  if (form && submitBtn) {
+    let isSubmitting = false;
+    form.addEventListener('submit', function(e) {
+      if (isSubmitting) {
+        e.preventDefault();
+        return false;
+      }
+      isSubmitting = true;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+      // Re-enable after 5 seconds as fallback (in case of error)
+      setTimeout(function() {
+        if (isSubmitting) {
+          isSubmitting = false;
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="bi bi-save"></i> Save';
+        }
+      }, 5000);
+    });
+  }
 
   function recalc(){
     if (lockAll) { return; }

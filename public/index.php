@@ -1144,6 +1144,20 @@ switch ($page) {
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            
+            // Prevent double submission using idempotency token
+            $idempotencyKey = $_POST['idempotency_key'] ?? '';
+            if ($idempotencyKey === '') {
+                $idempotencyKey = bin2hex(random_bytes(16));
+            }
+            $idempotencySessionKey = 'parcel_save_' . md5($idempotencyKey);
+            if (isset($_SESSION[$idempotencySessionKey])) {
+                // This exact submission was already processed, redirect to prevent duplicate
+                $savedId = (int)$_SESSION[$idempotencySessionKey];
+                Helpers::redirect('index.php?page=parcels&action=new&saved_id=' . $savedId);
+                break;
+            }
+            
             $id = (int)($_POST['id'] ?? 0);
             $customer_id = (int)($_POST['customer_id'] ?? 0);
             $supplier_id = (int)($_POST['supplier_id'] ?? 0);
@@ -1339,7 +1353,17 @@ switch ($page) {
                     } catch (Throwable $e) { /* ignore sync errors */ }
                 }
             } else {
-                // Create
+                // Create - Check for duplicate entry (same data within last 10 seconds)
+                // Check BEFORE starting transaction to avoid unnecessary rollback
+                $duplicateCheck = $pdo->prepare('SELECT id FROM parcels WHERE customer_id = ? AND from_branch_id = ? AND to_branch_id = ? AND weight = ? AND COALESCE(vehicle_no, "") = ? AND created_at > DATE_SUB(NOW(), INTERVAL 10 SECOND) ORDER BY id DESC LIMIT 1');
+                $duplicateCheck->execute([$customer_id, $from_branch_id, $to_branch_id, $weight, $vehicle_no ?: '']);
+                $duplicate = $duplicateCheck->fetch();
+                if ($duplicate) {
+                    // Duplicate detected - redirect to prevent double entry
+                    Helpers::redirect('index.php?page=parcels&action=new&duplicate=' . (int)$duplicate['id'] . '&customer_id=' . urlencode((string)$customer_id) . '&vehicle_no=' . urlencode((string)$vehicle_no) . '&from_branch_id=' . urlencode((string)$from_branch_id) . '&to_branch_id=' . urlencode((string)$to_branch_id));
+                    break;
+                }
+                
                 if ($isKilinochchi) {
                     // Compute price now for Kilinochchi create
                     $priceRaw = trim($_POST['price'] ?? '');
@@ -1408,6 +1432,13 @@ switch ($page) {
                 }
             }
             $pdo->commit();
+            
+            // Store idempotency key to prevent duplicate submissions
+            if ($id > 0) {
+                $_SESSION[$idempotencySessionKey] = $id;
+                // Clear idempotency key after 1 minute to allow legitimate resubmissions
+                // (but prevent immediate duplicates)
+            }
             
             // Include RouteHelper for automatic route assignment
             require_once __DIR__ . '/../app/helpers/RouteHelper.php';
@@ -1627,9 +1658,24 @@ switch ($page) {
         $status = $_GET['status'] ?? '';
         $vehicle_no = trim($_GET['vehicle_no'] ?? '');
         $customer_filter_id = (int)($_GET['customer_id'] ?? 0);
-        // Default to last 30 days so recent payments (e.g., previous month) appear without manual filtering
-        $from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
-        $to = $_GET['to'] ?? date('Y-m-d');
+        
+        // Handle date filter persistence in session
+        // If dates are provided in GET, save them to session
+        if (isset($_GET['from']) && $_GET['from'] !== '') {
+            $_SESSION['parcels_filter_from'] = $_GET['from'];
+        }
+        if (isset($_GET['to']) && $_GET['to'] !== '') {
+            $_SESSION['parcels_filter_to'] = $_GET['to'];
+        }
+        // If 'clear_dates' is set, clear the session dates
+        if (isset($_GET['clear_dates']) && $_GET['clear_dates'] === '1') {
+            unset($_SESSION['parcels_filter_from']);
+            unset($_SESSION['parcels_filter_to']);
+        }
+        
+        // Use GET params if provided, otherwise use session, otherwise default to last 30 days
+        $from = $_GET['from'] ?? ($_SESSION['parcels_filter_from'] ?? date('Y-m-d', strtotime('-30 days')));
+        $to = $_GET['to'] ?? ($_SESSION['parcels_filter_to'] ?? date('Y-m-d'));
         $to_branch_filter_id = (int)($_GET['to_branch_id'] ?? 0);
         $where = [];
         $params = [];
@@ -1721,8 +1767,49 @@ switch ($page) {
             array_unshift($params, $from, $to, $from, $to);
         }
         if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
-        $sql .= ' ORDER BY p.created_at DESC, p.id DESC LIMIT 200';
+        
+        // Pagination: 10 items per page
+        $page = max(1, (int)($_GET['page_num'] ?? 1));
+        $perPage = 10;
+        $offset = ($page - 1) * $perPage;
+        
+        // Get total count for pagination (simplified query without dra joins)
+        $countSql = 'SELECT COUNT(DISTINCT p.id) as total FROM parcels p
+                     LEFT JOIN customers c ON c.id = p.customer_id
+                     LEFT JOIN suppliers s ON s.id = p.supplier_id
+                     LEFT JOIN branches bf ON bf.id = p.from_branch_id
+                     LEFT JOIN branches bt ON bt.id = p.to_branch_id';
+        if ($where) { $countSql .= ' WHERE ' . implode(' AND ', $where); }
+        $countStmt = $pdo->prepare($countSql);
+        // Count query doesn't need dra join params, only the filter params
+        $countParams = [];
+        if ($q !== '') {
+            $like = "%$q%";
+            array_push($countParams, $like, $like, $like);
+        }
+        if ($vehicle_no !== '') {
+            $countParams[] = "%$vehicle_no%";
+        }
+        if ($customer_filter_id > 0) {
+            $countParams[] = $customer_filter_id;
+        }
+        if ($to_branch_filter_id > 0) {
+            $countParams[] = $to_branch_filter_id;
+        }
+        if (in_array($status, ['pending','in_transit','delivered'], true)) {
+            $countParams[] = $status;
+        }
+        if ($from !== '' && $to !== '') {
+            array_push($countParams, $from, $to);
+        }
+        $countStmt->execute($countParams);
+        $totalCount = (int)$countStmt->fetch()['total'];
+        $totalPages = max(1, ceil($totalCount / $perPage));
+        
+        $sql .= ' ORDER BY p.created_at DESC, p.id DESC LIMIT ? OFFSET ?';
         $stmt = $pdo->prepare($sql);
+        $params[] = $perPage;
+        $params[] = $offset;
         $stmt->execute($params);
         $parcels = $stmt->fetchAll();
         // If we just sent an email and DB join isn't available, mark that parcel as sent in-memory
@@ -1742,7 +1829,7 @@ switch ($page) {
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
         // branches for filter
         $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels','isKilinochchi'));
+        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount'));
         break;
 
     case 'email_log':

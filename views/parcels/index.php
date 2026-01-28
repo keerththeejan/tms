@@ -43,11 +43,28 @@
   </div>
   <div class="col-auto">
     <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+    <?php if (isset($_SESSION['parcels_filter_from']) || isset($_SESSION['parcels_filter_to'])): ?>
+      <a href="<?php 
+        $query = $_GET;
+        $query['clear_dates'] = '1';
+        unset($query['page_num']); // Reset to page 1 when clearing dates
+        echo Helpers::baseUrl('index.php?' . http_build_query($query));
+      ?>" class="btn btn-outline-danger ms-2" title="Clear saved date filter">
+        <i class="bi bi-x-circle"></i> Clear Dates
+      </a>
+    <?php endif; ?>
   </div>
 </form>
-<div class="table-responsive">
+<?php if (isset($_SESSION['parcels_filter_from']) || isset($_SESSION['parcels_filter_to'])): ?>
+  <div class="alert alert-info alert-dismissible fade show mb-3" role="alert">
+    <i class="bi bi-info-circle"></i> Date filter is saved: 
+    <strong><?php echo htmlspecialchars($from ?? ''); ?></strong> to <strong><?php echo htmlspecialchars($to ?? ''); ?></strong>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<?php endif; ?>
+<div class="table-responsive" style="max-height: 600px; overflow-y: auto; overflow-x: auto;">
   <table class="table table-sm table-striped align-middle datatable">
-    <thead>
+    <thead class="table-light" style="position: sticky; top: 0; z-index: 10; background-color: #f8f9fa;">
       <tr>
         <th>#</th>
         <th>Customer</th>
@@ -126,3 +143,84 @@
     </tbody>
   </table>
 </div>
+
+<?php if (($totalPages ?? 1) > 1): ?>
+<div class="d-flex justify-content-between align-items-center mt-3">
+  <div class="text-muted">
+    Showing <?php echo count($parcels); ?> of <?php echo (int)($totalCount ?? 0); ?> parcels
+  </div>
+  <nav>
+    <ul class="pagination pagination-sm mb-0">
+      <?php if (($page ?? 1) > 1): ?>
+        <li class="page-item">
+          <a class="page-link" href="<?php 
+            $query = $_GET;
+            $query['page_num'] = ($page ?? 1) - 1;
+            echo Helpers::baseUrl('index.php?' . http_build_query($query));
+          ?>">Previous</a>
+        </li>
+      <?php else: ?>
+        <li class="page-item disabled">
+          <span class="page-link">Previous</span>
+        </li>
+      <?php endif; ?>
+      
+      <?php
+      $currentPage = $page ?? 1;
+      $totalPages = $totalPages ?? 1;
+      $startPage = max(1, $currentPage - 2);
+      $endPage = min($totalPages, $currentPage + 2);
+      
+      if ($startPage > 1): ?>
+        <li class="page-item">
+          <a class="page-link" href="<?php 
+            $query = $_GET;
+            $query['page_num'] = 1;
+            echo Helpers::baseUrl('index.php?' . http_build_query($query));
+          ?>">1</a>
+        </li>
+        <?php if ($startPage > 2): ?>
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        <?php endif; ?>
+      <?php endif; ?>
+      
+      <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+        <li class="page-item <?php echo $i === $currentPage ? 'active' : ''; ?>">
+          <a class="page-link" href="<?php 
+            $query = $_GET;
+            $query['page_num'] = $i;
+            echo Helpers::baseUrl('index.php?' . http_build_query($query));
+          ?>"><?php echo $i; ?></a>
+        </li>
+      <?php endfor; ?>
+      
+      <?php if ($endPage < $totalPages): ?>
+        <?php if ($endPage < $totalPages - 1): ?>
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+        <?php endif; ?>
+        <li class="page-item">
+          <a class="page-link" href="<?php 
+            $query = $_GET;
+            $query['page_num'] = $totalPages;
+            echo Helpers::baseUrl('index.php?' . http_build_query($query));
+          ?>"><?php echo $totalPages; ?></a>
+        </li>
+      <?php endif; ?>
+      
+      <?php if (($page ?? 1) < ($totalPages ?? 1)): ?>
+        <li class="page-item">
+          <a class="page-link" href="<?php 
+            $query = $_GET;
+            $query['page_num'] = ($page ?? 1) + 1;
+            echo Helpers::baseUrl('index.php?' . http_build_query($query));
+          ?>">Next</a>
+        </li>
+      <?php else: ?>
+        <li class="page-item disabled">
+          <span class="page-link">Next</span>
+        </li>
+      <?php endif; ?>
+    </ul>
+  </nav>
+</div>
+<?php endif; ?>
