@@ -350,6 +350,88 @@ switch ($page) {
         Helpers::view('users/change_password');
         break;
 
+    case 'settings':
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        if (!Auth::hasRole('admin')) { http_response_code(403); echo 'Forbidden'; break; }
+        $config = Helpers::config();
+        $company = $config['company'] ?? [];
+        $error = '';
+        $success = '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['settings_section'])) {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $section = $_POST['settings_section'] ?? '';
+            if ($section === 'company') {
+                $name = trim($_POST['company_name'] ?? '');
+                $regNo = trim($_POST['reg_no'] ?? '');
+                $logoUrl = trim($_POST['logo_url'] ?? '');
+                $footerNote = trim($_POST['footer_note'] ?? '');
+                $routePart1 = trim($_POST['route_1'] ?? '');
+                $routePart2 = trim($_POST['route_2'] ?? '');
+                $routePart3 = trim($_POST['route_3'] ?? '');
+                $googleMapsKey = trim($_POST['google_maps_api_key'] ?? '');
+
+                // Logo file upload
+                if (!empty($_FILES['logo_file']['name']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
+                    $uploadDir = __DIR__ . '/../public/uploads';
+                    if (!is_dir($uploadDir)) {
+                        @mkdir($uploadDir, 0755, true);
+                    }
+                    $ext = strtolower(pathinfo($_FILES['logo_file']['name'], PATHINFO_EXTENSION));
+                    if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) {
+                        $dest = $uploadDir . '/logo.' . $ext;
+                        if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $dest)) {
+                            $logoUrl = 'uploads/logo.' . $ext;
+                        }
+                    }
+                }
+
+                $branchName = $_POST['branch_name'] ?? [];
+                $branchAddressTa = $_POST['branch_address_ta'] ?? [];
+                $branchAddressEn = $_POST['branch_address_en'] ?? [];
+                $branchPhones = $_POST['branch_phones'] ?? [];
+                $branchesData = [];
+                for ($i = 0; $i < 3; $i++) {
+                    $branchesData[] = [
+                        'name' => trim($branchName[$i] ?? ''),
+                        'address_ta' => trim($branchAddressTa[$i] ?? ''),
+                        'address_en' => trim($branchAddressEn[$i] ?? ''),
+                        'phones' => trim($branchPhones[$i] ?? ''),
+                    ];
+                }
+
+                $routeParts = array_filter([$routePart1, $routePart2, $routePart3]);
+                if (empty($routeParts)) {
+                    $routeParts = ['கொழும்பு', 'கிளிநொச்சி', 'முல்லைத்தீவு'];
+                }
+
+                $companyOverride = [
+                    'name' => $name ?: ($company['name'] ?? 'TS Transport'),
+                    'reg_no' => $regNo,
+                    'logo_url' => $logoUrl,
+                    'route_tamil_parts' => array_values($routeParts),
+                    'branches' => $branchesData,
+                    'footer_note' => $footerNote,
+                ];
+                $toSave = [
+                    'company' => array_merge($company, $companyOverride),
+                    'google_maps_api_key' => $googleMapsKey,
+                ];
+                $jsonPath = __DIR__ . '/../config/company.json';
+                $written = @file_put_contents($jsonPath, json_encode($toSave, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                if ($written !== false) {
+                    $success = 'Company settings saved.';
+                    $company = array_merge($company, $companyOverride);
+                    $config['google_maps_api_key'] = $googleMapsKey;
+                } else {
+                    $error = 'Could not save settings. Check that config/company.json is writable.';
+                }
+            }
+        }
+
+        Helpers::view('settings/index', compact('company', 'config', 'error', 'success'));
+        break;
+
     case 'branches':
         // Admin only
         if (!Auth::hasRole('admin')) { http_response_code(403); echo 'Forbidden'; break; }
@@ -1195,6 +1277,15 @@ switch ($page) {
                 $st->execute([$id]);
                 $existing = $st->fetch();
                 if ($existing) { $isBilled = ($existing['price'] !== null && (float)$existing['price'] > 0); }
+                // Status-only update: parcel is In Transit and form submitted with status_only_edit
+                if ($existing && (string)($existing['status'] ?? '') === 'in_transit' && isset($_POST['status_only_edit']) && (int)$_POST['status_only_edit'] === 1) {
+                    $status = $_POST['status'] ?? $existing['status'];
+                    $allowedStatus = ['pending', 'in_transit', 'delivered'];
+                    if (!in_array($status, $allowedStatus, true)) { $status = 'in_transit'; }
+                    $pdo->prepare('UPDATE parcels SET status=? WHERE id=?')->execute([$status, $id]);
+                    Helpers::redirect('index.php?page=parcels&action=edit&id=' . $id);
+                    break;
+                }
             }
             // Determine if this is a price-only edit at Kilinochchi (fields were disabled in UI)
             $priceOnlyEdit = ($id > 0 && $isKilinochchi && !$isBilled);
@@ -1602,7 +1693,7 @@ switch ($page) {
                 'id'=>0,
                 'customer_id'=>0,
                 'supplier_id'=>0,
-                'from_branch_id'=>0,
+                'from_branch_id'=> (int)($user['branch_id'] ?? 0),
                 'to_branch_id'=>0,
                 'weight'=>0,
                 'price'=>null,
@@ -1610,11 +1701,20 @@ switch ($page) {
                 'tracking_number'=>'',
                 'vehicle_no'=>''
             ];
-            // Prefill vehicle no from query if provided
+            // Prefill from query (e.g. from "Add more parcel")
             $preVeh = isset($_GET['vehicle_no']) ? trim((string)$_GET['vehicle_no']) : '';
             if ($preVeh !== '') { $parcel['vehicle_no'] = $preVeh; }
             $pre = (int)($_GET['customer_id'] ?? 0);
             if ($pre > 0) { $parcel['customer_id'] = $pre; }
+            $preFrom = (int)($_GET['from_branch_id'] ?? 0);
+            if ($preFrom > 0) { $parcel['from_branch_id'] = $preFrom; }
+            $preTo = (int)($_GET['to_branch_id'] ?? 0);
+            if ($preTo > 0) { $parcel['to_branch_id'] = $preTo; }
+            // Same-day bill: prefill date from query (Y-m-d)
+            $preDate = isset($_GET['date']) ? trim((string)$_GET['date']) : '';
+            if ($preDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preDate)) {
+                $parcel['created_at'] = $preDate . ' 00:00:00';
+            }
             $items = [];
             // Load vehicles list
             try {
@@ -1626,9 +1726,16 @@ switch ($page) {
                     catch (Throwable $e3) { $vehiclesAll = []; }
                 }
             }
+            // Last bill (most recent parcel) for "Open last bill" / "Add more parcel" options
+            $lastParcel = null;
+            try {
+                $lastStmt = $pdo->query('SELECT id, customer_id, vehicle_no, from_branch_id, to_branch_id, created_at FROM parcels ORDER BY created_at DESC, id DESC LIMIT 1');
+                $lastParcel = $lastStmt->fetch();
+            } catch (Throwable $e) { /* ignore */ }
+
             // Determine lock/priceOnly flags for UI
             $policy = ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>$canEnterItemAmounts];
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy'));
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel'));
             break;
         }
 
@@ -1647,8 +1754,12 @@ switch ($page) {
             } catch (Throwable $e) {
                 try { $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e2) { $vehiclesAll = []; }
             }
-            // Ensure pricing policy is passed so Kilinochchi can edit price
-            $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+            // When parcel is In Transit: only status change allowed (no other edit options)
+            $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts, 'statusOnlyEdit'=>false];
+            if ((string)($parcel['status'] ?? '') === 'in_transit') {
+                $policy['lockAll'] = true;
+                $policy['statusOnlyEdit'] = true;
+            }
             Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy'));
             break;
         }
@@ -2484,6 +2595,64 @@ switch ($page) {
             }
             arsort($placeCounts);
             Helpers::view('delivery_notes/route_detail', compact('vehicle_no','from','to','grouped','customers','direction','placeCounts','placeFilter'));
+            break;
+        }
+
+        if ($action === 'previous_bill') {
+            $custId = (int)($_GET['customer_id'] ?? 0);
+            $deliveryDate = trim((string)($_GET['delivery_date'] ?? ''));
+            if ($custId <= 0) {
+                header('Content-Type: text/html; charset=utf-8');
+                echo '<div class="alert alert-warning">No customer selected.</div>';
+                break;
+            }
+            $dnSql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, b.name AS branch_name FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id LEFT JOIN branches b ON b.id = dn.branch_id WHERE dn.customer_id=?';
+            $dnParams = [$custId];
+            if ($deliveryDate !== '') {
+                $dnSql .= ' AND dn.delivery_date=?';
+                $dnParams[] = $deliveryDate;
+            }
+            $dnSql .= ' ORDER BY dn.delivery_date DESC, dn.id DESC LIMIT 1';
+            $stmt = $pdo->prepare($dnSql);
+            $stmt->execute($dnParams);
+            $dn = $stmt->fetch();
+            if (!$dn) {
+                header('Content-Type: text/html; charset=utf-8');
+                echo '<div class="alert alert-info">No previous bill for this customer' . ($deliveryDate !== '' ? ' on this date' : '') . '.</div>';
+                break;
+            }
+            $id = (int)$dn['id'];
+            $itemsStmt = $pdo->prepare('SELECT dnp.*, p.tracking_number, p.weight, p.vehicle_no, p.created_at,
+                                               s.name AS supplier_name, s.phone AS supplier_phone,
+                                               pit.item_descriptions
+                                        FROM delivery_note_parcels dnp
+                                        LEFT JOIN parcels p ON p.id = dnp.parcel_id
+                                        LEFT JOIN suppliers s ON s.id = p.supplier_id
+                                        LEFT JOIN (
+                                          SELECT parcel_id, GROUP_CONCAT(TRIM(description) ORDER BY id SEPARATOR ", ") AS item_descriptions
+                                          FROM parcel_items
+                                          GROUP BY parcel_id
+                                        ) pit ON pit.parcel_id = p.id
+                                        WHERE dnp.delivery_note_id=?');
+            $itemsStmt->execute([$id]);
+            $items = $itemsStmt->fetchAll();
+            $supNames = [];
+            $supPhones = [];
+            foreach ($items as $row) {
+                if (!empty($row['supplier_name'])) { $supNames[$row['supplier_name']] = true; }
+                if (!empty($row['supplier_phone'])) { $supPhones[$row['supplier_phone']] = true; }
+            }
+            $dn['suppliers_agg'] = implode(', ', array_keys($supNames));
+            $dn['supplier_phones_agg'] = implode(', ', array_keys($supPhones));
+            $vehSet = [];
+            foreach ($items as $row) {
+                $v = trim((string)($row['vehicle_no'] ?? ''));
+                if ($v !== '') { $vehSet[$v] = true; }
+            }
+            $dn['vehicles_agg'] = implode(', ', array_keys($vehSet));
+            header('Content-Type: text/html; charset=utf-8');
+            extract(compact('dn','items'));
+            include __DIR__ . '/../views/delivery_notes/previous_bill_modal.php';
             break;
         }
 

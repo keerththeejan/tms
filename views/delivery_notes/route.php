@@ -202,7 +202,7 @@ function updateLocationAjax(form) {
               <button id="veh-btn-<?php echo (int)$r['customer_id']; ?>" type="button" class="btn btn-sm btn-success" onclick="(function(f){var v=prompt('Enter vehicle number'); if(v!==null){v=v.trim(); if(v){f.vehicle_no.value=v; assignVehicleAjax(f);} else {alert('Enter vehicle number');}}})(document.getElementById('veh-add-<?php echo (int)$r['customer_id']; ?>'));"><i class="bi bi-truck"></i> Add Vehicle</button>
             <?php endif; ?>
 
-            <!-- Full customer edit page -->
+            <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="openPreviousBill(<?php echo (int)$r['customer_id']; ?>, '<?php echo htmlspecialchars($date ?? date('Y-m-d'), ENT_QUOTES); ?>')"><i class="bi bi-receipt me-1"></i> Previous Bill</button>
             <a class="btn btn-sm btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=edit&id='.(int)$r['customer_id']); ?>" target="_blank"><i class="bi bi-person-lines-fill"></i> Edit</a>
             <form class="d-inline" method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=generate'); ?>" onsubmit="return confirm('Generate delivery note for this customer on selected date?');">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
@@ -218,4 +218,39 @@ function updateLocationAjax(form) {
     </tbody>
   </table>
 </div>
+
+<!-- Previous Bill modal -->
+<div class="modal fade" id="previousBillModal" tabindex="-1" aria-labelledby="previousBillModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title" id="previousBillModalLabel">Previous Bill</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="previousBillModalBody">
+        <div class="text-center text-muted py-4">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function openPreviousBill(customerId, deliveryDate) {
+  var modal = document.getElementById('previousBillModal');
+  var body = document.getElementById('previousBillModalBody');
+  if (!modal || !body) return;
+  body.innerHTML = '<div class="text-center text-muted py-4">Loading…</div>';
+  var bsModal = window.bootstrap && bootstrap.Modal ? new bootstrap.Modal(modal) : null;
+  if (bsModal) bsModal.show();
+  var url = '<?php echo Helpers::baseUrl('index.php'); ?>?page=delivery_notes&action=previous_bill&customer_id=' + encodeURIComponent(customerId);
+  if (deliveryDate) url += '&delivery_date=' + encodeURIComponent(deliveryDate);
+  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      body.innerHTML = html || '<div class="alert alert-warning">No previous bill found.</div>';
+    })
+    .catch(function() {
+      body.innerHTML = '<div class="alert alert-danger">Failed to load previous bill.</div>';
+    });
+}
+</script>
 <?php endif; ?>

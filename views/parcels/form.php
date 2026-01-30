@@ -10,10 +10,11 @@
 
 <?php 
   $isEdit = (int)($parcel['id'] ?? 0) > 0; 
-  $policy = $policy ?? ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>false];
+  $policy = $policy ?? ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>false,'statusOnlyEdit'=>false];
   $priceOnly = !empty($policy['priceOnly']);
   $lockAll = !empty($policy['lockAll']);
   $canEnterItemAmounts = !empty($policy['canEnterItemAmounts']);
+  $statusOnlyEdit = !empty($policy['statusOnlyEdit']);
   // Build unique branch list by case-insensitive name, prefer main branch
   $branchesUnique = [];
   foreach (($branchesAll ?? []) as $b) {
@@ -32,6 +33,60 @@
   <h3 class="mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h3>
   <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> Next</a>
 </div>
+
+<?php
+  // New parcel: show add options when we have prefilled data (same-day / add more) or when we have a last bill
+  $isNewPrefilled = empty($parcel['id']) && (int)($parcel['customer_id'] ?? 0) > 0 && ((int)($parcel['from_branch_id'] ?? 0) > 0 || (int)($parcel['to_branch_id'] ?? 0) > 0 || !empty($parcel['created_at']));
+  $sameDayDateNew = $isNewPrefilled ? substr((string)($parcel['created_at'] ?? date('Y-m-d')), 0, 10) : '';
+  $sameDayUrlNew = $isNewPrefilled ? Helpers::baseUrl('index.php?page=parcels&action=new'
+    . '&customer_id='.(int)($parcel['customer_id'] ?? 0)
+    . '&vehicle_no='.urlencode((string)($parcel['vehicle_no'] ?? ''))
+    . '&from_branch_id='.(int)($parcel['from_branch_id'] ?? 0)
+    . '&to_branch_id='.(int)($parcel['to_branch_id'] ?? 0)
+    . '&date='.urlencode($sameDayDateNew)) : '';
+?>
+<?php if (empty($parcel['id']) && ($isNewPrefilled || !empty($lastParcel))): ?>
+<div class="card mb-3 border-primary">
+  <div class="card-body py-2 px-3">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <?php if ($isNewPrefilled && $sameDayUrlNew !== ''): ?>
+      <span class="fw-semibold text-secondary small">Same day bill:</span>
+      <a href="<?php echo $sameDayUrlNew; ?>" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i> Add new parcel (same bill)</a>
+      <?php endif; ?>
+      <?php if (!empty($lastParcel)): ?>
+      <?php if ($isNewPrefilled && $sameDayUrlNew !== ''): ?><span class="text-secondary mx-1">|</span><?php endif; ?>
+      <span class="fw-semibold text-secondary small">Last bill:</span>
+      <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$lastParcel['id']); ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square me-1"></i> Open last bill #<?php echo (int)$lastParcel['id']; ?></a>
+      <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new&customer_id='.(int)$lastParcel['customer_id'].'&vehicle_no='.urlencode((string)($lastParcel['vehicle_no'] ?? '')).'&from_branch_id='.(int)$lastParcel['from_branch_id'].'&to_branch_id='.(int)$lastParcel['to_branch_id'].'&date='.urlencode(substr((string)($lastParcel['created_at'] ?? date('Y-m-d')),0,10))); ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-circle me-1"></i> Add more parcel</a>
+      <?php endif; ?>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($isEdit && !empty($parcel['id']) && !$statusOnlyEdit): ?>
+<?php
+  $sameDayDate = substr((string)($parcel['created_at'] ?? date('Y-m-d')), 0, 10);
+  $sameDayUrl = Helpers::baseUrl('index.php?page=parcels&action=new'
+    . '&customer_id='.(int)($parcel['customer_id'] ?? 0)
+    . '&vehicle_no='.urlencode((string)($parcel['vehicle_no'] ?? ''))
+    . '&from_branch_id='.(int)($parcel['from_branch_id'] ?? 0)
+    . '&to_branch_id='.(int)($parcel['to_branch_id'] ?? 0)
+    . '&date='.urlencode($sameDayDate));
+?>
+<div class="card mb-3 border-primary">
+  <div class="card-body py-2 px-3">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="fw-semibold text-secondary small">Same day bill:</span>
+      <a href="<?php echo $sameDayUrl; ?>" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i> Add new parcel (same bill)</a>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($statusOnlyEdit): ?>
+  <div class="alert alert-info py-2"><i class="bi bi-info-circle me-1"></i> Parcel is In Transit. Only status can be changed.</div>
+<?php endif; ?>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
@@ -66,8 +121,10 @@
 <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>" autocomplete="off">
   <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
   <input type="hidden" name="id" value="<?php echo (int)$parcel['id']; ?>">
+  <?php if ($statusOnlyEdit): ?><input type="hidden" name="status_only_edit" value="1"><?php endif; ?>
   <input type="hidden" name="idempotency_key" value="<?php echo bin2hex(random_bytes(16)); ?>">
 
+  <div class="<?php echo $statusOnlyEdit ? 'd-none' : ''; ?>">
   <!-- Top controls (data fields required by system) -->
   <div class="row g-3 mb-3">
     <div class="col-md-4">
@@ -335,16 +392,36 @@
             </tr>
           </thead>
           <tbody>
-            <?php 
-              $rowIndex = 0; 
-              foreach (($items ?? []) as $it): 
-                $rowIndex++; 
-                $q = (float)($it['qty'] ?? 0);
-                // derive rs/cts from qty*rate if present
+            <?php
+              $itemsList = $items ?? [];
+              $parcelPrice = (float)($parcel['price'] ?? 0);
+              $sumWithRate = 0.0;
+              $noRateCount = 0;
+              foreach ($itemsList as $it) {
                 $r = (float)($it['rate'] ?? 0);
-                $amt = $q > 0 && $r > 0 ? ($q * $r) : 0; 
-                $rs = floor($amt); 
-                $ct = (int)round(($amt - $rs) * 100);
+                $q = (float)($it['qty'] ?? 0);
+                if ($q > 0 && $r > 0) {
+                  $sumWithRate += $q * $r;
+                } elseif ($q > 0 || trim((string)($it['description'] ?? '')) !== '') {
+                  $noRateCount++;
+                }
+              }
+              $remainderForNoRate = $noRateCount > 0 && $parcelPrice > $sumWithRate ? ($parcelPrice - $sumWithRate) : 0;
+              $rowIndex = 0;
+              $noRateIdx = 0;
+            ?>
+            <?php foreach ($itemsList as $it): ?>
+            <?php
+              $rowIndex++;
+              $q = (float)($it['qty'] ?? 0);
+              $r = (float)($it['rate'] ?? 0);
+              $amt = $q > 0 && $r > 0 ? ($q * $r) : 0;
+              if ($amt <= 0 && $noRateCount > 0 && $parcelPrice > 0 && ($q > 0 || trim((string)($it['description'] ?? '')) !== '')) {
+                $noRateIdx++;
+                $amt = ($remainderForNoRate / $noRateCount);
+              }
+              $rs = floor($amt);
+              $ct = (int)round(($amt - $rs) * 100);
             ?>
             <tr>
               <td class="text-center align-middle"><?php echo $rowIndex; ?></td>
@@ -368,7 +445,7 @@
           </tbody>
         </table>
         <div class="text-end mb-2">
-          <?php if (!$isEdit && !$lockAll): ?>
+          <?php if (!$lockAll): ?>
             <button type="button" class="btn btn-sm btn-outline-primary" id="addRow"><i class="bi bi-plus-lg"></i> Add Row</button>
           <?php endif; ?>
         </div>
@@ -402,12 +479,13 @@
       </div>
     </div>
   </div>
+  </div>
 
   <!-- Status and actions -->
-  <div class="row g-3 align-items-end">
+  <div class="row g-3 align-items-end mt-3">
     <div class="col-sm-4">
       <label class="form-label">Status</label>
-      <select name="status" class="form-select">
+      <select name="status" class="form-select" <?php echo ($lockAll && !$statusOnlyEdit) ? 'disabled' : ''; ?>>
         <option value="pending" <?php echo ($parcel['status'] ?? '')==='pending'?'selected':''; ?>>Pending</option>
         <option value="in_transit" <?php echo ($parcel['status'] ?? '')==='in_transit'?'selected':''; ?>>In Transit</option>
         <option value="delivered" <?php echo ($parcel['status'] ?? '')==='delivered'?'selected':''; ?>>Delivered</option>
@@ -786,12 +864,19 @@
   const customersData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)$c['id'],'delivery_location'=>$c['delivery_location'] ?? '']; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   function updateMeta(){
     const selIdx = customerSelect?.selectedIndex ?? -1;
-    const custText = customerSelect?.options[selIdx]?.text || 'selected above';
-    const fromText = fromBranchSelect?.options[fromBranchSelect.selectedIndex]?.text || 'selected above';
-    const toText = toBranchSelect?.options[toBranchSelect.selectedIndex]?.text || 'selected above';
+    const custText = customerSelect?.options[selIdx]?.text || '-- Select Customer --';
+    const fromText = fromBranchSelect?.options[fromBranchSelect?.selectedIndex]?.text || '—';
+    const toText = toBranchSelect?.options[toBranchSelect?.selectedIndex]?.text || '—';
     if (customerDisplay) customerDisplay.textContent = custText;
     if (fromBranchDisplay) fromBranchDisplay.textContent = fromText;
     if (toBranchDisplay) toBranchDisplay.textContent = toText;
+    // Receipt header summary (recCustomer, recFrom, recTo)
+    const recCustomerEl = document.getElementById('recCustomer');
+    const recFromEl = document.getElementById('recFrom');
+    const recToEl = document.getElementById('recTo');
+    if (recCustomerEl) recCustomerEl.textContent = custText;
+    if (recFromEl) recFromEl.textContent = fromText;
+    if (recToEl) recToEl.textContent = toText;
     // Customer delivery location
     const custId = parseInt(customerSelect?.value || '0');
     const cRow = customersData.find(c => c.id === custId);

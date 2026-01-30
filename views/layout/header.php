@@ -152,6 +152,7 @@ $user = Auth::user();
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reports'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reports'); ?>"><i class="bi bi-bar-chart-line me-1"></i> Reports</a></li>
       <?php if (($user['role'] ?? '') === 'admin'): ?>
         <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Admin</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='settings'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>"><i class="bi bi-gear me-1"></i> Settings</a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='backup'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=backup'); ?>"><i class="bi bi-hdd me-1"></i> Backups</a></li>
       <?php endif; ?>
       <?php if ($user): ?>
