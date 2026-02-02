@@ -22,6 +22,7 @@ require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/Sms.php';
+require_once __DIR__ . '/DataReset.php';
 
 // Load config and initialize DB
 $config = require __DIR__ . '/../config/config.php';

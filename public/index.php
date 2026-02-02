@@ -23,7 +23,9 @@ if ($page === 'login') {
             Helpers::view('auth/login', compact('error'));
         }
     } else {
-        Helpers::view('auth/login');
+        $success = ($_GET['reset'] ?? '') === '1' ? 'All data has been reset. Run the seed script to create an admin user, then log in.' : null;
+$seedUrl = ($_GET['reset'] ?? '') === '1' ? Helpers::baseUrl('seed_admin.php') : null;
+        Helpers::view('auth/login', array_filter(compact('success', 'seedUrl')));
     }
     return;
 }
@@ -101,6 +103,35 @@ switch ($page) {
             header('Content-Length: ' . filesize($path));
             readfile($path);
             return;
+        }
+        if ($action === 'reset_data' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $confirm = trim($_POST['confirm_reset'] ?? '');
+            if ($confirm !== 'DELETE') {
+                $files = [];
+                foreach (glob($backupDir . DIRECTORY_SEPARATOR . 'tms_backup_*.sql') as $f) {
+                    $files[] = ['name' => basename($f), 'size' => filesize($f), 'mtime' => filemtime($f)];
+                }
+                usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
+                $error = 'Type DELETE (all caps) to confirm reset.';
+                Helpers::view('admin/backup', compact('files','error'));
+                break;
+            }
+            $pdo = Database::pdo();
+            $result = DataReset::deleteAllRecords($pdo);
+            if ($result['success']) {
+                Auth::logout();
+                Helpers::redirect('index.php?page=login&reset=1');
+                return;
+            }
+            $files = [];
+            foreach (glob($backupDir . DIRECTORY_SEPARATOR . 'tms_backup_*.sql') as $f) {
+                $files[] = ['name' => basename($f), 'size' => filesize($f), 'mtime' => filemtime($f)];
+            }
+            usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
+            $error = 'Reset failed: ' . implode('; ', $result['errors']);
+            Helpers::view('admin/backup', compact('files','error'));
+            break;
         }
         // index: list existing backups
         $files = [];

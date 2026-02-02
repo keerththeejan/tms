@@ -6,6 +6,14 @@
         <?php if (!empty($error)): ?>
           <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
+        <?php if (!empty($success)): ?>
+          <div class="alert alert-info py-2">
+            <?php echo htmlspecialchars($success); ?>
+            <?php if (!empty($seedUrl)): ?>
+              <br><a href="<?php echo htmlspecialchars($seedUrl); ?>">Create admin user (run seed)</a> — then use <strong>admin</strong> / <strong>admin123</strong> to log in.
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
         <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=login'); ?>">
           <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
           <div class="mb-3">
