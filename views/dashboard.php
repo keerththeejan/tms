@@ -1,14 +1,29 @@
+<style>
+  .dashboard-page .quick-actions .card-body { padding: 0.75rem 1rem; }
+  .dashboard-page .quick-actions .bi { font-size: 1.75rem !important; }
+  @media (max-width: 576px) {
+    .dashboard-page h2 { font-size: 1.35rem; }
+    .dashboard-page .quick-actions .card-body { padding: 0.65rem 0.85rem; flex-wrap: nowrap; }
+    .dashboard-page .quick-actions .bi { font-size: 1.5rem !important; margin-right: 0.65rem !important; }
+    .dashboard-page .quick-actions .h6 { font-size: 0.95rem; margin-bottom: 0.15rem !important; }
+    .dashboard-page .quick-actions small { font-size: 0.8rem; }
+    .dashboard-page .card-body { padding: 0.85rem; }
+    .dashboard-page .nav-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+    .dashboard-page .nav-tabs .nav-link { white-space: nowrap; font-size: 0.9rem; }
+  }
+</style>
+<div class="dashboard-page">
 <h2 class="mb-3">Dashboard</h2>
 
-<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 quick-actions mb-3">
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-2 g-sm-3 quick-actions mb-3">
   <div class="col">
     <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body d-flex align-items-center">
           <i class="bi bi-search fs-1 me-3 text-primary"></i>
-          <div>
+          <div class="min-w-0">
             <div class="h6 mb-1">Search Customer</div>
-            <small class="text-muted">Find by phone number</small>
+            <small class="text-muted">Find by phone</small>
           </div>
         </div>
       </div>
@@ -20,22 +35,21 @@
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body d-flex align-items-center">
           <i class="bi bi-box-seam fs-1 me-3 text-success"></i>
-          <div>
+          <div class="min-w-0">
             <div class="h6 mb-1">Add Parcel</div>
-            <small class="text-muted">Record incoming/outgoing</small>
+            <small class="text-muted">Record parcel</small>
           </div>
         </div>
       </div>
     </a>
   </div>
   <?php endif; ?>
-  <!-- Pending Parcels quick card -->
   <div class="col">
     <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending'); ?>">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body d-flex align-items-center">
           <i class="bi bi-hourglass-split fs-1 me-3 text-secondary"></i>
-          <div>
+          <div class="min-w-0">
             <div class="h6 mb-1">Pending Parcels</div>
             <small class="text-muted">Count: <strong><?php echo (int)($pendingParcels ?? 0); ?></strong></small>
           </div>
@@ -48,9 +62,9 @@
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body d-flex align-items-center">
           <i class="bi bi-receipt fs-1 me-3 text-warning"></i>
-          <div>
-            <div class="h6 mb-1">Print Delivery Note</div>
-            <small class="text-muted">Group daily parcels</small>
+          <div class="min-w-0">
+            <div class="h6 mb-1">Delivery Note</div>
+            <small class="text-muted">Print / group</small>
           </div>
         </div>
       </div>
@@ -62,53 +76,39 @@
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body d-flex align-items-center">
           <i class="bi bi-cash-coin fs-1 me-3 text-danger"></i>
-          <div>
-            <div class="h6 mb-1">Collect Due</div>
-            <small class="text-muted">Record payments</small>
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <?php endif; ?>
-  <!-- Pending Payments quick card -->
-  <div class="col">
-    <a class="text-decoration-none text-dark" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body d-flex align-items-center">
-          <i class="bi bi-exclamation-octagon fs-1 me-3 text-danger"></i>
-          <div>
-            <div class="h6 mb-1">Pending Payments</div>
+          <div class="min-w-0">
+            <div class="h6 mb-1">Payments</div>
             <small class="text-muted">Due: <strong>Rs. <?php echo number_format((float)($totalDue ?? 0), 2); ?></strong></small>
           </div>
         </div>
       </div>
     </a>
   </div>
+  <?php endif; ?>
 </div>
 
-<form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="row g-2 align-items-end mb-3">
+<form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="row g-2 g-md-3 align-items-end mb-3">
   <input type="hidden" name="page" value="dashboard">
   <div class="col-6 col-md-3">
-    <label class="form-label">From</label>
-    <input type="date" class="form-control" name="df" value="<?php echo htmlspecialchars($df ?? ($today ?? '')); ?>">
+    <label class="form-label small mb-0 mb-md-1">From</label>
+    <input type="date" class="form-control form-control-sm" name="df" value="<?php echo htmlspecialchars($df ?? ($today ?? '')); ?>">
   </div>
   <div class="col-6 col-md-3">
-    <label class="form-label">To</label>
-    <input type="date" class="form-control" name="dt" value="<?php echo htmlspecialchars($dt ?? ($today ?? '')); ?>">
+    <label class="form-label small mb-0 mb-md-1">To</label>
+    <input type="date" class="form-control form-control-sm" name="dt" value="<?php echo htmlspecialchars($dt ?? ($today ?? '')); ?>">
   </div>
-  <div class="col-12 col-md-3">
-    <label class="form-label">From Branch</label>
-    <select class="form-select" name="fb">
+  <div class="col-6 col-md-3">
+    <label class="form-label small mb-0 mb-md-1">From Branch</label>
+    <select class="form-select form-select-sm" name="fb">
       <option value="0">All</option>
       <?php foreach (($branchesAll ?? []) as $b): ?>
         <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($fb ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
       <?php endforeach; ?>
     </select>
   </div>
-  <div class="col-12 col-md-3">
-    <label class="form-label">To Branch</label>
-    <select class="form-select" name="tb">
+  <div class="col-6 col-md-3">
+    <label class="form-label small mb-0 mb-md-1">To Branch</label>
+    <select class="form-select form-select-sm" name="tb">
       <option value="0">All</option>
       <?php foreach (($branchesAll ?? []) as $b): ?>
         <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($tb ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
@@ -116,32 +116,32 @@
     </select>
   </div>
   <div class="col-12 col-md-6">
-    <label class="form-label">Customer</label>
-    <select class="form-select" name="cust">
+    <label class="form-label small mb-0 mb-md-1">Customer</label>
+    <select class="form-select form-select-sm" name="cust">
       <option value="0">All</option>
       <?php foreach (($customersAll ?? []) as $c): ?>
         <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($cust ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($c['name'].' ('.$c['phone'].')'); ?></option>
       <?php endforeach; ?>
     </select>
   </div>
-  <div class="col-12 col-md-6 text-md-end">
-    <button class="btn btn-primary me-2"><i class="bi bi-funnel"></i> Apply</button>
-    <a class="btn btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>"><i class="bi bi-x-circle"></i> Reset</a>
+  <div class="col-12 col-md-6 d-flex flex-wrap gap-2 justify-content-md-end">
+    <button class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Apply</button>
+    <a class="btn btn-outline-secondary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>"><i class="bi bi-x-circle"></i> Reset</a>
   </div>
 </form>
 <?php if (isset($pendingParcels, $totalDue, $todayParcels)): ?>
-  <div class="row g-3 mb-3">
+  <div class="row g-2 g-sm-3 mb-3">
     <div class="col-12">
       <div class="card border-0 shadow-sm w-100">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="text-muted">Today's Parcels</div>
+          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+            <span class="text-muted small">Today's Parcels</span>
             <small class="text-muted"><?php echo htmlspecialchars($today ?? ''); ?></small>
           </div>
           <?php if (empty($todayParcels)): ?>
-            <div class="text-muted">No parcels today.</div>
+            <div class="text-muted small">No parcels today.</div>
           <?php else: ?>
-          <div class="table-responsive" style="max-height:200px; overflow:auto;">
+          <div class="table-responsive" style="max-height:200px; overflow:auto;-webkit-overflow-scrolling:touch;">
             <table class="table table-sm table-striped align-middle mb-0">
               <thead>
                 <tr>
@@ -171,14 +171,12 @@
     </div>
   </div>
   <?php if (!empty($isMain)): ?>
-  <div class="row g-3 mb-3">
+  <div class="row g-2 g-sm-3 mb-3">
     <div class="col-12">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0">All Branches Status (Today)</h5>
-          </div>
-          <div class="table-responsive">
+          <h5 class="mb-2 small text-muted">All Branches (Today)</h5>
+          <div class="table-responsive overflow-auto">
             <table class="table table-sm table-striped align-middle mb-0">
               <thead>
                 <tr>
@@ -219,43 +217,43 @@
     </div>
   </div>
   <?php endif; ?>
-  <div class="row g-3 mb-4">
-    <div class="col-sm-4">
+  <div class="row g-2 g-sm-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-4">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
-          <div class="text-muted">Today's Collections</div>
-          <div class="display-6 fw-bold">Rs. <?php echo number_format((float)($collectionsToday ?? 0), 2); ?></div>
+          <div class="text-muted small">Today's Collections</div>
+          <div class="display-6 fw-bold" style="font-size:clamp(1.25rem,4vw,1.75rem);">Rs. <?php echo number_format((float)($collectionsToday ?? 0), 2); ?></div>
           <a class="small" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">Go to Payments</a>
         </div>
       </div>
     </div>
-    <div class="col-sm-4">
+    <div class="col-12 col-sm-6 col-lg-4">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
-          <div class="text-muted">Today's Expenses</div>
-          <div class="display-6 fw-bold">Rs. <?php echo number_format((float)($expensesToday ?? 0), 2); ?></div>
+          <div class="text-muted small">Today's Expenses</div>
+          <div class="display-6 fw-bold" style="font-size:clamp(1.25rem,4vw,1.75rem);">Rs. <?php echo number_format((float)($expensesToday ?? 0), 2); ?></div>
           <a class="small" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Go to Expenses</a>
         </div>
       </div>
     </div>
-    <div class="col-sm-4 d-flex align-items-stretch">
+    <div class="col-12 col-lg-4 d-flex align-items-stretch">
       <div class="card border-0 shadow-sm w-100">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="text-muted">Recent Payments</div>
+          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+            <span class="text-muted small">Recent Payments</span>
             <a class="small" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">View all</a>
           </div>
           <?php if (empty($recentPayments)): ?>
             <div class="text-muted">No recent payments.</div>
           <?php else: ?>
-          <div class="table-responsive" style="max-height:200px; overflow:auto;">
+          <div class="table-responsive overflow-auto" style="max-height:200px;-webkit-overflow-scrolling:touch;">
             <table class="table table-sm table-striped align-middle mb-0">
               <thead>
                 <tr>
                   <th>#</th>
                   <th>Customer</th>
                   <th>Amount</th>
-                  <th>Paid At</th>
+                  <th class="d-none d-sm-table-cell">Paid At</th>
                 </tr>
               </thead>
               <tbody>
@@ -264,7 +262,7 @@
                   <td><?php echo (int)$p['id']; ?></td>
                   <td><?php echo htmlspecialchars(($p['customer_name'] ?? '').' ('.($p['customer_phone'] ?? '').')'); ?></td>
                   <td>Rs. <?php echo number_format((float)$p['amount'], 2); ?></td>
-                  <td><small class="text-muted"><?php echo htmlspecialchars($p['paid_at']); ?></small></td>
+                  <td class="d-none d-sm-table-cell"><small class="text-muted"><?php echo htmlspecialchars($p['paid_at']); ?></small></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -284,12 +282,12 @@
   };
 ?>
 
-<div class="row g-3 mb-3">
+<div class="row g-2 g-sm-3 mb-3">
   <div class="col-12">
     <div class="card border-0 shadow-sm">
       <div class="card-body">
-        <h5 class="mb-3">Branch Status Summary</h5>
-        <ul class="nav nav-tabs" id="statusTabs" role="tablist">
+        <h5 class="mb-2 mb-md-3 small">Branch Status Summary</h5>
+        <ul class="nav nav-tabs flex-nowrap overflow-auto pb-1" id="statusTabs" role="tablist" style="-webkit-overflow-scrolling:touch;">
           <li class="nav-item" role="presentation">
             <button class="nav-link active" id="today-tab" data-bs-toggle="tab" data-bs-target="#today-pane" type="button" role="tab">Today</button>
           </li>
@@ -377,5 +375,6 @@
       </div>
     </div>
   </div>
+</div>
 </div>
  

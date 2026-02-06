@@ -1,6 +1,10 @@
 <?php /** @var array $parcels */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h3 class="mb-0">Parcels</h3>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm"><i class="bi bi-geo-alt me-1"></i> Route Planning</a>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm"><i class="bi bi-truck-front me-1"></i> Vehicle Routes</a>
+  </div>
 </div>
 <form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="parcels">
@@ -81,9 +85,9 @@
       </tr>
     </thead>
     <tbody>
-      <?php foreach ($parcels as $p): ?>
+      <?php $rowNum = (int)($parcelRowStart ?? 0); foreach ($parcels as $p): $rowNum++; ?>
         <tr>
-          <td><?php echo (int)$p['id']; ?></td>
+          <td><?php echo $rowNum; ?></td>
           <td>
             <?php $cid = (int)$p['customer_id']; ?>
             <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&customer_id=' . $cid); ?>" class="text-decoration-none">

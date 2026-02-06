@@ -26,6 +26,14 @@ $config = [
     'company' => [
         'name' => 'TS Transport',
         'reg_no' => 'KN/KR/1443',
+        // Logo: 'image' = use logo_url / uploaded file; 'builtin' = red arch + bar style with logo_initials
+        'logo_display' => 'builtin',
+        'logo_initials' => 'TS',
+        // Built-in logo colors (hex, no # required in settings)
+        'logo_arch_color' => 'c00',
+        'logo_bar_bg' => '000',
+        'logo_bar_color' => 'fff',
+        'logo_title_color' => 'c00',
         // Optional: place a logo image in public/ (e.g., public/logo.png) and set the URL below
         'logo_url' => '', // e.g., '/TMS/public/logo.png'
         // Route bar: Tamil names with yellow arrows between (Colombo ⟷ Kilinochchi ⟷ Mullaitivu)

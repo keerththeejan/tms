@@ -127,6 +127,15 @@
   <div class="<?php echo $statusOnlyEdit ? 'd-none' : ''; ?>">
   <!-- Top controls (data fields required by system) -->
   <div class="row g-3 mb-3">
+    <div class="col-6 col-md-2">
+      <label class="form-label">Invoice No.</label>
+      <?php if ($lockAll && $isEdit): ?>
+      <input type="hidden" name="invoice_no" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>">
+      <input type="number" class="form-control" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>" disabled readonly>
+      <?php else: ?>
+      <input type="number" name="invoice_no" class="form-control" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? 0) ?: ''; ?>" placeholder="<?php echo $isEdit ? '' : 'Auto (next from 1)'; ?>">
+      <?php endif; ?>
+    </div>
     <div class="col-md-4">
       <label class="form-label d-flex justify-content-between align-items-center">
         <span>Customer</span>

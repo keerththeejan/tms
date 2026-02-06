@@ -26,9 +26,11 @@ $config = $config ?? [];
     <div class="card shadow-sm mb-4">
       <div class="card-header"><h5 class="mb-0"><i class="bi bi-building me-1"></i> Company / Logo & Address</h5></div>
       <div class="card-body">
-        <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>" enctype="multipart/form-data">
+        <?php $baseUrlForLogo = rtrim(Helpers::baseUrl(''), '/'); ?>
+          <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>" enctype="multipart/form-data" id="companySettingsForm">
           <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
           <input type="hidden" name="settings_section" value="company">
+          <input type="hidden" id="baseUrlForLogo" value="<?php echo htmlspecialchars($baseUrlForLogo); ?>">
 
           <div class="row g-3 mb-3">
             <div class="col-md-6">
@@ -41,17 +43,78 @@ $config = $config ?? [];
             </div>
           </div>
 
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label">Logo URL</label>
-              <input type="text" name="logo_url" class="form-control" value="<?php echo htmlspecialchars($company['logo_url'] ?? ''); ?>" placeholder="e.g. uploads/logo.png">
-              <small class="text-muted">Or upload a file below.</small>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Upload Logo</label>
-              <input type="file" name="logo_file" class="form-control" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
+          <input type="hidden" name="logo_display" value="image">
+          <input type="hidden" name="logo_initials" value="<?php echo htmlspecialchars($company['logo_initials'] ?? 'TS'); ?>">
+          <input type="hidden" name="logo_arch_color" value="<?php echo htmlspecialchars($company['logo_arch_color'] ?? 'c00'); ?>">
+          <input type="hidden" name="logo_bar_bg" value="<?php echo htmlspecialchars($company['logo_bar_bg'] ?? '000'); ?>">
+          <input type="hidden" name="logo_bar_color" value="<?php echo htmlspecialchars($company['logo_bar_color'] ?? 'fff'); ?>">
+          <input type="hidden" name="logo_title_color" value="<?php echo htmlspecialchars($company['logo_title_color'] ?? 'c00'); ?>">
+            <div class="col-12">
+              <div class="card border bg-light">
+                <div class="card-body py-3">
+                  <h6 class="card-title mb-2"><i class="bi bi-image me-1"></i> Company logo</h6>
+                  <p class="text-muted small mb-3">Enter a logo URL manually <strong>or</strong> upload a file. Shown on receipts and print views.</p>
+                  <?php
+                  $currentLogoUrl = $company['logo_url'] ?? '';
+                  $previewSrc = '';
+                  if ($currentLogoUrl !== '') {
+                    $previewSrc = (strpos($currentLogoUrl, 'http') === 0 || strpos($currentLogoUrl, '//') === 0) ? $currentLogoUrl : Helpers::baseUrl($currentLogoUrl);
+                  }
+                  ?>
+                  <div class="mb-3">
+                    <label class="form-label small">Preview</label>
+                    <div class="d-inline-flex align-items-center p-2 border rounded bg-white">
+                      <img id="previewMainLogo" src="<?php echo $previewSrc ? htmlspecialchars($previewSrc) : ''; ?>" alt="Company logo" style="max-height: 56px; max-width: 200px; object-fit: contain;<?php echo $previewSrc ? '' : ' display:none;'; ?>" onerror="this.style.display='none'; document.getElementById('previewPlaceholder')&&(document.getElementById('previewPlaceholder').style.display='');">
+                      <span id="previewPlaceholder" class="text-muted small" style="<?php echo $previewSrc ? 'display:none' : ''; ?>">No logo — add URL or upload</span>
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label"><i class="bi bi-link-45deg me-1"></i> Manual — Logo URL</label>
+                      <input type="text" name="logo_url" id="logoUrlInput" class="form-control" value="<?php echo htmlspecialchars($company['logo_url'] ?? ''); ?>" placeholder="e.g. uploads/logo.png or https://...">
+                      <small class="text-muted">Enter image path (e.g. uploads/logo.png) or full URL.</small>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label"><i class="bi bi-upload me-1"></i> Upload — Logo file</label>
+                      <input type="file" name="logo_file" id="logoFileInput" class="form-control" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
+                      <small class="text-muted">PNG, JPG, GIF or WebP. Upload overwrites current logo.</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+          <script>
+            (function(){
+              var baseUrl = (document.getElementById('baseUrlForLogo') && document.getElementById('baseUrlForLogo').value) || '';
+              var mainLogo = document.getElementById('previewMainLogo');
+              var placeholder = document.getElementById('previewPlaceholder');
+              var urlInput = document.getElementById('logoUrlInput');
+              var fileInput = document.getElementById('logoFileInput');
+              function showPreview(src){
+                if (mainLogo) { mainLogo.src = src || ''; mainLogo.style.display = src ? '' : 'none'; }
+                if (placeholder) placeholder.style.display = src ? 'none' : '';
+              }
+              function updateFromUrl(){
+                var v = (urlInput && urlInput.value || '').trim();
+                if (v) {
+                  var src = (v.indexOf('http') === 0 || v.indexOf('//') === 0) ? v : (baseUrl + '/' + v.replace(/^\//, ''));
+                  showPreview(src);
+                } else { showPreview(''); }
+              }
+              if (urlInput) urlInput.addEventListener('input', updateFromUrl);
+              if (fileInput) {
+                fileInput.addEventListener('change', function(){
+                  var f = this.files && this.files[0];
+                  if (f && /^image\//.test(f.type)) {
+                    var r = new FileReader();
+                    r.onload = function(e){ showPreview(e.target.result); };
+                    r.readAsDataURL(f);
+                  }
+                });
+              }
+            })();
+          </script>
 
           <div class="mb-3">
             <label class="form-label">Route Bar (Tamil) — 3 parts separated by arrows</label>

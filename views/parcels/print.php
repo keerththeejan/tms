@@ -3,6 +3,14 @@
 $cfg = (require __DIR__ . '/../../config/config.php');
 $brand = $cfg['company'] ?? [];
 $branches = $brand['branches'] ?? [];
+$logoArch = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_arch_color'] ?? 'c00') ?: 'c00');
+$logoBarBg = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_bar_bg'] ?? '000') ?: '000');
+$logoBarColor = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_bar_color'] ?? 'fff') ?: 'fff');
+$logoTitleColor = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_title_color'] ?? 'c00') ?: 'c00');
+if (strlen($logoArch) === 4) { $c = $logoArch[1].$logoArch[1].$logoArch[2].$logoArch[2].$logoArch[3].$logoArch[3]; $logoArch = '#'.$c; }
+if (strlen($logoBarBg) === 4) { $c = $logoBarBg[1].$logoBarBg[1].$logoBarBg[2].$logoBarBg[2].$logoBarBg[3].$logoBarBg[3]; $logoBarBg = '#'.$c; }
+if (strlen($logoBarColor) === 4) { $c = $logoBarColor[1].$logoBarColor[1].$logoBarColor[2].$logoBarColor[2].$logoBarColor[3].$logoBarColor[3]; $logoBarColor = '#'.$c; }
+if (strlen($logoTitleColor) === 4) { $c = $logoTitleColor[1].$logoTitleColor[1].$logoTitleColor[2].$logoTitleColor[2].$logoTitleColor[3].$logoTitleColor[3]; $logoTitleColor = '#'.$c; }
 ?>
 <!doctype html>
 <html>
@@ -11,32 +19,35 @@ $branches = $brand['branches'] ?? [];
   <title>Parcel Receipt #<?php echo (int)$parcel['id']; ?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    :root { --brand:#c00; --brand-dark:#0d6efd; }
-    body { padding: 24px; font-size: 13px; }
-    .sheet { border: 2px solid #333; border-radius: 6px; overflow: hidden; }
+    :root { --brand:<?php echo $logoTitleColor; ?>; --logo-arch:<?php echo $logoArch; ?>; --logo-bar-bg:<?php echo $logoBarBg; ?>; --logo-bar-color:<?php echo $logoBarColor; ?>; }
+    body { padding: 24px; font-size: 13px; background: #fff; color: #333; }
+    .sheet { border: 2px solid #333; border-radius: 6px; overflow: hidden; background: #fff; }
     .sheet-header { background: #fff; position: relative; }
-    .header-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 14px 12px; }
-    .header-brand { display: flex; align-items: center; gap: 12px; }
-    .logo-unit { display: flex; flex-direction: column; align-items: center; }
-    .logo-unit .logo-wrap { width: 64px; height: 48px; display: flex; align-items: center; justify-content: center; background: #c00; border-radius: 50% 50% 0 0; font-weight: 800; font-size: 18px; color: #fff; border: 2px solid #333; position: relative; }
+    .header-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 16px 10px; }
+    .header-brand { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .logo-unit { display: flex; flex-direction: column; align-items: flex-start; }
+    .logo-unit .logo-wrap { width: 64px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--logo-arch); border-radius: 50% 50% 0 0; font-weight: 800; font-size: 18px; color: var(--logo-bar-color); border: 2px solid #333; position: relative; }
     .logo-unit .logo-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: 0; border-radius: inherit; background: repeating-linear-gradient(0deg, #000 0, #000 2px, transparent 2px, transparent 6px); opacity: 0.4; pointer-events: none; }
-    .logo-unit .bar-small { background: #000; color: #fff; padding: 3px 10px; font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
-    .brand-title { font-weight: 900; font-size: 28px; letter-spacing: 2px; color: var(--brand); text-transform: uppercase; line-height: 1.1; }
-    .reg-no { font-size: 12px; color: #333; font-weight: 600; position: absolute; top: 10px; right: 14px; }
-    .route-bar { background: #000; color: #fff; padding: 8px 14px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 8px; }
+    .logo-unit .bar-small { background: var(--logo-bar-bg); color: var(--logo-bar-color); padding: 4px 10px; font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
+    .brand-title { font-weight: 900; font-size: 26px; letter-spacing: 2px; color: var(--brand); text-transform: uppercase; line-height: 1.1; }
+    .reg-no { font-size: 12px; color: #333; font-weight: 600; position: absolute; top: 12px; right: 16px; }
+    .route-bar { background: #000; color: #fff; padding: 10px 16px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px; }
     .route-bar .route-part { white-space: nowrap; }
-    .route-bar .arrow-double { color: #ffc107; font-size: 16px; margin: 0 4px; }
-    .branch-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 16px; padding: 12px 14px; border-bottom: 1px solid #eee; }
+    .route-bar .arrow-double { color: #ffc107; font-size: 18px; margin: 0 4px; }
+    .branch-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 18px; padding: 14px 16px; border-bottom: 1px solid #ddd; }
     .branch-col { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
     .branch-col .branch-name { font-weight: 700; font-size: 12px; color: #333; margin-bottom: 2px; }
-    .branch-col .addr-ta { color: #333; line-height: 1.3; }
-    .branch-col .addr-en { color: #555; line-height: 1.3; }
+    .branch-col .addr-ta { color: #333; line-height: 1.35; }
+    .branch-col .addr-en { color: #555; line-height: 1.35; }
     .branch-col .addr-phones { color: #333; }
     .branch-col .addr-phones::before { content: "📞 "; }
-    .header-date { padding: 8px 14px; font-size: 13px; color: #333; text-align: right; }
-    .header-date .date-placeholder { border-bottom: 1px solid #333; padding: 0 4px; margin: 0 2px; min-width: 24px; display: inline-block; }
+    .header-date { padding: 10px 16px 12px; font-size: 13px; color: #333; text-align: right; }
+    .header-date .date-placeholder { border-bottom: 1px dotted #333; padding: 0 6px 2px; margin: 0 2px; min-width: 28px; display: inline-block; }
     .meta-row { padding: 8px 14px; background: #f8f9fa; border-top: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 12px 20px; font-size: 12px; }
     .meta-row strong { margin-right: 4px; }
+    .invoice-no-block { padding: 10px 16px 8px; text-align: center; }
+    .invoice-no-block .invoice-no-title { color: #c00; font-size: 1.25rem; font-weight: 700; }
+    .invoice-no-block .invoice-no-line { border-bottom: 1px solid #000; margin-top: 4px; }
     .addr { font-size: 11px; color: #333; }
     table.receipt { width: 100%; border-collapse: collapse; margin-top: 8px; }
     table.receipt th, table.receipt td { border: 1px solid #333; padding: 8px; vertical-align: middle; }
@@ -45,7 +56,15 @@ $branches = $brand['branches'] ?? [];
     .serial-big { font-size: 20px; font-weight: 800; letter-spacing: 2px; color: var(--brand); }
     .sig-line { border-top: 1px dashed #888; padding-top: 4px; text-align: center; }
     .note { font-size: 11px; color: #555; }
-    @media print { .no-print { display:none !important; } body{ padding:0; } .sheet { border-color: #000; } }
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0; background: #fff; }
+      .sheet { border-color: #000; background: #fff; box-shadow: none; }
+      .sheet-header { break-inside: avoid; }
+      .route-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .logo-unit .bar-small { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .invoice-no-block .invoice-no-title { -webkit-print-color-adjust: exact; print-color-adjust: exact; color: #c00; }
+    }
   </style>
   </head>
 <body>
@@ -87,6 +106,7 @@ if ($addrParam !== '') {
 }
 $parcelDate = substr((string)($parcel['created_at'] ?? date('Y-m-d')), 0, 10);
 $parcelDateParts = explode('-', $parcelDate);
+$invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] : (int)$parcel['id'];
 ?>
 <div class="sheet">
   <div class="sheet-header">
@@ -95,12 +115,17 @@ $parcelDateParts = explode('-', $parcelDate);
     <?php endif; ?>
     <div class="header-top">
       <div class="header-brand">
-        <?php if (!empty($brand['logo_url'])): ?>
+        <?php
+          $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']);
+          $logoInitials = trim($brand['logo_initials'] ?? 'TS') ?: 'TS';
+          $logoInitials = mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $logoInitials), 0, 6) ?: 'TS';
+        ?>
+        <?php if ($useLogoImage): ?>
           <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
           <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo" style="height:56px">
         <?php else: ?>
           <div class="logo-unit">
-            <div class="logo-wrap">TS</div>
+            <div class="logo-wrap"><?php echo htmlspecialchars(strtoupper($logoInitials)); ?></div>
             <span class="bar-small"><?php echo htmlspecialchars(strtoupper($brand['name'] ?? 'TS Transport')); ?></span>
           </div>
         <?php endif; ?>
@@ -148,6 +173,11 @@ $parcelDateParts = explode('-', $parcelDate);
       <span><strong>Customer:</strong> <?php echo htmlspecialchars($parcel['customer_name'] ?? ''); ?> (<?php echo htmlspecialchars($parcel['customer_phone'] ?? ''); ?>)</span>
       <span><strong>Supplier:</strong> <?php echo htmlspecialchars($parcel['supplier_name'] ?? '—'); ?><?php echo !empty($parcel['supplier_phone']) ? ' (' . htmlspecialchars($parcel['supplier_phone']) . ')' : ''; ?></span>
     </div>
+  </div>
+
+  <div class="invoice-no-block">
+    <div class="invoice-no-title">Invoice No. #<?php echo $invoiceNo; ?></div>
+    <div class="invoice-no-line"></div>
   </div>
 
   <div class="p-3">
@@ -232,7 +262,6 @@ $parcelDateParts = explode('-', $parcelDate);
       if (($items && count($items)>0) && $displayGrand <= 0) { $displayGrand = (float)($parcel['price'] ?? 0); }
       $dRs = floor($displayGrand);
       $dCts = (int)round(($displayGrand - $dRs) * 100);
-      $invoiceNo = (int)$parcel['id'];
     ?>
     <div class="d-flex justify-content-between mt-3 align-items-center">
       <div class="serial-big">Invoice No. #<?php echo $invoiceNo; ?></div>

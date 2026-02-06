@@ -395,6 +395,13 @@ switch ($page) {
             if ($section === 'company') {
                 $name = trim($_POST['company_name'] ?? '');
                 $regNo = trim($_POST['reg_no'] ?? '');
+                $logoDisplay = in_array($_POST['logo_display'] ?? '', ['image', 'builtin'], true) ? $_POST['logo_display'] : 'builtin';
+                $logoInitials = trim($_POST['logo_initials'] ?? '') ?: 'TS';
+                $logoInitials = mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $logoInitials), 0, 6);
+                $logoArchColor = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_arch_color'] ?? 'c00')) ?: 'c00';
+                $logoBarBg = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_bar_bg'] ?? '000')) ?: '000';
+                $logoBarColor = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_bar_color'] ?? 'fff')) ?: 'fff';
+                $logoTitleColor = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_title_color'] ?? 'c00')) ?: 'c00';
                 $logoUrl = trim($_POST['logo_url'] ?? '');
                 $footerNote = trim($_POST['footer_note'] ?? '');
                 $routePart1 = trim($_POST['route_1'] ?? '');
@@ -439,6 +446,12 @@ switch ($page) {
                 $companyOverride = [
                     'name' => $name ?: ($company['name'] ?? 'TS Transport'),
                     'reg_no' => $regNo,
+                    'logo_display' => $logoDisplay,
+                    'logo_initials' => $logoInitials ?: 'TS',
+                    'logo_arch_color' => $logoArchColor,
+                    'logo_bar_bg' => $logoBarBg,
+                    'logo_bar_color' => $logoBarColor,
+                    'logo_title_color' => $logoTitleColor,
                     'logo_url' => $logoUrl,
                     'route_tamil_parts' => array_values($routeParts),
                     'branches' => $branchesData,
@@ -1123,6 +1136,7 @@ switch ($page) {
         if (!Auth::canCreateParcels()) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
+        try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         $user = Auth::user();
         $userBranchCode = (string)($user['branch_code'] ?? '');
         $userBranchName = (string)($user['branch_name'] ?? '');
@@ -1287,6 +1301,19 @@ switch ($page) {
             $tracking_number_raw = trim($_POST['tracking_number'] ?? '');
             $tracking_number = $tracking_number_raw; // keep as-is for update/insert
             $vehicle_no = trim($_POST['vehicle_no'] ?? '');
+            // Invoice number: manual or auto (next from 1)
+            $invoice_no = (int)($_POST['invoice_no'] ?? 0);
+            if ($id <= 0) {
+                if ($invoice_no <= 0) {
+                    $nextRow = $pdo->query('SELECT COALESCE(MAX(invoice_no),0)+1 AS n FROM parcels');
+                    $invoice_no = $nextRow ? (int)$nextRow->fetch(PDO::FETCH_ASSOC)['n'] : 1;
+                }
+            } else {
+                if ($invoice_no <= 0) {
+                    // will use existing invoice_no or id after we load $existing below
+                    $invoice_no = 0;
+                }
+            }
             // Lorry full flag
             $lorry_full = isset($_POST['lorry_full']) && ($_POST['lorry_full'] === '1' || $_POST['lorry_full'] === 'on');
             // Remember preference in session so the form can keep the checkbox state on next load
@@ -1307,7 +1334,13 @@ switch ($page) {
                 $st = $pdo->prepare('SELECT * FROM parcels WHERE id=?');
                 $st->execute([$id]);
                 $existing = $st->fetch();
-                if ($existing) { $isBilled = ($existing['price'] !== null && (float)$existing['price'] > 0); }
+                if ($existing) {
+                    $isBilled = ($existing['price'] !== null && (float)$existing['price'] > 0);
+                    if ($invoice_no <= 0) {
+                        $invoice_no = (int)($existing['invoice_no'] ?? 0);
+                        if ($invoice_no <= 0) { $invoice_no = (int)$existing['id']; }
+                    }
+                }
                 // Status-only update: parcel is In Transit and form submitted with status_only_edit
                 if ($existing && (string)($existing['status'] ?? '') === 'in_transit' && isset($_POST['status_only_edit']) && (int)$_POST['status_only_edit'] === 1) {
                     $status = $_POST['status'] ?? $existing['status'];
@@ -1431,8 +1464,8 @@ switch ($page) {
                     } catch (Throwable $e) { /* ignore sync errors */ }
                 } else {
                     // Other branches: full edit except price (kept same value as existing)
-                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=? WHERE id=?");
-                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$id]);
+                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=?, invoice_no=? WHERE id=?");
+                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,$id]);
                     // Replace items allowed for non-Kilinochchi
                     $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]);
                     if (is_array($items)) {
@@ -1511,21 +1544,21 @@ switch ($page) {
                     $price = $p;
                     $createdAtOverride = trim($_POST['created_date'] ?? '');
                     if ($createdAtOverride) {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, created_at) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$createdAtOverride]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, created_at) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,$createdAtOverride]);
                     } else {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no]);
                     }
                 } else {
                     // Other branches: do not set price at create
                     $createdAtOverride = trim($_POST['created_date'] ?? '');
                     if ($createdAtOverride) {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, created_at) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$createdAtOverride]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, created_at) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,$createdAtOverride]);
                     } else {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no]);
                     }
                 }
                 $id = (int)$pdo->lastInsertId();
@@ -1971,7 +2004,8 @@ switch ($page) {
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
         // branches for filter
         $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount'));
+        $parcelRowStart = ($page - 1) * $perPage; // 0-based start for sequential # column (1, 2, 3...)
+        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount','parcelRowStart'));
         break;
 
     case 'email_log':
@@ -2028,6 +2062,7 @@ switch ($page) {
     case 'parcel_print':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
+        try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         $id = (int)($_GET['id'] ?? 0);
         $stmt = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, s.phone AS supplier_phone, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id LEFT JOIN suppliers s ON s.id = p.supplier_id LEFT JOIN branches bf ON bf.id=p.from_branch_id LEFT JOIN branches bt ON bt.id=p.to_branch_id WHERE p.id=?');
         $stmt->execute([$id]);

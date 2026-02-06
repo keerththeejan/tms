@@ -2,8 +2,10 @@
 <?php $cfg = (require __DIR__ . '/../../config/config.php'); $brand = $cfg['company'] ?? []; ?>
 <div class="mb-2 p-2 border rounded">
   <div class="d-flex align-items-center gap-2">
-    <?php if (!empty($brand['logo_url'])): ?>
-      <img src="<?php echo htmlspecialchars($brand['logo_url']); ?>" alt="Logo" style="height:38px">
+    <?php $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']); ?>
+    <?php if ($useLogoImage): ?>
+      <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
+      <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo" style="height:38px">
     <?php endif; ?>
     <div>
       <div class="fw-bold"><?php echo htmlspecialchars($brand['name'] ?? ''); ?></div>
