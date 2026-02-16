@@ -1,12 +1,29 @@
 <?php /** @var array $parcel */ ?>
 <style>
-  .receipt-box { border: 2px solid #0d6efd; border-radius: 6px; }
-  .receipt-header { background: #e7f1ff; border-bottom: 2px solid #0d6efd; }
-  .receipt-grid th, .receipt-grid td { border: 1px solid #0d6efd; vertical-align: middle; }
-  .receipt-grid th { background: #f8fbff; text-transform: uppercase; font-size: 0.85rem; }
-  .receipt-total { background: #e7f1ff; border-top: 2px solid #0d6efd; font-weight: 700; }
-  .serial-badge { border: 2px solid #0d6efd; padding: .25rem .5rem; border-radius: .25rem; font-weight: 600; }
+  .parcel-form-page { --pf-radius: 0.5rem; --pf-border: 1px solid var(--bs-border-color-translucent); }
+  .parcel-form-page .page-header { margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: var(--pf-border); }
+  .parcel-form-page .section-card { border: var(--pf-border); border-radius: var(--pf-radius); box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1.25rem; overflow: hidden; }
+  .parcel-form-page .section-card .section-title { font-size: 0.95rem; font-weight: 600; padding: 0.65rem 1rem; background: var(--bs-tertiary-bg); border-bottom: var(--pf-border); }
+  .parcel-form-page .section-card .section-body { padding: 1rem; }
+  .parcel-form-page .receipt-box { border: 2px solid var(--bs-primary); border-radius: var(--pf-radius); overflow: hidden; }
+  .parcel-form-page .receipt-header { background: var(--bs-primary-bg-subtle); border-bottom: 2px solid var(--bs-primary); padding: 0.65rem 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { border: 1px solid var(--bs-border-color); vertical-align: middle; padding: 0.4rem 0.5rem; }
+  .parcel-form-page .receipt-grid th { background: var(--bs-tertiary-bg); text-transform: uppercase; font-size: 0.75rem; font-weight: 600; }
+  .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 2rem; }
+  .parcel-form-page .receipt-total { background: var(--bs-primary-bg-subtle); border-top: 2px solid var(--bs-primary); font-weight: 700; padding: 0.75rem 1rem; }
+  .parcel-form-page .serial-badge { border: 2px solid var(--bs-primary); padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600; }
+  .parcel-form-page .table-responsive { -webkit-overflow-scrolling: touch; }
+  .parcel-form-page .form-label { font-weight: 500; margin-bottom: 0.25rem; }
+  .parcel-form-page .btn-quick { font-size: 0.8rem; }
+  @media (max-width: 576px) {
+    .parcel-form-page .page-header { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
+    .parcel-form-page .section-card .section-body { padding: 0.75rem; }
+    .parcel-form-page .receipt-header { flex-direction: column; align-items: stretch; }
+    .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { padding: 0.35rem 0.4rem; font-size: 0.85rem; }
+    .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 1.85rem; font-size: 0.9rem; }
+  }
 </style>
+<div class="parcel-form-page">
 
 <?php 
   $isEdit = (int)($parcel['id'] ?? 0) > 0; 
@@ -29,10 +46,10 @@
   }
   $branchesList = array_values($branchesUnique);
 ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> Next</a>
-</div>
+<header class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <h1 class="h4 mb-0 fw-bold"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back to Parcels</a>
+</header>
 
 <?php
   // New parcel: show add options when we have prefilled data (same-day / add more) or when we have a last bill
@@ -125,23 +142,26 @@
   <input type="hidden" name="idempotency_key" value="<?php echo bin2hex(random_bytes(16)); ?>">
 
   <div class="<?php echo $statusOnlyEdit ? 'd-none' : ''; ?>">
-  <!-- Top controls (data fields required by system) -->
-  <div class="row g-3 mb-3">
-    <div class="col-6 col-md-2">
+  <!-- Parcel details section -->
+  <div class="section-card">
+    <div class="section-title"><i class="bi bi-box-seam me-1"></i> Parcel details</div>
+    <div class="section-body">
+  <div class="row g-3 mb-0">
+    <div class="col-6 col-md-4 col-lg-2">
       <label class="form-label">Invoice No.</label>
       <?php if ($lockAll && $isEdit): ?>
       <input type="hidden" name="invoice_no" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>">
-      <input type="number" class="form-control" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>" disabled readonly>
+      <input type="number" class="form-control form-control-sm" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>" disabled readonly>
       <?php else: ?>
-      <input type="number" name="invoice_no" class="form-control" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? 0) ?: ''; ?>" placeholder="<?php echo $isEdit ? '' : 'Auto (next from 1)'; ?>">
+      <input type="number" name="invoice_no" class="form-control form-control-sm" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? 0) ?: ''; ?>" placeholder="<?php echo $isEdit ? '' : 'Auto (next from 1)'; ?>">
       <?php endif; ?>
     </div>
-    <div class="col-md-4">
-      <label class="form-label d-flex justify-content-between align-items-center">
+    <div class="col-12 col-md-6 col-lg-4">
+      <label class="form-label d-flex flex-wrap justify-content-between align-items-center gap-1">
         <span>Customer</span>
-        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddCustomer" aria-expanded="false"><i class="bi bi-person-plus"></i> Quick Add</button>
+        <button type="button" class="btn btn-sm btn-outline-primary btn-quick" data-bs-toggle="collapse" data-bs-target="#quickAddCustomer" aria-expanded="false"><i class="bi bi-person-plus me-1"></i> Quick Add</button>
       </label>
-      <select name="customer_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+      <select name="customer_id" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Customer --</option>
         <?php foreach (($customersAll ?? []) as $c): ?>
           <?php 
@@ -207,12 +227,12 @@
       </div>
       <div id="customerSummary" class="mt-2"></div>
     </div>
-    <div class="col-md-4">
-      <label class="form-label d-flex justify-content-between align-items-center">
+    <div class="col-12 col-md-6 col-lg-4">
+      <label class="form-label d-flex flex-wrap justify-content-between align-items-center gap-1">
         <span>Supplier</span>
-        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddSupplier" aria-expanded="false"><i class="bi bi-person-plus"></i> Quick Add</button>
+        <button type="button" class="btn btn-sm btn-outline-primary btn-quick" data-bs-toggle="collapse" data-bs-target="#quickAddSupplier" aria-expanded="false"><i class="bi bi-person-plus me-1"></i> Quick Add</button>
       </label>
-      <select name="supplier_id" id="supplierSelect" class="form-select" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+      <select name="supplier_id" id="supplierSelect" class="form-select form-select-sm" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="0">-- None --</option>
         <?php foreach (($suppliersAll ?? []) as $s): ?>
           <?php 
@@ -247,16 +267,16 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-6 col-md-4 col-lg-3">
       <label class="form-label">Date</label>
-      <input type="date" class="form-control" id="parcelDate" name="created_date" value="<?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?>">
+      <input type="date" class="form-control form-control-sm" id="parcelDate" name="created_date" value="<?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?>">
     </div>
-    <div class="col-md-4">
-      <label class="form-label d-flex justify-content-between align-items-center">
+    <div class="col-12 col-md-6 col-lg-4">
+      <label class="form-label d-flex flex-wrap justify-content-between align-items-center gap-1">
         <span>From Branch</span>
-        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddFromBranch" aria-expanded="false"><i class="bi bi-building-add"></i> Quick Add</button>
+        <button type="button" class="btn btn-sm btn-outline-primary btn-quick" data-bs-toggle="collapse" data-bs-target="#quickAddFromBranch" aria-expanded="false"><i class="bi bi-building-add me-1"></i> Quick Add</button>
       </label>
-      <select name="from_branch_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+      <select name="from_branch_id" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesList ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['from_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
@@ -273,12 +293,12 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <label class="form-label d-flex justify-content-between align-items-center">
+    <div class="col-12 col-md-6 col-lg-4">
+      <label class="form-label d-flex flex-wrap justify-content-between align-items-center gap-1">
         <span>To Branch</span>
-        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddToBranch" aria-expanded="false"><i class="bi bi-building-add"></i> Quick Add</button>
+        <button type="button" class="btn btn-sm btn-outline-primary btn-quick" data-bs-toggle="collapse" data-bs-target="#quickAddToBranch" aria-expanded="false"><i class="bi bi-building-add me-1"></i> Quick Add</button>
       </label>
-      <select name="to_branch_id" class="form-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+      <select name="to_branch_id" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesList ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['to_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
@@ -296,13 +316,13 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <label class="form-label d-flex justify-content-between align-items-center">
+    <div class="col-12 col-md-6 col-lg-4">
+      <label class="form-label d-flex flex-wrap justify-content-between align-items-center gap-1">
         <span>Vehicle No.</span>
-        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddVehicle" aria-expanded="false"><i class="bi bi-truck"></i> Quick Add</button>
+        <button type="button" class="btn btn-sm btn-outline-primary btn-quick" data-bs-toggle="collapse" data-bs-target="#quickAddVehicle" aria-expanded="false"><i class="bi bi-truck me-1"></i> Quick Add</button>
       </label>
       <?php if (!empty($vehiclesAll)): ?>
-        <select name="vehicle_no" class="form-select" id="vehicleSelect" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+        <select name="vehicle_no" class="form-select form-select-sm" id="vehicleSelect" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
           <option value="">-- None --</option>
           <?php 
             $vehCurrent = trim((string)($parcel['vehicle_no'] ?? ''));
@@ -314,8 +334,9 @@
           <?php endforeach; ?>
         </select>
       <?php else: ?>
-        <input type="text" name="vehicle_no" class="form-control" id="vehicleInput" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+        <input type="text" name="vehicle_no" class="form-control form-control-sm" id="vehicleInput" placeholder="e.g., AB-1234" value="<?php echo htmlspecialchars($parcel['vehicle_no'] ?? ''); ?>" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
       <?php endif; ?>
+      <div id="deliveryRouteHint" class="form-text small text-success d-none" aria-live="polite"></div>
       <div class="collapse mt-2" id="quickAddVehicle">
         <div class="border rounded p-2 bg-light">
           <div class="row g-2">
@@ -341,6 +362,8 @@
       </div>
     </div>
   </div>
+  </div>
+  </div>
 
   <!-- Full-width Previous Bill Preview (moved outside left column) -->
   <div id="billPreview" class="mb-3" style="display:none;">
@@ -355,11 +378,14 @@
     </div>
   </div>
 
-  <!-- Receipt-like box -->
-  <div class="receipt-box mt-4">
-    <div class="receipt-header p-2 d-flex justify-content-between align-items-center">
-      <div>TS Transport</div>
-      <div class="serial-badge d-flex align-items-center gap-2">
+  <!-- Items & receipt section -->
+  <div class="section-card mt-3">
+    <div class="section-title"><i class="bi bi-list-ul me-1"></i> Items &amp; Total</div>
+    <div class="section-body p-0">
+  <div class="receipt-box">
+    <div class="receipt-header d-flex justify-content-between align-items-center">
+      <div class="fw-semibold">TS Transport</div>
+      <div class="serial-badge d-flex align-items-center gap-2 flex-wrap justify-content-end">
         <label for="serialInput" class="mb-0 me-1">Serial:</label>
         <input type="text" id="serialInput" name="tracking_number" class="form-control form-control-sm" style="max-width: 180px;" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" />
       </div>
@@ -372,31 +398,32 @@
     </div>
 
     <div class="p-3">
-      <div class="row g-3 mb-2">
-        <div class="col-sm-4">
+      <div class="row g-2 g-md-3 mb-2">
+        <div class="col-12 col-sm-6 col-lg-4">
           <div><strong>Customer:</strong> <span id="customerDisplay" class="text-muted">selected above</span></div>
           <div class="small text-muted"><strong>Delivery Location:</strong> <span id="customerLocDisplay" class="text-muted">—</span></div>
         </div>
-        <div class="col-sm-2">
-          <div><strong>Date:</strong> <?php echo date('Y-m-d'); ?></div>
+        <div class="col-6 col-sm-4 col-lg-2">
+          <div><strong>Date:</strong> <span id="recDateSummary"><?php echo date('Y-m-d'); ?></span></div>
         </div>
-        <div class="col-sm-3">
+        <div class="col-6 col-sm-4 col-lg-3">
           <div><strong>From:</strong> <span id="fromBranchDisplay" class="text-muted">selected above</span></div>
         </div>
-        <div class="col-sm-3">
+        <div class="col-6 col-sm-4 col-lg-3">
           <div><strong>To:</strong> <span id="toBranchDisplay" class="text-muted">selected above</span></div>
         </div>
       </div>
 
-      <div class="table-responsive">
+      <div class="table-responsive overflow-x-auto">
+        <p class="small text-muted d-md-none mb-1" aria-hidden="true"><i class="bi bi-arrow-left-right me-1"></i>Scroll horizontally to see all columns.</p>
         <table class="table receipt-grid mb-2" id="itemsTable">
           <thead>
             <tr>
-              <th style="width:8%">No</th>
+              <th style="width:6%">No</th>
               <th>Description</th>
-              <th style="width:12%">Qty</th>
-              <th style="width:10%">Rs</th>
-              <th style="width:10%">Cts</th>
+              <th style="width:10%">Qty</th>
+              <th style="width:12%">Rate</th>
+              <th style="width:12%">Amount</th>
               <th style="width:6%"></th>
             </tr>
           </thead>
@@ -429,15 +456,38 @@
                 $noRateIdx++;
                 $amt = ($remainderForNoRate / $noRateCount);
               }
-              $rs = floor($amt);
-              $ct = (int)round(($amt - $rs) * 100);
             ?>
             <tr>
               <td class="text-center align-middle"><?php echo $rowIndex; ?></td>
               <td><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
               <td><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td><input type="number" step="1" min="0" name="items[<?php echo $rowIndex; ?>][rs]" class="form-control item-rs" value="<?php echo $rs>0?(string)$rs:''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rs"></td>
-              <td><input type="number" step="1" min="0" max="99" name="items[<?php echo $rowIndex; ?>][cts]" class="form-control item-cts" value="<?php echo $amt>0?str_pad((string)$ct,2,'0',STR_PAD_LEFT):''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Cts"></td>
+              <td><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
+              <td class="align-middle item-amount-cell">
+                <?php
+                  $addAmounts = [];
+                  if (!empty($it['additional_amounts'])) {
+                    $raw = $it['additional_amounts'];
+                    $addAmounts = is_string($raw) ? (json_decode($raw, true) ?: []) : (array)$raw;
+                  } elseif ((float)($it['additional_amount'] ?? 0) > 0) {
+                    $addAmounts = [(float)$it['additional_amount']];
+                  }
+                  if (empty($addAmounts)) { $addAmounts = ['']; }
+                  $rowTotal = $amt + array_sum(array_map('floatval', $addAmounts));
+                ?>
+                <div class="d-flex flex-column gap-1">
+                  <span class="item-amount fw-semibold"><?php echo $rowTotal > 0 ? number_format($rowTotal, 2) : '—'; ?></span>
+                  <label class="small text-muted mb-0">+ Add amounts:</label>
+                  <div class="item-add-list d-flex flex-column gap-1">
+                    <?php foreach ($addAmounts as $addVal): ?>
+                    <div class="d-flex gap-1 align-items-center item-add-row">
+                      <input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][additional_amounts][]" class="form-control form-control-sm item-add" value="<?php echo ($addVal !== '' && (float)$addVal > 0) ? number_format((float)$addVal, 2, '.', '') : ''; ?>" placeholder="0" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?>>
+                      <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button><?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                  </div>
+                  <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button><?php endif; ?>
+                </div>
+              </td>
               <td class="text-center"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
             </tr>
             <?php endforeach; ?>
@@ -446,8 +496,20 @@
               <td class="text-center align-middle">1</td>
               <td><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
               <td><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td><input type="number" step="1" min="0" name="items[1][rs]" class="form-control item-rs" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rs"></td>
-              <td><input type="number" step="1" min="0" max="99" name="items[1][cts]" class="form-control item-cts" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Cts"></td>
+              <td><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
+              <td class="align-middle item-amount-cell">
+                <div class="d-flex flex-column gap-1">
+                  <span class="item-amount fw-semibold">—</span>
+                  <label class="small text-muted mb-0">+ Add amounts:</label>
+                  <div class="item-add-list d-flex flex-column gap-1">
+                    <div class="d-flex gap-1 align-items-center item-add-row">
+                      <input type="number" step="0.01" min="0" name="items[1][additional_amounts][]" class="form-control form-control-sm item-add" placeholder="0" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?>>
+                      <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button><?php endif; ?>
+                    </div>
+                  </div>
+                  <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button><?php endif; ?>
+                </div>
+              </td>
               <td class="text-center"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button><?php endif; ?></td>
             </tr>
             <?php endif; ?>
@@ -460,51 +522,55 @@
         </div>
       </div>
 
-      <div class="receipt-total p-2 d-flex justify-content-end">
-        <div class="text-end w-100-sm">
-          <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
-          <div class="row g-2 align-items-center">
-            <div class="col-auto">
-              <label class="col-form-label"><strong>Total</strong></label>
+      <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
+      <div class="receipt-total p-2 p-md-3">
+        <div class="row g-2 g-md-3 align-items-center justify-content-md-end">
+          <div class="col-6 col-md-auto">
+            <label class="col-form-label mb-0"><strong>Total</strong></label>
+          </div>
+          <div class="col-6 col-md-auto">
+            <input type="number" step="0.01" min="0" class="form-control form-control-sm" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php 
+              echo ($lockAll || !$priceOnly) ? 'disabled' : '';
+            ?> placeholder="0.00">
+          </div>
+          <?php if ($priceOnly && !$lockAll): ?>
+            <div class="col-6 col-md-auto">
+              <label class="col-form-label mb-0"><strong>Discount</strong></label>
             </div>
-            <div class="col">
-              <input type="number" step="0.01" min="0" class="form-control" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php 
-                echo ($lockAll || !$priceOnly) ? 'disabled' : '';
-              ?> placeholder="0.00">
+            <div class="col-6 col-md-auto">
+              <input type="number" step="0.01" min="0" class="form-control form-control-sm" name="discount" id="discountInput" value="" placeholder="0.00">
             </div>
-            <?php if ($priceOnly && !$lockAll): ?>
-              <div class="col-auto">
-                <label class="col-form-label"><strong>Discount</strong></label>
-              </div>
-              <div class="col">
-                <input type="number" step="0.01" min="0" class="form-control" name="discount" id="discountInput" value="" placeholder="0.00">
-              </div>
-            <?php endif; ?>
-            <div class="col-auto">
-              <span class="fs-5" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
-            </div>
+          <?php endif; ?>
+          <div class="col-12 col-md-auto text-md-end">
+            <span class="fs-5 fw-bold" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
           </div>
         </div>
       </div>
     </div>
   </div>
   </div>
+  </div>
 
   <!-- Status and actions -->
-  <div class="row g-3 align-items-end mt-3">
-    <div class="col-sm-4">
-      <label class="form-label">Status</label>
-      <select name="status" class="form-select" <?php echo ($lockAll && !$statusOnlyEdit) ? 'disabled' : ''; ?>>
-        <option value="pending" <?php echo ($parcel['status'] ?? '')==='pending'?'selected':''; ?>>Pending</option>
-        <option value="in_transit" <?php echo ($parcel['status'] ?? '')==='in_transit'?'selected':''; ?>>In Transit</option>
-        <option value="delivered" <?php echo ($parcel['status'] ?? '')==='delivered'?'selected':''; ?>>Delivered</option>
-      </select>
-    </div>
-    <div class="col-sm-8 text-end">
-      <button type="submit" id="parcelSubmitBtn" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+  <div class="section-card mt-3">
+    <div class="section-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-sm-6 col-md-4">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select form-select-sm" <?php echo ($lockAll && !$statusOnlyEdit) ? 'disabled' : ''; ?>>
+            <option value="pending" <?php echo ($parcel['status'] ?? '')==='pending'?'selected':''; ?>>Pending</option>
+            <option value="in_transit" <?php echo ($parcel['status'] ?? '')==='in_transit'?'selected':''; ?>>In Transit</option>
+            <option value="delivered" <?php echo ($parcel['status'] ?? '')==='delivered'?'selected':''; ?>>Delivered</option>
+          </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-auto text-md-end">
+          <button type="submit" id="parcelSubmitBtn" class="btn btn-primary btn-sm w-100 w-md-auto text-nowrap"><i class="bi bi-save me-1"></i> Save Parcel</button>
+        </div>
+      </div>
     </div>
   </div>
 </form>
+</div><!-- .parcel-form-page -->
 
 <script>
 (function(){
@@ -528,37 +594,64 @@
         e.preventDefault();
         return false;
       }
+      // Scroll to first invalid field (HTML5 validation)
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        const firstInvalid = form.querySelector(':invalid');
+        if (firstInvalid) {
+          firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstInvalid.focus();
+        }
+        return false;
+      }
       isSubmitting = true;
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
-      // Re-enable after 5 seconds as fallback (in case of error)
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving…';
       setTimeout(function() {
         if (isSubmitting) {
           isSubmitting = false;
           submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="bi bi-save"></i> Save';
+          submitBtn.innerHTML = '<i class="bi bi-save me-1"></i> Save Parcel';
         }
       }, 5000);
     });
   }
 
+  // Sync recDateSummary with parcel date
+  const parcelDateEl = document.getElementById('parcelDate');
+  const recDateSummaryEl = document.getElementById('recDateSummary');
+  if (parcelDateEl && recDateSummaryEl) {
+    function syncRecDate() { recDateSummaryEl.textContent = parcelDateEl.value || '—'; }
+    parcelDateEl.addEventListener('change', syncRecDate);
+    parcelDateEl.addEventListener('input', syncRecDate);
+    syncRecDate();
+  }
+
   function recalc(){
     if (lockAll) { return; }
-    // When item amounts are allowed (Kilinochchi), derive from RS/CTS
+    // When item amounts are allowed, derive from Qty × Rate and show Amount per row
     // EXCEPT during price-only edit (user types price manually)
     if (canEnterItemAmounts && !(isEdit && priceOnly)) {
       let total = 0;
       const rows = table.querySelectorAll('tbody tr');
       rows.forEach(row => {
         const qty = parseFloat(row.querySelector('.item-qty')?.value || '0');
-        const rsInput = row.querySelector('.item-rs');
-        const ctsInput = row.querySelector('.item-cts');
-        const rs = parseFloat(rsInput?.value || '0');
-        const cts = parseFloat(ctsInput?.value || '0');
-        const perUnit = rs + (cts/100);
-        const line = (qty > 0 && perUnit > 0) ? (qty * perUnit) : 0;
+        const rateInput = row.querySelector('.item-rate');
+        const rate = parseFloat(rateInput?.value || '0') || 0;
+        const addInputs = row.querySelectorAll('.item-add');
+        let addSum = 0;
+        addInputs.forEach(inp => { addSum += parseFloat(inp?.value || '0') || 0; });
+        const base = (qty > 0 && rate > 0) ? (qty * rate) : 0;
+        const line = base + addSum;
         total += line;
+        const amountEl = row.querySelector('.item-amount');
+        if (amountEl) amountEl.textContent = line > 0 ? line.toFixed(2) : '—';
       });
+      if (totalDisplay) totalDisplay.textContent = total > 0 ? total.toFixed(2) : '—';
+      if (totalPrice && !totalPrice.disabled) totalPrice.value = total > 0 ? total.toFixed(2) : '';
+    }
+  }
+
   // Supplier phone hint + Vehicle display
   const supplierSelect = document.getElementById('supplierSelect');
   const supplierPhoneHint = document.getElementById('supplierPhoneHint');
@@ -582,6 +675,54 @@
   vehicleSelect?.addEventListener('change', updateVehicle);
   vehicleInput?.addEventListener('input', updateVehicle);
   updateVehicle();
+
+  // Auto-pick Delivery Route (vehicle) when customer and branches are selected
+  const customerSel = document.querySelector('select[name="customer_id"]');
+  const toBranchSel = document.querySelector('select[name="to_branch_id"]');
+  const fromBranchSel = document.querySelector('select[name="from_branch_id"]');
+  const parcelDateEl = document.getElementById('parcelDate');
+  const routeHintEl = document.getElementById('deliveryRouteHint');
+  function applyDeliveryRouteFromCustomer() {
+    if (lockAll) return;
+    const cid = customerSel ? (customerSel.value || '').trim() : '';
+    const toId = toBranchSel ? (toBranchSel.value || '').trim() : '';
+    const fromId = fromBranchSel ? (fromBranchSel.value || '').trim() : '';
+    const dateVal = parcelDateEl ? (parcelDateEl.value || '').trim() : '';
+    if (!cid || cid === '0') return;
+    const date = dateVal || '<?php echo date('Y-m-d'); ?>';
+    const url = '<?php echo Helpers::baseUrl('index.php?page=parcels&action=route_for_customer'); ?>'
+      + '&customer_id=' + encodeURIComponent(cid)
+      + '&to_branch_id=' + encodeURIComponent(toId)
+      + '&from_branch_id=' + encodeURIComponent(fromId)
+      + '&date=' + encodeURIComponent(date);
+    fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        const v = data && data.vehicle_no ? String(data.vehicle_no).trim() : '';
+        if (v === '') return;
+        if (vehicleSelect) {
+          let exists = false;
+          Array.from(vehicleSelect.options).forEach(function(o) { if ((o.value || '') === v) exists = true; });
+          if (!exists) { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; vehicleSelect.appendChild(opt); }
+          const wasDisabled = vehicleSelect.disabled; if (wasDisabled) vehicleSelect.disabled = false;
+          vehicleSelect.value = v;
+          vehicleSelect.dispatchEvent(new Event('change')); vehicleSelect.dispatchEvent(new Event('input'));
+          if (wasDisabled) vehicleSelect.disabled = true;
+        } else if (vehicleInput) {
+          vehicleInput.value = v;
+          vehicleInput.dispatchEvent(new Event('input'));
+        }
+        updateVehicle();
+        if (routeHintEl) { routeHintEl.textContent = 'Delivery route: ' + v + (data.delivery_date ? ' (' + data.delivery_date + ')' : ''); routeHintEl.classList.remove('d-none'); }
+      })
+      .catch(function() { if (routeHintEl) routeHintEl.classList.add('d-none'); });
+  }
+  if (customerSel) customerSel.addEventListener('change', applyDeliveryRouteFromCustomer);
+  if (toBranchSel) toBranchSel.addEventListener('change', applyDeliveryRouteFromCustomer);
+  if (fromBranchSel) fromBranchSel.addEventListener('change', applyDeliveryRouteFromCustomer);
+  if (parcelDateEl) parcelDateEl.addEventListener('change', applyDeliveryRouteFromCustomer);
+  if (parcelDateEl) parcelDateEl.addEventListener('input', applyDeliveryRouteFromCustomer);
+  setTimeout(applyDeliveryRouteFromCustomer, 100);
 
   // Quick Add Vehicle in parcel form
   document.getElementById('qv_submit')?.addEventListener('click', async function(){
@@ -792,12 +933,34 @@
     const target = e.target;
     if (lockAll) return;
     if (!canEnterItemAmounts) return;
-    if (target.classList.contains('item-qty') || target.classList.contains('item-rs') || target.classList.contains('item-cts')) {
+    if (target.classList.contains('item-qty') || target.classList.contains('item-rate') || target.classList.contains('item-add')) {
       recalc();
     }
   });
 
   table.addEventListener('click', function(e){
+    if (e.target.closest('.add-amount-btn')) {
+      const cell = e.target.closest('.item-amount-cell');
+      const list = cell?.querySelector('.item-add-list');
+      if (!list) return;
+      const nameMatch = list.querySelector('input[name]');
+      const baseName = (nameMatch && nameMatch.name) ? nameMatch.name : 'items[1][additional_amounts][]';
+      const div = document.createElement('div');
+      div.className = 'd-flex gap-1 align-items-center item-add-row';
+      div.innerHTML = `<input type="number" step="0.01" min="0" name="${baseName}" class="form-control form-control-sm item-add" placeholder="0"><button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button>`;
+      list.appendChild(div);
+      recalc();
+      return;
+    }
+    if (e.target.closest('.remove-add')) {
+      const addRow = e.target.closest('.item-add-row');
+      const list = addRow?.parentElement;
+      if (list && list.querySelectorAll('.item-add-row').length > 1) {
+        addRow.remove();
+        recalc();
+      }
+      return;
+    }
     if (e.target.closest('.remove-row')) {
       const tr = e.target.closest('tr');
       tr.parentNode.removeChild(tr);
@@ -813,8 +976,20 @@
       <td class="text-center align-middle">${idx}</td>
       <td><input type="text" name="items[${idx}][description]" class="form-control item-desc" placeholder="Description"></td>
       <td><input type="number" step="0.01" name="items[${idx}][qty]" class="form-control item-qty" placeholder="Qty"></td>
-      <td><input type="number" step="1" min="0" name="items[${idx}][rs]" class="form-control item-rs" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rs"></td>
-      <td><input type="number" step="1" min="0" max="99" name="items[${idx}][cts]" class="form-control item-cts" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Cts"></td>
+      <td><input type="number" step="0.01" min="0" name="items[${idx}][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
+      <td class="align-middle item-amount-cell">
+        <div class="d-flex flex-column gap-1">
+          <span class="item-amount fw-semibold">—</span>
+          <label class="small text-muted mb-0">+ Add amounts:</label>
+          <div class="item-add-list d-flex flex-column gap-1">
+            <div class="d-flex gap-1 align-items-center item-add-row">
+              <input type="number" step="0.01" min="0" name="items[${idx}][additional_amounts][]" class="form-control form-control-sm item-add" placeholder="0" ${canEnterItemAmounts ? '' : 'disabled'}>
+              <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button>
+        </div>
+      </td>
       <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button></td>
     `;
     tbody.appendChild(tr);
@@ -1062,7 +1237,8 @@
   const fromSel = document.querySelector('select[name="from_branch_id"]');
   const toSel = document.querySelector('select[name="to_branch_id"]');
   // Quick Add Customer via AJAX
-  document.getElementById('qa_submit')?.addEventListener('click', async function(){
+  document.getElementById('qa_submit')?.addEventListener('click', async function(e){
+    e.preventDefault();
     const name = (document.getElementById('qa_name')?.value || '').trim();
     const phone = (document.getElementById('qa_phone_input')?.value || '').trim();
     const email = (document.getElementById('qa_email')?.value || '').trim();
@@ -1073,8 +1249,11 @@
     if (!name) { alert('Please enter Name before saving.'); return; }
     // Basic email pattern check only if email provided
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Enter a valid email'); return; }
+    const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+    if (!csrf) { alert('Session expired. Please refresh the page and try again.'); return; }
+    const btn = document.getElementById('qa_submit');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...'; }
     try {
-      const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
       const fd = new FormData();
       fd.append('csrf_token', csrf);
       fd.append('ajax', '1');
@@ -1091,20 +1270,31 @@
         body: fd
       });
       let data = null;
-      if (res.ok) {
-        try { data = await res.json(); } catch(_) { /* fall through to fallback */ }
-      }
-      if (!res.ok || !data || data.error || !data.id) {
+      try { const text = await res.text(); data = text ? JSON.parse(text) : null; } catch(_) { data = null; }
+      if (data && data.error) { alert(data.error); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-save"></i> Save & Use'; } return; }
+      if (!res.ok || !data || !data.id) {
         // Fallback to quick_add_customer endpoint
-        fd.set('ajax','1');
+        const fd2 = new FormData();
+        fd2.append('csrf_token', csrf);
+        fd2.append('ajax', '1');
+        fd2.append('name', name);
+        fd2.append('phone', phone);
+        fd2.append('email', email);
+        fd2.append('address', address);
+        fd2.append('delivery_location', delivery_location);
+        fd2.append('customer_type', type);
         res = await fetch('<?php echo Helpers::baseUrl('index.php?page=quick_add_customer'); ?>', {
           method: 'POST',
           headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
-          body: fd
+          body: fd2
         });
-        if (!res.ok) throw new Error('Failed');
-        data = await res.json();
-        if (!data || !data.id) throw new Error('Invalid response');
+        try { const text2 = await res.text(); data = text2 ? JSON.parse(text2) : null; } catch(_) { data = null; }
+        if (data && data.error) { alert(data.error); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-save"></i> Save & Use'; } return; }
+        if (!res.ok || !data || !data.id) {
+          alert(data && data.error ? data.error : ('Request failed. ' + (res.status ? 'Status: ' + res.status : '')));
+          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-save"></i> Save & Use'; }
+          return;
+        }
       }
       // Ensure it shows up in the Customer dropdown immediately
       const sel = document.querySelector('select[name="customer_id"]');
@@ -1159,10 +1349,11 @@
       const collapseEl = document.getElementById('quickAddCustomer'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
       // Clear inputs
       ['qa_name','qa_phone_input','qa_email','qa_address','qa_delivery_location'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-save me-1"></i> Save & Use'; }
     } catch (e) {
-      // As a last resort, reload minimal to reflect saved state if server saved but JSON failed
-      const wantsHardRefresh = confirm('Failed to add customer without refresh. Reload page to see the new customer?');
-      if (wantsHardRefresh) { window.location.reload(); }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-save me-1"></i> Save & Use'; }
+      console.error('Quick Add Customer error', e);
+      alert('Could not add customer. ' + (e && e.message ? e.message : 'Please try again or refresh the page.'));
     }
   });
   document.getElementById('fab_submit')?.addEventListener('click', async function(){

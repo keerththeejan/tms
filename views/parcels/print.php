@@ -206,7 +206,8 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
           if ($items && count($items)>0) : foreach ($items as $i):
             $qty = (float)$i['qty'];
             $rate = (float)($i['rate'] ?? 0);
-            $amt = $qty * $rate;
+            $addAmt = (float)($i['additional_amount'] ?? 0);
+            $amt = $qty * $rate + $addAmt;
             if ($useParcelPriceOnFirstRow && !$firstRowDone) {
               $amt = $parcelPrice;
               $rate = ($qty > 0) ? ($parcelPrice / $qty) : $parcelPrice;

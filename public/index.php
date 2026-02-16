@@ -832,7 +832,13 @@ switch ($page) {
         }
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $wantsJsonSave = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
+                             || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
+                             || (($_POST['ajax'] ?? '') === '1');
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) {
+                if ($wantsJsonSave) { header('Content-Type: application/json'); echo json_encode(['error'=>'Invalid CSRF. Please refresh the page and try again.']); return; }
+                http_response_code(400); echo 'Invalid CSRF'; break;
+            }
             $id = (int)($_POST['id'] ?? 0);
             $name = trim($_POST['name'] ?? '');
             $phone = trim($_POST['phone'] ?? '');
@@ -856,7 +862,10 @@ switch ($page) {
             $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
                          || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
                          || (($_POST['ajax'] ?? '') === '1');
-            if ($name === '') { $error = 'Name is required.'; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break; }
+            if ($name === '') {
+                if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>'Name is required.']); return; }
+                $error = 'Name is required.'; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
+            }
             try {
                 if ($id > 0) {
                     $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, email=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
@@ -1137,6 +1146,8 @@ switch ($page) {
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
         try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         $user = Auth::user();
         $userBranchCode = (string)($user['branch_code'] ?? '');
         $userBranchName = (string)($user['branch_name'] ?? '');
@@ -1148,8 +1159,8 @@ switch ($page) {
                          || (stripos($userBranchName, 'Mullaithiv') !== false);
         // Keep legacy isMain flag aligned to Colombo for pricing behavior
         $isMain = $isColombo;
-        // Policy: Item amount entry should NOT work in Colombo or Mullaitivu; enable only at Kilinochchi if ever needed
-        $canEnterItemAmounts = $isKilinochchi;
+        // Allow all branches to enter item RS/CTS (price) so price add fields work for new parcels
+        $canEnterItemAmounts = true;
         // Allow all branches with parcel role to create parcels
         $canCreateParcels = true;
 
@@ -1375,15 +1386,20 @@ switch ($page) {
                     $discountRaw = trim($_POST['discount'] ?? '');
                     $p = ($priceRaw === '') ? null : (float)$priceRaw;
                     if ($p === null) {
-                        // Fallback: compute from posted items
+                        // Fallback: compute from posted items (Qty × Rate)
                         $sum = 0.0;
                         if (is_array($items)) {
                             foreach ($items as $it) {
                                 $q = (float)($it['qty'] ?? 0);
-                                $rs = (float)($it['rs'] ?? 0);
-                                $cts = (float)($it['cts'] ?? 0);
-                                $r = $rs + ($cts/100.0);
-                                if ($q > 0 && $r > 0) { $sum += $q * $r; }
+                                $r = (float)($it['rate'] ?? 0);
+                                if ($r <= 0) { $rs = (float)($it['rs'] ?? 0); $cts = (float)($it['cts'] ?? 0); $r = $rs + ($cts/100.0); }
+                                $line = ($q > 0 && $r > 0) ? ($q * $r) : 0;
+                                $addArr = $it['additional_amounts'] ?? [];
+                                if (is_string($addArr)) { $addArr = json_decode($addArr, true) ?: []; }
+                                $addAmt = 0;
+                                foreach ((array)$addArr as $a) { $addAmt += (float)$a; }
+                                if ($addAmt <= 0) { $addAmt = (float)($it['additional_amount'] ?? 0); }
+                                $sum += $line + $addAmt;
                             }
                         }
                         if ($sum > 0) { $p = $sum; }
@@ -1395,7 +1411,7 @@ switch ($page) {
                     $price = $p;
                     if ($price === null) {
                         // Re-render with error for missing price
-                        $error = 'Please enter a valid price (or RS/CTS) for Kilinochchi.';
+                        $error = 'Please enter a valid price (or Rate) for Kilinochchi.';
                         // Load vehicles for form
                         try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
                         catch (Throwable $e) { $vehiclesAll = []; }
@@ -1441,7 +1457,7 @@ switch ($page) {
                     try {
                         $newAmount = (float)($price ?? 0);
                         if ($newAmount <= 0) {
-                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
+                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
                             $sumItems->execute([$id]);
                             $newAmount = (float)($sumItems->fetch()['s'] ?? 0);
                         }
@@ -1469,15 +1485,22 @@ switch ($page) {
                     // Replace items allowed for non-Kilinochchi
                     $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]);
                     if (is_array($items)) {
-                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate) VALUES (?,?,?,?)');
+                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate, additional_amount, additional_amounts) VALUES (?,?,?,?,?,?)');
                         foreach ($items as $it) {
                             $desc = trim($it['description'] ?? '');
                             $qty = (float)($it['qty'] ?? 0);
-                            $rs = (float)($it['rs'] ?? 0);
-                            $cts = (float)($it['cts'] ?? 0);
-                            $rate = $canEnterItemAmounts ? ($rs + ($cts/100.0)) : null;
+                            $rate = (float)($it['rate'] ?? 0);
+                            if ($rate <= 0) { $rs = (float)($it['rs'] ?? 0); $cts = (float)($it['cts'] ?? 0); $rate = $rs + ($cts/100.0); }
+                            $rate = ($rate > 0) ? $rate : null;
+                            $addArr = $it['additional_amounts'] ?? [];
+                            if (is_string($addArr)) { $addArr = json_decode($addArr, true) ?: []; }
+                            $addAmt = 0;
+                            foreach ((array)$addArr as $a) { $addAmt += (float)$a; }
+                            $addAmt = ($addAmt > 0) ? $addAmt : null;
+                            $addJson = !empty($addArr) ? json_encode(array_values(array_filter(array_map('floatval', $addArr)))) : null;
+                            if ($addJson === '[]') $addJson = null;
                             if ($desc !== '' || $qty > 0) {
-                                $insItem->execute([$id, $qty, $desc, $rate]);
+                                $insItem->execute([$id, $qty, $desc, $rate, $addAmt, $addJson]);
                             }
                         }
                     }
@@ -1485,7 +1508,7 @@ switch ($page) {
                     try {
                         $newAmount = (float)($price ?? 0);
                         if ($newAmount <= 0) {
-                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
+                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
                             $sumItems->execute([$id]);
                             $newAmount = (float)($sumItems->fetch()['s'] ?? 0);
                         }
@@ -1529,10 +1552,15 @@ switch ($page) {
                         if (is_array($items)) {
                             foreach ($items as $it) {
                                 $q = (float)($it['qty'] ?? 0);
-                                $rs = (float)($it['rs'] ?? 0);
-                                $cts = (float)($it['cts'] ?? 0);
-                                $r = $rs + ($cts/100.0);
-                                if ($q > 0 && $r > 0) { $sum += $q * $r; }
+                                $r = (float)($it['rate'] ?? 0);
+                                if ($r <= 0) { $rs = (float)($it['rs'] ?? 0); $cts = (float)($it['cts'] ?? 0); $r = $rs + ($cts/100.0); }
+                                $line = ($q > 0 && $r > 0) ? ($q * $r) : 0;
+                                $addArr = $it['additional_amounts'] ?? [];
+                                if (is_string($addArr)) { $addArr = json_decode($addArr, true) ?: []; }
+                                $addAmt = 0;
+                                foreach ((array)$addArr as $a) { $addAmt += (float)$a; }
+                                if ($addAmt <= 0) { $addAmt = (float)($it['additional_amount'] ?? 0); }
+                                $sum += $line + $addAmt;
                             }
                         }
                         if ($sum > 0) { $p = $sum; }
@@ -1572,15 +1600,22 @@ switch ($page) {
                 // Insert item rows on create so list can show descriptions immediately
                 if ($id > 0 && is_array($items)) {
                     try {
-                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate) VALUES (?,?,?,?)');
+                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate, additional_amount, additional_amounts) VALUES (?,?,?,?,?,?)');
                         foreach ($items as $it) {
                             $desc = trim($it['description'] ?? '');
                             $qty = (float)($it['qty'] ?? 0);
-                            $rs = (float)($it['rs'] ?? 0);
-                            $cts = (float)($it['cts'] ?? 0);
-                            $rate = $canEnterItemAmounts ? ($rs + ($cts/100.0)) : null;
+                            $rate = (float)($it['rate'] ?? 0);
+                            if ($rate <= 0) { $rs = (float)($it['rs'] ?? 0); $cts = (float)($it['cts'] ?? 0); $rate = $rs + ($cts/100.0); }
+                            $rate = ($rate > 0) ? $rate : null;
+                            $addArr = $it['additional_amounts'] ?? [];
+                            if (is_string($addArr)) { $addArr = json_decode($addArr, true) ?: []; }
+                            $addAmt = 0;
+                            foreach ((array)$addArr as $a) { $addAmt += (float)$a; }
+                            $addAmt = ($addAmt > 0) ? $addAmt : null;
+                            $addJson = !empty($addArr) ? json_encode(array_values(array_filter(array_map('floatval', $addArr)))) : null;
+                            if ($addJson === '[]') $addJson = null;
                             if ($desc !== '' || $qty > 0) {
-                                $insItem->execute([$id, $qty, $desc, $rate]);
+                                $insItem->execute([$id, $qty, $desc, $rate, $addAmt, $addJson]);
                             }
                         }
                     } catch (Throwable $e) { /* ignore if table missing */ }
@@ -1828,11 +1863,50 @@ switch ($page) {
             break;
         }
 
+        // AJAX: get delivery route (vehicle) for customer + branch + date (for auto-pick on parcel form)
+        if ($action === 'route_for_customer') {
+            header('Content-Type: application/json');
+            if (!Auth::check()) { echo json_encode(['vehicle_no'=>null,'delivery_date'=>null]); break; }
+            $pdo = Database::pdo();
+            $customer_id = (int)($_GET['customer_id'] ?? $_POST['customer_id'] ?? 0);
+            $to_branch_id = (int)($_GET['to_branch_id'] ?? $_POST['to_branch_id'] ?? 0);
+            $from_branch_id = (int)($_GET['from_branch_id'] ?? $_POST['from_branch_id'] ?? 0);
+            $date = trim($_GET['date'] ?? $_POST['date'] ?? '');
+            if ($date === '') $date = date('Y-m-d');
+            if ($customer_id <= 0) { echo json_encode(['vehicle_no'=>null,'delivery_date'=>null]); break; }
+            $vehicle_no = null;
+            $delivery_date = null;
+            try {
+                if ($to_branch_id > 0) {
+                    $stmt = $pdo->prepare('SELECT vehicle_no, delivery_date FROM delivery_route_assignments WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
+                    $stmt->execute([$customer_id, $to_branch_id, $date]);
+                    $row = $stmt->fetch();
+                    if ($row && trim($row['vehicle_no'] ?? '') !== '') { $vehicle_no = trim($row['vehicle_no']); $delivery_date = $row['delivery_date'] ?? null; }
+                }
+                if (($vehicle_no === null || $vehicle_no === '') && $from_branch_id > 0) {
+                    $stmt = $pdo->prepare('SELECT vehicle_no, delivery_date FROM delivery_route_assignments WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
+                    $stmt->execute([$customer_id, $from_branch_id, $date]);
+                    $row = $stmt->fetch();
+                    if ($row && trim($row['vehicle_no'] ?? '') !== '') { $vehicle_no = trim($row['vehicle_no']); $delivery_date = $row['delivery_date'] ?? null; }
+                }
+            } catch (Throwable $e) { /* ignore */ }
+            echo json_encode(['vehicle_no'=>$vehicle_no,'delivery_date'=>$delivery_date]);
+            break;
+        }
+
         // index with search filters
         $q = trim($_GET['q'] ?? '');
         $status = $_GET['status'] ?? '';
         $vehicle_no = trim($_GET['vehicle_no'] ?? '');
         $customer_filter_id = (int)($_GET['customer_id'] ?? 0);
+        $from_branch_filter_id = (int)($_GET['from_branch_id'] ?? 0);
+        $to_branch_filter_id = (int)($_GET['to_branch_id'] ?? 0);
+        $supplier_filter_id = (int)($_GET['supplier_id'] ?? 0);
+        $tracking_filter = trim($_GET['tracking_number'] ?? '');
+        $invoice_no_filter = trim($_GET['invoice_no'] ?? '');
+        $delivery_location_filter = trim($_GET['delivery_location'] ?? '');
+        $route_date = trim($_GET['route_date'] ?? '');
+        $filter_type = trim($_GET['filter_type'] ?? '');
         
         // Handle date filter persistence in session
         // If dates are provided in GET, save them to session
@@ -1851,9 +1925,19 @@ switch ($page) {
         // Use GET params if provided, otherwise use session, otherwise default to last 30 days
         $from = $_GET['from'] ?? ($_SESSION['parcels_filter_from'] ?? date('Y-m-d', strtotime('-30 days')));
         $to = $_GET['to'] ?? ($_SESSION['parcels_filter_to'] ?? date('Y-m-d'));
-        $to_branch_filter_id = (int)($_GET['to_branch_id'] ?? 0);
         $where = [];
         $params = [];
+        // Preset: Delivery Route Planning — only pending/in_transit (default today if dates not in GET)
+        if ($filter_type === 'route_planning') {
+            if (!isset($_GET['from']) || $_GET['from'] === '') { $from = date('Y-m-d'); }
+            if (!isset($_GET['to']) || $_GET['to'] === '') { $to = date('Y-m-d'); }
+            $where[] = "p.status IN ('pending','in_transit')";
+        }
+        // Preset: Vehicle Routes — only parcels with vehicle assigned
+        if ($filter_type === 'vehicle_routes') {
+            $where[] = "(p.vehicle_no IS NOT NULL AND TRIM(COALESCE(p.vehicle_no,'')) <> '')";
+        }
+        // Preset: Customers — only that customer's parcels (customer_filter_id applied below)
         if ($q !== '') {
             $where[] = '(c.phone LIKE ? OR c.name LIKE ? OR p.tracking_number LIKE ?)';
             $like = "%$q%";
@@ -1867,9 +1951,36 @@ switch ($page) {
             $where[] = 'p.customer_id = ?';
             $params[] = $customer_filter_id;
         }
+        if ($from_branch_filter_id > 0) {
+            $where[] = 'p.from_branch_id = ?';
+            $params[] = $from_branch_filter_id;
+        }
         if ($to_branch_filter_id > 0) {
             $where[] = 'p.to_branch_id = ?';
             $params[] = $to_branch_filter_id;
+        }
+        if ($supplier_filter_id > 0) {
+            $where[] = 'p.supplier_id = ?';
+            $params[] = $supplier_filter_id;
+        }
+        if ($tracking_filter !== '') {
+            $where[] = 'p.tracking_number LIKE ?';
+            $params[] = '%' . $tracking_filter . '%';
+        }
+        if ($invoice_no_filter !== '') {
+            $invNo = (int)$invoice_no_filter;
+            if ($invNo > 0) {
+                $where[] = 'p.invoice_no = ?';
+                $params[] = $invNo;
+            }
+        }
+        if ($delivery_location_filter !== '') {
+            $where[] = 'c.delivery_location LIKE ?';
+            $params[] = '%' . $delivery_location_filter . '%';
+        }
+        if ($route_date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $route_date)) {
+            $where[] = '(EXISTS (SELECT 1 FROM delivery_route_assignments dra WHERE dra.customer_id = p.customer_id AND ((dra.branch_id = p.to_branch_id AND dra.delivery_date = ?) OR (dra.branch_id = p.from_branch_id AND dra.delivery_date = ?))))';
+            array_push($params, $route_date, $route_date);
         }
         if (in_array($status, ['pending','in_transit','delivered'], true)) {
             $where[] = 'p.status = ?';
@@ -1885,6 +1996,7 @@ switch ($page) {
         if ($hasEmailLog) {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
+                           COALESCE(dra_to.delivery_date, "") AS route_date_to, COALESCE(dra_from.delivery_date, "") AS route_date_from,
                            c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            COALESCE(pe.status, p.last_email_status) AS email_status,
                            COALESCE(pe.created_at, p.last_emailed_at) AS emailed_at,
@@ -1918,6 +2030,7 @@ switch ($page) {
         } else {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
+                           COALESCE(dra_to.delivery_date, "") AS route_date_to, COALESCE(dra_from.delivery_date, "") AS route_date_from,
                            c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            p.last_email_status AS email_status, p.last_emailed_at AS emailed_at,
                            pit.item_descriptions
@@ -1968,8 +2081,26 @@ switch ($page) {
         if ($customer_filter_id > 0) {
             $countParams[] = $customer_filter_id;
         }
+        if ($from_branch_filter_id > 0) {
+            $countParams[] = $from_branch_filter_id;
+        }
         if ($to_branch_filter_id > 0) {
             $countParams[] = $to_branch_filter_id;
+        }
+        if ($supplier_filter_id > 0) {
+            $countParams[] = $supplier_filter_id;
+        }
+        if ($tracking_filter !== '') {
+            $countParams[] = '%' . $tracking_filter . '%';
+        }
+        if ($invoice_no_filter !== '' && (int)$invoice_no_filter > 0) {
+            $countParams[] = (int)$invoice_no_filter;
+        }
+        if ($delivery_location_filter !== '') {
+            $countParams[] = '%' . $delivery_location_filter . '%';
+        }
+        if ($route_date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $route_date)) {
+            array_push($countParams, $route_date, $route_date);
         }
         if (in_array($status, ['pending','in_transit','delivered'], true)) {
             $countParams[] = $status;
@@ -2000,12 +2131,16 @@ switch ($page) {
             unset($row);
             unset($_SESSION['email_sent_parcel_id']);
         }
-        // customers for filter
+        // customers, branches, suppliers for filter
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
-        // branches for filter
         $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $suppliersFilterList = $pdo->query('SELECT id, name FROM suppliers ORDER BY name LIMIT 300')->fetchAll();
         $parcelRowStart = ($page - 1) * $perPage; // 0-based start for sequential # column (1, 2, 3...)
-        Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','customersList','from','to','to_branch_filter_id','branchesFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount','parcelRowStart'));
+        if ($action === 'print_list') {
+            Helpers::view('parcels/print_list', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','route_date','filter_type','from','to','totalCount','parcelRowStart'));
+        } else {
+            Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','route_date','filter_type','customersList','from','to','branchesFilterList','suppliersFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount','parcelRowStart'));
+        }
         break;
 
     case 'email_log':
@@ -2063,6 +2198,8 @@ switch ($page) {
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
         try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         $id = (int)($_GET['id'] ?? 0);
         $stmt = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, s.phone AS supplier_phone, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id LEFT JOIN suppliers s ON s.id = p.supplier_id LEFT JOIN branches bf ON bf.id=p.from_branch_id LEFT JOIN branches bt ON bt.id=p.to_branch_id WHERE p.id=?');
         $stmt->execute([$id]);
@@ -2078,6 +2215,8 @@ switch ($page) {
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         if (!Auth::hasAnyRole(['admin','parcel_user','staff'])) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
+        try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         $user = Auth::user();
         $branchId = (int)($user['branch_id'] ?? 0);
         $branchFilterId = Auth::isMainBranch() ? (int)($_GET['branch_id'] ?? $branchId) : $branchId;
@@ -2277,7 +2416,7 @@ switch ($page) {
                     $amount = (float)str_replace([',',' '], '', $rawPrice);
                     if ($amount <= 0) {
                         try {
-                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
+                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
                             $sumItems->execute([(int)$r['id']]);
                             $amount = (float)($sumItems->fetch()['s'] ?? 0);
                         } catch (Throwable $e) { /* ignore */ }
@@ -2434,7 +2573,7 @@ switch ($page) {
                      AND $branchCol = ?
                      AND (p.status IS NULL OR p.status <> 'delivered')
                     LEFT JOIN (
-                      SELECT parcel_id, SUM(COALESCE(qty,0)*COALESCE(rate,0)) AS items_total
+                      SELECT parcel_id, SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)) AS items_total
                       FROM parcel_items
                       GROUP BY parcel_id
                     ) isum ON isum.parcel_id = p.id
@@ -2468,7 +2607,7 @@ switch ($page) {
                          AND $branchCol2 = ?
                          AND (p.status IS NULL OR p.status <> 'delivered')
                         LEFT JOIN (
-                          SELECT parcel_id, SUM(COALESCE(qty,0)*COALESCE(rate,0)) AS items_total
+                          SELECT parcel_id, SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)) AS items_total
                           FROM parcel_items
                           GROUP BY parcel_id
                         ) isum ON isum.parcel_id = p.id
@@ -4468,10 +4607,16 @@ switch ($page) {
     case 'quick_add_customer':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Method Not Allowed'; break; }
-        if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+        if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['error'=>'Invalid CSRF. Please refresh the page and try again.']);
+            return;
+        }
         $pdo = Database::pdo();
         $name = trim($_POST['name'] ?? '');
         $phone = trim($_POST['phone'] ?? '');
+        $email = trim($_POST['email'] ?? '');
         $address = trim($_POST['address'] ?? '');
         $delivery_location = trim($_POST['delivery_location'] ?? '');
         $type = trim($_POST['customer_type'] ?? '');
@@ -4483,7 +4628,7 @@ switch ($page) {
             Helpers::redirect('index.php?page=parcels&action=new');
             break;
         }
-        // Check if exists
+        // Check if exists (by phone if provided)
         $cid = 0;
         if ($phone !== '') {
             $stmt = $pdo->prepare('SELECT id FROM customers WHERE phone=? LIMIT 1');
@@ -4492,13 +4637,17 @@ switch ($page) {
             if ($existing) { $cid = (int)$existing['id']; }
         }
         if ($cid === 0) {
-            // allow null phone
             try { $pdo->exec("ALTER TABLE customers MODIFY phone VARCHAR(20) NULL"); } catch (Throwable $e) { /* ignore */ }
-            $ins = $pdo->prepare('INSERT INTO customers (name, phone, address, delivery_location, customer_type) VALUES (?,?,?,?,?)');
-            $ins->execute([$name, ($phone!==''?$phone:null), $address, $delivery_location, $type !== '' ? $type : null]);
-            $cid = (int)$pdo->lastInsertId();
+            try {
+                $ins = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, customer_type) VALUES (?,?,?,?,?,?)');
+                $ins->execute([$name, ($phone!==''?$phone:null), ($email!==''?$email:null), $address, $delivery_location, $type !== '' ? $type : null]);
+                $cid = (int)$pdo->lastInsertId();
+            } catch (Throwable $e) {
+                if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>'Failed to save customer. ' . $e->getMessage()]); return; }
+                throw $e;
+            }
         }
-        if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$cid,'name'=>$name,'phone'=>$phone,'address'=>$address,'delivery_location'=>$delivery_location]); return; }
+        if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$cid,'name'=>$name,'phone'=>$phone,'email'=>$email,'address'=>$address,'delivery_location'=>$delivery_location]); return; }
         Helpers::redirect('index.php?page=parcels&action=new&customer_id=' . $cid);
         break;
 
