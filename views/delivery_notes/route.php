@@ -91,6 +91,63 @@ function updateLocationAjax(form) {
   </div>
   </div>
 <?php endif; ?>
+
+<div class="card border shadow-sm mb-3">
+  <div class="card-header bg-light py-2">
+    <button class="btn btn-link btn-sm text-decoration-none p-0 fw-semibold d-flex align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#addRouteOptions" aria-expanded="false">
+      <i class="bi bi-plus-circle me-1"></i> Add delivery route options
+    </button>
+  </div>
+  <div class="collapse" id="addRouteOptions">
+    <div class="card-body">
+      <p class="small text-muted mb-2">Register a customer first (Dashboard → Register Customer), then pick that customer here to use their address and add a delivery route assignment.</p>
+      <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=assign_vehicle'); ?>" class="row g-3 align-items-end">
+        <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+        <input type="hidden" name="direction" value="<?php echo htmlspecialchars($direction ?? 'to'); ?>">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Customer</label>
+          <select class="form-select" name="customer_id" id="addRouteCustomer" required>
+            <option value="">-- Select customer --</option>
+            <?php foreach (($customersFilter ?? []) as $c): ?>
+              <option value="<?php echo (int)$c['id']; ?>" data-address="<?php echo htmlspecialchars((string)($c['delivery_location'] ?? '')); ?>"><?php echo htmlspecialchars(($c['name'] ?? '') . ' (' . ($c['phone'] ?? '') . ')'); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Customer address</label>
+          <div id="addRouteAddress" class="form-control-plaintext small text-muted border rounded px-2 py-1 bg-light" style="min-height: 2.25rem;">— Pick a customer</div>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Delivery date</label>
+          <input type="date" name="delivery_date" class="form-control" value="<?php echo htmlspecialchars($date ?? date('Y-m-d')); ?>">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Vehicle No</label>
+          <input type="text" name="vehicle_no" class="form-control" placeholder="e.g. AB-1234" required>
+        </div>
+        <div class="col-12 col-md-12">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-signpost me-1"></i> Add delivery route</button>
+          <a href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>" class="btn btn-outline-secondary btn-sm ms-2"><i class="bi bi-person-plus me-1"></i> Register new customer</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var sel = document.getElementById('addRouteCustomer');
+  var addr = document.getElementById('addRouteAddress');
+  if (!sel || !addr) return;
+  function update(){
+    var opt = sel.options[sel.selectedIndex];
+    var a = opt ? (opt.getAttribute('data-address') || '') : '';
+    addr.textContent = a ? a : (sel.value ? '— No address' : '— Pick a customer');
+  }
+  sel.addEventListener('change', update);
+  update();
+})();
+</script>
+
 <form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="delivery_notes">
   <input type="hidden" name="action" value="route">

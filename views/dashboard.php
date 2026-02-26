@@ -178,6 +178,57 @@
     </div>
   </section>
 
+  <section class="mb-4">
+    <h5 class="mb-3">Delivery Route</h5>
+    <p class="text-muted small mb-2">Register a customer first, then plan routes and assign vehicles. When adding a delivery route you can pick the customer and use their address.</p>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
+      <div class="col">
+        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>">
+          <div class="action-icon bg-info bg-opacity-10 text-info">
+            <i class="bi bi-person-plus"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="action-title">Register Customer</div>
+            <div class="action-desc">Add customer &amp; address</div>
+          </div>
+        </a>
+      </div>
+      <div class="col">
+        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>">
+          <div class="action-icon bg-primary bg-opacity-10 text-primary">
+            <i class="bi bi-signpost-split"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="action-title">Plan Delivery Route</div>
+            <div class="action-desc">Pick customer, use address</div>
+          </div>
+        </a>
+      </div>
+      <div class="col">
+        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>">
+          <div class="action-icon bg-secondary bg-opacity-10 text-secondary">
+            <i class="bi bi-truck-front"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="action-title">Vehicle Routes</div>
+            <div class="action-desc">By vehicle &amp; date</div>
+          </div>
+        </a>
+      </div>
+      <div class="col">
+        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=route_planning'); ?>">
+          <div class="action-icon bg-success bg-opacity-10 text-success">
+            <i class="bi bi-geo-alt"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="action-title">Parcels by Route</div>
+            <div class="action-desc">Today’s route planning</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
   <div class="filters-card">
     <form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="row g-3 align-items-end">
       <input type="hidden" name="page" value="dashboard">

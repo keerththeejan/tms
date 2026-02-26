@@ -15,6 +15,9 @@
   .parcel-form-page .table-responsive { -webkit-overflow-scrolling: touch; }
   .parcel-form-page .form-label { font-weight: 500; margin-bottom: 0.25rem; }
   .parcel-form-page .btn-quick { font-size: 0.8rem; }
+  .parcel-form-page .pf-visually-hidden-select { position:absolute !important; left:-9999px !important; width:1px !important; height:1px !important; opacity:0 !important; }
+  .parcel-form-page .customer-search-results { position: relative; }
+  .parcel-form-page .customer-search-results .list-group { position:absolute; z-index: 1050; width:100%; max-height: 260px; overflow:auto; }
   @media (max-width: 576px) {
     .parcel-form-page .page-header { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
     .parcel-form-page .section-card .section-body { padding: 0.75rem; }
@@ -161,8 +164,12 @@
         <span>Customer</span>
         <button type="button" class="btn btn-sm btn-outline-primary btn-quick" data-bs-toggle="collapse" data-bs-target="#quickAddCustomer" aria-expanded="false"><i class="bi bi-person-plus me-1"></i> Quick Add</button>
       </label>
-      <select name="customer_id" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
-        <option value="">-- Select Customer --</option>
+      <div class="customer-search-results">
+        <input type="text" id="customerSearch" class="form-control form-control-sm mb-1" placeholder="Search customer (name/phone)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+        <div id="customerSearchResults" class="list-group shadow-sm" style="display:none"></div>
+      </div>
+      <select name="customer_id" id="customerSelectHidden" class="form-select form-select-sm pf-visually-hidden-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+        <option value="" disabled hidden <?php echo ((int)($parcel['customer_id'] ?? 0) <= 0) ? 'selected' : ''; ?>>-- Select Customer --</option>
         <?php foreach (($customersAll ?? []) as $c): ?>
           <?php 
             $nm = (string)($c['name'] ?? '');
@@ -578,6 +585,7 @@
   const priceOnly = <?php echo $priceOnly ? 'true' : 'false'; ?>;
   const lockAll = <?php echo $lockAll ? 'true' : 'false'; ?>;
   const canEnterItemAmounts = <?php echo $canEnterItemAmounts ? 'true' : 'false'; ?>;
+  const customersSearchData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)($c['id'] ?? 0),'name'=>(string)($c['name'] ?? ''),'phone'=>(string)($c['phone'] ?? '')]; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   const table = document.getElementById('itemsTable');
   const addBtn = document.getElementById('addRow');
   const totalDisplay = document.getElementById('totalDisplay');
@@ -649,7 +657,23 @@
       });
       if (totalDisplay) totalDisplay.textContent = total > 0 ? total.toFixed(2) : '—';
       if (totalPrice && !totalPrice.disabled) totalPrice.value = total > 0 ? total.toFixed(2) : '';
+      return;
     }
+
+
+
+
+
+    // Otherwise (other branches), show price minus discount on edit
+    if (isEdit) {
+      const p = parseFloat(totalPrice?.value || '0') || 0;
+      const d = parseFloat(discountInput?.value || '0') || 0;
+      const v = Math.max(0, p - Math.max(0, d));
+      totalDisplay.textContent = v > 0 ? v.toFixed(2) : '—';
+      return;
+    }
+    // Default fallback for create in other branches
+    totalDisplay.textContent = totalPrice?.value ? String(totalPrice.value) : '—';
   }
 
   // Supplier phone hint + Vehicle display
@@ -676,18 +700,107 @@
   vehicleInput?.addEventListener('input', updateVehicle);
   updateVehicle();
 
+  const customerSearchInput = document.getElementById('customerSearch');
+  const customerSelectMain = document.getElementById('customerSelectHidden') || document.querySelector('select[name="customer_id"]');
+  const customerSearchResults = document.getElementById('customerSearchResults');
+  function normalize(s){ return String(s || '').toLowerCase().replace(/\s+/g,' ').trim(); }
+  function digits(s){ return String(s || '').replace(/\D+/g,''); }
+  function formatCustomerLabel(c){
+    const nm = String(c.name || '').trim();
+    const ph = String(c.phone || '').trim();
+    if (nm && ph) return nm + ' (' + ph + ')';
+    return nm || ph || ('Customer #' + String(c.id || ''));
+  }
+  function setCustomer(id){
+    if (!customerSelectMain) return;
+    customerSelectMain.value = String(id || '');
+    customerSelectMain.dispatchEvent(new Event('change'));
+    customerSelectMain.dispatchEvent(new Event('input'));
+  }
+  function hideCustomerResults(){
+    if (customerSearchResults) customerSearchResults.style.display = 'none';
+    if (customerSearchResults) customerSearchResults.innerHTML = '';
+  }
+  function showCustomerResults(items){
+    if (!customerSearchResults) return;
+    if (!items || items.length === 0) { hideCustomerResults(); return; }
+    customerSearchResults.innerHTML = items.map(function(c){
+      const label = formatCustomerLabel(c);
+      return `<button type="button" class="list-group-item list-group-item-action" data-customer-id="${c.id}">${label}</button>`;
+    }).join('');
+    customerSearchResults.style.display = '';
+  }
+  function findMatches(qRaw){
+    const q = normalize(qRaw);
+    const qd = digits(qRaw);
+    if (!q && !qd) return [];
+    const scored = [];
+    customersSearchData.forEach(function(c){
+      if (!c || !c.id) return;
+      const n = normalize(c.name);
+      const p = String(c.phone || '').trim();
+      const pd = digits(p);
+      let score = 0;
+      if (qd && pd && (pd === qd)) score += 100;
+      if (qd && pd && (pd.endsWith(qd) || qd.endsWith(pd))) score += 60;
+      if (q && n === q) score += 80;
+      if (q && n.startsWith(q)) score += 40;
+      if (q && n.includes(q)) score += 20;
+      if (q && normalize(p).includes(q)) score += 10;
+      if (score > 0) scored.push({c, score});
+    });
+    scored.sort(function(a,b){ return b.score - a.score; });
+    return scored.map(x=>x.c);
+  }
+  function onCustomerSearch(){
+    if (lockAll || priceOnly) return;
+    const qRaw = String(customerSearchInput?.value || '').trim();
+    const matches = findMatches(qRaw).slice(0, 15);
+    showCustomerResults(matches);
+  }
+  customerSearchInput?.addEventListener('input', onCustomerSearch);
+  customerSearchInput?.addEventListener('focus', onCustomerSearch);
+  customerSearchInput?.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { hideCustomerResults(); }
+    if (e.key === 'Enter') {
+      const qRaw = String(customerSearchInput?.value || '').trim();
+      const matches = findMatches(qRaw);
+      if (matches.length === 1) {
+        e.preventDefault();
+        setCustomer(matches[0].id);
+        customerSearchInput.value = formatCustomerLabel(matches[0]);
+        hideCustomerResults();
+      }
+    }
+  });
+  customerSearchResults?.addEventListener('click', function(e){
+    const btn = e.target.closest('[data-customer-id]');
+    if (!btn) return;
+    const id = parseInt(btn.getAttribute('data-customer-id') || '0');
+    const c = customersSearchData.find(x => parseInt(x.id||0) === id);
+    setCustomer(id);
+    if (customerSearchInput && c) customerSearchInput.value = formatCustomerLabel(c);
+    hideCustomerResults();
+  });
+  document.addEventListener('click', function(e){
+    if (!customerSearchResults || !customerSearchInput) return;
+    if (e.target === customerSearchInput) return;
+    if (customerSearchResults.contains(e.target)) return;
+    hideCustomerResults();
+  });
+
   // Auto-pick Delivery Route (vehicle) when customer and branches are selected
   const customerSel = document.querySelector('select[name="customer_id"]');
   const toBranchSel = document.querySelector('select[name="to_branch_id"]');
   const fromBranchSel = document.querySelector('select[name="from_branch_id"]');
-  const parcelDateEl = document.getElementById('parcelDate');
+  const parcelDateEl2 = document.getElementById('parcelDate');
   const routeHintEl = document.getElementById('deliveryRouteHint');
   function applyDeliveryRouteFromCustomer() {
     if (lockAll) return;
     const cid = customerSel ? (customerSel.value || '').trim() : '';
     const toId = toBranchSel ? (toBranchSel.value || '').trim() : '';
     const fromId = fromBranchSel ? (fromBranchSel.value || '').trim() : '';
-    const dateVal = parcelDateEl ? (parcelDateEl.value || '').trim() : '';
+    const dateVal = parcelDateEl2 ? (parcelDateEl2.value || '').trim() : '';
     if (!cid || cid === '0') return;
     const date = dateVal || '<?php echo date('Y-m-d'); ?>';
     const url = '<?php echo Helpers::baseUrl('index.php?page=parcels&action=route_for_customer'); ?>'
@@ -720,8 +833,8 @@
   if (customerSel) customerSel.addEventListener('change', applyDeliveryRouteFromCustomer);
   if (toBranchSel) toBranchSel.addEventListener('change', applyDeliveryRouteFromCustomer);
   if (fromBranchSel) fromBranchSel.addEventListener('change', applyDeliveryRouteFromCustomer);
-  if (parcelDateEl) parcelDateEl.addEventListener('change', applyDeliveryRouteFromCustomer);
-  if (parcelDateEl) parcelDateEl.addEventListener('input', applyDeliveryRouteFromCustomer);
+  if (parcelDateEl2) parcelDateEl2.addEventListener('change', applyDeliveryRouteFromCustomer);
+  if (parcelDateEl2) parcelDateEl2.addEventListener('input', applyDeliveryRouteFromCustomer);
   setTimeout(applyDeliveryRouteFromCustomer, 100);
 
   // Quick Add Vehicle in parcel form
@@ -877,29 +990,6 @@
       alert('Failed to add supplier');
     }
   });
-      if (total > 0) {
-        totalDisplay.textContent = total.toFixed(2);
-        if (totalPrice) totalPrice.value = total.toFixed(2);
-      } else {
-        totalDisplay.textContent = '—';
-        // Do not clear manual price during price-only edit
-        if (!(isEdit && priceOnly)) {
-          if (totalPrice) totalPrice.value = '';
-        }
-      }
-      return;
-    }
-    // Otherwise (other branches), show price minus discount on edit
-    if (isEdit) {
-      const p = parseFloat(totalPrice?.value || '0') || 0;
-      const d = parseFloat(discountInput?.value || '0') || 0;
-      const v = Math.max(0, p - Math.max(0, d));
-      totalDisplay.textContent = v > 0 ? v.toFixed(2) : '—';
-      return;
-    }
-    // Default fallback for create in other branches
-    totalDisplay.textContent = totalPrice?.value ? String(totalPrice.value) : '—';
-  }
 
   // Keep total display in sync while typing manual price in price-only mode
   totalPrice?.addEventListener('input', function(){
@@ -938,6 +1028,22 @@
     }
   });
 
+  function syncAddRemoveButtons(root){
+    if (!root) return;
+    const lists = root.querySelectorAll ? root.querySelectorAll('.item-add-list') : [];
+    lists.forEach(function(list){
+      const rows = list.querySelectorAll('.item-add-row');
+      const hide = rows.length <= 1;
+      rows.forEach(function(r){
+        const btn = r.querySelector('.remove-add');
+        if (btn) btn.style.display = hide ? 'none' : '';
+      });
+    });
+  }
+
+  // Initial state: hide unwanted X when only one add-amount row exists
+  syncAddRemoveButtons(table);
+
   table.addEventListener('click', function(e){
     if (e.target.closest('.add-amount-btn')) {
       const cell = e.target.closest('.item-amount-cell');
@@ -949,16 +1055,29 @@
       div.className = 'd-flex gap-1 align-items-center item-add-row';
       div.innerHTML = `<input type="number" step="0.01" min="0" name="${baseName}" class="form-control form-control-sm item-add" placeholder="0"><button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button>`;
       list.appendChild(div);
+      syncAddRemoveButtons(cell);
       recalc();
       return;
     }
     if (e.target.closest('.remove-add')) {
       const addRow = e.target.closest('.item-add-row');
       const list = addRow?.parentElement;
-      if (list && list.querySelectorAll('.item-add-row').length > 1) {
+      if (!list || !addRow) return;
+      const rows = list.querySelectorAll('.item-add-row');
+      if (rows.length > 1) {
         addRow.remove();
+        syncAddRemoveButtons(list);
         recalc();
+        return;
       }
+      // If this is the only remaining add-amount row, clear its value instead of no-op
+      const inp = addRow.querySelector('input.item-add');
+      if (inp) {
+        inp.value = '';
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      syncAddRemoveButtons(list);
+      recalc();
       return;
     }
     if (e.target.closest('.remove-row')) {
@@ -993,6 +1112,7 @@
       <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button></td>
     `;
     tbody.appendChild(tr);
+    syncAddRemoveButtons(tr);
     // Focus Description of the newly added row for quick typing
     const desc = tr.querySelector(`input[name="items[${idx}][description]"]`);
     if (desc) { desc.focus(); desc.select(); }
@@ -1009,41 +1129,6 @@
   const toBranchDisplay = document.getElementById('toBranchDisplay');
   const customerLocDisplay = document.getElementById('customerLocDisplay');
   const toBranchSuggest = document.getElementById('toBranchSuggest');
-  // Quick Add Vehicle handlers
-  const qvBtn = document.getElementById('qv_submit');
-  qvBtn?.addEventListener('click', async function(){
-    const v = (document.getElementById('qv_no')?.value || '').trim();
-    if (!v) { alert('Enter a vehicle number'); return; }
-    try {
-      const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
-      const fd = new FormData();
-      fd.append('csrf_token', csrf);
-      fd.append('vehicle_no', v);
-      const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=vehicles&action=save'); ?>', {
-        method: 'POST',
-        headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
-        body: fd
-      });
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
-      // If we have a select, append option; else fill input
-      const sel = document.getElementById('vehicleSelect');
-      const inp = document.getElementById('vehicleInput');
-      if (sel) {
-        // Avoid duplicate option
-        let exists = false;
-        Array.from(sel.options).forEach(o=>{ if ((o.value||'').toLowerCase() === v.toLowerCase()) exists = true; });
-        if (!exists) { const opt=document.createElement('option'); opt.value=v; opt.textContent=v; sel.appendChild(opt); }
-        sel.value = v;
-      } else if (inp) {
-        inp.value = v;
-      }
-      document.getElementById('qv_no').value='';
-      const collapseEl = document.getElementById('quickAddVehicle'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
-    } catch (e) {
-      alert('Failed to add vehicle');
-    }
-  });
   const branchesData = <?php echo json_encode(array_map(function($b){ return ['id'=>(int)$b['id'],'name'=>$b['name']]; }, $branchesAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   const customersData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)$c['id'],'delivery_location'=>$c['delivery_location'] ?? '']; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   function updateMeta(){

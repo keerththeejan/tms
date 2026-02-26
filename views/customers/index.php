@@ -48,9 +48,9 @@
       </tr>
     </thead>
     <tbody>
-      <?php foreach ($customers as $c): ?>
+      <?php $rowNum = 0; foreach ($customers as $c): $rowNum++; ?>
         <tr>
-          <td><?php echo (int)$c['id']; ?></td>
+          <td><?php echo $rowNum; ?></td>
           <td><?php echo htmlspecialchars($c['name']); ?></td>
           <td>
             <?php $ph = trim((string)($c['phone'] ?? '')); $showPh = (preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1) ? '' : $ph; echo htmlspecialchars($showPh); ?>

@@ -2,6 +2,23 @@
 require_once __DIR__ . '/../app/bootstrap.php';
 
 $page = $_GET['page'] ?? 'dashboard';
+
+function _merge_delivery_location_options(PDO $pdo) {
+    $opts = [];
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS delivery_routes (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+    } catch (Throwable $e) { /* ignore */ }
+    try {
+        $st = $pdo->query("SELECT name FROM delivery_routes ORDER BY name");
+        if ($st) { while (($v = $st->fetchColumn()) !== false) $opts[] = $v; }
+    } catch (Throwable $e) { /* ignore */ }
+    $stmtDl = $pdo->query("SELECT DISTINCT delivery_location FROM customers WHERE delivery_location IS NOT NULL AND TRIM(delivery_location) != '' ORDER BY delivery_location");
+    if ($stmtDl) { while (($v = $stmtDl->fetchColumn()) !== false) $opts[] = $v; }
+    $opts = array_values(array_unique($opts));
+    sort($opts);
+    return $opts;
+}
+
 action_router:
 
 // Public routes
@@ -864,7 +881,8 @@ switch ($page) {
                          || (($_POST['ajax'] ?? '') === '1');
             if ($name === '') {
                 if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>'Name is required.']); return; }
-                $error = 'Name is required.'; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
+                $deliveryLocationOptions = _merge_delivery_location_options($pdo);
+                $error = 'Name is required.'; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error','deliveryLocationOptions')); break;
             }
             try {
                 if ($id > 0) {
@@ -890,7 +908,8 @@ switch ($page) {
                     }
                 }
                 if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>$msg]); return; }
-                $error = $msg; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error')); break;
+                $deliveryLocationOptions = _merge_delivery_location_options($pdo);
+                $error = $msg; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error','deliveryLocationOptions')); break;
             }
             if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone,'email'=>$email,'delivery_location'=>$delivery_location]); return; }
             Helpers::redirect('index.php?page=customers');
@@ -955,7 +974,8 @@ switch ($page) {
 
         if ($action === 'new') {
             $customer = ['id'=>0,'name'=>'','phone'=>'','address'=>'','delivery_location'=>'','customer_type'=>null];
-            Helpers::view('customers/form', compact('customer'));
+            $deliveryLocationOptions = _merge_delivery_location_options($pdo);
+            Helpers::view('customers/form', compact('customer','deliveryLocationOptions'));
             break;
         }
 
@@ -965,7 +985,8 @@ switch ($page) {
             $stmt->execute([$id]);
             $customer = $stmt->fetch();
             if (!$customer) { http_response_code(404); echo 'Not found'; break; }
-            Helpers::view('customers/form', compact('customer'));
+            $deliveryLocationOptions = _merge_delivery_location_options($pdo);
+            Helpers::view('customers/form', compact('customer','deliveryLocationOptions'));
             break;
         }
 
@@ -1001,6 +1022,45 @@ switch ($page) {
             $customers = $pdo->query('SELECT * FROM customers ORDER BY created_at DESC LIMIT 100')->fetchAll();
         }
         Helpers::view('customers/index', compact('customers','q','name','phone','email','address','delivery_location','type'));
+        break;
+
+    case 'delivery_routes':
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        $action = $_GET['action'] ?? 'index';
+        $pdo = Database::pdo();
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS delivery_routes (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+        } catch (Throwable $e) { /* ignore */ }
+
+        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $name = trim($_POST['name'] ?? '');
+            if ($name === '') {
+                $routes = $pdo->query('SELECT * FROM delivery_routes ORDER BY name')->fetchAll();
+                $error = 'Route name is required.';
+                Helpers::view('delivery_routes/index', compact('routes','error'));
+                break;
+            }
+            $stmt = $pdo->prepare('INSERT INTO delivery_routes (name) VALUES (?)');
+            $stmt->execute([$name]);
+            Helpers::redirect('index.php?page=delivery_routes&saved=1');
+            break;
+        }
+
+        if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                $pdo->prepare('DELETE FROM delivery_routes WHERE id=?')->execute([$id]);
+            }
+            Helpers::redirect('index.php?page=delivery_routes');
+            break;
+        }
+
+        $routes = $pdo->query('SELECT * FROM delivery_routes ORDER BY name')->fetchAll();
+        $success = isset($_GET['saved']) && $_GET['saved'] === '1' ? 'Delivery route added.' : null;
+        $error = $error ?? null;
+        Helpers::view('delivery_routes/index', compact('routes','success','error'));
         break;
 
     case 'vehicles':
@@ -1648,6 +1708,33 @@ switch ($page) {
                     error_log('Error assigning route/load number: ' . $e->getMessage());
                 }
             }
+
+            // Record delivery route assignment so parcel list shows Delivery Route for this customer/branch/date
+            if ($id > 0 && $customer_id > 0 && trim($vehicle_no ?? '') !== '') {
+                try {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS delivery_route_assignments (
+                        id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+                        customer_id BIGINT UNSIGNED NOT NULL,
+                        branch_id BIGINT UNSIGNED NOT NULL,
+                        delivery_date DATE NOT NULL,
+                        vehicle_no VARCHAR(60) NOT NULL,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        UNIQUE KEY uniq_customer_branch_date (customer_id, branch_id, delivery_date)
+                    ) ENGINE=InnoDB");
+                    $dateStmt = $pdo->prepare('SELECT created_at FROM parcels WHERE id=? LIMIT 1');
+                    $dateStmt->execute([$id]);
+                    $dateRow = $dateStmt->fetch();
+                    $parcelDate = $dateRow && !empty($dateRow['created_at']) ? date('Y-m-d', strtotime($dateRow['created_at'])) : date('Y-m-d');
+                    $insDra = $pdo->prepare('INSERT INTO delivery_route_assignments (customer_id, branch_id, delivery_date, vehicle_no) VALUES (?,?,?,?)
+                        ON DUPLICATE KEY UPDATE vehicle_no=VALUES(vehicle_no), updated_at=CURRENT_TIMESTAMP');
+                    if ($to_branch_id > 0) {
+                        $insDra->execute([$customer_id, $to_branch_id, $parcelDate, trim($vehicle_no)]);
+                    }
+                    if ($from_branch_id > 0) {
+                        $insDra->execute([$customer_id, $from_branch_id, $parcelDate, trim($vehicle_no)]);
+                    }
+                } catch (Throwable $e) { /* ignore */ }
+            }
             
             // Send customer notification email (best-effort) with enriched details
             try {
@@ -2020,13 +2107,11 @@ switch ($page) {
                     LEFT JOIN delivery_route_assignments dra_to
                       ON dra_to.customer_id = p.customer_id
                      AND dra_to.branch_id = p.to_branch_id
-                     AND dra_to.delivery_date BETWEEN ? AND ?
+                     AND dra_to.delivery_date = DATE(p.created_at)
                     LEFT JOIN delivery_route_assignments dra_from
                       ON dra_from.customer_id = p.customer_id
                      AND dra_from.branch_id = p.from_branch_id
-                     AND dra_from.delivery_date BETWEEN ? AND ?';
-            // add params for dra joins at the beginning of params later
-            array_unshift($params, $from, $to, $from, $to);
+                     AND dra_from.delivery_date = DATE(p.created_at)';
         } else {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
@@ -2047,12 +2132,11 @@ switch ($page) {
                     LEFT JOIN delivery_route_assignments dra_to
                       ON dra_to.customer_id = p.customer_id
                      AND dra_to.branch_id = p.to_branch_id
-                     AND dra_to.delivery_date BETWEEN ? AND ?
+                     AND dra_to.delivery_date = DATE(p.created_at)
                     LEFT JOIN delivery_route_assignments dra_from
                       ON dra_from.customer_id = p.customer_id
                      AND dra_from.branch_id = p.from_branch_id
-                     AND dra_from.delivery_date BETWEEN ? AND ?';
-            array_unshift($params, $from, $to, $from, $to);
+                     AND dra_from.delivery_date = DATE(p.created_at)';
         }
         if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
         
@@ -2633,7 +2717,7 @@ switch ($page) {
             $customers_total = count($routes);
             $branchName = (string)($user['branch_name'] ?? '');
             // Build dropdown filter lists (all customers and all places)
-            $customersFilter = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 1000')->fetchAll();
+            $customersFilter = $pdo->query('SELECT id, name, phone, COALESCE(delivery_location, "") AS delivery_location FROM customers ORDER BY name LIMIT 1000')->fetchAll();
             $pf = $pdo->query('SELECT DISTINCT COALESCE(delivery_location, "") AS place FROM customers WHERE COALESCE(delivery_location, "") <> "" ORDER BY place')->fetchAll();
             $placesFilter = array_map(function($r){ return $r['place']; }, $pf);
             Helpers::view('delivery_notes/route', compact('routes','date','parcels_total','customers_total','branchName','customer','phone','place','customer_id','place_sel','customersFilter','placesFilter','direction'));
@@ -2686,6 +2770,7 @@ switch ($page) {
                 break;
             }
             // Otherwise, stay on the same planning page with a success flag
+            $direction = isset($_POST['direction']) ? $_POST['direction'] : 'to';
             $redir = 'index.php?page=delivery_notes&action=route&customer_id=' . $customer_id . '&date=' . urlencode($delivery_date) . '&direction=' . urlencode($direction) . '&saved=1';
             Helpers::redirect($redir);
             break;

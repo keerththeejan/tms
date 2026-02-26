@@ -31,9 +31,9 @@ if (strlen($logoTitleColor) === 4) { $c = $logoTitleColor[1].$logoTitleColor[1].
     .logo-unit .bar-small { background: var(--logo-bar-bg); color: var(--logo-bar-color); padding: 4px 10px; font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
     .brand-title { font-weight: 900; font-size: 26px; letter-spacing: 2px; color: var(--brand); text-transform: uppercase; line-height: 1.1; }
     .reg-no { font-size: 12px; color: #333; font-weight: 600; position: absolute; top: 12px; right: 16px; }
-    .route-bar { background: #000; color: #fff; padding: 10px 16px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px; }
+    .route-bar { background: transparent; color: #333; padding: 10px 16px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px; border-bottom: 1px solid #ddd; }
     .route-bar .route-part { white-space: nowrap; }
-    .route-bar .arrow-double { color: #ffc107; font-size: 18px; margin: 0 4px; }
+    .route-bar .arrow-double { color: #666; font-size: 18px; margin: 0 4px; }
     .branch-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 18px; padding: 14px 16px; border-bottom: 1px solid #ddd; }
     .branch-col { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
     .branch-col .branch-name { font-weight: 700; font-size: 12px; color: #333; margin-bottom: 2px; }

@@ -63,7 +63,7 @@
       // Skip if developer opted out
       if (sel.dataset.enhance === 'false') return;
       var optionCount = sel.options ? sel.options.length : 0;
-      var searchEnabled = optionCount >= 5; // auto-disable search for very small lists
+      var searchEnabled = sel.dataset.choicesSearch === 'true' || optionCount >= 5; // force search e.g. delivery route
       var cfg = {
         searchEnabled: searchEnabled,
         searchResultLimit: 50,

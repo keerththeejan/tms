@@ -184,11 +184,15 @@
             <?php
               $rdTo = trim((string)($p['route_date_to'] ?? ''));
               $rdFrom = trim((string)($p['route_date_from'] ?? ''));
+              $veh = trim((string)($p['vehicle_no'] ?? ''));
               if ($rdTo !== '' || $rdFrom !== ''):
                 $parts = [];
                 if ($rdTo !== '') $parts[] = 'To: ' . $rdTo;
                 if ($rdFrom !== '') $parts[] = 'From: ' . $rdFrom;
-                echo htmlspecialchars(implode(' / ', $parts));
+                if ($veh !== '') array_unshift($parts, $veh);
+                echo htmlspecialchars(implode(' · ', $parts));
+              elseif ($veh !== ''):
+                echo htmlspecialchars($veh);
               else:
                 echo '—';
               endif;

@@ -1,4 +1,10 @@
 <?php /** @var array $customer */ ?>
+<?php
+  $deliveryLocationOptions = $deliveryLocationOptions ?? [];
+  $currentDl = trim((string)($customer['delivery_location'] ?? ''));
+  $dlInList = in_array($currentDl, $deliveryLocationOptions, true);
+  $showOtherInput = ($currentDl !== '' && !$dlInList);
+?>
 <?php // Maps config needed early (OSM/Google blocks may check $gmKey)
   $cfgMaps = (require __DIR__ . '/../../config/config.php');
   $gmKey = $cfgMaps['google_maps_api_key'] ?? '';
@@ -8,7 +14,7 @@
   <a href="<?php echo Helpers::baseUrl('index.php?page=customers'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
 </div>
 <?php if (!empty($error)): ?>
-  <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
+  <div class="alert alert-danger py-2"><?php echo htmlspecialchars((string)($error ?? '')); ?></div>
 <?php endif; ?>
 <?php if (!$gmKey): ?>
 <!-- OSM Fallback: Nominatim + Leaflet -->
@@ -22,7 +28,7 @@
 </style>
 <script>
 (function(){
-  const input = document.querySelector('input[name="delivery_location"]');
+  const input = document.getElementById('delivery_location_other');
   const placeIdEl = document.querySelector('input[name="place_id"]');
   const latEl = document.querySelector('input[name="lat"]');
   const lngEl = document.querySelector('input[name="lng"]');
@@ -81,6 +87,8 @@
     if (!item) return;
     input.value = item.textContent;
     list.style.display = 'none';
+    var hidden = document.getElementById('delivery_location_value');
+    if (hidden) hidden.value = item.textContent;
     if (placeIdEl) placeIdEl.value = item.dataset.id || '';
     const lat = parseFloat(item.dataset.lat || '');
     const lon = parseFloat(item.dataset.lon || '');
@@ -94,6 +102,7 @@
       }
     }
   });
+  input.addEventListener('input', function(){ var h = document.getElementById('delivery_location_value'); if (h) h.value = input.value; });
 })();
 </script>
 <?php endif; ?>
@@ -102,36 +111,41 @@
     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
     <input type="hidden" name="id" value="<?php echo (int)$customer['id']; ?>">
     <div class="row g-3">
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <label class="form-label">Name</label>
-        <input type="text" name="name" class="form-control" required value="<?php echo htmlspecialchars($customer['name']); ?>">
+        <input type="text" name="name" class="form-control" required value="<?php echo htmlspecialchars((string)($customer['name'] ?? '')); ?>">
       </div>
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <label class="form-label">Phone</label>
-        <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>">
+        <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars((string)($customer['phone'] ?? '')); ?>">
       </div>
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <label class="form-label">Email</label>
-        <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email'] ?? ''); ?>">
+        <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars((string)($customer['email'] ?? '')); ?>">
       </div>
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <label class="form-label">Address</label>
-        <input type="text" name="address" class="form-control" value="<?php echo htmlspecialchars($customer['address']); ?>">
+        <input type="text" name="address" class="form-control" value="<?php echo htmlspecialchars((string)($customer['address'] ?? '')); ?>">
       </div>
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <label class="form-label">Delivery Location</label>
-        <input type="text" name="delivery_location" class="form-control" list="dl_locations" value="<?php echo htmlspecialchars($customer['delivery_location']); ?>">
-        <input type="hidden" name="place_id" value="<?php echo htmlspecialchars($customer['place_id'] ?? ''); ?>">
+        <input type="hidden" name="delivery_location" id="delivery_location_value" value="<?php echo htmlspecialchars($currentDl); ?>">
+        <select id="delivery_location_select" class="form-select" data-choices-search="true" aria-label="Delivery route">
+          <option value="">— Select or search —</option>
+          <option value="__other__" <?php echo $showOtherInput ? ' selected' : ''; ?>>— Other (type below) —</option>
+          <?php foreach ($deliveryLocationOptions as $opt): ?>
+            <option value="<?php echo htmlspecialchars($opt); ?>" <?php echo ($currentDl === $opt && $dlInList) ? ' selected' : ''; ?>><?php echo htmlspecialchars($opt); ?></option>
+          <?php endforeach; ?>
+        </select>
+        <div id="delivery_location_other_wrap" class="mt-1" style="display:<?php echo $showOtherInput ? 'block' : 'none'; ?>;">
+          <input type="text" id="delivery_location_other" class="form-control" placeholder="Type delivery location" value="<?php echo $showOtherInput ? htmlspecialchars($currentDl) : ''; ?>">
+        </div>
+        <input type="hidden" name="place_id" value="<?php echo htmlspecialchars((string)($customer['place_id'] ?? '')); ?>">
         <input type="hidden" name="lat" value="<?php echo htmlspecialchars((string)($customer['lat'] ?? '')); ?>">
         <input type="hidden" name="lng" value="<?php echo htmlspecialchars((string)($customer['lng'] ?? '')); ?>">
-        <datalist id="dl_locations">
-          <?php if (!empty($customer['delivery_location'])): ?>
-            <option value="<?php echo htmlspecialchars($customer['delivery_location']); ?>"></option>
-          <?php endif; ?>
-        </datalist>
         <div id="mapPreview" class="mt-2" style="height: 180px; border-radius: 6px; border: 1px solid #ddd;"></div>
       </div>
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <label class="form-label">Customer Type</label>
         <select name="customer_type" class="form-select">
           <option value="">-- Select --</option>
@@ -141,6 +155,45 @@
       </div>
     </div>
   </div>
+  <script>
+  (function(){
+    function syncDeliveryLocation() {
+      var sel = document.getElementById('delivery_location_select');
+      var hidden = document.getElementById('delivery_location_value');
+      var wrap = document.getElementById('delivery_location_other_wrap');
+      var otherInput = document.getElementById('delivery_location_other');
+      if (!sel || !hidden) return;
+      var val = (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].value) || '';
+      if (val === '__other__') {
+        if (wrap) wrap.style.display = 'block';
+        if (otherInput) hidden.value = otherInput.value;
+      } else {
+        if (wrap) wrap.style.display = 'none';
+        hidden.value = val;
+      }
+    }
+    function initDlSync() {
+      var sel = document.getElementById('delivery_location_select');
+      var hidden = document.getElementById('delivery_location_value');
+      var otherInput = document.getElementById('delivery_location_other');
+      var form = sel && sel.closest('form');
+      if (!sel || !hidden) return;
+      sel.addEventListener('change', syncDeliveryLocation);
+      if (otherInput) otherInput.addEventListener('input', syncDeliveryLocation);
+      if (form) form.addEventListener('submit', function() {
+        if ((sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].value) === '__other__' && otherInput) {
+          hidden.value = otherInput.value;
+        }
+      });
+      syncDeliveryLocation();
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { setTimeout(initDlSync, 150); });
+    } else {
+      setTimeout(initDlSync, 150);
+    }
+  })();
+  </script>
   <div class="card-footer text-end">
     <button class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
   </div>
@@ -149,7 +202,7 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=<?php echo htmlspecialchars($gmKey); ?>&libraries=places"></script>
 <script>
 (function(){
-  var input = document.querySelector('input[name="delivery_location"]');
+  var input = document.getElementById('delivery_location_other');
   var placeIdEl = document.querySelector('input[name="place_id"]');
   var latEl = document.querySelector('input[name="lat"]');
   var lngEl = document.querySelector('input[name="lng"]');
@@ -178,7 +231,11 @@
     ac.addListener('place_changed', function(){
       var place = ac.getPlace();
       if (!place) return;
-      if (place.formatted_address) input.value = place.formatted_address;
+      if (place.formatted_address) {
+        input.value = place.formatted_address;
+        var hidden = document.getElementById('delivery_location_value');
+        if (hidden) hidden.value = place.formatted_address;
+      }
       if (place.place_id && placeIdEl) placeIdEl.value = place.place_id;
       var loc = place.geometry && place.geometry.location ? place.geometry.location : null;
       if (loc) {

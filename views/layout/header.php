@@ -124,6 +124,7 @@ $user = Auth::user();
       <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsCreateActive?'active':''; ?>" href="<?php echo $parcelsCreateUrl; ?>"><i class="bi bi-box-seam me-1"></i> Parcels</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsListActive?'active':''; ?>" href="<?php echo $parcelsListUrl; ?>"><i class="bi bi-card-list me-1"></i> Parcel Details</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='customers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=customers'); ?>"><i class="bi bi-person-lines-fill me-1"></i> Customers</a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='delivery_routes'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_routes'); ?>"><i class="bi bi-signpost me-1"></i> Delivery Routes</a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='suppliers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>"><i class="bi bi-truck me-1"></i> Suppliers</a></li>
       <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Delivery</li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>"><i class="bi bi-geo-alt me-1"></i> Route Planning</a></li>
