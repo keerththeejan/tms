@@ -59,9 +59,9 @@
       </tr>
     </thead>
     <tbody>
-      <?php foreach (($users ?? []) as $u): ?>
+      <?php $rowNum = 0; foreach (($users ?? []) as $u): $rowNum++; ?>
         <tr>
-          <td><?php echo (int)$u['id']; ?></td>
+          <td><?php echo (int)$rowNum; ?></td>
           <td><?php echo htmlspecialchars($u['username']); ?></td>
           <td><?php echo htmlspecialchars($u['full_name']); ?></td>
           <td><span class="badge text-bg-secondary"><?php echo htmlspecialchars($u['role']); ?></span></td>

@@ -13,7 +13,7 @@ $user = Auth::user();
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <style>
     html, body { height: 100%; }
-    body { padding-top: 0; margin: 0; }
+    body { padding-top: 0; margin: 0; background: #f8f9fb; }
     .quick-actions .card { cursor: pointer; transition: transform .05s ease-in; }
     .quick-actions .card:hover { transform: scale(1.01); }
     /* Slightly smaller, neater navbar font sizes */
@@ -26,9 +26,76 @@ $user = Auth::user();
     .navbar .dropdown-toggle.no-caret::after { display: none; }
     /* Sidebar tweaks */
     /* place logout as a normal item at the end */
-    #sidebar { box-shadow: inset -1px 0 0 rgba(255,255,255,.08); transition: transform .2s ease-in-out; z-index: 1045; }
+    #sidebar { box-shadow: inset -1px 0 0 rgba(255,255,255,.08); transition: transform .2s ease-in-out, width .15s ease; z-index: 1045; }
     .content-wrapper { transition: margin-left .2s ease-in-out, width .2s ease-in-out; }
     body.sidebar-open { overflow: hidden; }
+
+    /* 2026 SaaS shell styling */
+    :root {
+      --shell-radius: 14px;
+      --shell-border: rgba(17,24,39,.10);
+      --shell-shadow: 0 1px 2px rgba(16,24,40,.06);
+    }
+    #sidebar {
+      width: 220px !important;
+      background: #0b1220 !important;
+    }
+    #sidebar .nav-link {
+      border-radius: 10px;
+      padding: .5rem .65rem;
+      transition: background .15s ease, color .15s ease;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    #sidebar .nav-link:hover { background: rgba(255,255,255,.06); }
+    #sidebar .nav-link.active { background: rgba(79,188,255,.16) !important; color: #e8f7ff !important; }
+    #sidebar .nav-link i { width: 18px; text-align: center; }
+    #sidebar .nav-section {
+      font-size: .72rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.55);
+      font-weight: 700;
+      margin-top: .75rem;
+      padding: .35rem .65rem;
+    }
+    .content-wrapper {
+      margin-left: 220px !important;
+      width: calc(100% - 220px) !important;
+    }
+
+    /* Collapsed (icon-only) sidebar on desktop */
+    body.sidebar-collapsed #sidebar { width: 72px !important; }
+    body.sidebar-collapsed .content-wrapper { margin-left: 72px !important; width: calc(100% - 72px) !important; }
+    body.sidebar-collapsed #sidebar .nav-link { justify-content: center; padding: .55rem .5rem; }
+    body.sidebar-collapsed #sidebar .nav-link span,
+    body.sidebar-collapsed #sidebar .nav-section,
+    body.sidebar-collapsed #sidebar .branch-meta,
+    body.sidebar-collapsed #sidebar .btn-logout { display: none !important; }
+    body.sidebar-collapsed #sidebar .navbar-brand { font-size: 1.1rem; }
+
+    /* Sticky top bar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 1020;
+      background: rgba(248,249,251,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--shell-border);
+    }
+    .topbar-inner {
+      min-height: 56px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .page-title { font-size: 1.05rem; font-weight: 700; margin: 0; }
+    .page-subtitle { font-size: .82rem; color: #6b7280; margin: 0; }
+    .icon-btn { width: 36px; height: 36px; padding: 0; display: inline-flex; align-items:center; justify-content:center; border-radius: 10px; }
+    .shell-card { background: #fff; border: 1px solid var(--shell-border); border-radius: var(--shell-radius); box-shadow: var(--shell-shadow); }
     /* Small screens: sidebar hidden by default, content full width */
     @media (max-width: 992px) {
       #sidebar { transform: translateX(-240px); }
@@ -109,67 +176,113 @@ $user = Auth::user();
 <?php if ($user): ?>
 <div class="d-flex">
   <!-- Sidebar -->
-  <nav id="sidebar" class="bg-dark text-white position-fixed vh-100" style="width: 240px; top:0; left:0; overflow-y:auto;">
-    <div class="p-3 border-bottom border-secondary d-flex align-items-center justify-content-between">
+  <nav id="sidebar" class="bg-dark text-white position-fixed vh-100" style="top:0; left:0; overflow-y:auto;">
+    <div class="p-3 border-bottom border-secondary d-flex align-items-center justify-content-between gap-2">
       <a class="navbar-brand text-white text-decoration-none fw-semibold" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>">TMS</a>
-      <button class="btn btn-sm btn-outline-light sidebar-close-btn" type="button" title="Close" data-role="sidebar-close"><i class="bi bi-x"></i></button>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-light d-none d-lg-inline-flex" type="button" title="Collapse" data-role="sidebar-collapse"><i class="bi bi-layout-sidebar-inset"></i></button>
+        <button class="btn btn-sm btn-outline-light sidebar-close-btn" type="button" title="Close" data-role="sidebar-close"><i class="bi bi-x"></i></button>
+      </div>
     </div>
     <?php if ($user): ?>
     <ul class="nav nav-pills flex-column p-2 small">
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='dashboard'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='dashboard'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a></li>
       <?php if (($user['role'] ?? '') === 'admin'): ?>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='branches'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=branches'); ?>"><i class="bi bi-diagram-3 me-1"></i> Branches</a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='users'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>"><i class="bi bi-people me-1"></i> Users</a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='branches'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=branches'); ?>"><i class="bi bi-diagram-3"></i><span>Branches</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='users'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>"><i class="bi bi-people"></i><span>Users</span></a></li>
       <?php endif; ?>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsCreateActive?'active':''; ?>" href="<?php echo $parcelsCreateUrl; ?>"><i class="bi bi-box-seam me-1"></i> Parcels</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsListActive?'active':''; ?>" href="<?php echo $parcelsListUrl; ?>"><i class="bi bi-card-list me-1"></i> Parcel Details</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='customers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=customers'); ?>"><i class="bi bi-person-lines-fill me-1"></i> Customers</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='delivery_routes'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_routes'); ?>"><i class="bi bi-signpost me-1"></i> Delivery Routes</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='suppliers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>"><i class="bi bi-truck me-1"></i> Suppliers</a></li>
-      <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Delivery</li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>"><i class="bi bi-geo-alt me-1"></i> Route Planning</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteVehiclesActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>"><i class="bi bi-truck-front me-1"></i> Vehicle Routes</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $isDNIndexActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>"><i class="bi bi-receipt me-1"></i> Delivery Notes</a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsCreateActive?'active':''; ?>" href="<?php echo $parcelsCreateUrl; ?>"><i class="bi bi-box-seam"></i><span>Parcels</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsListActive?'active':''; ?>" href="<?php echo $parcelsListUrl; ?>"><i class="bi bi-card-list"></i><span>Parcel Details</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='customers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=customers'); ?>"><i class="bi bi-person-lines-fill"></i><span>Customers</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='delivery_routes'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_routes'); ?>"><i class="bi bi-signpost"></i><span>Delivery Routes</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='suppliers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>"><i class="bi bi-truck"></i><span>Suppliers</span></a></li>
+      <li class="nav-item nav-section">Delivery</li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>"><i class="bi bi-geo-alt"></i><span>Route Planning</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteVehiclesActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>"><i class="bi bi-truck-front"></i><span>Vehicle Routes</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $isDNIndexActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>"><i class="bi bi-receipt"></i><span>Delivery Notes</span></a></li>
       <?php if (Auth::canCollectPayments()): ?>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='payments'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>"><i class="bi bi-currency-dollar me-1"></i> Payments</a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='payments'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>"><i class="bi bi-currency-dollar"></i><span>Payments</span></a></li>
       <?php endif; ?>
       <?php if (Auth::canManageExpenses()): ?>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='expenses'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>"><i class="bi bi-wallet2 me-1"></i> Expenses</a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='expenses'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>"><i class="bi bi-wallet2"></i><span>Expenses</span></a></li>
       <?php endif; ?>
       <?php if (Auth::hasAnyRole(['admin','accountant'])): ?>
-        <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">HR</li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action!=='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>"><i class="bi bi-person-badge me-1"></i> Employee Details</a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action==='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>"><i class="bi bi-clipboard-data me-1"></i> Salary Report</a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='salaries'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=salaries'); ?>"><i class="bi bi-cash-coin me-1"></i> Salaries</a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='advances'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>"><i class="bi bi-cash-stack me-1"></i> Advances</a></li>
-        <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Accounts</li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='accounts'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts'); ?>"><i class="bi bi-journal-richtext me-1"></i> Accounts</a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='daybook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=daybook'); ?>"><i class="bi bi-journal-text me-1"></i> Daybook</a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='ledger'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=ledger'); ?>"><i class="bi bi-journal-check me-1"></i> Account Ledger</a></li>
+        <li class="nav-item nav-section">HR</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action!=='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>"><i class="bi bi-person-badge"></i><span>Employee Details</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action==='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>"><i class="bi bi-clipboard-data"></i><span>Salary Report</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='salaries'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=salaries'); ?>"><i class="bi bi-cash-coin"></i><span>Salaries</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='advances'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>"><i class="bi bi-cash-stack"></i><span>Advances</span></a></li>
+        <li class="nav-item nav-section">Accounts</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='accounts'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts'); ?>"><i class="bi bi-journal-richtext"></i><span>Accounts</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='daybook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=daybook'); ?>"><i class="bi bi-journal-text"></i><span>Daybook</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='ledger'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=ledger'); ?>"><i class="bi bi-journal-check"></i><span>Account Ledger</span></a></li>
       <?php endif; ?>
-      <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Tools</li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='search'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>"><i class="bi bi-search me-1"></i> Search</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reminders'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reminders'); ?>"><i class="bi bi-bell me-1"></i> Reminders</a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reports'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reports'); ?>"><i class="bi bi-bar-chart-line me-1"></i> Reports</a></li>
+      <li class="nav-item nav-section">Tools</li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='search'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>"><i class="bi bi-search"></i><span>Search</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reminders'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reminders'); ?>"><i class="bi bi-bell"></i><span>Reminders</span></a></li>
+      <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reports'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reports'); ?>"><i class="bi bi-bar-chart-line"></i><span>Reports</span></a></li>
       <?php if (($user['role'] ?? '') === 'admin'): ?>
-        <li class="nav-item mt-2 text-uppercase text-secondary fw-semibold px-2">Admin</li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='settings'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>"><i class="bi bi-gear me-1"></i> Settings</a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='backup'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=backup'); ?>"><i class="bi bi-hdd me-1"></i> Backups</a></li>
+        <li class="nav-item nav-section">Admin</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='settings'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>"><i class="bi bi-gear"></i><span>Settings</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='backup'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=backup'); ?>"><i class="bi bi-hdd"></i><span>Backups</span></a></li>
       <?php endif; ?>
       <?php if ($user): ?>
         <li class="nav-item mt-2 px-2"><hr class="border-secondary opacity-50"></li>
-        <li class="nav-item px-2 mb-2 text-secondary small">Branch: <?php echo htmlspecialchars($user['branch_name'] ?? ''); ?> (<?php echo $user['is_main_branch'] ? 'Main' : 'Branch'; ?>)</li>
-        <li class="nav-item px-2 mb-3"><a class="btn btn-sm btn-outline-warning w-100" href="<?php echo Helpers::baseUrl('index.php?page=logout'); ?>"><i class="bi bi-box-arrow-right me-1"></i> Logout</a></li>
+        <li class="nav-item px-2 mb-2 text-secondary small branch-meta">Branch: <?php echo htmlspecialchars($user['branch_name'] ?? ''); ?> (<?php echo $user['is_main_branch'] ? 'Main' : 'Branch'; ?>)</li>
+        <li class="nav-item px-2 mb-3"><a class="btn btn-sm btn-outline-warning w-100 btn-logout" href="<?php echo Helpers::baseUrl('index.php?page=logout'); ?>"><i class="bi bi-box-arrow-right"></i> <span>Logout</span></a></li>
       <?php endif; ?>
     </ul>
     <?php endif; ?>
   </nav>
 
   <!-- Content wrapper -->
-  <div class="content-wrapper" style="margin-left: 240px; width: calc(100% - 240px); min-height: 100vh;">
+  <div class="content-wrapper" style="min-height: 100vh;">
     <div class="sidebar-overlay" data-role="sidebar-overlay"></div>
+    <?php
+      $uiCompany = Helpers::company();
+      $uiHeaderAddr = Helpers::companyHeaderAddressLines('', 3);
+      $pageTitle = 'Dashboard';
+      if ($currentPage && $currentPage !== 'dashboard') {
+        $pageTitle = ucwords(str_replace('_', ' ', (string)$currentPage));
+      }
+    ?>
+    <div class="topbar">
+      <div class="container-fluid">
+        <div class="topbar-inner">
+          <div class="d-flex align-items-center gap-2 min-w-0">
+            <button class="btn btn-outline-secondary icon-btn d-none d-lg-inline-flex" type="button" title="Toggle sidebar" data-role="sidebar-collapse" aria-label="Toggle sidebar"><i class="bi bi-layout-sidebar-inset"></i></button>
+            <button class="btn btn-outline-secondary icon-btn d-lg-none" type="button" title="Menu" data-role="sidebar-open"><i class="bi bi-list"></i></button>
+            <div class="min-w-0">
+              <p class="page-title text-truncate mb-0"><?php echo htmlspecialchars($pageTitle); ?></p>
+              <?php if (!empty($uiHeaderAddr)): ?>
+                <p class="page-subtitle text-truncate mb-0"><?php echo htmlspecialchars(implode(' | ', $uiHeaderAddr)); ?></p>
+              <?php endif; ?>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <?php if (Auth::canCreateParcels()): ?>
+              <a class="btn btn-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new'); ?>"><i class="bi bi-plus-lg me-1"></i> Parcel</a>
+            <?php endif; ?>
+            <button class="btn btn-outline-secondary icon-btn" type="button" title="Notifications" aria-label="Notifications"><i class="bi bi-bell"></i></button>
+            <div class="dropdown">
+              <button class="btn btn-outline-secondary icon-btn dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Profile">
+                <i class="bi bi-person-circle"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header"><?php echo htmlspecialchars((string)($user['username'] ?? ($user['name'] ?? 'User'))); ?></h6></li>
+                <li><span class="dropdown-item-text small text-muted"><?php echo htmlspecialchars((string)($user['role'] ?? '')); ?></span></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=logout'); ?>"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="container-fluid mt-3">
-      <button class="btn btn-primary sidebar-toggle-floating d-lg-none" type="button" title="Menu" data-role="sidebar-open"><i class="bi bi-list"></i></button>
+      
 <?php else: ?>
 <div class="container-fluid mt-3">
 <?php endif; ?>

@@ -2,6 +2,42 @@
   $filter_type = $filter_type ?? '';
   $today = date('Y-m-d');
 ?>
+<style>
+  /* Parcels table: compact, high-density (UI only) */
+  .parcels-page { --p-gap: 12px; }
+  .parcels-page .table-wrap { border: 1px solid rgba(17,24,39,.10); border-radius: 10px; background:#fff; }
+  .parcels-page .parcels-table { table-layout: fixed; font-size: 13px; }
+  .parcels-page .parcels-table th,
+  .parcels-page .parcels-table td { padding: 6px 10px !important; vertical-align: middle; }
+  .parcels-page .parcels-table thead th { font-size: 12px; letter-spacing: .02em; }
+  .parcels-page .parcels-table tbody tr:hover { background: rgba(2,6,23,.035); }
+  .parcels-page .parcels-table .cell-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display:block; }
+  .parcels-page .parcels-table .cell-tight { white-space: nowrap; }
+  .parcels-page .parcels-table .col-actions { width: 120px; }
+  .parcels-page .parcels-table .col-num { width: 56px; }
+  .parcels-page .parcels-table .col-status { width: 100px; }
+  .parcels-page .parcels-table .col-email { width: 120px; }
+  .parcels-page .parcels-table .col-weight { width: 84px; }
+  .parcels-page .parcels-table .col-price { width: 84px; }
+  .parcels-page .badge.badge-soft { font-weight: 700; border: 1px solid rgba(17,24,39,.10); }
+  .parcels-page .badge-soft-success { background: rgba(25,135,84,.12); color: #146c43; }
+  .parcels-page .badge-soft-warning { background: rgba(255,193,7,.16); color: #8a6d00; }
+  .parcels-page .badge-soft-info { background: rgba(13,202,240,.16); color: #055160; }
+  .parcels-page .badge-soft-secondary { background: rgba(108,117,125,.14); color: #495057; }
+  .parcels-page .badge-soft-danger { background: rgba(220,53,69,.14); color: #b02a37; }
+  .parcels-page .btn-icon { width: 30px; height: 30px; padding: 0; display:inline-flex; align-items:center; justify-content:center; }
+  @media (max-width: 992px) {
+    /* Tablet: keep width tighter */
+    .parcels-page .parcels-table th,
+    .parcels-page .parcels-table td { padding: 6px 8px !important; }
+  }
+  @media (max-width: 576px) {
+    /* Mobile: still allow scroll, but tighter */
+    .parcels-page .parcels-table { font-size: 12.5px; }
+  }
+</style>
+
+<div class="parcels-page">
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h3 class="mb-0">Parcels</h3>
   <div class="d-flex flex-wrap gap-2">
@@ -139,11 +175,11 @@
     <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_detail&vehicle_no=' . urlencode($vehicle_no) . '&from=' . urlencode($from ?? date('Y-m-d')) . '&to=' . urlencode($to ?? date('Y-m-d')) . '&direction=from'); ?>" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-signpost me-1"></i> Print by route (vehicle <?php echo htmlspecialchars($vehicle_no); ?>)</a>
   <?php endif; ?>
 </div>
-<div class="table-responsive" style="max-height: 600px; overflow-y: auto; overflow-x: auto;">
-  <table class="table table-sm table-striped align-middle datatable">
+<div class="table-responsive table-wrap" style="max-height: 600px; overflow-y: auto; overflow-x: auto;">
+  <table class="table table-sm table-striped align-middle datatable parcels-table">
     <thead class="table-light" style="position: sticky; top: 0; z-index: 10; background-color: #f8f9fa;">
       <tr>
-        <th>#</th>
+        <th class="col-num">#</th>
         <th>Customer</th>
         <th>Supplier</th>
         <th>From Branch</th>
@@ -151,11 +187,11 @@
         <th>Vehicle</th>
         <th>Delivery Route</th>
         <th>Items</th>
-        <th>Weight</th>
-        <th>Price</th>
-        <th>Status</th>
-        <th>Email</th>
-        <th class="text-end">Actions</th>
+        <th class="col-weight">Weight</th>
+        <th class="col-price">Price</th>
+        <th class="col-status">Status</th>
+        <th class="col-email">Email</th>
+        <th class="text-end col-actions">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -165,16 +201,17 @@
           <td>
             <?php $cid = (int)$p['customer_id']; ?>
             <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&customer_id=' . $cid); ?>" class="text-decoration-none">
-              <?php $nm = (string)($p['customer_name'] ?? ''); $ph = trim((string)($p['customer_phone'] ?? '')); $isPH = preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1; $label = $nm . (!$isPH && $ph !== '' ? ' (' . $ph . ')' : ''); echo htmlspecialchars($label); ?>
+              <?php $nm = (string)($p['customer_name'] ?? ''); $ph = trim((string)($p['customer_phone'] ?? '')); $isPH = preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1; $label = $nm . (!$isPH && $ph !== '' ? ' (' . $ph . ')' : ''); ?>
+              <span class="cell-ellipsis" title="<?php echo htmlspecialchars($label); ?>"><?php echo htmlspecialchars($label); ?></span>
             </a>
           </td>
-          <td><?php echo htmlspecialchars($p['supplier_name'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($p['from_branch'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($p['to_branch'] ?? ''); ?></td>
+          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['supplier_name'] ?? '')); ?>"><?php echo htmlspecialchars($p['supplier_name'] ?? ''); ?></span></td>
+          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['from_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['from_branch'] ?? ''); ?></span></td>
+          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['to_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['to_branch'] ?? ''); ?></span></td>
           <td>
             <?php if (!empty($p['vehicle_no'])): ?>
               <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&vehicle_no=' . urlencode($p['vehicle_no'])); ?>" class="text-decoration-none">
-                <?php echo htmlspecialchars($p['vehicle_no']); ?>
+                <span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)$p['vehicle_no']); ?>"><?php echo htmlspecialchars($p['vehicle_no']); ?></span>
               </a>
             <?php else: ?>
               —
@@ -190,9 +227,10 @@
                 if ($rdTo !== '') $parts[] = 'To: ' . $rdTo;
                 if ($rdFrom !== '') $parts[] = 'From: ' . $rdFrom;
                 if ($veh !== '') array_unshift($parts, $veh);
-                echo htmlspecialchars(implode(' · ', $parts));
+                $routeLabel = implode(' · ', $parts);
+                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($routeLabel) . '">' . htmlspecialchars($routeLabel) . '</span>';
               elseif ($veh !== ''):
-                echo htmlspecialchars($veh);
+                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($veh) . '">' . htmlspecialchars($veh) . '</span>';
               else:
                 echo '—';
               endif;
@@ -201,43 +239,61 @@
           <td>
             <?php 
               $desc = trim((string)($p['item_descriptions'] ?? ''));
-              echo $desc === '' ? '—' : htmlspecialchars($desc);
+              if ($desc === '') { echo '—'; }
+              else { echo '<span class="cell-ellipsis" title="' . htmlspecialchars($desc) . '">' . htmlspecialchars($desc) . '</span>'; }
             ?>
           </td>
-          <td><?php echo number_format((float)$p['weight'], 2); ?></td>
-          <td><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
-          <td><span class="badge bg-<?php echo $p['status']==='delivered'?'success':($p['status']==='in_transit'?'info':'secondary'); ?>"><?php echo htmlspecialchars($p['status']); ?></span></td>
+          <td class="text-end cell-tight"><?php echo number_format((float)$p['weight'], 2); ?></td>
+          <td class="text-end cell-tight"><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
+          <td>
+            <?php
+              $st = (string)($p['status'] ?? '');
+              $stClass = ($st === 'delivered') ? 'badge-soft-success' : (($st === 'in_transit') ? 'badge-soft-info' : 'badge-soft-warning');
+            ?>
+            <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars($st); ?></span>
+          </td>
           <td>
             <?php if (!empty($p['email_status'])): ?>
               <?php if ($p['email_status'] === 'sent'): ?>
-                <span class="badge bg-success">Sent</span>
+                <span class="badge badge-soft badge-soft-success">Sent</span>
               <?php else: ?>
-                <span class="badge bg-danger">Failed</span>
+                <span class="badge badge-soft badge-soft-danger">Failed</span>
               <?php endif; ?>
               <small class="text-muted d-block"><?php echo htmlspecialchars($p['emailed_at'] ?? ''); ?></small>
             <?php else: ?>
-              <span class="badge bg-secondary">Not sent</span>
+              <span class="badge badge-soft badge-soft-secondary">Not sent</span>
             <?php endif; ?>
             <div>
               <a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=email_log&id='.(int)$p['id']); ?>">View log</a>
             </div>
           </td>
           <td class="text-end">
-            <a class="btn btn-sm btn-outline-primary" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer"></i> Print</a>
-            <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square"></i> Edit</a>
-            <a class="btn btn-sm btn-outline-success" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route&customer_id='.(int)$p['customer_id']); ?>"><i class="bi bi-signpost"></i> Delivery Route</a>
-            
-            <a class="btn btn-sm btn-outline-info" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id='.(int)$p['id']); ?>"><i class="bi bi-envelope"></i> Email</a>
-            <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" class="d-inline" onsubmit="return confirm('Delete this parcel?');">
-              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-              <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
-            </form>
+            <div class="dropdown d-inline">
+              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer me-2"></i>Print</a></li>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a></li>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route&customer_id='.(int)$p['customer_id']); ?>"><i class="bi bi-signpost me-2"></i>Delivery Route</a></li>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id='.(int)$p['id']); ?>"><i class="bi bi-envelope me-2"></i>Email</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" class="px-3" onsubmit="return confirm('Delete this parcel?');">
+                    <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+                    <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
+                    <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash me-2"></i>Delete</button>
+                  </form>
+                </li>
+              </ul>
+            </div>
           </td>
         </tr>
       <?php endforeach; ?>
     </tbody>
   </table>
+</div>
+
 </div>
 
 <?php if (($totalPages ?? 1) > 1): ?>

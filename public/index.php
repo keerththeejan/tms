@@ -420,11 +420,16 @@ switch ($page) {
                 $logoBarColor = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_bar_color'] ?? 'fff')) ?: 'fff';
                 $logoTitleColor = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_title_color'] ?? 'c00')) ?: 'c00';
                 $logoUrl = trim($_POST['logo_url'] ?? '');
+                $removeLogo = (string)($_POST['remove_logo'] ?? '') === '1';
                 $footerNote = trim($_POST['footer_note'] ?? '');
                 $routePart1 = trim($_POST['route_1'] ?? '');
                 $routePart2 = trim($_POST['route_2'] ?? '');
                 $routePart3 = trim($_POST['route_3'] ?? '');
                 $googleMapsKey = trim($_POST['google_maps_api_key'] ?? '');
+
+                if ($removeLogo) {
+                    $logoUrl = '';
+                }
 
                 // Logo file upload
                 if (!empty($_FILES['logo_file']['name']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
@@ -453,6 +458,16 @@ switch ($page) {
                         'address_en' => trim($branchAddressEn[$i] ?? ''),
                         'phones' => trim($branchPhones[$i] ?? ''),
                     ];
+                }
+
+                // Default header/print branch: store by ordering (selected branch becomes index 0)
+                $defaultBranchIdx = isset($_POST['default_branch_idx']) ? (int)$_POST['default_branch_idx'] : 0;
+                if ($defaultBranchIdx < 0) { $defaultBranchIdx = 0; }
+                if ($defaultBranchIdx > 2) { $defaultBranchIdx = 2; }
+                if (isset($branchesData[$defaultBranchIdx])) {
+                    $selected = $branchesData[$defaultBranchIdx];
+                    array_splice($branchesData, $defaultBranchIdx, 1);
+                    array_unshift($branchesData, $selected);
                 }
 
                 $routeParts = array_filter([$routePart1, $routePart2, $routePart3]);
@@ -792,6 +807,141 @@ switch ($page) {
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
+
+        if ($action === 'import_template' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="customers_import_template.csv"');
+            // Add BOM so Excel reads UTF-8 correctly
+            echo "\xEF\xBB\xBF";
+            $out = fopen('php://output', 'wb');
+
+            $dataOnly = (string)($_GET['data_only'] ?? '') === '1';
+            // Template columns (keep minimal + useful)
+            if (!$dataOnly) {
+                fputcsv($out, ['name','phone','delivery_location','address','email','customer_type'], ',', '"', '\\');
+            }
+            // Sample rows (edit/replace these)
+            fputcsv($out, ['John Doe','0771234567','Ootuppulam','No. 10, Main Street, Colombo','john@example.com','regular'], ',', '"', '\\');
+            fputcsv($out, ['ZEMIRA','0779321072','Kilinochchi','KILI','','regular'], ',', '"', '\\');
+            fputcsv($out, ['ஜூட் அல்விஸ்','0777550905','Ootuppulam','kilinochchi','mjudealvis@gmail.com','regular'], ',', '"', '\\');
+            fclose($out);
+            return;
+        }
+
+        if ($action === 'import' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+
+            $imported = 0;
+            $failed = 0;
+            $errors = [];
+
+            $file = $_FILES['import_file'] ?? null;
+            $tmp = is_array($file) ? ($file['tmp_name'] ?? '') : '';
+            $name = is_array($file) ? ($file['name'] ?? '') : '';
+            $err = is_array($file) ? (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+
+            if ($err !== UPLOAD_ERR_OK || $tmp === '' || !is_file($tmp)) {
+                Helpers::redirect('index.php?page=customers&import_failed=1');
+                break;
+            }
+
+            $ext = strtolower(pathinfo((string)$name, PATHINFO_EXTENSION));
+            if ($ext !== 'csv') {
+                Helpers::redirect('index.php?page=customers&import_failed=1');
+                break;
+            }
+
+            $fh = @fopen($tmp, 'rb');
+            if (!$fh) {
+                Helpers::redirect('index.php?page=customers&import_failed=1');
+                break;
+            }
+
+            $header = fgetcsv($fh);
+            if (!is_array($header) || empty($header)) {
+                fclose($fh);
+                Helpers::redirect('index.php?page=customers&import_failed=1');
+                break;
+            }
+
+            $norm = function($v){
+                $v = strtolower(trim((string)$v));
+                $v = preg_replace('/\s+/', '_', $v);
+                return $v;
+            };
+            $hmap = [];
+            foreach ($header as $idx => $col) { $hmap[$norm($col)] = (int)$idx; }
+
+            $get = function(array $row, string $key) use ($hmap) {
+                if (!isset($hmap[$key])) return '';
+                $i = (int)$hmap[$key];
+                return isset($row[$i]) ? trim((string)$row[$i]) : '';
+            };
+
+            $line = 1;
+            while (($row = fgetcsv($fh)) !== false) {
+                $line++;
+                if (!is_array($row)) { continue; }
+                $nameV = $get($row, 'name');
+                $phoneV = $get($row, 'phone');
+                $emailV = $get($row, 'email');
+                $addressV = $get($row, 'address');
+                $dlV = $get($row, 'delivery_location');
+                $typeV = $get($row, 'customer_type');
+
+                // Allow alternative header
+                if ($dlV === '') { $dlV = $get($row, 'deliverylocation'); }
+                if ($typeV === '') { $typeV = $get($row, 'type'); }
+
+                // Skip fully empty lines
+                if ($nameV === '' && $phoneV === '' && $emailV === '' && $addressV === '' && $dlV === '' && $typeV === '') {
+                    continue;
+                }
+
+                if ($nameV === '') {
+                    $failed++;
+                    $errors[] = 'Line ' . $line . ': Name is required.';
+                    continue;
+                }
+
+                $phoneDb = ($phoneV === '') ? null : $phoneV;
+                $emailDb = ($emailV === '') ? null : $emailV;
+                $typeDb = null;
+                if ($typeV !== '') {
+                    $ct = strtolower(trim($typeV));
+                    if ($ct === 'corporate' || $ct === 'regular') { $typeDb = $ct; }
+                }
+
+                try {
+                    $stmt = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?,?)');
+                    $stmt->execute([$nameV, $phoneDb, $emailDb, $addressV, $dlV, null, null, null, $typeDb]);
+                    $imported++;
+                } catch (Throwable $e) {
+                    $failed++;
+                    $msg = 'Failed to import row.';
+                    if ($e instanceof PDOException) {
+                        $code = $e->getCode();
+                        $emsg = $e->getMessage();
+                        if ($code === '23000' && stripos($emsg, 'phone') !== false) {
+                            $msg = 'Duplicate phone.';
+                        }
+                    }
+                    $errors[] = 'Line ' . $line . ': ' . $msg;
+                }
+            }
+            fclose($fh);
+
+            // Store compact info in query params (avoid large payload)
+            $q = 'index.php?page=customers&imported=' . (int)$imported . '&failed=' . (int)$failed;
+            if (!empty($errors)) {
+                $q .= '&import_errors=1';
+                try { $_SESSION['import_customer_errors'] = array_slice($errors, 0, 30); } catch (Throwable $e) { /* ignore */ }
+            } else {
+                try { unset($_SESSION['import_customer_errors']); } catch (Throwable $e) { /* ignore */ }
+            }
+            Helpers::redirect($q);
+            break;
+        }
 
         // JSON summary for a customer (used by parcel form notification)
         if ($action === 'summary' && $_SERVER['REQUEST_METHOD'] === 'GET') {

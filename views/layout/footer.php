@@ -42,14 +42,40 @@
     function openSidebar(){ body.classList.add('sidebar-open'); }
     function closeSidebar(){ body.classList.remove('sidebar-open'); }
 
+    function setCollapsed(on){
+      if (on) body.classList.add('sidebar-collapsed');
+      else body.classList.remove('sidebar-collapsed');
+      try { localStorage.setItem('tms_sidebar_collapsed', on ? '1' : '0'); } catch(e) {}
+    }
+
+    // Restore collapsed state (desktop only)
+    (function(){
+      try {
+        var v = localStorage.getItem('tms_sidebar_collapsed');
+        if (v === '1') { body.classList.add('sidebar-collapsed'); }
+      } catch(e) {}
+    })();
+
     if (openBtn) openBtn.addEventListener('click', function(e){ e.preventDefault(); openSidebar(); });
     if (overlay) overlay.addEventListener('click', function(){ closeSidebar(); });
+
+    // Desktop collapse button (event delegation so it always works)
+    document.addEventListener('click', function(e){
+      var btn = e.target && (e.target.closest ? e.target.closest('[data-role="sidebar-collapse"]') : null);
+      if (!btn) return;
+      e.preventDefault();
+      // Don't collapse on small screens (mobile uses drawer behavior)
+      if (window.innerWidth < 992) return;
+      setCollapsed(!body.classList.contains('sidebar-collapsed'));
+    });
 
     // Close on ESC
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeSidebar(); });
 
     // Auto-close when switching to large screens
-    function handleResize(){ if (window.innerWidth >= 992) { body.classList.remove('sidebar-open'); } }
+    function handleResize(){
+      if (window.innerWidth >= 992) { body.classList.remove('sidebar-open'); }
+    }
     window.addEventListener('resize', handleResize);
   })();
 </script>

@@ -1,30 +1,47 @@
 <style>
   .dashboard-page {
-    --dash-card-radius: 0.75rem;
-    --dash-shadow: 0 1px 3px rgba(0,0,0,.08);
-    --dash-shadow-hover: 0 4px 12px rgba(0,0,0,.12);
+    --dash-radius: 14px;
+    --dash-border: rgba(17,24,39,.10);
+    --dash-shadow: 0 1px 2px rgba(16,24,40,.06);
+    --dash-shadow-hover: 0 6px 18px rgba(16,24,40,.10);
   }
-  .dashboard-page .page-header {
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--bs-border-color-translucent);
-  }
-  .dashboard-page .page-header h1 {
-    font-size: 1.75rem;
+  .dashboard-page .section-title {
+    font-size: .92rem;
     font-weight: 700;
-    color: var(--bs-body-color);
-    margin: 0;
+    color: #111827;
+    margin: 0 0 .6rem;
   }
-  .dashboard-page .page-header .lead {
-    font-size: 0.95rem;
-    color: var(--bs-secondary-color);
-    margin: 0.25rem 0 0;
+  .dashboard-page .section-subtitle {
+    font-size: .82rem;
+    color: #6b7280;
+    margin: 0 0 .75rem;
   }
-  .dashboard-page .quick-actions .action-card {
-    border: 1px solid var(--bs-border-color-translucent);
-    border-radius: var(--dash-card-radius);
+  .dashboard-page .kpi-card {
+    border: 1px solid var(--dash-border);
+    border-radius: var(--dash-radius);
     box-shadow: var(--dash-shadow);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    background: #fff;
+    padding: 12px 14px;
+    height: 100%;
+  }
+  .dashboard-page .kpi-card:hover { transform: translateY(-1px); box-shadow: var(--dash-shadow-hover); }
+  .dashboard-page .kpi-label { font-size: .78rem; color: #6b7280; font-weight: 600; }
+  .dashboard-page .kpi-value { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; color: #111827; }
+  .dashboard-page .kpi-icon {
+    width: 34px; height: 34px;
+    border-radius: 12px;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(13,110,253,.10);
+    color: #0d6efd;
+    flex: 0 0 auto;
+  }
+
+  .dashboard-page .quick-actions .action-card {
+    border: 1px solid var(--dash-border);
+    border-radius: var(--dash-radius);
+    box-shadow: var(--dash-shadow);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
     text-decoration: none;
     color: inherit;
     display: block;
@@ -33,51 +50,42 @@
   .dashboard-page .quick-actions .action-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--dash-shadow-hover);
-    border-color: var(--bs-primary-border-subtle);
+    border-color: rgba(13,110,253,.25);
     color: inherit;
   }
   .dashboard-page .quick-actions .action-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 0.65rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     flex-shrink: 0;
   }
-  .dashboard-page .quick-actions .action-card .action-title { font-weight: 600; font-size: 1rem; margin-bottom: 0.15rem; }
-  .dashboard-page .quick-actions .action-card .action-desc { font-size: 0.8rem; color: var(--bs-secondary-color); }
-  .dashboard-page .card-dash {
-    border: 1px solid var(--bs-border-color-translucent);
-    border-radius: var(--dash-card-radius);
-    box-shadow: var(--dash-shadow);
-  }
+  .dashboard-page .quick-actions .action-card .action-title { font-weight: 700; font-size: .92rem; margin-bottom: 0.1rem; }
+  .dashboard-page .quick-actions .action-card .action-desc { font-size: 0.78rem; color: #6b7280; }
+  .dashboard-page .card-dash { border: 1px solid var(--dash-border); border-radius: var(--dash-radius); box-shadow: var(--dash-shadow); background:#fff; }
   .dashboard-page .card-dash .card-header-dash {
     font-weight: 600;
     font-size: 0.9rem;
     color: var(--bs-body-color);
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--bs-border-color-translucent);
-    background: var(--bs-tertiary-bg);
-    border-radius: var(--dash-card-radius) var(--dash-card-radius) 0 0;
+    padding: 0.7rem .9rem;
+    border-bottom: 1px solid var(--dash-border);
+    background: #fbfcfe;
+    border-radius: var(--dash-radius) var(--dash-radius) 0 0;
   }
   .dashboard-page .filters-card {
-    background: var(--bs-tertiary-bg);
-    border: 1px solid var(--bs-border-color-translucent);
-    border-radius: var(--dash-card-radius);
-    padding: 1rem 1.25rem;
-    margin-bottom: 1.5rem;
+    background: #fff;
+    border: 1px solid var(--dash-border);
+    border-radius: var(--dash-radius);
+    padding: .85rem .95rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--dash-shadow);
   }
   .dashboard-page .filters-card .form-label { font-size: 0.8rem; font-weight: 500; color: var(--bs-secondary-color); }
-  .dashboard-page .stat-card {
-    border-left: 4px solid;
-    border-radius: var(--dash-card-radius);
-    overflow: hidden;
-  }
-  .dashboard-page .stat-card.stat-collections { border-left-color: var(--bs-success); }
-  .dashboard-page .stat-card.stat-expenses { border-left-color: var(--bs-warning); }
-  .dashboard-page .stat-card .stat-value { font-size: clamp(1.25rem, 4vw, 1.75rem); font-weight: 700; }
+  .dashboard-page .stat-card { border-radius: var(--dash-radius); overflow: hidden; }
+  .dashboard-page .stat-card .stat-value { font-size: 1.35rem; font-weight: 800; letter-spacing: -.01em; }
   .dashboard-page .table-dash thead th {
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -89,6 +97,12 @@
   }
   .dashboard-page .table-dash tbody td { padding: 0.6rem 0.75rem; vertical-align: middle; }
   .dashboard-page .table-dash.table-hover tbody tr:hover { background-color: var(--bs-tertiary-bg); }
+
+  .dashboard-page .badge-soft { font-weight: 700; border: 1px solid rgba(17,24,39,.10); }
+  .dashboard-page .badge-soft-success { background: rgba(25,135,84,.12); color: #146c43; }
+  .dashboard-page .badge-soft-warning { background: rgba(255,193,7,.16); color: #8a6d00; }
+  .dashboard-page .badge-soft-info { background: rgba(13,202,240,.16); color: #055160; }
+  .dashboard-page .badge-soft-secondary { background: rgba(108,117,125,.14); color: #495057; }
   .dashboard-page .nav-tabs-dash .nav-link {
     border: none;
     border-radius: 0.5rem;
@@ -109,12 +123,70 @@
   }
 </style>
 <div class="dashboard-page">
-  <header class="page-header">
-    <h1>Dashboard</h1>
-    <p class="lead">Overview and quick actions</p>
-  </header>
+  <?php
+    $kpiPending = (int)($pendingParcels ?? 0);
+    $kpiTodayParcels = is_array($todayParcels ?? null) ? count($todayParcels) : 0;
+    $kpiCollections = (float)($collectionsToday ?? 0);
+    $kpiExpenses = (float)($expensesToday ?? 0);
+  ?>
 
-  <section class="quick-actions mb-4">
+  <section class="mb-3">
+    <p class="section-title">Overview</p>
+    <p class="section-subtitle">Key operational metrics for the selected branch and date range.</p>
+    <div class="row g-3">
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Pending Parcels</div>
+              <div class="kpi-value"><?php echo $kpiPending; ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true"><i class="bi bi-hourglass-split"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending'); ?>">View pending</a></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Today's Parcels</div>
+              <div class="kpi-value"><?php echo $kpiTodayParcels; ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(32,201,151,.12); color:#198754;"><i class="bi bi-box-seam"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&from=' . urlencode($today ?? date('Y-m-d')) . '&to=' . urlencode($today ?? date('Y-m-d'))); ?>">View list</a></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Today’s Collections</div>
+              <div class="kpi-value">Rs. <?php echo number_format($kpiCollections, 2); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,110,253,.10); color:#0d6efd;"><i class="bi bi-cash-stack"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">Go to payments</a></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Today’s Expenses</div>
+              <div class="kpi-value">Rs. <?php echo number_format($kpiExpenses, 2); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#8a6d00;"><i class="bi bi-wallet2"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Go to expenses</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="quick-actions mb-3">
+    <p class="section-title">Quick Actions</p>
     <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
       <div class="col">
         <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>">
@@ -179,8 +251,8 @@
   </section>
 
   <section class="mb-4">
-    <h5 class="mb-3">Delivery Route</h5>
-    <p class="text-muted small mb-2">Register a customer first, then plan routes and assign vehicles. When adding a delivery route you can pick the customer and use their address.</p>
+    <p class="section-title">Delivery</p>
+    <p class="section-subtitle">Register a customer first, then plan routes and assign vehicles. When adding a delivery route you can pick the customer and use their address.</p>
     <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
       <div class="col">
         <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>">
@@ -303,7 +375,13 @@
                   <td><?php echo htmlspecialchars($p['customer_name'] ?? ''); ?></td>
                   <td><?php echo htmlspecialchars($p['tracking_number'] ?? ''); ?></td>
                   <td><?php echo htmlspecialchars($p['vehicle_no'] ?? ''); ?></td>
-                  <td><span class="badge text-bg-secondary"><?php echo htmlspecialchars($p['status']); ?></span></td>
+                  <td>
+                    <?php
+                      $st = (string)($p['status'] ?? '');
+                      $stClass = ($st === 'delivered') ? 'badge-soft-success' : (($st === 'in_transit') ? 'badge-soft-info' : 'badge-soft-warning');
+                    ?>
+                    <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars($st); ?></span>
+                  </td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -464,9 +542,9 @@
                     <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
                     <tr>
                       <td class="fw-medium"><?php echo htmlspecialchars($b['name']); ?></td>
-                      <td class="text-end"><span class="badge text-bg-secondary"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'pending'); ?></span></td>
-                      <td class="text-end"><span class="badge text-bg-info"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'in_transit'); ?></span></td>
-                      <td class="text-end"><span class="badge text-bg-success"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'delivered'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'pending'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'in_transit'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'delivered'); ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                   </tbody>
@@ -488,9 +566,9 @@
                     <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
                     <tr>
                       <td class="fw-medium"><?php echo htmlspecialchars($b['name']); ?></td>
-                      <td class="text-end"><span class="badge text-bg-secondary"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'pending'); ?></span></td>
-                      <td class="text-end"><span class="badge text-bg-info"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'in_transit'); ?></span></td>
-                      <td class="text-end"><span class="badge text-bg-success"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'delivered'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'pending'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'in_transit'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'delivered'); ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                   </tbody>
@@ -512,9 +590,9 @@
                     <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
                     <tr>
                       <td class="fw-medium"><?php echo htmlspecialchars($b['name']); ?></td>
-                      <td class="text-end"><span class="badge text-bg-secondary"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'pending'); ?></span></td>
-                      <td class="text-end"><span class="badge text-bg-info"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'in_transit'); ?></span></td>
-                      <td class="text-end"><span class="badge text-bg-success"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'delivered'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'pending'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'in_transit'); ?></span></td>
+                      <td class="text-end"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'delivered'); ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                   </tbody>

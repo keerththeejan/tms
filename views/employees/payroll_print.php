@@ -11,6 +11,10 @@
       body { margin: 0.5in; }
       .table td, .table th { padding: .35rem .5rem; }
     }
+    @media print {
+      .print-header-card { border: 0 !important; background: transparent !important; padding: 0 !important; }
+      .print-header-card .text-muted { color: #444 !important; }
+    }
   </style>
 </head>
 <body>
@@ -30,9 +34,9 @@
     </div>
   </div>
 </div>
-<?php $cfg = (require __DIR__ . '/../../config/config.php'); $brand = $cfg['company'] ?? []; $addrParam = (string)($_GET['addr'] ?? ''); if ($addrParam !== '') { $addrParam = str_replace(["\r"], '', $addrParam); } $addresses = []; if ($addrParam !== '') { $tmp = explode("\n", $addrParam); foreach ($tmp as $a) { $a = trim($a); if ($a !== '') { $addresses[] = $a; } } } else { foreach (($brand['addresses'] ?? []) as $a) { $a = trim((string)$a); if ($a !== '') { $addresses[] = $a; } } } ?>
+<?php $brand = Helpers::company(); $addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 3); ?>
 <div class="container">
-  <div class="mb-3 p-2 border rounded">
+  <div class="mb-3 p-2 border rounded print-header-card">
     <div class="d-flex align-items-center gap-2">
       <?php $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']); ?>
       <?php if ($useLogoImage): ?>

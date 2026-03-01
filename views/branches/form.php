@@ -1,7 +1,11 @@
 <?php /** @var array $branch */ ?>
 <style>
+  .branches-form-page { --ui-border: rgba(17,24,39,.10); --ui-shadow: 0 1px 2px rgba(16,24,40,.06); --ui-radius: 14px; }
   .branches-form-page .page-header { flex-wrap: wrap; gap: 0.5rem; }
-  .branches-form-page .page-header h3 { font-size: 1.25rem; }
+  .branches-form-page .page-header h3 { font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; }
+  .branches-form-page .card-soft { background:#fff; border: 1px solid var(--ui-border); border-radius: var(--ui-radius); box-shadow: var(--ui-shadow); }
+  .branches-form-page .form-control { height: 38px; border-radius: 12px; }
+  .branches-form-page .form-label { font-size: .9rem; font-weight: 600; color:#374151; }
   @media (max-width: 576px) {
     .branches-form-page .page-header { flex-direction: column; align-items: stretch; }
     .branches-form-page .page-header .btn { width: 100%; }
@@ -16,7 +20,7 @@
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
-<form method="post" action="<?php echo Helpers::baseUrl('index.php?page=branches&action=save'); ?>" class="card shadow-sm">
+<form method="post" action="<?php echo Helpers::baseUrl('index.php?page=branches&action=save'); ?>" class="card card-soft">
   <div class="card-body">
     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
     <input type="hidden" name="id" value="<?php echo (int)$branch['id']; ?>">
@@ -37,7 +41,7 @@
       </div>
     </div>
   </div>
-  <div class="card-footer text-end">
+  <div class="card-footer d-flex justify-content-end">
     <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
   </div>
 </form>

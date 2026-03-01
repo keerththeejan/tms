@@ -1,13 +1,7 @@
 <?php
 /** @var array $dn */ /** @var array $items */
-$cfg = (require __DIR__ . '/../../config/config.php');
-$brand = $cfg['company'] ?? [];
-$addresses = $brand['addresses'] ?? [];
-if (empty($addresses) && !empty($brand['branches'])) {
-    foreach ($brand['branches'] as $b) {
-        $addresses[] = ($b['name'] ?? '') . ': ' . ($b['address_en'] ?? '') . ' | ' . ($b['phones'] ?? '');
-    }
-}
+$brand = Helpers::company();
+$addresses = Helpers::companyHeaderAddressLines('', 3);
 $total = 0.0;
 foreach ($items as $i) { $total += (float)$i['amount']; }
 $disc = (float)($dn['discount'] ?? 0);

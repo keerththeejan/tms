@@ -1,8 +1,7 @@
 <?php
 /** @var array $parcel */ /** @var array $items */
-$cfg = (require __DIR__ . '/../../config/config.php');
-$brand = $cfg['company'] ?? [];
-$branches = $brand['branches'] ?? [];
+$brand = Helpers::company();
+$branches = Helpers::companyBranches();
 $logoArch = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_arch_color'] ?? 'c00') ?: 'c00');
 $logoBarBg = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_bar_bg'] ?? '000') ?: '000');
 $logoBarColor = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_bar_color'] ?? 'fff') ?: 'fff');
@@ -91,19 +90,7 @@ if (strlen($logoTitleColor) === 4) { $c = $logoTitleColor[1].$logoTitleColor[1].
 <?php
 $regNo = $brand['reg_no'] ?? '';
 $routeTamilParts = $brand['route_tamil_parts'] ?? ['கொழும்பு', 'கிளிநொச்சி', 'முல்லைத்தீவு'];
-$addrParam = (string)($_GET['addr'] ?? '');
-if ($addrParam !== '') { $addrParam = str_replace(["\r"], '', $addrParam); }
-$addresses = [];
-if ($addrParam !== '') {
-  $tmp = explode("\n", $addrParam);
-  foreach ($tmp as $a) { $a = trim($a); if ($a !== '') { $addresses[] = $a; } }
-} elseif (!empty($branches)) {
-  foreach ($branches as $b) {
-    $addresses[] = ($b['address_en'] ?? '') . ' | ' . ($b['phones'] ?? '');
-  }
-} else {
-  foreach (($brand['addresses'] ?? []) as $a) { $a = trim((string)$a); if ($a !== '') { $addresses[] = $a; } }
-}
+$addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 3);
 $parcelDate = substr((string)($parcel['created_at'] ?? date('Y-m-d')), 0, 10);
 $parcelDateParts = explode('-', $parcelDate);
 $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] : (int)$parcel['id'];
