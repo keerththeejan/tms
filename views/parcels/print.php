@@ -22,8 +22,10 @@ if (strlen($logoTitleColor) === 4) { $c = $logoTitleColor[1].$logoTitleColor[1].
     body { padding: 24px; font-size: 13px; background: #fff; color: #333; }
     .sheet { border: 2px solid #333; border-radius: 6px; overflow: hidden; background: #fff; }
     .sheet-header { background: #fff; position: relative; }
-    .header-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 8px 16px 4px; }
-    .header-brand { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .header-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 8px 16px 4px; }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-center { text-align: center; }
+    .header-right { min-width: 64px; }
     .logo-unit { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-unit .logo-wrap { width: 64px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--logo-arch); border-radius: 50% 50% 0 0; font-weight: 800; font-size: 18px; color: var(--logo-bar-color); border: 2px solid #333; position: relative; }
     .logo-unit .logo-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: 0; border-radius: inherit; background: repeating-linear-gradient(0deg, #000 0, #000 2px, transparent 2px, transparent 6px); opacity: 0.4; pointer-events: none; }
@@ -108,18 +110,18 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
       </div>
     <?php endif; ?>
     <div class="header-top">
-      <div class="header-brand">
-        <?php
-          $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']);
-          $logoInitials = trim($brand['logo_initials'] ?? 'TS') ?: 'TS';
-          $logoInitials = preg_replace('/[^A-Za-z0-9]/', '', $logoInitials);
-          if (function_exists('mb_substr')) {
-            $logoInitials = mb_substr($logoInitials, 0, 6);
-          } else {
-            $logoInitials = substr($logoInitials, 0, 6);
-          }
-          $logoInitials = $logoInitials ?: 'TS';
-        ?>
+      <?php
+        $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']);
+        $logoInitials = trim($brand['logo_initials'] ?? 'TS') ?: 'TS';
+        $logoInitials = preg_replace('/[^A-Za-z0-9]/', '', $logoInitials);
+        if (function_exists('mb_substr')) {
+          $logoInitials = mb_substr($logoInitials, 0, 6);
+        } else {
+          $logoInitials = substr($logoInitials, 0, 6);
+        }
+        $logoInitials = $logoInitials ?: 'TS';
+      ?>
+      <div class="header-left">
         <?php if ($useLogoImage): ?>
           <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
           <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo" style="height:56px">
@@ -129,8 +131,11 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
             <span class="bar-small"><?php echo htmlspecialchars(strtoupper($brand['name'] ?? 'TS Transport')); ?></span>
           </div>
         <?php endif; ?>
+      </div>
+      <div class="header-center">
         <div class="brand-title"><?php echo htmlspecialchars($brand['name'] ?? 'TS Transport'); ?></div>
       </div>
+      <div class="header-right"></div>
     </div>
     <div class="route-bar">
       <?php foreach ($routeTamilParts as $i => $part): ?>
