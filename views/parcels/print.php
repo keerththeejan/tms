@@ -44,11 +44,11 @@ if (strlen($logoTitleColor) === 4) { $c = $logoTitleColor[1].$logoTitleColor[1].
     .branch-col .addr-phones::before { content: "📞 "; }
     .meta-row { padding: 7px 14px; background: #f8f9fa; border-top: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 12px; }
     .meta-row strong { margin-right: 4px; }
-    .invoice-no-block { padding: 10px 16px 8px; text-align: center; }
+    .invoice-no-block { padding: 4px 16px 2px; text-align: center; }
     .invoice-no-block .invoice-no-title { color: #c00; font-size: 1.25rem; font-weight: 700; }
-    .invoice-no-block .invoice-no-line { border-bottom: 1px solid #000; margin-top: 4px; }
+    .invoice-no-block .invoice-no-line { border-bottom: 0; margin-top: 0; height: 0; }
     .addr { font-size: 11px; color: #333; }
-    table.receipt { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    table.receipt { width: 100%; border-collapse: collapse; margin-top: 4px; }
     table.receipt th, table.receipt td { border: 1px solid #333; padding: 8px; vertical-align: middle; }
     table.receipt th { background: #f0f0f0; text-transform: uppercase; font-size: 12px; font-weight: 700; }
     .totals { border-top: 2px solid #333; background: #e8e8e8; font-weight: 700; }
