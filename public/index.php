@@ -1382,6 +1382,8 @@ switch ($page) {
         if (!Auth::canCreateParcels()) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
+
+        try { $pdo->exec("ALTER TABLE parcels ADD COLUMN delivery_route VARCHAR(255) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
@@ -1549,6 +1551,7 @@ switch ($page) {
             $tracking_number_raw = trim($_POST['tracking_number'] ?? '');
             $tracking_number = $tracking_number_raw; // keep as-is for update/insert
             $vehicle_no = trim($_POST['vehicle_no'] ?? '');
+            $delivery_route = trim((string)($_POST['delivery_route'] ?? ''));
             // Invoice number: manual or auto (next from 1)
             $invoice_no = (int)($_POST['invoice_no'] ?? 0);
             if ($id <= 0) {
@@ -1665,7 +1668,7 @@ switch ($page) {
 
             if (!$priceOnlyEdit && ($customer_id <= 0 || $from_branch_id <= 0 || $to_branch_id <= 0)) {
                 $error = 'Customer, From Branch and To Branch are required.';
-                $parcel = compact('id','customer_id','supplier_id','from_branch_id','to_branch_id','weight','status','tracking_number','vehicle_no');
+                $parcel = compact('id','customer_id','supplier_id','from_branch_id','to_branch_id','weight','status','tracking_number','vehicle_no','delivery_route');
                 // Load vehicles list: prefer reg_number, fallback to plate_no, then vehicle_no
                 try {
                     $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
@@ -1676,8 +1679,10 @@ switch ($page) {
                         catch (Throwable $e3) { $vehiclesAll = []; }
                     }
                 }
+                $deliveryRoutesAll = [];
+                try { $deliveryRoutesAll = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesAll = []; }
                 $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
-                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy'));
+                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll'));
                 break;
             }
 
@@ -1717,8 +1722,8 @@ switch ($page) {
                     } catch (Throwable $e) { /* ignore sync errors */ }
                 } else {
                     // Other branches: full edit except price (kept same value as existing)
-                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=?, invoice_no=? WHERE id=?");
-                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,$id]);
+                    $stmt = $pdo->prepare("UPDATE parcels SET customer_id=?, supplier_id=?, from_branch_id=?, to_branch_id=?, weight=?, price=?, status=?, tracking_number = NULLIF(?, ''), vehicle_no=?, invoice_no=?, delivery_route=? WHERE id=?");
+                    $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null),$id]);
                     // Replace items allowed for non-Kilinochchi
                     $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]);
                     if (is_array($items)) {
@@ -1809,21 +1814,21 @@ switch ($page) {
                     $price = $p;
                     $createdAtOverride = trim($_POST['created_date'] ?? '');
                     if ($createdAtOverride) {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, created_at) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,$createdAtOverride]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, delivery_route, created_at) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null),$createdAtOverride]);
                     } else {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, delivery_route) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null)]);
                     }
                 } else {
                     // Other branches: do not set price at create
                     $createdAtOverride = trim($_POST['created_date'] ?? '');
                     if ($createdAtOverride) {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, created_at) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,$createdAtOverride]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, delivery_route, created_at) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null),$createdAtOverride]);
                     } else {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, delivery_route) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null)]);
                     }
                 }
                 $id = (int)$pdo->lastInsertId();
@@ -2089,6 +2094,8 @@ switch ($page) {
                     catch (Throwable $e3) { $vehiclesAll = []; }
                 }
             }
+            $deliveryRoutesAll = [];
+            try { $deliveryRoutesAll = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesAll = []; }
             // Last bill (most recent parcel) for "Open last bill" / "Add more parcel" options
             $lastParcel = null;
             try {
@@ -2098,7 +2105,7 @@ switch ($page) {
 
             // Determine lock/priceOnly flags for UI
             $policy = ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>$canEnterItemAmounts];
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel'));
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel','deliveryRoutesAll'));
             break;
         }
 
@@ -2117,13 +2124,15 @@ switch ($page) {
             } catch (Throwable $e) {
                 try { $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e2) { $vehiclesAll = []; }
             }
+            $deliveryRoutesAll = [];
+            try { $deliveryRoutesAll = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesAll = []; }
             // When parcel is In Transit: only status change allowed (no other edit options)
             $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts, 'statusOnlyEdit'=>false];
             if ((string)($parcel['status'] ?? '') === 'in_transit') {
                 $policy['lockAll'] = true;
                 $policy['statusOnlyEdit'] = true;
             }
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy'));
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy','deliveryRoutesAll'));
             break;
         }
 
@@ -2169,6 +2178,7 @@ switch ($page) {
         $tracking_filter = trim($_GET['tracking_number'] ?? '');
         $invoice_no_filter = trim($_GET['invoice_no'] ?? '');
         $delivery_location_filter = trim($_GET['delivery_location'] ?? '');
+        $delivery_route_filter = trim($_GET['delivery_route'] ?? '');
         $route_date = trim($_GET['route_date'] ?? '');
         $filter_type = trim($_GET['filter_type'] ?? '');
         
@@ -2242,6 +2252,10 @@ switch ($page) {
             $where[] = 'c.delivery_location LIKE ?';
             $params[] = '%' . $delivery_location_filter . '%';
         }
+        if ($delivery_route_filter !== '') {
+            $where[] = 'p.delivery_route LIKE ?';
+            $params[] = '%' . $delivery_route_filter . '%';
+        }
         if ($route_date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $route_date)) {
             $where[] = '(EXISTS (SELECT 1 FROM delivery_route_assignments dra WHERE dra.customer_id = p.customer_id AND ((dra.branch_id = p.to_branch_id AND dra.delivery_date = ?) OR (dra.branch_id = p.from_branch_id AND dra.delivery_date = ?))))';
             array_push($params, $route_date, $route_date);
@@ -2261,7 +2275,8 @@ switch ($page) {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
                            COALESCE(dra_to.delivery_date, "") AS route_date_to, COALESCE(dra_from.delivery_date, "") AS route_date_from,
-                           c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
+                           p.delivery_route,
+                           c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS customer_delivery_location, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            COALESCE(pe.status, p.last_email_status) AS email_status,
                            COALESCE(pe.created_at, p.last_emailed_at) AS emailed_at,
                            pit.item_descriptions
@@ -2293,7 +2308,8 @@ switch ($page) {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
                            COALESCE(dra_to.delivery_date, "") AS route_date_to, COALESCE(dra_from.delivery_date, "") AS route_date_from,
-                           c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
+                           p.delivery_route,
+                           c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS customer_delivery_location, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            p.last_email_status AS email_status, p.last_emailed_at AS emailed_at,
                            pit.item_descriptions
                     FROM parcels p
@@ -2360,6 +2376,9 @@ switch ($page) {
         if ($delivery_location_filter !== '') {
             $countParams[] = '%' . $delivery_location_filter . '%';
         }
+        if ($delivery_route_filter !== '') {
+            $countParams[] = '%' . $delivery_route_filter . '%';
+        }
         if ($route_date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $route_date)) {
             array_push($countParams, $route_date, $route_date);
         }
@@ -2396,11 +2415,13 @@ switch ($page) {
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
         $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
         $suppliersFilterList = $pdo->query('SELECT id, name FROM suppliers ORDER BY name LIMIT 300')->fetchAll();
+        $deliveryRoutesFilterList = [];
+        try { $deliveryRoutesFilterList = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesFilterList = []; }
         $parcelRowStart = ($page - 1) * $perPage; // 0-based start for sequential # column (1, 2, 3...)
         if ($action === 'print_list') {
             Helpers::view('parcels/print_list', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','route_date','filter_type','from','to','totalCount','parcelRowStart'));
         } else {
-            Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','route_date','filter_type','customersList','from','to','branchesFilterList','suppliersFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount','parcelRowStart'));
+            Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','delivery_route_filter','route_date','filter_type','customersList','from','to','branchesFilterList','suppliersFilterList','deliveryRoutesFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount','parcelRowStart'));
         }
         break;
 
@@ -2462,7 +2483,7 @@ switch ($page) {
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         $id = (int)($_GET['id'] ?? 0);
-        $stmt = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, s.name AS supplier_name, s.phone AS supplier_phone, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id LEFT JOIN suppliers s ON s.id = p.supplier_id LEFT JOIN branches bf ON bf.id=p.from_branch_id LEFT JOIN branches bt ON bt.id=p.to_branch_id WHERE p.id=?');
+        $stmt = $pdo->prepare('SELECT p.*, c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS delivery_location, s.name AS supplier_name, s.phone AS supplier_phone, bf.name AS from_branch, bt.name AS to_branch FROM parcels p LEFT JOIN customers c ON c.id=p.customer_id LEFT JOIN suppliers s ON s.id = p.supplier_id LEFT JOIN branches bf ON bf.id=p.from_branch_id LEFT JOIN branches bt ON bt.id=p.to_branch_id WHERE p.id=?');
         $stmt->execute([$id]);
         $parcel = $stmt->fetch();
         if (!$parcel) { http_response_code(404); echo 'Not found'; break; }

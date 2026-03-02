@@ -22,27 +22,27 @@ if (strlen($logoTitleColor) === 4) { $c = $logoTitleColor[1].$logoTitleColor[1].
     body { padding: 24px; font-size: 13px; background: #fff; color: #333; }
     .sheet { border: 2px solid #333; border-radius: 6px; overflow: hidden; background: #fff; }
     .sheet-header { background: #fff; position: relative; }
-    .header-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 16px 10px; }
+    .header-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 8px 16px 4px; }
     .header-brand { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
     .logo-unit { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-unit .logo-wrap { width: 64px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--logo-arch); border-radius: 50% 50% 0 0; font-weight: 800; font-size: 18px; color: var(--logo-bar-color); border: 2px solid #333; position: relative; }
     .logo-unit .logo-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: 0; border-radius: inherit; background: repeating-linear-gradient(0deg, #000 0, #000 2px, transparent 2px, transparent 6px); opacity: 0.4; pointer-events: none; }
     .logo-unit .bar-small { background: var(--logo-bar-bg); color: var(--logo-bar-color); padding: 4px 10px; font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
     .brand-title { font-weight: 900; font-size: 26px; letter-spacing: 2px; color: var(--brand); text-transform: uppercase; line-height: 1.1; }
-    .reg-no { font-size: 12px; color: #333; font-weight: 600; position: absolute; top: 12px; right: 16px; }
-    .route-bar { background: transparent; color: #333; padding: 10px 16px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px; border-bottom: 1px solid #ddd; }
+    .reg-no { font-size: 12px; color: #333; font-weight: 600; position: absolute; top: 10px; right: 16px; text-align: right; }
+    .reg-no .reg-line { display:block; }
+    .reg-no .date-line { display:block; margin-top: 2px; }
+    .route-bar { background: transparent; color: #333; padding: 6px 16px 7px; font-size: 14px; line-height: 1.1; text-align: center; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 10px; border-bottom: 1px solid #ddd; }
     .route-bar .route-part { white-space: nowrap; }
     .route-bar .arrow-double { color: #666; font-size: 18px; margin: 0 4px; }
-    .branch-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 18px; padding: 14px 16px; border-bottom: 1px solid #ddd; }
+    .branch-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 16px; padding: 10px 16px; border-bottom: 1px solid #ddd; }
     .branch-col { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
     .branch-col .branch-name { font-weight: 700; font-size: 12px; color: #333; margin-bottom: 2px; }
     .branch-col .addr-ta { color: #333; line-height: 1.35; }
     .branch-col .addr-en { color: #555; line-height: 1.35; }
     .branch-col .addr-phones { color: #333; }
     .branch-col .addr-phones::before { content: "📞 "; }
-    .header-date { padding: 10px 16px 12px; font-size: 13px; color: #333; text-align: right; }
-    .header-date .date-placeholder { border-bottom: 1px dotted #333; padding: 0 6px 2px; margin: 0 2px; min-width: 28px; display: inline-block; }
-    .meta-row { padding: 8px 14px; background: #f8f9fa; border-top: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 12px 20px; font-size: 12px; }
+    .meta-row { padding: 7px 14px; background: #f8f9fa; border-top: 1px solid #ddd; display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 12px; }
     .meta-row strong { margin-right: 4px; }
     .invoice-no-block { padding: 10px 16px 8px; text-align: center; }
     .invoice-no-block .invoice-no-title { color: #c00; font-size: 1.25rem; font-weight: 700; }
@@ -93,12 +93,19 @@ $routeTamilParts = $brand['route_tamil_parts'] ?? ['கொழும்பு', '
 $addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 3);
 $parcelDate = substr((string)($parcel['created_at'] ?? date('Y-m-d')), 0, 10);
 $parcelDateParts = explode('-', $parcelDate);
+$dateInline = '';
+if (count($parcelDateParts) >= 3) {
+  $dateInline = $parcelDateParts[2] . ' / ' . $parcelDateParts[1] . ' / ' . $parcelDateParts[0];
+}
 $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] : (int)$parcel['id'];
 ?>
 <div class="sheet">
   <div class="sheet-header">
     <?php if ($regNo !== ''): ?>
-      <div class="reg-no">Reg No: <?php echo htmlspecialchars($regNo); ?></div>
+      <div class="reg-no">
+        <span class="reg-line">Reg No: <?php echo htmlspecialchars($regNo); ?></span>
+        <span class="date-line">Date: <?php echo htmlspecialchars($dateInline); ?></span>
+      </div>
     <?php endif; ?>
     <div class="header-top">
       <div class="header-brand">
@@ -155,16 +162,11 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
-    <div class="header-date">
-      <strong>Date:</strong>
-      <span class="date-placeholder"><?php echo count($parcelDateParts) >= 1 ? $parcelDateParts[2] : ''; ?></span> /
-      <span class="date-placeholder"><?php echo count($parcelDateParts) >= 2 ? $parcelDateParts[1] : ''; ?></span> /
-      <span class="date-placeholder"><?php echo count($parcelDateParts) >= 3 ? $parcelDateParts[0] : ''; ?></span>
-    </div>
     <div class="meta-row">
       <span><strong>Vehicle No:</strong> <?php echo htmlspecialchars($parcel['vehicle_no'] ?? '—'); ?></span>
       <span><strong>Customer:</strong> <?php echo htmlspecialchars($parcel['customer_name'] ?? ''); ?> (<?php echo htmlspecialchars($parcel['customer_phone'] ?? ''); ?>)</span>
       <span><strong>Supplier:</strong> <?php echo htmlspecialchars($parcel['supplier_name'] ?? '—'); ?><?php echo !empty($parcel['supplier_phone']) ? ' (' . htmlspecialchars($parcel['supplier_phone']) . ')' : ''; ?></span>
+      <span><strong>Delivery Location:</strong> <?php $dl = trim((string)($parcel['delivery_location'] ?? '')); echo htmlspecialchars($dl !== '' ? $dl : '—'); ?></span>
     </div>
   </div>
 
@@ -181,7 +183,6 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
           <th>Description</th>
           <th style="width:15%">Rate</th>
           <th style="width:10%">Rs</th>
-          <th style="width:10%">Cts</th>
         </tr>
       </thead>
       <tbody>
@@ -208,23 +209,20 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
             }
             $total += $amt;
             $rs = floor($amt);
-            $cts = (int)round(($amt - $rs) * 100);
         ?>
           <tr>
             <td><?php echo $qty>0?number_format($qty, 2):''; ?></td>
             <td><?php echo htmlspecialchars($i['description']); ?></td>
             <td class="text-end"><?php echo $rate>0?number_format($rate,2):''; ?></td>
             <td class="text-end"><?php echo $amt>0?number_format($rs):''; ?></td>
-            <td class="text-end"><?php echo $amt>0?str_pad((string)$cts,2,'0',STR_PAD_LEFT):''; ?></td>
           </tr>
         <?php endforeach; else: // fallback to single line ?>
-          <?php $amt = (float)($parcel['price'] ?? 0); $rs=floor($amt); $cts=(int)round(($amt-$rs)*100); ?>
+          <?php $amt = (float)($parcel['price'] ?? 0); $rs=floor($amt); ?>
           <tr>
             <td><?php echo number_format((float)($parcel['weight'] ?? 0), 2); ?></td>
             <td><?php echo htmlspecialchars($parcel['tracking_number'] ?? ''); ?></td>
             <td class="text-end"><?php echo $amt>0?number_format($amt,2):''; ?></td>
             <td class="text-end"><?php echo $amt>0?number_format($rs):''; ?></td>
-            <td class="text-end"><?php echo $amt>0?str_pad((string)$cts,2,'0',STR_PAD_LEFT):''; ?></td>
           </tr>
         <?php endif; ?>
       </tbody>
@@ -235,12 +233,11 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
           if (($items && count($items)>0) && ($grand <= 0)) {
             $grand = (float)($parcel['price'] ?? 0);
           }
-          $grs=floor($grand); $gcts=(int)round(($grand-$grs)*100); 
+          $grs=floor($grand);
         ?>
         <tr class="totals">
           <td colspan="3" class="text-end">Total</td>
           <td class="text-end"><?php echo number_format($grs); ?></td>
-          <td class="text-end"><?php echo str_pad((string)$gcts,2,'0',STR_PAD_LEFT); ?></td>
         </tr>
       </tfoot>
     </table>
@@ -255,12 +252,11 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
       $displayGrand = ($items && count($items)>0) ? $total : (float)($parcel['price'] ?? 0);
       if (($items && count($items)>0) && $displayGrand <= 0) { $displayGrand = (float)($parcel['price'] ?? 0); }
       $dRs = floor($displayGrand);
-      $dCts = (int)round(($displayGrand - $dRs) * 100);
     ?>
     <div class="d-flex justify-content-between mt-3 align-items-center">
       <div class="serial-big">Invoice No. #<?php echo $invoiceNo; ?></div>
-      <div class="fw-bold" style="color: var(--brand); font-size: 1.1rem;">
-        TOTAL RS <?php echo number_format($dRs); ?> CTS <?php echo str_pad((string)$dCts, 2, '0', STR_PAD_LEFT); ?>
+      <div class="fw-bold" style="color: var(--brand); font-size: 1.6rem; letter-spacing: .5px;">
+        TOTAL RS <?php echo number_format($dRs); ?>
       </div>
     </div>
   </div>

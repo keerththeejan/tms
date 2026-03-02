@@ -368,6 +368,22 @@
         </label>
       </div>
     </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <label class="form-label">Delivery Route</label>
+      <?php $drVal = trim((string)($parcel['delivery_route'] ?? '')); ?>
+      <?php if (!empty($deliveryRoutesAll) && is_array($deliveryRoutesAll)): ?>
+        <select name="delivery_route" class="form-select form-select-sm" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+          <option value="">-- Select Route --</option>
+          <?php foreach ($deliveryRoutesAll as $r): ?>
+            <?php $rName = trim((string)($r['name'] ?? '')); if ($rName === '') continue; ?>
+            <option value="<?php echo htmlspecialchars($rName); ?>" <?php echo ($drVal !== '' && strcasecmp($drVal, $rName) === 0) ? 'selected' : ''; ?>><?php echo htmlspecialchars($rName); ?></option>
+          <?php endforeach; ?>
+        </select>
+      <?php else: ?>
+        <input type="text" name="delivery_route" class="form-control form-control-sm" placeholder="Delivery route" value="<?php echo htmlspecialchars($drVal); ?>" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+      <?php endif; ?>
+    </div>
   </div>
   </div>
   </div>

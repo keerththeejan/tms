@@ -138,6 +138,20 @@
           <label class="form-label small text-muted mb-0 d-block">Delivery Location</label>
           <input type="text" class="form-control form-control-sm" name="delivery_location" placeholder="Customer delivery location" value="<?php echo htmlspecialchars($delivery_location_filter ?? ''); ?>">
         </div>
+        <div class="col-6 col-md-4 col-lg-3">
+          <label class="form-label small text-muted mb-0 d-block">Delivery Route</label>
+          <?php if (!empty($deliveryRoutesFilterList) && is_array($deliveryRoutesFilterList)): ?>
+            <select class="form-select form-select-sm" name="delivery_route">
+              <option value="">All Routes</option>
+              <?php foreach ($deliveryRoutesFilterList as $r): ?>
+                <?php $rName = (string)($r['name'] ?? ''); if (trim($rName) === '') continue; ?>
+                <option value="<?php echo htmlspecialchars($rName); ?>" <?php echo ((string)($delivery_route_filter ?? '') === (string)$rName) ? 'selected' : ''; ?>><?php echo htmlspecialchars($rName); ?></option>
+              <?php endforeach; ?>
+            </select>
+          <?php else: ?>
+            <input type="text" class="form-control form-control-sm" name="delivery_route" placeholder="Delivery route" value="<?php echo htmlspecialchars($delivery_route_filter ?? ''); ?>">
+          <?php endif; ?>
+        </div>
         <div class="col-6 col-md-4 col-lg-2">
           <label class="form-label small text-muted mb-0 d-block">Status</label>
           <select class="form-select form-select-sm" name="status">
@@ -219,10 +233,16 @@
           </td>
           <td class="small">
             <?php
+              $savedRoute = trim((string)($p['delivery_route'] ?? ''));
+              $custLoc = trim((string)($p['customer_delivery_location'] ?? ''));
               $rdTo = trim((string)($p['route_date_to'] ?? ''));
               $rdFrom = trim((string)($p['route_date_from'] ?? ''));
               $veh = trim((string)($p['vehicle_no'] ?? ''));
-              if ($rdTo !== '' || $rdFrom !== ''):
+              if ($savedRoute !== ''):
+                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($savedRoute) . '">' . htmlspecialchars($savedRoute) . '</span>';
+              elseif ($custLoc !== ''):
+                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($custLoc) . '">' . htmlspecialchars($custLoc) . '</span>';
+              elseif ($rdTo !== '' || $rdFrom !== ''):
                 $parts = [];
                 if ($rdTo !== '') $parts[] = 'To: ' . $rdTo;
                 if ($rdFrom !== '') $parts[] = 'From: ' . $rdFrom;
