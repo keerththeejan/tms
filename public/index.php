@@ -414,7 +414,12 @@ switch ($page) {
                 $regNo = trim($_POST['reg_no'] ?? '');
                 $logoDisplay = in_array($_POST['logo_display'] ?? '', ['image', 'builtin'], true) ? $_POST['logo_display'] : 'builtin';
                 $logoInitials = trim($_POST['logo_initials'] ?? '') ?: 'TS';
-                $logoInitials = mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $logoInitials), 0, 6);
+                $logoInitials = preg_replace('/[^A-Za-z0-9]/', '', $logoInitials);
+                if (function_exists('mb_substr')) {
+                    $logoInitials = mb_substr($logoInitials, 0, 6);
+                } else {
+                    $logoInitials = substr($logoInitials, 0, 6);
+                }
                 $logoArchColor = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_arch_color'] ?? 'c00')) ?: 'c00';
                 $logoBarBg = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_bar_bg'] ?? '000')) ?: '000';
                 $logoBarColor = preg_replace('/[^0-9a-fA-F]/', '', trim($_POST['logo_bar_color'] ?? 'fff')) ?: 'fff';

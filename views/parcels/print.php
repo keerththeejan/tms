@@ -105,7 +105,13 @@ $invoiceNo = (int)($parcel['invoice_no'] ?? 0) > 0 ? (int)$parcel['invoice_no'] 
         <?php
           $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']);
           $logoInitials = trim($brand['logo_initials'] ?? 'TS') ?: 'TS';
-          $logoInitials = mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $logoInitials), 0, 6) ?: 'TS';
+          $logoInitials = preg_replace('/[^A-Za-z0-9]/', '', $logoInitials);
+          if (function_exists('mb_substr')) {
+            $logoInitials = mb_substr($logoInitials, 0, 6);
+          } else {
+            $logoInitials = substr($logoInitials, 0, 6);
+          }
+          $logoInitials = $logoInitials ?: 'TS';
         ?>
         <?php if ($useLogoImage): ?>
           <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
