@@ -148,8 +148,6 @@ $config = $config ?? [];
           <div class="settings-section-label">Primary Branch - Header &amp; Billing Address</div>
           <div class="settings-helper mb-3">Displayed on invoices and official documents. The selected default is used in the website header, print views, and exports.</div>
 
-          <input type="hidden" name="default_branch_idx" id="defaultBranchIdx" value="0">
-
           <?php $b0 = $branches[0] ?? ['name'=>'','address_ta'=>'','address_en'=>'','phones'=>'']; ?>
           <div class="branch-card mb-3 default" data-branch-index="0">
             <div class="branch-top mb-2">
@@ -218,7 +216,7 @@ $config = $config ?? [];
                 <div class="row g-3">
                   <div class="col-12">
                     <label class="form-label">Branch Name</label>
-                    <input type="text" name="branch_name[]" class="form-control" value="<?php echo htmlspecialchars($b['name']); ?>" placeholder="e.g. Kilinochchi" required>
+                    <input type="text" name="branch_name[]" class="form-control" value="<?php echo htmlspecialchars($b['name']); ?>" placeholder="e.g. Kilinochchi">
                     <div class="error-text" data-error-for="branch_name_<?php echo (int)$i; ?>">Branch name is required.</div>
                   </div>
                 </div>
@@ -229,7 +227,7 @@ $config = $config ?? [];
                   </div>
                   <div>
                     <label class="form-label">Address (English)</label>
-                    <input type="text" name="branch_address_en[]" class="form-control" value="<?php echo htmlspecialchars($b['address_en']); ?>" placeholder="English address" required>
+                    <input type="text" name="branch_address_en[]" class="form-control" value="<?php echo htmlspecialchars($b['address_en']); ?>" placeholder="English address">
                     <div class="error-text" data-error-for="branch_address_en_<?php echo (int)$i; ?>">English address is required.</div>
                   </div>
                 </div>
@@ -363,15 +361,35 @@ $config = $config ?? [];
               if (companyName && companyName.value.trim() === '') { ok = false; setErr(companyName, true); var e1 = form.querySelector('[data-error-for="company_name"]'); if (e1) e1.style.display = ''; }
               else { setErr(companyName, false); var e1b = form.querySelector('[data-error-for="company_name"]'); if (e1b) e1b.style.display = 'none'; }
 
+              // Branch validation
+              // - Primary branch (index 0) is required
+              // - Additional branches are optional unless user starts filling one of their fields
               var branchNames = form.querySelectorAll('input[name="branch_name[]"]');
               var branchEns = form.querySelectorAll('input[name="branch_address_en[]"]');
+              var branchTas = form.querySelectorAll('input[name="branch_address_ta[]"]');
+              var branchPhones = form.querySelectorAll('input[name="branch_phones[]"]');
+
               for (var i=0; i<branchNames.length; i++) {
                 var bn = branchNames[i];
-                if (bn && bn.value.trim() === '') { ok = false; setErr(bn, true); } else { setErr(bn, false); }
-              }
-              for (var j=0; j<branchEns.length; j++) {
-                var be = branchEns[j];
-                if (be && be.value.trim() === '') { ok = false; setErr(be, true); } else { setErr(be, false); }
+                var be = branchEns[i];
+                var bt = branchTas[i];
+                var bp = branchPhones[i];
+
+                var bnV = bn ? bn.value.trim() : '';
+                var beV = be ? be.value.trim() : '';
+                var btV = bt ? bt.value.trim() : '';
+                var bpV = bp ? bp.value.trim() : '';
+
+                var hasAny = (bnV !== '' || beV !== '' || btV !== '' || bpV !== '');
+                var required = (i === 0) || hasAny;
+
+                if (required) {
+                  if (bn && bnV === '') { ok = false; setErr(bn, true); } else { setErr(bn, false); }
+                  if (be && beV === '') { ok = false; setErr(be, true); } else { setErr(be, false); }
+                } else {
+                  if (bn) setErr(bn, false);
+                  if (be) setErr(be, false);
+                }
               }
               return ok;
             }
