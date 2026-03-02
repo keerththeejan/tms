@@ -84,6 +84,8 @@ $config = $config ?? [];
           <input type="hidden" name="settings_section" value="company">
           <input type="hidden" id="baseUrlForLogo" value="<?php echo htmlspecialchars($baseUrlForLogo); ?>">
 
+          <div id="settingsClientError" class="alert alert-danger d-none" role="alert"></div>
+
           <input type="hidden" name="logo_display" value="image">
           <input type="hidden" name="logo_initials" value="<?php echo htmlspecialchars($company['logo_initials'] ?? 'TS'); ?>">
           <input type="hidden" name="logo_arch_color" value="<?php echo htmlspecialchars($company['logo_arch_color'] ?? 'c00'); ?>">
@@ -373,8 +375,27 @@ $config = $config ?? [];
               }
               return ok;
             }
+            function showClientError(msg){
+              var box = document.getElementById('settingsClientError');
+              if (!box) return;
+              box.textContent = msg || 'Please fix validation errors and try again.';
+              box.classList.remove('d-none');
+            }
+            function scrollToFirstError(){
+              var first = form.querySelector('.field-error');
+              if (!first) return;
+              try { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) { first.scrollIntoView(true); }
+              try { first.focus({ preventScroll: true }); } catch(e) { try { first.focus(); } catch(e2) {} }
+            }
             form.addEventListener('submit', function(e){
-              if (!validate()) { e.preventDefault(); e.stopPropagation(); return; }
+              var ok = validate();
+              if (!ok) {
+                e.preventDefault();
+                e.stopPropagation();
+                showClientError('Please fill all required fields (Company Name, Branch Names, and English Address).');
+                scrollToFirstError();
+                return;
+              }
               if (saveBtn) {
                 saveBtn.disabled = true;
                 var a = saveBtn.querySelector('.save-label');
