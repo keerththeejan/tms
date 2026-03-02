@@ -10,6 +10,11 @@
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
     box-sizing: border-box;
   }
+  .login-page {
+    background: radial-gradient(1200px 600px at 50% 0%, rgba(13,110,253,.10), transparent 55%),
+                url('https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=1920&auto=format&fit=crop') center/cover no-repeat fixed;
+    background-blend-mode: overlay;
+  }
   .login-page .login-card { width: 100%; max-width: 400px; }
   .login-page .card-body { padding: 1.5rem; }
   .login-page .form-control { min-height: 2.75rem; font-size: 1rem; }
@@ -35,9 +40,9 @@
 <div class="login-page">
   <div class="row justify-content-center w-100 g-0">
     <div class="col-12 col-sm-11 col-md-8 col-lg-5 col-xl-4 px-2 px-sm-3">
-      <div class="card shadow-sm login-card">
+      <div class="card shadow-sm login-card border-0">
         <div class="card-body">
-          <h5 class="card-title mb-3">Login</h5>
+          <h5 class="card-title mb-3 text-center">Login</h5>
           <?php if (!empty($error)): ?>
             <div class="alert alert-danger py-2 mb-3"><?php echo htmlspecialchars($error); ?></div>
           <?php endif; ?>

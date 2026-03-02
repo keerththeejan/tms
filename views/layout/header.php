@@ -14,6 +14,79 @@ $user = Auth::user();
   <style>
     html, body { height: 100%; }
     body { padding-top: 0; margin: 0; background: #f8f9fb; }
+
+    :root {
+      --tms-bg: #f6f8fc;
+      --tms-surface: #ffffff;
+      --tms-text: #0f172a;
+      --tms-muted: #64748b;
+      --tms-border: rgba(15, 23, 42, .12);
+      --tms-shadow-sm: 0 1px 2px rgba(16,24,40,.06);
+      --tms-shadow-md: 0 12px 24px rgba(16,24,40,.10);
+      --tms-radius: 14px;
+      --tms-banner-img: url('https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=1920&auto=format&fit=crop');
+      --tms-banner-overlay: rgba(15,23,42,.05);
+    }
+
+    body {
+      background: var(--tms-banner-img) center/cover no-repeat fixed,
+                  var(--tms-bg);
+      background-blend-mode: overlay;
+      color: var(--tms-text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    a { text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container-fluid { max-width: 1500px; }
+
+    .card, .dropdown-menu {
+      border-color: var(--tms-border) !important;
+      border-radius: var(--tms-radius) !important;
+      box-shadow: var(--tms-shadow-sm);
+      background: var(--tms-surface);
+    }
+
+    .card-header {
+      background: rgba(248,250,252,.85);
+      border-bottom: 1px solid var(--tms-border);
+    }
+
+    .btn {
+      border-radius: 12px;
+    }
+    .btn-primary {
+      box-shadow: 0 8px 16px rgba(13,110,253,.16);
+    }
+    .btn-outline-secondary:hover {
+      background: rgba(15, 23, 42, .04);
+    }
+
+    .form-control, .form-select {
+      border-radius: 12px;
+      border-color: rgba(15, 23, 42, .18);
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: rgba(13,110,253,.55);
+      box-shadow: 0 0 0 .25rem rgba(13,110,253,.14);
+    }
+    .form-label { color: rgba(15,23,42,.78); font-weight: 600; }
+    .form-text { color: var(--tms-muted); }
+
+    .table {
+      --bs-table-striped-bg: rgba(15, 23, 42, .025);
+    }
+    .table thead th {
+      font-weight: 700;
+      color: rgba(15,23,42,.82);
+      background: rgba(248,250,252,.9);
+      border-bottom-color: var(--tms-border);
+    }
+    .table td, .table th { border-color: rgba(15,23,42,.10); }
+    .badge { border-radius: 999px; }
     .quick-actions .card { cursor: pointer; transition: transform .05s ease-in; }
     .quick-actions .card:hover { transform: scale(1.01); }
     /* Slightly smaller, neater navbar font sizes */
