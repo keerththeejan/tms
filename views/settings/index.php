@@ -79,7 +79,7 @@ $config = $config ?? [];
       </div>
       <div class="card-body">
         <?php $baseUrlForLogo = rtrim(Helpers::baseUrl(''), '/'); ?>
-        <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>" enctype="multipart/form-data" id="companySettingsForm" novalidate>
+        <form method="post" action="<?php echo htmlspecialchars((string)($_SERVER['REQUEST_URI'] ?? Helpers::baseUrl('index.php?page=settings'))); ?>" enctype="multipart/form-data" id="companySettingsForm" novalidate>
           <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
           <input type="hidden" name="settings_section" value="company">
           <input type="hidden" id="baseUrlForLogo" value="<?php echo htmlspecialchars($baseUrlForLogo); ?>">

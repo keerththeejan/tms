@@ -406,8 +406,14 @@ switch ($page) {
         $error = '';
         $success = '';
 
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['settings_section'])) {
+            $error = 'Invalid request. Please refresh the page and try again.';
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['settings_section'])) {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) {
+                $error = 'Invalid CSRF. Please refresh the page and try again.';
+            } else {
             $section = $_POST['settings_section'] ?? '';
             if ($section === 'company') {
                 $name = trim($_POST['company_name'] ?? '');
@@ -438,14 +444,16 @@ switch ($page) {
 
                 // Logo file upload
                 if (!empty($_FILES['logo_file']['name']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
-                    $uploadDir = __DIR__ . '/../public/uploads';
+                    $uploadDir = __DIR__ . '/uploads';
                     if (!is_dir($uploadDir)) {
                         @mkdir($uploadDir, 0755, true);
                     }
                     $ext = strtolower(pathinfo($_FILES['logo_file']['name'], PATHINFO_EXTENSION));
                     if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) {
                         $dest = $uploadDir . '/logo.' . $ext;
-                        if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $dest)) {
+                        if (!is_dir($uploadDir) || !is_writable($uploadDir)) {
+                            $error = 'Logo upload folder is not writable: ' . $uploadDir;
+                        } else if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $dest)) {
                             $logoUrl = 'uploads/logo.' . $ext;
                         }
                     }
@@ -498,15 +506,29 @@ switch ($page) {
                     'company' => array_merge($company, $companyOverride),
                     'google_maps_api_key' => $googleMapsKey,
                 ];
-                $jsonPath = __DIR__ . '/../config/company.json';
-                $written = @file_put_contents($jsonPath, json_encode($toSave, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-                if ($written !== false) {
-                    $success = 'Company settings saved.';
-                    $company = array_merge($company, $companyOverride);
-                    $config['google_maps_api_key'] = $googleMapsKey;
+                $configDir = realpath(__DIR__ . '/../config');
+                $jsonPath = ($configDir ? ($configDir . DIRECTORY_SEPARATOR . 'company.json') : (__DIR__ . '/../config/company.json'));
+
+                $json = json_encode($toSave, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                if ($json === false) {
+                    $error = 'Could not encode settings to JSON.';
+                } else if (!is_dir(dirname($jsonPath))) {
+                    $error = 'Config folder not found: ' . dirname($jsonPath);
+                } else if (!is_writable(dirname($jsonPath))) {
+                    $error = 'Config folder is not writable: ' . dirname($jsonPath);
                 } else {
-                    $error = 'Could not save settings. Check that config/company.json is writable.';
+                    $written = @file_put_contents($jsonPath, $json, LOCK_EX);
+                    if ($written !== false) {
+                        $success = 'Company settings saved.';
+                        $company = array_merge($company, $companyOverride);
+                        $config['google_maps_api_key'] = $googleMapsKey;
+                    } else {
+                        $last = error_get_last();
+                        $extra = ($last && isset($last['message'])) ? (' Error: ' . $last['message']) : '';
+                        $error = 'Could not save settings to ' . $jsonPath . '. Check write permissions.' . $extra;
+                    }
                 }
+            }
             }
         }
 
