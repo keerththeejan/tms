@@ -1,5 +1,7 @@
 <?php /** @var array $parcel */ ?>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  .parcel-form-page { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
   .parcel-form-page { --pf-radius: 0.5rem; --pf-border: 1px solid var(--bs-border-color-translucent); }
   .parcel-form-page .page-header { margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: var(--pf-border); }
   .parcel-form-page .section-card { border: var(--pf-border); border-radius: var(--pf-radius); box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 1.25rem; overflow: hidden; }
@@ -18,12 +20,27 @@
   .parcel-form-page .pf-visually-hidden-select { position:absolute !important; left:-9999px !important; width:1px !important; height:1px !important; opacity:0 !important; }
   .parcel-form-page .customer-search-results { position: relative; }
   .parcel-form-page .customer-search-results .list-group { position:absolute; z-index: 1050; width:100%; max-height: 260px; overflow:auto; }
+  .parcel-form-page .pf-breadcrumb { font-size: 0.9rem; }
+  .parcel-form-page .pf-card { border: var(--pf-border); border-radius: 12px; box-shadow: 0 8px 20px rgba(2,6,23,.06); background: #fff; overflow:hidden; }
+  .parcel-form-page .pf-card-h { padding: 0.85rem 1rem; background: linear-gradient(180deg, rgba(248,250,252,1), rgba(255,255,255,1)); border-bottom: var(--pf-border); font-weight: 700; }
+  .parcel-form-page .pf-card-b { padding: 1rem; }
+  .parcel-form-page .pf-field .form-text { margin-top: .25rem; }
+  .parcel-form-page .pf-actions-desktop { position: sticky; top: .75rem; z-index: 20; }
+  .parcel-form-page .pf-sticky-actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1055;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(17,24,39,.10);
+    padding: .65rem .75rem;
+  }
+  .parcel-form-page .pf-sticky-actions .btn { border-radius: 10px; }
+  .parcel-form-page .pf-toast-wrap { position: fixed; top: 1rem; right: 1rem; z-index: 1100; width: min(420px, calc(100vw - 2rem)); }
   @media (max-width: 576px) {
     .parcel-form-page .page-header { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
     .parcel-form-page .section-card .section-body { padding: 0.75rem; }
     .parcel-form-page .receipt-header { flex-direction: column; align-items: stretch; }
     .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { padding: 0.35rem 0.4rem; font-size: 0.85rem; }
     .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 1.85rem; font-size: 0.9rem; }
+    .parcel-form-page { padding-bottom: 90px; } /* space for sticky action bar */
   }
 </style>
 <div class="parcel-form-page">
@@ -49,8 +66,18 @@
   }
   $branchesList = array_values($branchesUnique);
 ?>
+<nav class="pf-breadcrumb mb-2" aria-label="breadcrumb">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>">Dashboard</a></li>
+    <li class="breadcrumb-item"><a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>">Parcels</a></li>
+    <li class="breadcrumb-item active" aria-current="page"><?php echo $parcel['id'] ? 'Edit' : 'New'; ?></li>
+  </ol>
+</nav>
 <header class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-  <h1 class="h4 mb-0 fw-bold"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
+  <div>
+    <h1 class="h4 mb-0 fw-bold"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
+    <div class="text-muted small">Fast entry • consistent billing • modern workflow</div>
+  </div>
   <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Back to Parcels</a>
 </header>
 
@@ -132,11 +159,43 @@
   <?php unset($_SESSION['flash_parcel_saved']); ?>
 <?php endif; ?>
 
+<?php
+  $showBillPrompt = isset($_GET['prompt_bill']) && (int)($_GET['prompt_bill'] ?? 0) === 1 && !empty($_SESSION['flash_bill_prompt']);
+  $billPrompt = $showBillPrompt ? $_SESSION['flash_bill_prompt'] : null;
+  if ($showBillPrompt) { unset($_SESSION['flash_bill_prompt']); }
+?>
+<?php if ($showBillPrompt && !empty($billPrompt['customer_id'])): ?>
+  <?php
+    $dnUrl = Helpers::baseUrl('index.php?page=delivery_notes&action=generate'
+      . '&customer_id='.(int)$billPrompt['customer_id']
+      . '&delivery_date='.urlencode((string)($billPrompt['date'] ?? date('Y-m-d'))));
+  ?>
+  <div class="modal fade" id="billPromptModal" tabindex="-1" aria-labelledby="billPromptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="billPromptModalLabel">Create new bill?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          Parcel status is now <strong>In Transit</strong>. Do you want to generate a new delivery note (bill) for this customer?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Not now</button>
+          <a class="btn btn-primary" href="<?php echo $dnUrl; ?>">Create Bill</a>
+        </div>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
 <?php if (isset($_GET['duplicate']) && (int)$_GET['duplicate'] > 0): ?>
   <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
     <i class="bi bi-exclamation-triangle"></i> Duplicate entry prevented. A similar parcel (#<?php echo (int)$_GET['duplicate']; ?>) was created recently. Please check if this is the same parcel.
   </div>
 <?php endif; ?>
+
+<div class="pf-toast-wrap" id="pfToastWrap" aria-live="polite" aria-atomic="true"></div>
 
 <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>" autocomplete="off">
   <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
@@ -401,6 +460,38 @@
     </div>
   </div>
 
+  <!-- Customer pick: show last bill first, then select -->
+  <div class="modal fade" id="customerLastBillModal" tabindex="-1" aria-labelledby="customerLastBillModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="customerLastBillModalLabel">Last Bill Preview</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <div class="small text-muted">
+              <span class="fw-semibold">Customer:</span> <span id="clbCustomerName">—</span>
+              <span class="mx-2 text-muted">|</span>
+              <span class="fw-semibold">Last Bill:</span> <span id="clbBillId">—</span>
+            </div>
+            <div class="small text-muted" id="clbHint">Review the last bill, then click “Select this customer”.</div>
+          </div>
+          <div id="clbNoBill" class="alert alert-info py-2 d-none">
+            No previous bill found for this customer. You can still select the customer.
+          </div>
+          <div class="ratio ratio-16x9 border rounded overflow-hidden" style="min-height: 60vh;">
+            <iframe id="clbFrame" src="about:blank" style="border:0; width:100%; height:100%;"></iframe>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="clbSelectBtn">Select this customer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Items & receipt section -->
   <div class="section-card mt-3">
     <div class="section-title"><i class="bi bi-list-ul me-1"></i> Items &amp; Total</div>
@@ -592,6 +683,14 @@
       </div>
     </div>
   </div>
+
+  <!-- Mobile sticky action bar -->
+  <div class="pf-sticky-actions d-lg-none">
+    <div class="d-flex gap-2">
+      <button type="reset" class="btn btn-outline-secondary w-50" id="pfResetBtnMobile"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
+      <button type="submit" class="btn btn-primary w-50" id="pfSaveBtnMobile"><i class="bi bi-save me-1"></i> Save</button>
+    </div>
+  </div>
 </form>
 </div><!-- .parcel-form-page -->
 
@@ -614,13 +713,13 @@
   if (form && submitBtn) {
     let isSubmitting = false;
     form.addEventListener('submit', function(e) {
+      // AJAX submit (no reload)
+      e.preventDefault();
       if (isSubmitting) {
-        e.preventDefault();
         return false;
       }
       // Scroll to first invalid field (HTML5 validation)
       if (!form.checkValidity()) {
-        e.preventDefault();
         const firstInvalid = form.querySelector(':invalid');
         if (firstInvalid) {
           firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -628,16 +727,124 @@
         }
         return false;
       }
-      isSubmitting = true;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving…';
-      setTimeout(function() {
-        if (isSubmitting) {
+
+      const toastWrap = document.getElementById('pfToastWrap');
+      function showToast(type, title, message) {
+        if (!toastWrap) return;
+        const cls = type === 'success' ? 'text-bg-success' : (type === 'warning' ? 'text-bg-warning' : 'text-bg-danger');
+        const id = 't' + Math.random().toString(16).slice(2);
+        const html = `
+          <div class="toast ${cls} border-0 mb-2" id="${id}" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+              <div class="toast-body">
+                <div class="fw-semibold">${title}</div>
+                <div class="small">${message || ''}</div>
+              </div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>`;
+        toastWrap.insertAdjacentHTML('beforeend', html);
+        const el = document.getElementById(id);
+        if (window.bootstrap && el) {
+          const t = new bootstrap.Toast(el, { delay: 3500 });
+          t.show();
+          el.addEventListener('hidden.bs.toast', () => { try { el.remove(); } catch(_) {} });
+        }
+      }
+
+      async function ajaxSubmit() {
+        isSubmitting = true;
+        submitBtn.disabled = true;
+        const oldHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving…';
+        try {
+          const fd = new FormData(form);
+          const res = await fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            body: fd
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok || !data || data.ok !== true) {
+            const msg = (data && data.error) ? String(data.error) : 'Save failed. Please check required fields.';
+            showToast('error', 'Could not save', msg);
+            // focus first invalid again
+            const firstInvalid = form.querySelector(':invalid');
+            if (firstInvalid) { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); firstInvalid.focus(); }
+            return;
+          }
+
+          showToast('success', 'Saved', `Parcel saved successfully (ID: ${data.id}).`);
+
+          // If backend suggests redirect, try to apply changes without full page reload
+          // New parcel flow: keep customer/branches/vehicle, clear items
+          const redirect = String(data.redirect || '');
+          if (redirect.includes('page=parcels') && redirect.includes('action=new')) {
+            try {
+              const u = new URL(redirect, window.location.origin);
+              const qs = u.searchParams;
+              const cid = qs.get('customer_id') || '';
+              const fromId = qs.get('from_branch_id') || '';
+              const toId = qs.get('to_branch_id') || '';
+              const veh = qs.get('vehicle_no') || '';
+              if (cid && customerSel) { customerSel.value = cid; customerSel.dispatchEvent(new Event('change')); }
+              if (fromId && fromBranchSel) { fromBranchSel.value = fromId; fromBranchSel.dispatchEvent(new Event('change')); }
+              if (toId && toBranchSel) { toBranchSel.value = toId; toBranchSel.dispatchEvent(new Event('change')); }
+              if (veh) {
+                if (vehicleSelect) { vehicleSelect.value = veh; vehicleSelect.dispatchEvent(new Event('change')); }
+                if (vehicleInput) { vehicleInput.value = veh; vehicleInput.dispatchEvent(new Event('input')); }
+                updateVehicle();
+              }
+              // clear item rows to a single blank row
+              const tbody = table?.querySelector('tbody');
+              if (tbody) {
+                tbody.innerHTML = `
+                  <tr>
+                    <td class="text-center align-middle">1</td>
+                    <td><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description"></td>
+                    <td><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty"></td>
+                    <td><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
+                    <td class="align-middle item-amount-cell">
+                      <div class="d-flex flex-column gap-1">
+                        <span class="item-amount fw-semibold">—</span>
+                        <label class="small text-muted mb-0">+ Add amounts:</label>
+                        <div class="item-add-list d-flex flex-column gap-1">
+                          <div class="d-flex gap-1 align-items-center item-add-row">
+                            <input type="number" step="0.01" min="0" name="items[1][additional_amounts][]" class="form-control form-control-sm item-add" placeholder="0" ${canEnterItemAmounts ? '' : 'disabled'}>
+                            ${canEnterItemAmounts ? '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button>' : ''}
+                          </div>
+                        </div>
+                        ${canEnterItemAmounts ? '<button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button>' : ''}
+                      </div>
+                    </td>
+                    <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm remove-row"><i class="bi bi-x"></i></button></td>
+                  </tr>`;
+                syncAddRemoveButtons(tbody);
+                recalc();
+              }
+              // clear tracking/serial input
+              const serial = document.getElementById('serialInput');
+              if (serial) serial.value = '';
+              // update URL quietly
+              try { window.history.replaceState({}, '', u.pathname + '?' + u.searchParams.toString()); } catch(_) {}
+            } catch(_) {
+              // fallback to navigation if URL parsing fails
+              window.location.href = redirect;
+            }
+          } else if (data.prompt_bill && redirect) {
+            // Status change to in_transit: navigate to show bill prompt modal
+            window.location.href = redirect;
+          }
+        } catch (err) {
+          showToast('error', 'Network error', 'Could not save right now. Please try again.');
+        } finally {
           isSubmitting = false;
           submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="bi bi-save me-1"></i> Save Parcel';
+          submitBtn.innerHTML = oldHtml;
         }
-      }, 5000);
+      }
+
+      ajaxSubmit();
     });
   }
 
@@ -789,14 +996,67 @@
       }
     }
   });
+  // Customer selection should happen AFTER showing last bill preview
+  let pendingCustomerPick = null;
+  const clbModalEl = document.getElementById('customerLastBillModal');
+  const clbFrame = document.getElementById('clbFrame');
+  const clbNoBill = document.getElementById('clbNoBill');
+  const clbCustomerName = document.getElementById('clbCustomerName');
+  const clbBillId = document.getElementById('clbBillId');
+  const clbSelectBtn = document.getElementById('clbSelectBtn');
+  async function showLastBillThenSelect(customer) {
+    if (!customer || !customer.id) return;
+    pendingCustomerPick = customer;
+    if (clbCustomerName) clbCustomerName.textContent = formatCustomerLabel(customer);
+    if (clbBillId) clbBillId.textContent = '—';
+    if (clbNoBill) clbNoBill.classList.add('d-none');
+    if (clbFrame) clbFrame.src = 'about:blank';
+
+    // Fetch customer summary to get last_delivery_note_id
+    try {
+      const url = '<?php echo Helpers::baseUrl('index.php?page=customers&action=summary'); ?>' + '&id=' + encodeURIComponent(String(customer.id));
+      const res = await fetch(url, { headers: { 'Accept':'application/json' } });
+      const data = res.ok ? await res.json() : null;
+      const dnId = data && data.last_delivery_note_id ? parseInt(data.last_delivery_note_id, 10) : 0;
+      if (dnId > 0) {
+        if (clbBillId) clbBillId.textContent = '#' + String(dnId);
+        let href = '<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=print&id='); ?>' + dnId + '&embed=1';
+        if (clbFrame) clbFrame.src = href;
+      } else {
+        if (clbNoBill) clbNoBill.classList.remove('d-none');
+      }
+    } catch(_) {
+      if (clbNoBill) clbNoBill.classList.remove('d-none');
+    }
+
+    if (clbModalEl && window.bootstrap) {
+      const modal = bootstrap.Modal.getOrCreateInstance(clbModalEl);
+      modal.show();
+    } else {
+      // Fallback: directly select if modal unavailable
+      setCustomer(customer.id);
+      if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(customer);
+      hideCustomerResults();
+    }
+  }
+
   customerSearchResults?.addEventListener('click', function(e){
     const btn = e.target.closest('[data-customer-id]');
     if (!btn) return;
     const id = parseInt(btn.getAttribute('data-customer-id') || '0');
-    const c = customersSearchData.find(x => parseInt(x.id||0) === id);
-    setCustomer(id);
-    if (customerSearchInput && c) customerSearchInput.value = formatCustomerLabel(c);
+    const c = customersSearchData.find(x => parseInt(x.id||0) === id) || { id };
     hideCustomerResults();
+    showLastBillThenSelect(c);
+  });
+
+  clbSelectBtn?.addEventListener('click', function(){
+    if (!pendingCustomerPick) return;
+    setCustomer(pendingCustomerPick.id);
+    if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(pendingCustomerPick);
+    pendingCustomerPick = null;
+    try {
+      if (clbModalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(clbModalEl).hide();
+    } catch(_) {}
   });
   document.addEventListener('click', function(e){
     if (!customerSearchResults || !customerSearchInput) return;
@@ -1231,6 +1491,64 @@
   }
   customerSelect?.addEventListener('change', updateMeta);
   customerSelect?.addEventListener('change', fetchCustomerSummary);
+  // Auto-populate previous billing info when customer changes (only if fields are empty/unselected)
+  async function applyPreviousBillingInfo(){
+    if (lockAll || priceOnly) return;
+    const custId = parseInt(customerSelect?.value || '0');
+    if (!custId) return;
+    try {
+      const url = '<?php echo Helpers::baseUrl('index.php?page=parcels&action=last_billing_for_customer'); ?>' + '&customer_id=' + encodeURIComponent(String(custId));
+      const res = await fetch(url, { headers: { 'Accept':'application/json' } });
+      if (!res.ok) return;
+      const payload = await res.json();
+      if (!payload || payload.ok !== true || !payload.data) return;
+      const d = payload.data;
+      // Only set if current value is empty/zero
+      if (fromBranchSelect && (!fromBranchSelect.value || fromBranchSelect.value === '0') && parseInt(d.from_branch_id||0) > 0) {
+        fromBranchSelect.value = String(d.from_branch_id);
+        fromBranchSelect.dispatchEvent(new Event('change'));
+      }
+      if (toBranchSelect && (!toBranchSelect.value || toBranchSelect.value === '0') && parseInt(d.to_branch_id||0) > 0) {
+        toBranchSelect.value = String(d.to_branch_id);
+        toBranchSelect.dispatchEvent(new Event('change'));
+      }
+      const suppSel = document.getElementById('supplierSelect');
+      if (suppSel && (!suppSel.value || suppSel.value === '0') && parseInt(d.supplier_id||0) > 0) {
+        suppSel.value = String(d.supplier_id);
+        suppSel.dispatchEvent(new Event('change'));
+      }
+      const drSel = document.querySelector('select[name="delivery_route"]');
+      const drInp = document.querySelector('input[name="delivery_route"]');
+      if (drSel && (!drSel.value || drSel.value.trim() === '') && d.delivery_route) {
+        drSel.value = String(d.delivery_route);
+        drSel.dispatchEvent(new Event('change'));
+      } else if (drInp && (!drInp.value || drInp.value.trim() === '') && d.delivery_route) {
+        drInp.value = String(d.delivery_route);
+        drInp.dispatchEvent(new Event('input'));
+      }
+      const v = String(d.vehicle_no || '').trim();
+      if (v) {
+        const currentV = vehicleSelect ? (vehicleSelect.value || '') : (vehicleInput?.value || '');
+        if (!currentV || currentV.trim() === '') {
+          if (vehicleSelect) {
+            let exists = false;
+            Array.from(vehicleSelect.options).forEach(function(o){ if ((o.value||'') === v) exists = true; });
+            if (!exists) { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; vehicleSelect.appendChild(opt); }
+            const wasDisabled = vehicleSelect.disabled; if (wasDisabled) vehicleSelect.disabled = false;
+            vehicleSelect.value = v;
+            vehicleSelect.dispatchEvent(new Event('change'));
+            vehicleSelect.dispatchEvent(new Event('input'));
+            if (wasDisabled) vehicleSelect.disabled = true;
+          } else if (vehicleInput) {
+            vehicleInput.value = v;
+            vehicleInput.dispatchEvent(new Event('input'));
+          }
+          updateVehicle();
+        }
+      }
+    } catch(_) { /* ignore */ }
+  }
+  customerSelect?.addEventListener('change', applyPreviousBillingInfo);
   fromBranchSelect?.addEventListener('change', updateMeta);
   toBranchSelect?.addEventListener('change', updateMeta);
   // If From Branch is empty on load, default to current user's branch
@@ -1241,6 +1559,15 @@
   }
   updateMeta();
   fetchCustomerSummary();
+  applyPreviousBillingInfo();
+
+  // Show bill prompt modal when redirected after setting in_transit
+  (function(){
+    const m = document.getElementById('billPromptModal');
+    if (!m || !window.bootstrap) return;
+    const modal = new bootstrap.Modal(m);
+    modal.show();
+  })();
 
   // Intercept 'Open ... Bill' links to show inline preview instead of navigating
   (function(){

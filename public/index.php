@@ -1521,6 +1521,8 @@ switch ($page) {
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $isAjax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string)$_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+                   || (isset($_SERVER['HTTP_ACCEPT']) && stripos((string)$_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
             
             // Prevent double submission using idempotency token
             $idempotencyKey = $_POST['idempotency_key'] ?? '';
@@ -1531,6 +1533,11 @@ switch ($page) {
             if (isset($_SESSION[$idempotencySessionKey])) {
                 // This exact submission was already processed, redirect to prevent duplicate
                 $savedId = (int)$_SESSION[$idempotencySessionKey];
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok'=>true,'id'=>$savedId,'redirect'=>Helpers::baseUrl('index.php?page=parcels&action=new&saved_id=' . $savedId)]);
+                    break;
+                }
                 Helpers::redirect('index.php?page=parcels&action=new&saved_id=' . $savedId);
                 break;
             }
@@ -1618,6 +1625,12 @@ switch ($page) {
                     // Load vehicles list for form
                     try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
                     catch (Throwable $e) { $vehiclesAll = []; }
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        http_response_code(422);
+                        echo json_encode(['ok'=>false,'error'=>$error]);
+                        break;
+                    }
                     Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error') + ['policy'=>['priceOnly'=>false,'lockAll'=>true,'canEnterItemAmounts'=>$canEnterItemAmounts]]);
                     break;
                 }
@@ -1657,6 +1670,12 @@ switch ($page) {
                         catch (Throwable $e) { $vehiclesAll = []; }
                         $parcel = $existing ?: ['id'=>$id,'customer_id'=>$customer_id,'from_branch_id'=>$from_branch_id,'to_branch_id'=>$to_branch_id,'weight'=>$weight,'status'=>$status,'tracking_number'=>$tracking_number,'vehicle_no'=>$vehicle_no];
                         $policy = ['priceOnly'=>true, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            http_response_code(422);
+                            echo json_encode(['ok'=>false,'error'=>$error]);
+                            break;
+                        }
                         Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy'));
                         break;
                     }
@@ -1682,12 +1701,22 @@ switch ($page) {
                 $deliveryRoutesAll = [];
                 try { $deliveryRoutesAll = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesAll = []; }
                 $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    http_response_code(422);
+                    echo json_encode(['ok'=>false,'error'=>$error]);
+                    break;
+                }
                 Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll'));
                 break;
             }
 
             $allowedStatus = ['pending','in_transit','delivered'];
             if (!in_array($status, $allowedStatus, true)) { $status = 'pending'; }
+
+            // Detect status transition to in_transit (for billing prompt)
+            $statusWas = $existing ? (string)($existing['status'] ?? '') : '';
+            $becameInTransit = ($id > 0 && $existing && $statusWas !== 'in_transit' && $status === 'in_transit');
 
             $pdo->beginTransaction();
             if ($id > 0) {
@@ -2010,6 +2039,23 @@ switch ($page) {
                 'to_branch_id' => (int)$to_branch_id,
                 'time' => date('Y-m-d H:i:s')
             ];
+
+            // If status just changed to in_transit, prompt user to create a new bill (Delivery Note)
+            if ($becameInTransit) {
+                $_SESSION['flash_bill_prompt'] = [
+                    'parcel_id' => (int)$id,
+                    'customer_id' => (int)$customer_id,
+                    'date' => date('Y-m-d')
+                ];
+                $redir = Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$id.'&prompt_bill=1');
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok'=>true,'id'=>(int)$id,'redirect'=>$redir,'prompt_bill'=>true]);
+                    break;
+                }
+                Helpers::redirect($redir);
+                break;
+            }
             // After save: stay in create flow with previous selections
             // Prefill customer, branches and vehicle so user can add next parcel quickly
             $q = 'index.php?page=parcels&action=new'
@@ -2017,6 +2063,11 @@ switch ($page) {
                . '&vehicle_no=' . urlencode((string)$vehicle_no)
                . '&from_branch_id=' . urlencode((string)$from_branch_id)
                . '&to_branch_id=' . urlencode((string)$to_branch_id);
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok'=>true,'id'=>(int)$id,'redirect'=>Helpers::baseUrl($q)]);
+                break;
+            }
             Helpers::redirect($q);
             break;
         }
@@ -2096,6 +2147,25 @@ switch ($page) {
             }
             $deliveryRoutesAll = [];
             try { $deliveryRoutesAll = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesAll = []; }
+
+            // If a customer is already preselected, prefill prior billing-related fields from the customer's most recent parcel
+            // (only for fields not explicitly provided via query string).
+            $cidPrefill = (int)($parcel['customer_id'] ?? 0);
+            if ($cidPrefill > 0) {
+                try {
+                    $lp = $pdo->prepare('SELECT supplier_id, from_branch_id, to_branch_id, vehicle_no, delivery_route
+                                         FROM parcels WHERE customer_id=? ORDER BY created_at DESC, id DESC LIMIT 1');
+                    $lp->execute([$cidPrefill]);
+                    $lastForCustomer = $lp->fetch();
+                    if ($lastForCustomer) {
+                        if ((int)$preFrom <= 0 && (int)($lastForCustomer['from_branch_id'] ?? 0) > 0) { $parcel['from_branch_id'] = (int)$lastForCustomer['from_branch_id']; }
+                        if ((int)$preTo <= 0 && (int)($lastForCustomer['to_branch_id'] ?? 0) > 0) { $parcel['to_branch_id'] = (int)$lastForCustomer['to_branch_id']; }
+                        if ($preVeh === '' && trim((string)($lastForCustomer['vehicle_no'] ?? '')) !== '') { $parcel['vehicle_no'] = (string)$lastForCustomer['vehicle_no']; }
+                        if ((int)($parcel['supplier_id'] ?? 0) <= 0 && (int)($lastForCustomer['supplier_id'] ?? 0) > 0) { $parcel['supplier_id'] = (int)$lastForCustomer['supplier_id']; }
+                        if (trim((string)($parcel['delivery_route'] ?? '')) === '' && trim((string)($lastForCustomer['delivery_route'] ?? '')) !== '') { $parcel['delivery_route'] = (string)$lastForCustomer['delivery_route']; }
+                    }
+                } catch (Throwable $e) { /* ignore */ }
+            }
             // Last bill (most recent parcel) for "Open last bill" / "Add more parcel" options
             $lastParcel = null;
             try {
@@ -2164,6 +2234,32 @@ switch ($page) {
                 }
             } catch (Throwable $e) { /* ignore */ }
             echo json_encode(['vehicle_no'=>$vehicle_no,'delivery_date'=>$delivery_date]);
+            break;
+        }
+
+        // AJAX: fetch customer's last billing-related parcel info for auto-populate on new parcel form
+        if ($action === 'last_billing_for_customer') {
+            header('Content-Type: application/json; charset=utf-8');
+            $customer_id = (int)($_GET['customer_id'] ?? 0);
+            if ($customer_id <= 0) { echo json_encode(['ok'=>false,'error'=>'customer_id required']); break; }
+            try {
+                $st = $pdo->prepare('SELECT id, supplier_id, from_branch_id, to_branch_id, vehicle_no, delivery_route, created_at
+                                     FROM parcels WHERE customer_id=? ORDER BY created_at DESC, id DESC LIMIT 1');
+                $st->execute([$customer_id]);
+                $row = $st->fetch();
+                if (!$row) { echo json_encode(['ok'=>true,'data'=>null]); break; }
+                echo json_encode(['ok'=>true,'data'=>[
+                    'parcel_id' => (int)($row['id'] ?? 0),
+                    'supplier_id' => (int)($row['supplier_id'] ?? 0),
+                    'from_branch_id' => (int)($row['from_branch_id'] ?? 0),
+                    'to_branch_id' => (int)($row['to_branch_id'] ?? 0),
+                    'vehicle_no' => (string)($row['vehicle_no'] ?? ''),
+                    'delivery_route' => (string)($row['delivery_route'] ?? ''),
+                    'created_at' => (string)($row['created_at'] ?? ''),
+                ]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+            } catch (Throwable $e) {
+                echo json_encode(['ok'=>false,'error'=>'failed']);
+            }
             break;
         }
 

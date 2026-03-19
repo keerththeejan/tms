@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Feb 06, 2026 at 06:57 AM
+-- Generation Time: Mar 14, 2026 at 09:52 AM
 -- Server version: 8.4.7
 -- PHP Version: 8.3.28
 
@@ -72,14 +72,15 @@ CREATE TABLE IF NOT EXISTS `customers` (
   UNIQUE KEY `phone` (`phone`),
   KEY `idx_customers_phone` (`phone`),
   KEY `idx_customers_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `customers`
 --
 
 INSERT INTO `customers` (`id`, `name`, `phone`, `email`, `address`, `delivery_location`, `place_id`, `lat`, `lng`, `customer_type`, `created_at`, `updated_at`) VALUES
-(99, 'user user', NULL, NULL, 'Kilinochchi', '', NULL, NULL, NULL, NULL, '2026-02-02 02:44:46', '2026-02-02 02:44:46');
+(99, 'user user', NULL, NULL, 'Kilinochchi', 'Iranamadu', NULL, NULL, NULL, NULL, '2026-02-02 02:44:46', '2026-02-17 08:31:11'),
+(100, 'Rasenthiram Pavuthira', '0798645352', 'emmentagrossist@gmail.com', 'Schwandgasse 16', 'k8', NULL, NULL, NULL, 'regular', '2026-02-16 10:14:32', '2026-02-16 10:14:32');
 
 -- --------------------------------------------------------
 
@@ -143,6 +144,29 @@ CREATE TABLE IF NOT EXISTS `delivery_note_parcels` (
   UNIQUE KEY `parcel_id` (`parcel_id`),
   KEY `idx_dnp_dn` (`delivery_note_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=129 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `delivery_routes`
+--
+
+DROP TABLE IF EXISTS `delivery_routes`;
+CREATE TABLE IF NOT EXISTS `delivery_routes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `delivery_routes`
+--
+
+INSERT INTO `delivery_routes` (`id`, `name`, `created_at`) VALUES
+(1, 'Iranamadu', '2026-02-17 08:30:49'),
+(2, 'jaffna', '2026-02-17 08:30:54'),
+(3, 'paranthan', '2026-02-17 08:31:00');
 
 -- --------------------------------------------------------
 
@@ -352,14 +376,7 @@ CREATE TABLE IF NOT EXISTS `parcels` (
   KEY `idx_parcels_customer` (`customer_id`),
   KEY `idx_parcels_status` (`status`),
   KEY `idx_parcels_to_branch` (`to_branch_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=183 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `parcels`
---
-
-INSERT INTO `parcels` (`id`, `customer_id`, `supplier_id`, `from_branch_id`, `to_branch_id`, `weight`, `price`, `status`, `tracking_number`, `vehicle_no`, `created_at`, `updated_at`, `last_email_status`, `last_emailed_at`, `last_email_subject`, `last_email_text`, `invoice_no`) VALUES
-(182, 99, NULL, 22, 23, 10.00, NULL, 'pending', 'SR260202-00182', '', '2026-02-01 18:30:00', '2026-02-02 02:45:40', NULL, NULL, NULL, NULL, NULL);
+) ENGINE=InnoDB AUTO_INCREMENT=186 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -396,17 +413,11 @@ CREATE TABLE IF NOT EXISTS `parcel_items` (
   `description` varchar(255) NOT NULL,
   `rate` decimal(12,2) DEFAULT NULL,
   `amount` decimal(12,2) GENERATED ALWAYS AS ((ifnull(`qty`,0) * ifnull(`rate`,0))) STORED,
+  `additional_amount` decimal(12,2) DEFAULT NULL,
+  `additional_amounts` text,
   PRIMARY KEY (`id`),
   KEY `idx_parcel_items_parcel` (`parcel_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=206 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `parcel_items`
---
-
-INSERT INTO `parcel_items` (`id`, `parcel_id`, `qty`, `description`, `rate`) VALUES
-(204, 182, 5.00, 'dfsd', NULL),
-(205, 182, 5.00, 'asda', NULL);
+) ENGINE=InnoDB AUTO_INCREMENT=213 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
