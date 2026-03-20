@@ -34,7 +34,13 @@
   }
   .parcel-form-page .pf-sticky-actions .btn { border-radius: 10px; }
   .parcel-form-page .pf-toast-wrap { position: fixed; top: 1rem; right: 1rem; z-index: 1100; width: min(420px, calc(100vw - 2rem)); }
+  /* Last-bill modal: full screen on phones, comfortable on desktop */
+  .parcel-form-page .clb-modal .modal-content { border: 0; border-radius: 1rem; box-shadow: 0 18px 50px rgba(2,6,23,.12); overflow: hidden; }
+  .parcel-form-page .clb-modal .modal-header { border-bottom: 1px solid var(--bs-border-color-translucent); }
+  .parcel-form-page .clb-modal .modal-footer { border-top: 1px solid var(--bs-border-color-translucent); }
+  .parcel-form-page .clb-iframe-wrap { min-height: clamp(220px, 52vh, 640px); }
   @media (max-width: 576px) {
+    .parcel-form-page .clb-modal .modal-body { padding: 0.75rem; }
     .parcel-form-page .page-header { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
     .parcel-form-page .section-card .section-body { padding: 0.75rem; }
     .parcel-form-page .receipt-header { flex-direction: column; align-items: stretch; }
@@ -52,6 +58,11 @@
   $lockAll = !empty($policy['lockAll']);
   $canEnterItemAmounts = !empty($policy['canEnterItemAmounts']);
   $statusOnlyEdit = !empty($policy['statusOnlyEdit']);
+  // Safety: ensure the status select never renders with an empty value.
+  $parcelStatus = trim((string)($parcel['status'] ?? ''));
+  if ($parcelStatus === '') {
+    $parcel['status'] = 'pending';
+  }
   // Build unique branch list by case-insensitive name, prefer main branch
   $branchesUnique = [];
   foreach (($branchesAll ?? []) as $b) {
@@ -460,33 +471,32 @@
     </div>
   </div>
 
-  <!-- Customer pick: show last bill first, then select -->
+  <!-- Customer pick: show last bill first, then select (New Parcel only) -->
   <div class="modal fade" id="customerLastBillModal" tabindex="-1" aria-labelledby="customerLastBillModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog clb-modal modal-fullscreen-sm-down modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="customerLastBillModalLabel">Last Bill Preview</h5>
+          <div>
+            <h5 class="modal-title mb-0" id="customerLastBillModalLabel"><i class="bi bi-receipt-cutoff me-2"></i>Last bill</h5>
+            <div class="small text-muted" id="clbHint">Review the bill, then tap <strong>Select customer</strong> to continue.</div>
+          </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-            <div class="small text-muted">
-              <span class="fw-semibold">Customer:</span> <span id="clbCustomerName">—</span>
-              <span class="mx-2 text-muted">|</span>
-              <span class="fw-semibold">Last Bill:</span> <span id="clbBillId">—</span>
-            </div>
-            <div class="small text-muted" id="clbHint">Review the last bill, then click “Select this customer”.</div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2 small">
+            <span class="badge text-bg-light border"><span class="text-muted">Customer</span> <span id="clbCustomerName" class="fw-semibold text-dark">—</span></span>
+            <span class="badge text-bg-light border"><span class="text-muted">Bill</span> <span id="clbBillId" class="fw-semibold text-dark">—</span></span>
           </div>
-          <div id="clbNoBill" class="alert alert-info py-2 d-none">
-            No previous bill found for this customer. You can still select the customer.
+          <div id="clbNoBill" class="alert alert-info py-2 d-none mb-2">
+            <i class="bi bi-info-circle me-1"></i>No previous delivery note found. You can still select this customer.
           </div>
-          <div class="ratio ratio-16x9 border rounded overflow-hidden" style="min-height: 60vh;">
-            <iframe id="clbFrame" src="about:blank" style="border:0; width:100%; height:100%;"></iframe>
+          <div class="clb-iframe-wrap border rounded overflow-hidden bg-light">
+            <iframe id="clbFrame" title="Last bill preview" src="about:blank" class="w-100 h-100" style="border:0; min-height: inherit;"></iframe>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" id="clbSelectBtn">Select this customer</button>
+        <div class="modal-footer flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Cancel</button>
+          <button type="button" class="btn btn-primary px-4" id="clbSelectBtn"><i class="bi bi-check2-circle me-1"></i>Select customer</button>
         </div>
       </div>
     </div>
@@ -697,6 +707,8 @@
 <script>
 (function(){
   const isEdit = <?php echo $isEdit ? 'true' : 'false'; ?>;
+  /** New Parcel: always preview last bill before customer is applied */
+  const forceLastBillFlow = <?php echo empty($parcel['id']) ? 'true' : 'false'; ?>;
   const priceOnly = <?php echo $priceOnly ? 'true' : 'false'; ?>;
   const lockAll = <?php echo $lockAll ? 'true' : 'false'; ?>;
   const canEnterItemAmounts = <?php echo $canEnterItemAmounts ? 'true' : 'false'; ?>;
@@ -990,9 +1002,14 @@
       const matches = findMatches(qRaw);
       if (matches.length === 1) {
         e.preventDefault();
-        setCustomer(matches[0].id);
-        customerSearchInput.value = formatCustomerLabel(matches[0]);
         hideCustomerResults();
+        if (forceLastBillFlow && !isEdit) {
+          showLastBillThenSelect(matches[0]);
+          customerSearchInput.value = formatCustomerLabel(matches[0]);
+        } else {
+          setCustomer(matches[0].id);
+          customerSearchInput.value = formatCustomerLabel(matches[0]);
+        }
       }
     }
   });
@@ -1023,7 +1040,22 @@
         let href = '<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=print&id='); ?>' + dnId + '&embed=1';
         if (clbFrame) clbFrame.src = href;
       } else {
-        if (clbNoBill) clbNoBill.classList.remove('d-none');
+        // Fallback: query last delivery note directly from delivery_notes
+        try {
+          const url2 = '<?php echo Helpers::baseUrl('index.php?page=parcels&action=last_delivery_note_id_for_customer'); ?>' + '&customer_id=' + encodeURIComponent(String(customer.id));
+          const res2 = await fetch(url2, { headers: { 'Accept':'application/json' } });
+          const data2 = res2.ok ? await res2.json() : null;
+          const dnId2 = data2 && data2.data && data2.data.delivery_note_id ? parseInt(data2.data.delivery_note_id, 10) : 0;
+          if (dnId2 > 0) {
+            if (clbBillId) clbBillId.textContent = '#' + String(dnId2);
+            let href = '<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=print&id='); ?>' + dnId2 + '&embed=1';
+            if (clbFrame) clbFrame.src = href;
+          } else {
+            if (clbNoBill) clbNoBill.classList.remove('d-none');
+          }
+        } catch(_) {
+          if (clbNoBill) clbNoBill.classList.remove('d-none');
+        }
       }
     } catch(_) {
       if (clbNoBill) clbNoBill.classList.remove('d-none');
@@ -1046,7 +1078,12 @@
     const id = parseInt(btn.getAttribute('data-customer-id') || '0');
     const c = customersSearchData.find(x => parseInt(x.id||0) === id) || { id };
     hideCustomerResults();
-    showLastBillThenSelect(c);
+    if (forceLastBillFlow && !isEdit) {
+      showLastBillThenSelect(c);
+    } else {
+      setCustomer(id);
+      if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(c);
+    }
   });
 
   clbSelectBtn?.addEventListener('click', function(){
@@ -1065,12 +1102,53 @@
     hideCustomerResults();
   });
 
-  // Auto-pick Delivery Route (vehicle) when customer and branches are selected
+  // Auto-pick vehicle + delivery route name when customer / branches / date change
   const customerSel = document.querySelector('select[name="customer_id"]');
   const toBranchSel = document.querySelector('select[name="to_branch_id"]');
   const fromBranchSel = document.querySelector('select[name="from_branch_id"]');
   const parcelDateEl2 = document.getElementById('parcelDate');
   const routeHintEl = document.getElementById('deliveryRouteHint');
+  function applyDeliveryRouteName(drName) {
+    if (lockAll) return;
+    const dr = String(drName || '').trim();
+    if (!dr) return;
+    const drSel = document.querySelector('select[name="delivery_route"]');
+    const drInp = document.querySelector('input[name="delivery_route"]');
+    if (drSel) {
+      const wasDisabled = drSel.disabled;
+      if (wasDisabled) drSel.disabled = false;
+      let matchVal = '';
+      Array.from(drSel.options).forEach(function(o) {
+        if (String(o.value).toLowerCase() === dr.toLowerCase()) matchVal = o.value;
+      });
+      if (matchVal) {
+        drSel.value = matchVal;
+      } else {
+        const opt = document.createElement('option');
+        opt.value = dr;
+        opt.textContent = dr;
+        drSel.appendChild(opt);
+        drSel.value = dr;
+      }
+      // If enhanced by Choices.js, sync visible UI too
+      try {
+        if (drSel._choices) {
+          const choices = Array.from(drSel.options).map(function(o){
+            return { value: o.value, label: o.textContent, selected: o.selected, disabled: o.disabled };
+          });
+          drSel._choices.setChoices(choices, 'value', 'label', true);
+          drSel._choices.setChoiceByValue(drSel.value || dr);
+        }
+      } catch(_) { /* ignore */ }
+      drSel.dispatchEvent(new Event('change'));
+      drSel.dispatchEvent(new Event('input'));
+      drSel.dispatchEvent(new Event('refresh-choices'));
+      if (wasDisabled) drSel.disabled = true;
+    } else if (drInp) {
+      drInp.value = dr;
+      drInp.dispatchEvent(new Event('input'));
+    }
+  }
   function applyDeliveryRouteFromCustomer() {
     if (lockAll) return;
     const cid = customerSel ? (customerSel.value || '').trim() : '';
@@ -1088,21 +1166,42 @@
       .then(function(r) { return r.json(); })
       .then(function(data) {
         const v = data && data.vehicle_no ? String(data.vehicle_no).trim() : '';
-        if (v === '') return;
-        if (vehicleSelect) {
-          let exists = false;
-          Array.from(vehicleSelect.options).forEach(function(o) { if ((o.value || '') === v) exists = true; });
-          if (!exists) { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; vehicleSelect.appendChild(opt); }
-          const wasDisabled = vehicleSelect.disabled; if (wasDisabled) vehicleSelect.disabled = false;
-          vehicleSelect.value = v;
-          vehicleSelect.dispatchEvent(new Event('change')); vehicleSelect.dispatchEvent(new Event('input'));
-          if (wasDisabled) vehicleSelect.disabled = true;
-        } else if (vehicleInput) {
-          vehicleInput.value = v;
-          vehicleInput.dispatchEvent(new Event('input'));
+        if (v !== '') {
+          if (vehicleSelect) {
+            let exists = false;
+            Array.from(vehicleSelect.options).forEach(function(o) { if ((o.value || '') === v) exists = true; });
+            if (!exists) { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; vehicleSelect.appendChild(opt); }
+            const wasDisabled = vehicleSelect.disabled; if (wasDisabled) vehicleSelect.disabled = false;
+            vehicleSelect.value = v;
+            vehicleSelect.dispatchEvent(new Event('change')); vehicleSelect.dispatchEvent(new Event('input'));
+            if (wasDisabled) vehicleSelect.disabled = true;
+          } else if (vehicleInput) {
+            vehicleInput.value = v;
+            vehicleInput.dispatchEvent(new Event('input'));
+          }
+          updateVehicle();
         }
-        updateVehicle();
-        if (routeHintEl) { routeHintEl.textContent = 'Delivery route: ' + v + (data.delivery_date ? ' (' + data.delivery_date + ')' : ''); routeHintEl.classList.remove('d-none'); }
+        let routeNm = data && data.delivery_route ? String(data.delivery_route).trim() : '';
+        // Fallback: if API has no saved route, use selected branch label so route field is not left blank.
+        if (routeNm === '') {
+          const toLabel = toBranchSel?.options[toBranchSel?.selectedIndex]?.text?.trim() || '';
+          const fromLabel = fromBranchSel?.options[fromBranchSel?.selectedIndex]?.text?.trim() || '';
+          if (toLabel && toLabel !== '-- Select Branch --') routeNm = toLabel;
+          else if (fromLabel && fromLabel !== '-- Select Branch --') routeNm = fromLabel;
+        }
+        if (routeNm !== '') applyDeliveryRouteName(routeNm);
+        if (routeHintEl) {
+          const parts = [];
+          if (routeNm) parts.push('Route: ' + routeNm);
+          if (v) parts.push('Vehicle: ' + v);
+          if (data && data.delivery_date) parts.push(String(data.delivery_date));
+          if (parts.length) {
+            routeHintEl.textContent = parts.join(' · ');
+            routeHintEl.classList.remove('d-none');
+          } else {
+            routeHintEl.classList.add('d-none');
+          }
+        }
       })
       .catch(function() { if (routeHintEl) routeHintEl.classList.add('d-none'); });
   }
@@ -1111,7 +1210,6 @@
   if (fromBranchSel) fromBranchSel.addEventListener('change', applyDeliveryRouteFromCustomer);
   if (parcelDateEl2) parcelDateEl2.addEventListener('change', applyDeliveryRouteFromCustomer);
   if (parcelDateEl2) parcelDateEl2.addEventListener('input', applyDeliveryRouteFromCustomer);
-  setTimeout(applyDeliveryRouteFromCustomer, 100);
 
   // Quick Add Vehicle in parcel form
   document.getElementById('qv_submit')?.addEventListener('click', async function(){
@@ -1519,12 +1617,8 @@
       }
       const drSel = document.querySelector('select[name="delivery_route"]');
       const drInp = document.querySelector('input[name="delivery_route"]');
-      if (drSel && (!drSel.value || drSel.value.trim() === '') && d.delivery_route) {
-        drSel.value = String(d.delivery_route);
-        drSel.dispatchEvent(new Event('change'));
-      } else if (drInp && (!drInp.value || drInp.value.trim() === '') && d.delivery_route) {
-        drInp.value = String(d.delivery_route);
-        drInp.dispatchEvent(new Event('input'));
+      if (d.delivery_route && ((drSel && (!drSel.value || drSel.value.trim() === '')) || (drInp && (!drInp.value || drInp.value.trim() === '')))) {
+        applyDeliveryRouteName(d.delivery_route);
       }
       const v = String(d.vehicle_no || '').trim();
       if (v) {
@@ -1547,6 +1641,9 @@
         }
       }
     } catch(_) { /* ignore */ }
+    finally {
+      try { applyDeliveryRouteFromCustomer(); } catch(_) {}
+    }
   }
   customerSelect?.addEventListener('change', applyPreviousBillingInfo);
   fromBranchSelect?.addEventListener('change', updateMeta);
@@ -1559,7 +1656,7 @@
   }
   updateMeta();
   fetchCustomerSummary();
-  applyPreviousBillingInfo();
+  setTimeout(function(){ applyPreviousBillingInfo(); }, 120);
 
   // Show bill prompt modal when redirected after setting in_transit
   (function(){
@@ -1654,9 +1751,13 @@
   locRes?.addEventListener('click', function(e){
     const btn = e.target.closest('[data-pick]');
     if (btn) {
-      const id = btn.getAttribute('data-pick');
-      if (customerSelect2) {
-        customerSelect2.value = id;
+      const id = parseInt(btn.getAttribute('data-pick') || '0', 10);
+      const c = (allCustomers || []).find(x => parseInt(x.id||0) === id) || { id };
+      if (forceLastBillFlow && !isEdit) {
+        if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(c);
+        showLastBillThenSelect({ id: c.id, name: c.name || '', phone: c.phone || '' });
+      } else if (customerSelect2) {
+        customerSelect2.value = String(id);
         customerSelect2.dispatchEvent(new Event('change'));
       }
     }
@@ -1742,25 +1843,35 @@
           opt.textContent = label;
           sel.appendChild(opt);
         }
-        // If select is disabled, temporarily enable to set value so UI reflects change
-        const wasDisabled = sel.disabled;
-        if (wasDisabled) sel.disabled = false;
-        sel.value = idStr;
-        // If enhanced by Choices.js, sync and select via API
-        try {
-          if (sel._choices) {
-            // Re-sync choices from current <option>s and select new value
-            const choices = Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, selected: o.selected, disabled: o.disabled }));
-            sel._choices.setChoices(choices, 'value', 'label', true);
-            sel._choices.setChoiceByValue(idStr);
+        if (Array.isArray(customersSearchData)) {
+          const cid = parseInt(idStr, 10);
+          if (!customersSearchData.find(x => parseInt(x.id||0) === cid)) {
+            customersSearchData.push({ id: cid, name: String(data.name||'').trim(), phone: String(data.phone||'').trim() });
           }
-        } catch(_) { /* ignore */ }
-        // Trigger common events so any listeners refresh, and notify Choices via custom event
-        sel.dispatchEvent(new Event('change'));
-        sel.dispatchEvent(new Event('input'));
-        // Ask any Choices initializer to refresh if needed
-        sel.dispatchEvent(new Event('refresh-choices'));
-        if (wasDisabled) sel.disabled = true;
+        }
+        if (forceLastBillFlow && !isEdit) {
+          if (customerSearchInput) customerSearchInput.value = label;
+          showLastBillThenSelect({ id: parseInt(idStr,10), name: String(data.name||'').trim(), phone: String(data.phone||'').trim() });
+        } else {
+          // If select is disabled, temporarily enable to set value so UI reflects change
+          const wasDisabled = sel.disabled;
+          if (wasDisabled) sel.disabled = false;
+          sel.value = idStr;
+          // If enhanced by Choices.js, sync and select via API
+          try {
+            if (sel._choices) {
+              const choices = Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, selected: o.selected, disabled: o.disabled }));
+              sel._choices.setChoices(choices, 'value', 'label', true);
+              sel._choices.setChoiceByValue(idStr);
+            }
+          } catch(_) { /* ignore */ }
+          sel.dispatchEvent(new Event('change'));
+          sel.dispatchEvent(new Event('input'));
+          sel.dispatchEvent(new Event('refresh-choices'));
+          if (wasDisabled) sel.disabled = true;
+          try { if (typeof updateMeta === 'function') updateMeta(); } catch(_) {}
+          try { if (typeof fetchCustomerSummary === 'function') fetchCustomerSummary(); } catch(_) {}
+        }
         // Update in-memory customersData so delivery location and suggestions work without refresh
         try {
           if (Array.isArray(customersData)) {
@@ -1769,9 +1880,6 @@
             if (!existing) customersData.push({ id: cid, delivery_location: (data.delivery_location || '').trim() });
           }
         } catch(_) { /* ignore */ }
-        // Ensure header labels and summary update immediately
-        try { if (typeof updateMeta === 'function') updateMeta(); } catch(_) {}
-        try { if (typeof fetchCustomerSummary === 'function') fetchCustomerSummary(); } catch(_) {}
       }
       // Close the collapse
       const collapseEl = document.getElementById('quickAddCustomer'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});

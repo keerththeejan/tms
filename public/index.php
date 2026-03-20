@@ -2209,14 +2209,14 @@ switch ($page) {
         // AJAX: get delivery route (vehicle) for customer + branch + date (for auto-pick on parcel form)
         if ($action === 'route_for_customer') {
             header('Content-Type: application/json');
-            if (!Auth::check()) { echo json_encode(['vehicle_no'=>null,'delivery_date'=>null]); break; }
+            if (!Auth::check()) { echo json_encode(['vehicle_no'=>null,'delivery_date'=>null,'delivery_route'=>null]); break; }
             $pdo = Database::pdo();
             $customer_id = (int)($_GET['customer_id'] ?? $_POST['customer_id'] ?? 0);
             $to_branch_id = (int)($_GET['to_branch_id'] ?? $_POST['to_branch_id'] ?? 0);
             $from_branch_id = (int)($_GET['from_branch_id'] ?? $_POST['from_branch_id'] ?? 0);
             $date = trim($_GET['date'] ?? $_POST['date'] ?? '');
             if ($date === '') $date = date('Y-m-d');
-            if ($customer_id <= 0) { echo json_encode(['vehicle_no'=>null,'delivery_date'=>null]); break; }
+            if ($customer_id <= 0) { echo json_encode(['vehicle_no'=>null,'delivery_date'=>null,'delivery_route'=>null]); break; }
             $vehicle_no = null;
             $delivery_date = null;
             try {
@@ -2233,7 +2233,77 @@ switch ($page) {
                     if ($row && trim($row['vehicle_no'] ?? '') !== '') { $vehicle_no = trim($row['vehicle_no']); $delivery_date = $row['delivery_date'] ?? null; }
                 }
             } catch (Throwable $e) { /* ignore */ }
-            echo json_encode(['vehicle_no'=>$vehicle_no,'delivery_date'=>$delivery_date]);
+
+            // Vehicle from latest parcel if still unknown (common when To branch not selected yet)
+            if (($vehicle_no === null || $vehicle_no === '')) {
+                try {
+                    $vst = $pdo->prepare('SELECT vehicle_no FROM parcels WHERE customer_id=? AND TRIM(COALESCE(vehicle_no, \'\'))<>\'\' ORDER BY created_at DESC, id DESC LIMIT 1');
+                    $vst->execute([$customer_id]);
+                    $vr = $vst->fetch();
+                    if ($vr && trim((string)($vr['vehicle_no'] ?? '')) !== '') {
+                        $vehicle_no = trim((string)$vr['vehicle_no']);
+                    }
+                } catch (Throwable $e) { /* ignore */ }
+            }
+
+            // Suggest delivery_route name from historical parcels + fallbacks
+            $delivery_route = null;
+            try {
+                $st = $pdo->prepare("SELECT delivery_route FROM parcels WHERE customer_id=? AND DATE(created_at)=? AND delivery_route IS NOT NULL AND TRIM(delivery_route)<>'' ORDER BY created_at DESC, id DESC LIMIT 1");
+                $st->execute([$customer_id, $date]);
+                $rrow = $st->fetch();
+                if ($rrow && trim((string)($rrow['delivery_route'] ?? '')) !== '') {
+                    $delivery_route = trim((string)$rrow['delivery_route']);
+                }
+                $vehResolved = ($vehicle_no !== null && $vehicle_no !== '') ? $vehicle_no : null;
+                if (($delivery_route === null || $delivery_route === '') && $vehResolved !== null) {
+                    $st2 = $pdo->prepare("SELECT delivery_route FROM parcels WHERE customer_id=? AND DATE(created_at)=? AND TRIM(COALESCE(vehicle_no,''))=? AND delivery_route IS NOT NULL AND TRIM(delivery_route)<>'' ORDER BY created_at DESC LIMIT 1");
+                    $st2->execute([$customer_id, $date, $vehResolved]);
+                    $r2 = $st2->fetch();
+                    if ($r2 && trim((string)($r2['delivery_route'] ?? '')) !== '') {
+                        $delivery_route = trim((string)$r2['delivery_route']);
+                    }
+                }
+                if ($delivery_route === null || $delivery_route === '') {
+                    $st3 = $pdo->prepare("SELECT delivery_route FROM parcels WHERE customer_id=? AND delivery_route IS NOT NULL AND TRIM(delivery_route)<>'' ORDER BY created_at DESC, id DESC LIMIT 1");
+                    $st3->execute([$customer_id]);
+                    $r3 = $st3->fetch();
+                    if ($r3 && trim((string)($r3['delivery_route'] ?? '')) !== '') {
+                        $delivery_route = trim((string)$r3['delivery_route']);
+                    }
+                }
+                // Same vehicle used elsewhere (parcel may have blank route but vehicle matches a billed route)
+                if (($delivery_route === null || $delivery_route === '') && $vehResolved !== null) {
+                    $st4 = $pdo->prepare("SELECT delivery_route FROM parcels WHERE TRIM(COALESCE(vehicle_no,''))=? AND delivery_route IS NOT NULL AND TRIM(delivery_route)<>'' ORDER BY created_at DESC, id DESC LIMIT 1");
+                    $st4->execute([$vehResolved]);
+                    $r4 = $st4->fetch();
+                    if ($r4 && trim((string)($r4['delivery_route'] ?? '')) !== '') {
+                        $delivery_route = trim((string)$r4['delivery_route']);
+                    }
+                }
+                // Customer delivery_location contains a configured route name
+                if ($delivery_route === null || $delivery_route === '') {
+                    $cst = $pdo->prepare('SELECT TRIM(COALESCE(delivery_location, \'\')) AS loc FROM customers WHERE id=? LIMIT 1');
+                    $cst->execute([$customer_id]);
+                    $cr = $cst->fetch();
+                    $loc = trim((string)($cr['loc'] ?? ''));
+                    if ($loc !== '') {
+                        try {
+                            $rn = $pdo->query('SELECT name FROM delivery_routes ORDER BY CHAR_LENGTH(name) DESC');
+                            $routes = $rn ? $rn->fetchAll(PDO::FETCH_ASSOC) : [];
+                            foreach ($routes as $rnRow) {
+                                $nm = trim((string)($rnRow['name'] ?? ''));
+                                if ($nm !== '' && stripos($loc, $nm) !== false) {
+                                    $delivery_route = $nm;
+                                    break;
+                                }
+                            }
+                        } catch (Throwable $e5) { /* ignore */ }
+                    }
+                }
+            } catch (Throwable $e) { /* ignore */ }
+
+            echo json_encode(['vehicle_no'=>$vehicle_no,'delivery_date'=>$delivery_date,'delivery_route'=>$delivery_route]);
             break;
         }
 
@@ -2248,14 +2318,65 @@ switch ($page) {
                 $st->execute([$customer_id]);
                 $row = $st->fetch();
                 if (!$row) { echo json_encode(['ok'=>true,'data'=>null]); break; }
+                $drOut = trim((string)($row['delivery_route'] ?? ''));
+                $vehOut = trim((string)($row['vehicle_no'] ?? ''));
+                if ($drOut === '' && $vehOut !== '') {
+                    try {
+                        $st4 = $pdo->prepare("SELECT delivery_route FROM parcels WHERE TRIM(COALESCE(vehicle_no,''))=? AND delivery_route IS NOT NULL AND TRIM(delivery_route)<>'' ORDER BY id DESC LIMIT 1");
+                        $st4->execute([$vehOut]);
+                        $r4 = $st4->fetch();
+                        if ($r4 && trim((string)($r4['delivery_route'] ?? '')) !== '') {
+                            $drOut = trim((string)$r4['delivery_route']);
+                        }
+                    } catch (Throwable $e) { /* ignore */ }
+                }
+                if ($drOut === '') {
+                    try {
+                        $cst = $pdo->prepare('SELECT TRIM(COALESCE(delivery_location, \'\')) AS loc FROM customers WHERE id=? LIMIT 1');
+                        $cst->execute([$customer_id]);
+                        $cr = $cst->fetch();
+                        $loc = trim((string)($cr['loc'] ?? ''));
+                        if ($loc !== '') {
+                            $rn = $pdo->query('SELECT name FROM delivery_routes ORDER BY CHAR_LENGTH(name) DESC');
+                            $routes = $rn ? $rn->fetchAll(PDO::FETCH_ASSOC) : [];
+                            foreach ($routes as $rnRow) {
+                                $nm = trim((string)($rnRow['name'] ?? ''));
+                                if ($nm !== '' && stripos($loc, $nm) !== false) {
+                                    $drOut = $nm;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (Throwable $e) { /* ignore */ }
+                }
                 echo json_encode(['ok'=>true,'data'=>[
                     'parcel_id' => (int)($row['id'] ?? 0),
                     'supplier_id' => (int)($row['supplier_id'] ?? 0),
                     'from_branch_id' => (int)($row['from_branch_id'] ?? 0),
                     'to_branch_id' => (int)($row['to_branch_id'] ?? 0),
-                    'vehicle_no' => (string)($row['vehicle_no'] ?? ''),
-                    'delivery_route' => (string)($row['delivery_route'] ?? ''),
+                    'vehicle_no' => $vehOut,
+                    'delivery_route' => $drOut,
                     'created_at' => (string)($row['created_at'] ?? ''),
+                ]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+            } catch (Throwable $e) {
+                echo json_encode(['ok'=>false,'error'=>'failed']);
+            }
+            break;
+        }
+
+        // AJAX: dedicated last delivery note id (used by parcel last-bill modal)
+        if ($action === 'last_delivery_note_id_for_customer') {
+            header('Content-Type: application/json; charset=utf-8');
+            $customer_id = (int)($_GET['customer_id'] ?? 0);
+            if ($customer_id <= 0) { echo json_encode(['ok'=>false,'error'=>'customer_id required']); break; }
+            try {
+                $st = $pdo->prepare('SELECT id, delivery_date FROM delivery_notes WHERE customer_id=? ORDER BY delivery_date DESC, id DESC LIMIT 1');
+                $st->execute([$customer_id]);
+                $row = $st->fetch();
+                $dnId = $row ? (int)($row['id'] ?? 0) : 0;
+                echo json_encode(['ok'=>true,'data'=>[
+                    'delivery_note_id' => $dnId,
+                    'delivery_date' => $row ? (string)($row['delivery_date'] ?? '') : ''
                 ]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
             } catch (Throwable $e) {
                 echo json_encode(['ok'=>false,'error'=>'failed']);
