@@ -110,6 +110,79 @@ class Helpers
         return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], (string)$token);
     }
 
+    /** Parcel workflow statuses (DB values => display labels) */
+    public static function parcelStatusMap(): array
+    {
+        return [
+            'pending' => 'Pending',
+            'in_transit' => 'In Transit',
+            'delivered' => 'Delivered',
+            'cancelled' => 'Cancelled',
+            'returned' => 'Returned',
+            'failed' => 'Failed',
+            'on_hold' => 'On Hold',
+            'out_for_delivery' => 'Out for Delivery',
+        ];
+    }
+
+    /** Ordered list of status keys for validation and select options */
+    public static function parcelStatusValues(): array
+    {
+        return array_keys(self::parcelStatusMap());
+    }
+
+    public static function parcelStatusLabel(string $st): string
+    {
+        $m = self::parcelStatusMap();
+        return $m[$st] ?? ucfirst(str_replace('_', ' ', $st));
+    }
+
+    /** Statuses excluded from delivery-note generation / route “open” parcel lists */
+    public static function parcelStatusesExcludedFromOpenBilling(): array
+    {
+        return ['delivered', 'cancelled', 'returned', 'failed', 'on_hold'];
+    }
+
+    /** SQL fragment: parcel row is eligible for billing / route queues (alias p.) */
+    public static function parcelSqlEligibleForOpenBilling(): string
+    {
+        $ex = self::parcelStatusesExcludedFromOpenBilling();
+        return '(p.status IS NULL OR p.status NOT IN (\'' . implode('\',\'', $ex) . '\'))';
+    }
+
+    /** Statuses that do not block “payment after delivery” checks (delivered or terminal) */
+    public static function parcelStatusesPaymentNotBlocking(): array
+    {
+        return ['delivered', 'cancelled', 'returned', 'failed'];
+    }
+
+    /** SQL fragment: parcel still requires delivery before payment (alias p.) */
+    public static function parcelSqlBlocksPaymentUntilDelivery(): string
+    {
+        $ok = self::parcelStatusesPaymentNotBlocking();
+        return '(p.status IS NULL OR p.status NOT IN (\'' . implode('\',\'', $ok) . '\'))';
+    }
+
+    /** CSS class for parcel list status badge (Bootstrap soft badges) */
+    public static function parcelStatusBadgeClass(string $st): string
+    {
+        switch ($st) {
+            case 'delivered':
+                return 'badge-soft-success';
+            case 'in_transit':
+            case 'out_for_delivery':
+                return 'badge-soft-info';
+            case 'cancelled':
+            case 'failed':
+            case 'returned':
+                return 'badge-soft-danger';
+            case 'on_hold':
+                return 'badge-soft-secondary';
+            default:
+                return 'badge-soft-warning';
+        }
+    }
+
     public static function view(string $view, array $data = []): void
     {
         extract($data);

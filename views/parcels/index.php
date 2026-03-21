@@ -3,19 +3,44 @@
   $today = date('Y-m-d');
 ?>
 <style>
-  /* Parcels table: compact, high-density (UI only) */
-  .parcels-page { --p-gap: 12px; }
-  .parcels-page .table-wrap { border: 1px solid rgba(17,24,39,.10); border-radius: 10px; background:#fff; }
-  .parcels-page .parcels-table { table-layout: fixed; font-size: 13px; }
+  /* Parcels list: one-viewport fit — tight filters + scrollable table (Bootstrap 5) */
+  .parcels-page { --p-gap: 6px; max-width: none !important; width: 100%; margin: 0; padding-bottom: .35rem; }
+  .parcels-page .table-wrap { border: 1px solid rgba(17,24,39,.10); border-radius: 12px; background:#fff; }
+  /* Vertical scroll for table body; horizontal scroll for wide grid — dropdowns use Popper fixed strategy (see Actions btn) */
+  .parcels-page .parcels-table-scroll {
+    max-height: min(640px, calc(100vh - 240px));
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  @media (max-width: 991.98px) {
+    .parcels-page .parcels-table-scroll { max-height: none; }
+  }
+  /* Actions dropdown above sticky header & scroll layers */
+  .parcels-page .parcels-actions-dd .dropdown-menu {
+    z-index: 1060;
+    min-width: 12rem;
+  }
+  .parcels-page .parcels-table { table-layout: fixed; font-size: 12.5px; }
   .parcels-page .parcels-table th,
-  .parcels-page .parcels-table td { padding: 6px 10px !important; vertical-align: middle; }
-  .parcels-page .parcels-table thead th { font-size: 12px; letter-spacing: .02em; }
+  .parcels-page .parcels-table td { padding: 4px 6px !important; vertical-align: middle; }
+  .parcels-page .parcels-table th { padding: 5px 6px !important; vertical-align: middle; }
+  .parcels-page .parcels-table thead th { font-size: 11.5px; letter-spacing: .02em; }
   .parcels-page .parcels-table tbody tr:hover { background: rgba(2,6,23,.035); }
+  /* Sticky table header: desktop only */
+  @media (min-width: 768px) {
+    .parcels-page .parcels-table thead th { position: sticky; top: 0; z-index: 10; background: #f8f9fa; }
+  }
+  /* Skeleton loader */
+  .parcels-page .skeleton { background: linear-gradient(90deg, rgba(200,200,200,0.3) 25%, rgba(220,220,220,0.5) 50%, rgba(200,200,200,0.3) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .parcels-page .skeleton-row td { padding: 10px 8px !important; }
+  .parcels-page .skeleton-cell { height: 16px; width: 80%; }
   .parcels-page .parcels-table .cell-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display:block; }
   .parcels-page .parcels-table .cell-tight { white-space: nowrap; }
   .parcels-page .parcels-table .col-actions { width: 120px; }
   .parcels-page .parcels-table .col-num { width: 56px; }
-  .parcels-page .parcels-table .col-status { width: 100px; }
+  .parcels-page .parcels-table .col-status { min-width: 118px; width: 128px; }
   .parcels-page .parcels-table .col-email { width: 120px; }
   .parcels-page .parcels-table .col-weight { width: 84px; }
   .parcels-page .parcels-table .col-price { width: 84px; }
@@ -26,6 +51,14 @@
   .parcels-page .badge-soft-secondary { background: rgba(108,117,125,.14); color: #495057; }
   .parcels-page .badge-soft-danger { background: rgba(220,53,69,.14); color: #b02a37; }
   .parcels-page .btn-icon { width: 30px; height: 30px; padding: 0; display:inline-flex; align-items:center; justify-content:center; }
+  .parcels-page .cards-wrap .card { border: 1px solid rgba(17,24,39,.10); border-radius: 12px; }
+  .parcels-page .cards-wrap .card .card-body { padding: .7rem .85rem; }
+  .parcels-page .cards-wrap .meta { color: #64748b; font-size: .85rem; }
+  .parcels-page .cards-wrap .kv { display:flex; justify-content:space-between; gap:.75rem; }
+  .parcels-page .cards-wrap .kv .k { color:#64748b; }
+  .parcels-page .cards-wrap .kv .v { font-weight:600; text-align:right; }
+  .parcels-page .cards-wrap .title { font-weight:800; }
+  .parcels-page .cards-wrap .actions .btn { border-radius: 10px; }
   @media (max-width: 992px) {
     /* Tablet: keep width tighter */
     .parcels-page .parcels-table th,
@@ -35,45 +68,66 @@
     /* Mobile: still allow scroll, but tighter */
     .parcels-page .parcels-table { font-size: 12.5px; }
   }
+
+  /* Compact page spacing */
+  .parcels-page .page-title-row { margin-bottom: .5rem !important; }
+  .parcels-page .filters-card { margin-bottom: .5rem !important; }
+  .parcels-page .filters-card .card-header { padding: .35rem .65rem !important; }
+  .parcels-page .filters-card .card-body { padding: .5rem .65rem !important; }
+  .parcels-page .filters-card .form-label { margin-bottom: .1rem !important; font-size: .72rem; font-weight: 600; color: #64748b; }
+  .parcels-page .filters-card { border-radius: 12px; }
+  .parcels-page .filters-card .form-control,
+  .parcels-page .filters-card .form-select { padding-top: .15rem; padding-bottom: .15rem; font-size: .8rem; min-height: calc(1.45em + .35rem + 2px); }
+  .parcels-page .filters-card .btn { border-radius: 8px; }
+  .parcels-page .filters-presets .btn { white-space: nowrap; }
+  .parcels-page .filters-tools .btn { padding: .2rem .45rem; font-size: .75rem; }
+  .parcels-page .filters-actions-row { border-top: 1px solid rgba(0,0,0,.06); margin-top: .25rem; padding-top: .35rem !important; }
+  .parcels-page .parcels-toolbar { margin-bottom: .35rem !important; }
+  /* Pull list slightly closer to topbar (less dead space under global header) */
+  main.content-wrapper > .container-fluid .parcels-page { margin-top: -0.35rem; }
 </style>
 
 <div class="parcels-page">
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <h3 class="mb-0">Parcels</h3>
-  <div class="d-flex flex-wrap gap-2">
-    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm"><i class="bi bi-geo-alt me-1"></i> Route Planning</a>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm"><i class="bi bi-truck-front me-1"></i> Vehicle Routes</a>
-  </div>
-</div>
 
-<div class="card border shadow-sm mb-3">
-  <div class="card-header py-2 bg-light d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <span class="fw-semibold"><i class="bi bi-funnel me-1"></i> Filters</span>
-    <div class="d-flex flex-wrap gap-1 align-items-center">
-      <span class="small text-muted me-1">Show only:</span>
-      <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=route_planning&from='.$today.'&to='.$today); ?>" class="btn btn-sm <?php echo $filter_type==='route_planning'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-geo-alt me-1"></i> Delivery Route Planning</a>
-      <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=vehicle_routes'); ?>" class="btn btn-sm <?php echo $filter_type==='vehicle_routes'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-truck-front me-1"></i> Vehicle Routes</a>
-      <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=customers'); ?>" class="btn btn-sm <?php echo $filter_type==='customers'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-people me-1"></i> Customers</a>
-      <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-sm btn-outline-secondary" title="Reset all filters"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset all</a>
+<div class="card border shadow-sm mb-1 filters-card">
+  <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-1 py-1 px-2">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="fw-semibold small mb-0"><i class="bi bi-funnel me-1"></i>Filters</span>
+      <div class="btn-group btn-group-sm filters-presets flex-wrap" role="group" aria-label="Quick filters">
+        <span class="input-group-text bg-light border-0 text-muted py-0 px-1 small d-none d-sm-inline">Presets</span>
+        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=route_planning&from='.$today.'&to='.$today); ?>" class="btn <?php echo $filter_type==='route_planning'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-geo-alt me-1"></i><span class="d-none d-md-inline">Route planning</span><span class="d-md-none">Route</span></a>
+        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=vehicle_routes'); ?>" class="btn <?php echo $filter_type==='vehicle_routes'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-truck-front me-1"></i><span class="d-none d-md-inline">Vehicles</span><span class="d-md-none">Veh</span></a>
+        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=customers'); ?>" class="btn <?php echo $filter_type==='customers'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-people me-1"></i><span class="d-none d-md-inline">Customers</span><span class="d-md-none">Cust</span></a>
+        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary" title="Reset all filters"><i class="bi bi-arrow-counterclockwise"></i></a>
+      </div>
+    </div>
+    <div class="btn-group btn-group-sm filters-tools" role="group" aria-label="Planning tools">
+      <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary"><i class="bi bi-map"></i><span class="d-none d-lg-inline ms-1">Plan routes</span></a>
+      <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary"><i class="bi bi-truck-front"></i><span class="d-none d-lg-inline ms-1">Vehicle routes</span></a>
     </div>
   </div>
-  <div class="card-body py-3">
+  <div class="d-flex align-items-center justify-content-between px-2 pt-1 d-md-none border-top border-light">
+    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#parcelsFilters" aria-expanded="true" aria-controls="parcelsFilters">
+      <i class="bi bi-sliders"></i>
+      <span class="ms-1">Toggle filters</span>
+    </button>
+  </div>
+  <div id="parcelsFilters" class="card-body collapse show py-1 px-2">
     <?php if ($filter_type === 'route_planning'): ?>
-    <div class="alert alert-info py-2 mb-3"><i class="bi bi-info-circle me-1"></i> Showing only parcels for <strong>Delivery Route Planning</strong>: pending or in transit, today's date.</div>
+    <div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-info-circle me-1"></i> <strong>Route planning</strong> preset: pending / in transit, today.</div>
     <?php elseif ($filter_type === 'vehicle_routes'): ?>
-    <div class="alert alert-info py-2 mb-3"><i class="bi bi-info-circle me-1"></i> Showing only parcels with a <strong>Vehicle</strong> assigned.</div>
+    <div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-info-circle me-1"></i> Showing parcels with a <strong>vehicle</strong> assigned.</div>
     <?php elseif ($filter_type === 'customers'): ?>
-    <div class="alert alert-info py-2 mb-3"><i class="bi bi-info-circle me-1"></i> Select a <strong>Customer</strong> below and click Apply to see only that customer's parcels.</div>
+    <div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-info-circle me-1"></i> Pick a <strong>customer</strong> below, then Apply.</div>
     <?php endif; ?>
-    <p class="small text-muted mb-2">Filter by the same fields used when creating a parcel (customer, branches, date) plus search, tracking, invoice, vehicle, delivery location, and status.</p>
     <form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
       <input type="hidden" name="page" value="parcels">
       <?php if ($filter_type !== ''): ?><input type="hidden" name="filter_type" value="<?php echo htmlspecialchars($filter_type); ?>"><?php endif; ?>
-      <div class="row g-2 g-md-3">
-        <div class="col-12"><label class="form-label small fw-semibold text-primary mb-1">Required / key fields (from parcel form)</label></div>
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small text-muted mb-0 d-block">Customer</label>
-          <select class="form-select form-select-sm" name="customer_id">
+
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-1 align-items-end">
+        <div class="col">
+          <label class="form-label" for="filter_customer_id">Customer</label>
+          <select class="form-select form-select-sm" id="filter_customer_id" name="customer_id">
             <option value="0">All Customers</option>
             <?php foreach (($customersList ?? []) as $c): ?>
               <?php $nm = (string)($c['name'] ?? ''); $ph = trim((string)($c['phone'] ?? '')); $isPH = preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1; $label = $nm . (!$isPH && $ph !== '' ? ' (' . $ph . ')' : ''); ?>
@@ -81,67 +135,71 @@
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small text-muted mb-0 d-block">From Branch</label>
-          <select class="form-select form-select-sm" name="from_branch_id">
+        <div class="col">
+          <label class="form-label" for="filter_from_branch_id">From branch</label>
+          <select class="form-select form-select-sm" id="filter_from_branch_id" name="from_branch_id">
             <option value="0">All From Branches</option>
             <?php foreach (($branchesFilterList ?? []) as $b): ?>
               <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($from_branch_filter_id ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small text-muted mb-0 d-block">To Branch</label>
-          <select class="form-select form-select-sm" name="to_branch_id">
+        <div class="col">
+          <label class="form-label" for="filter_to_branch_id">To branch</label>
+          <select class="form-select form-select-sm" id="filter_to_branch_id" name="to_branch_id">
             <option value="0">All To Branches</option>
             <?php foreach (($branchesFilterList ?? []) as $b): ?>
               <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($to_branch_filter_id ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-6 col-md-3 col-lg-2">
-          <label class="form-label small text-muted mb-0 d-block">Date From</label>
-          <input type="date" class="form-control form-control-sm" name="from" value="<?php echo htmlspecialchars($from ?? ''); ?>" title="From date">
+        <div class="col">
+          <label class="form-label" for="filter_from">Date from</label>
+          <input type="date" class="form-control form-control-sm" id="filter_from" name="from" value="<?php echo htmlspecialchars($from ?? ''); ?>" title="From date">
         </div>
-        <div class="col-6 col-md-3 col-lg-2">
-          <label class="form-label small text-muted mb-0 d-block">Date To</label>
-          <input type="date" class="form-control form-control-sm" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>" title="To date">
+        <div class="col">
+          <label class="form-label" for="filter_to">Date to</label>
+          <input type="date" class="form-control form-control-sm" id="filter_to" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>" title="To date">
         </div>
+      </div>
 
-        <div class="col-12 mt-3"><label class="form-label small fw-semibold text-secondary mb-1">Other filters (search, tracking, invoice, vehicle, delivery location, status)</label></div>
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small text-muted mb-0 d-block">Search (name / phone / tracking)</label>
-          <input type="text" class="form-control form-control-sm" name="q" placeholder="Customer name, phone, or tracking" value="<?php echo htmlspecialchars($q ?? ''); ?>">
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-1 align-items-end">
+        <div class="col">
+          <label class="form-label" for="filter_q">Search</label>
+          <input type="text" class="form-control form-control-sm" id="filter_q" name="q" placeholder="Name, phone, tracking" value="<?php echo htmlspecialchars($q ?? ''); ?>" title="Customer name, phone, or tracking">
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-          <label class="form-label small text-muted mb-0 d-block">Tracking / Serial</label>
-          <input type="text" class="form-control form-control-sm" name="tracking_number" placeholder="Tracking No" value="<?php echo htmlspecialchars($tracking_filter ?? ''); ?>">
+        <div class="col">
+          <label class="form-label" for="filter_tracking_number">Tracking / serial</label>
+          <input type="text" class="form-control form-control-sm" id="filter_tracking_number" name="tracking_number" placeholder="Serial" value="<?php echo htmlspecialchars($tracking_filter ?? ''); ?>">
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-          <label class="form-label small text-muted mb-0 d-block">Invoice No</label>
-          <input type="text" class="form-control form-control-sm" name="invoice_no" placeholder="Invoice No" value="<?php echo htmlspecialchars($invoice_no_filter ?? ''); ?>">
+        <div class="col">
+          <label class="form-label" for="filter_invoice_no">Invoice no.</label>
+          <input type="text" class="form-control form-control-sm" id="filter_invoice_no" name="invoice_no" placeholder="Invoice" value="<?php echo htmlspecialchars($invoice_no_filter ?? ''); ?>">
         </div>
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small text-muted mb-0 d-block">Supplier</label>
-          <select class="form-select form-select-sm" name="supplier_id">
+        <div class="col">
+          <label class="form-label" for="filter_supplier_id">Supplier</label>
+          <select class="form-select form-select-sm" id="filter_supplier_id" name="supplier_id">
             <option value="0">All Suppliers</option>
             <?php foreach (($suppliersFilterList ?? []) as $s): ?>
               <option value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($supplier_filter_id ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($s['name'] ?? ''); ?></option>
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-          <label class="form-label small text-muted mb-0 d-block">Vehicle No</label>
-          <input type="text" class="form-control form-control-sm" name="vehicle_no" placeholder="Vehicle No" value="<?php echo htmlspecialchars($vehicle_no ?? ''); ?>">
+        <div class="col">
+          <label class="form-label" for="filter_vehicle_no">Vehicle no.</label>
+          <input type="text" class="form-control form-control-sm" id="filter_vehicle_no" name="vehicle_no" placeholder="Vehicle" value="<?php echo htmlspecialchars($vehicle_no ?? ''); ?>">
         </div>
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small text-muted mb-0 d-block">Delivery Location</label>
-          <input type="text" class="form-control form-control-sm" name="delivery_location" placeholder="Customer delivery location" value="<?php echo htmlspecialchars($delivery_location_filter ?? ''); ?>">
+      </div>
+
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-1 align-items-end">
+        <div class="col">
+          <label class="form-label" for="filter_delivery_location">Delivery location</label>
+          <input type="text" class="form-control form-control-sm" id="filter_delivery_location" name="delivery_location" placeholder="Location" value="<?php echo htmlspecialchars($delivery_location_filter ?? ''); ?>">
         </div>
-        <div class="col-6 col-md-4 col-lg-3">
-          <label class="form-label small text-muted mb-0 d-block">Delivery Route</label>
+        <div class="col">
+          <label class="form-label" for="filter_delivery_route">Delivery route</label>
           <?php if (!empty($deliveryRoutesFilterList) && is_array($deliveryRoutesFilterList)): ?>
-            <select class="form-select form-select-sm" name="delivery_route">
+            <select class="form-select form-select-sm" id="filter_delivery_route" name="delivery_route">
               <option value="">All Routes</option>
               <?php foreach ($deliveryRoutesFilterList as $r): ?>
                 <?php $rName = (string)($r['name'] ?? ''); if (trim($rName) === '') continue; ?>
@@ -149,49 +207,119 @@
               <?php endforeach; ?>
             </select>
           <?php else: ?>
-            <input type="text" class="form-control form-control-sm" name="delivery_route" placeholder="Delivery route" value="<?php echo htmlspecialchars($delivery_route_filter ?? ''); ?>">
+            <input type="text" class="form-control form-control-sm" id="filter_delivery_route" name="delivery_route" placeholder="Route" value="<?php echo htmlspecialchars($delivery_route_filter ?? ''); ?>">
           <?php endif; ?>
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-          <label class="form-label small text-muted mb-0 d-block">Status</label>
-          <select class="form-select form-select-sm" name="status">
+        <div class="col">
+          <label class="form-label" for="filter_status">Status</label>
+          <select class="form-select form-select-sm" id="filter_status" name="status">
             <option value="">All Status</option>
-            <option value="pending" <?php echo ($status ?? '')==='pending'?'selected':''; ?>>Pending</option>
-            <option value="in_transit" <?php echo ($status ?? '')==='in_transit'?'selected':''; ?>>In Transit</option>
-            <option value="delivered" <?php echo ($status ?? '')==='delivered'?'selected':''; ?>>Delivered</option>
+            <?php foreach (Helpers::parcelStatusMap() as $stVal => $stLabel): ?>
+            <option value="<?php echo htmlspecialchars($stVal); ?>" <?php echo (($status ?? '') === $stVal) ? 'selected' : ''; ?>><?php echo htmlspecialchars($stLabel); ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-          <label class="form-label small text-muted mb-0 d-block">Route date</label>
-          <input type="date" class="form-control form-control-sm" name="route_date" value="<?php echo htmlspecialchars($route_date ?? ''); ?>" title="Parcels with delivery route on this date">
+        <div class="col">
+          <label class="form-label" for="filter_route_date">Route date</label>
+          <input type="date" class="form-control form-control-sm" id="filter_route_date" name="route_date" value="<?php echo htmlspecialchars($route_date ?? ''); ?>" title="Parcels with delivery route on this date">
         </div>
-        <div class="col-12 col-lg-12 d-flex align-items-end gap-2 flex-wrap mt-2">
-          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i> Apply filters</button>
-          <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm">Reset all</a>
-          <?php if (isset($_SESSION['parcels_filter_from']) || isset($_SESSION['parcels_filter_to'])): ?>
-            <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&clear_dates=1'); ?>" class="btn btn-outline-danger btn-sm" title="Clear saved date filter"><i class="bi bi-x-circle me-1"></i> Clear saved dates</a>
-          <?php endif; ?>
-        </div>
+      </div>
+      <div class="filters-actions-row d-flex flex-wrap justify-content-end align-items-center gap-2">
+        <button type="submit" class="btn btn-primary btn-sm py-1 px-2"><i class="bi bi-funnel me-1"></i> Apply</button>
+        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm py-1 px-2">Reset</a>
+        <?php if (isset($_SESSION['parcels_filter_from']) || isset($_SESSION['parcels_filter_to'])): ?>
+          <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&clear_dates=1'); ?>" class="btn btn-outline-danger btn-sm py-1 px-2" title="Clear saved date filter"><i class="bi bi-x-circle"></i></a>
+        <?php endif; ?>
       </div>
     </form>
   </div>
 </div>
 <?php if (isset($_SESSION['parcels_filter_from']) || isset($_SESSION['parcels_filter_to'])): ?>
-  <div class="alert alert-info alert-dismissible fade show mb-3" role="alert">
+  <div class="alert alert-info alert-dismissible fade show mb-1 py-1 small" role="alert">
     <i class="bi bi-info-circle"></i> Date filter is saved: 
     <strong><?php echo htmlspecialchars($from ?? ''); ?></strong> to <strong><?php echo htmlspecialchars($to ?? ''); ?></strong>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
 <?php endif; ?>
-<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-  <a href="<?php echo Helpers::baseUrl('index.php?' . http_build_query(array_merge($_GET, ['page'=>'parcels','action'=>'print_list']))); ?>" target="_blank" class="btn btn-outline-primary btn-sm"><i class="bi bi-printer me-1"></i> Print current list</a>
-  <?php if (!empty($vehicle_no)): ?>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_detail&vehicle_no=' . urlencode($vehicle_no) . '&from=' . urlencode($from ?? date('Y-m-d')) . '&to=' . urlencode($to ?? date('Y-m-d')) . '&direction=from'); ?>" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-signpost me-1"></i> Print by route (vehicle <?php echo htmlspecialchars($vehicle_no); ?>)</a>
+<div class="cards-wrap d-md-none">
+  <?php if (empty($parcels)): ?>
+    <div class="alert alert-light border mb-3">No parcels found.</div>
+  <?php else: ?>
+    <div class="d-flex flex-column gap-2">
+      <?php $rowNum = (int)($parcelRowStart ?? 0); foreach ($parcels as $p): $rowNum++; ?>
+        <?php
+          $st = (string)($p['status'] ?? '');
+          $stClass = Helpers::parcelStatusBadgeClass($st);
+          $cid = (int)($p['customer_id'] ?? 0);
+          $nm = (string)($p['customer_name'] ?? '');
+          $ph = trim((string)($p['customer_phone'] ?? ''));
+          $isPH = preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1;
+          $custLabel = $nm . (!$isPH && $ph !== '' ? ' (' . $ph . ')' : '');
+          $veh = trim((string)($p['vehicle_no'] ?? ''));
+          $fromBr = (string)($p['from_branch'] ?? '—');
+          $toBr = (string)($p['to_branch'] ?? '—');
+          $items = trim((string)($p['item_descriptions'] ?? ''));
+          $priceText = is_null($p['price']) ? '-' : number_format((float)$p['price'], 2);
+          $weightText = number_format((float)($p['weight'] ?? 0), 2);
+        ?>
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="title">
+                  <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>">
+                    #<?php echo (int)$p['id']; ?>
+                  </a>
+                  <span class="badge badge-soft <?php echo $stClass; ?> ms-1"><?php echo htmlspecialchars(Helpers::parcelStatusLabel($st)); ?></span>
+                </div>
+                <div class="meta">
+                  <?php echo htmlspecialchars(substr((string)($p['created_at'] ?? ''), 0, 16)); ?>
+                </div>
+              </div>
+              <div class="text-end">
+                <div class="kv"><span class="k">Price</span><span class="v"><?php echo $priceText; ?></span></div>
+                <div class="kv"><span class="k">Weight</span><span class="v"><?php echo $weightText; ?></span></div>
+              </div>
+            </div>
+
+            <div class="mt-2">
+              <div class="kv"><span class="k">Customer</span><span class="v text-truncate" style="max-width: 65%"><a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&customer_id=' . $cid); ?>"><?php echo htmlspecialchars($custLabel); ?></a></span></div>
+              <div class="kv"><span class="k">Route</span><span class="v text-truncate" style="max-width: 65%"><span><?php echo htmlspecialchars($fromBr); ?></span> <span class="text-muted">→</span> <span><?php echo htmlspecialchars($toBr); ?></span></span></div>
+              <div class="kv"><span class="k">Vehicle</span><span class="v text-truncate" style="max-width: 65%">
+                <?php if ($veh !== ''): ?>
+                  <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&vehicle_no=' . urlencode($veh)); ?>"><?php echo htmlspecialchars($veh); ?></a>
+                <?php else: ?>—<?php endif; ?>
+              </span></div>
+              <div class="kv"><span class="k">Items</span><span class="v text-truncate" style="max-width: 65%"><?php echo $items !== '' ? htmlspecialchars($items) : '—'; ?></span></div>
+            </div>
+
+            <div class="actions d-flex gap-2 flex-wrap mt-3">
+              <a class="btn btn-outline-secondary btn-sm" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer me-1"></i>Print</a>
+              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square me-1"></i>Edit</a>
+              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id='.(int)$p['id']); ?>"><i class="bi bi-envelope me-1"></i>Email</a>
+              <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" onsubmit="return confirm('Delete this parcel?');" class="ms-auto">
+                <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+                <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
+                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Delete</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
   <?php endif; ?>
 </div>
-<div class="table-responsive table-wrap" style="max-height: 600px; overflow-y: auto; overflow-x: auto;">
-  <table class="table table-sm table-striped align-middle datatable parcels-table">
-    <thead class="table-light" style="position: sticky; top: 0; z-index: 10; background-color: #f8f9fa;">
+
+<div class="d-flex flex-wrap align-items-center gap-2 parcels-toolbar">
+  <a href="<?php echo Helpers::baseUrl('index.php?' . http_build_query(array_merge($_GET, ['page'=>'parcels','action'=>'print_list']))); ?>" target="_blank" class="btn btn-outline-primary btn-sm py-1"><i class="bi bi-printer me-1"></i> Print list</a>
+  <?php if (!empty($vehicle_no)): ?>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_detail&vehicle_no=' . urlencode($vehicle_no) . '&from=' . urlencode($from ?? date('Y-m-d')) . '&to=' . urlencode($to ?? date('Y-m-d')) . '&direction=from'); ?>" target="_blank" class="btn btn-outline-secondary btn-sm py-1"><i class="bi bi-signpost me-1"></i> Route print</a>
+  <?php endif; ?>
+</div>
+
+<div class="table-responsive table-wrap parcels-table-scroll d-none d-md-block">
+  <table class="table table-sm table-striped table-hover align-middle parcels-table mb-0">
+    <thead class="table-light">
       <tr>
         <th class="col-num">#</th>
         <th>Customer</th>
@@ -268,9 +396,9 @@
           <td>
             <?php
               $st = (string)($p['status'] ?? '');
-              $stClass = ($st === 'delivered') ? 'badge-soft-success' : (($st === 'in_transit') ? 'badge-soft-info' : 'badge-soft-warning');
+              $stClass = Helpers::parcelStatusBadgeClass($st);
             ?>
-            <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars($st); ?></span>
+            <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars(Helpers::parcelStatusLabel($st)); ?></span>
           </td>
           <td>
             <?php if (!empty($p['email_status'])): ?>
@@ -287,12 +415,12 @@
               <a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=email_log&id='.(int)$p['id']); ?>">View log</a>
             </div>
           </td>
-          <td class="text-end">
-            <div class="dropdown d-inline">
-              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+          <td class="text-end position-relative">
+            <div class="dropdown d-inline parcels-actions-dd">
+              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true" data-bs-popper-config='{"strategy":"fixed","modifiers":[{"name":"preventOverflow","options":{"boundary":"viewport"}}]}' aria-expanded="false" title="Actions">
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end">
+              <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li><a class="dropdown-item" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer me-2"></i>Print</a></li>
                 <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a></li>
                 <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route&customer_id='.(int)$p['customer_id']); ?>"><i class="bi bi-signpost me-2"></i>Delivery Route</a></li>
@@ -312,12 +440,19 @@
       <?php endforeach; ?>
     </tbody>
   </table>
-</div>
-
+  <!-- Skeleton loader (hidden by default, shown via JS when loading) -->
+  <table id="parcelsSkeleton" class="table table-sm parcels-table" style="display:none;">
+    <thead class="table-light"><tr><th class="col-num">#</th><th>Customer</th><th>Supplier</th><th>From</th><th>To</th><th>Vehicle</th><th>Route</th><th>Items</th><th>Weight</th><th>Price</th><th>Status</th><th>Email</th><th>Actions</th></tr></thead>
+    <tbody>
+      <tr class="skeleton-row"><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
+      <tr class="skeleton-row"><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
+      <tr class="skeleton-row"><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
+    </tbody>
+  </table>
 </div>
 
 <?php if (($totalPages ?? 1) > 1): ?>
-<div class="d-flex justify-content-between align-items-center mt-3">
+<div class="d-flex justify-content-between align-items-center mt-1 flex-wrap gap-2 small">
   <div class="text-muted">
     Showing <?php echo count($parcels); ?> of <?php echo (int)($totalCount ?? 0); ?> parcels
   </div>
@@ -396,3 +531,5 @@
   </nav>
 </div>
 <?php endif; ?>
+
+</div><!-- /.parcels-page -->

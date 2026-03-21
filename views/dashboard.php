@@ -103,6 +103,7 @@
   .dashboard-page .badge-soft-warning { background: rgba(255,193,7,.16); color: #8a6d00; }
   .dashboard-page .badge-soft-info { background: rgba(13,202,240,.16); color: #055160; }
   .dashboard-page .badge-soft-secondary { background: rgba(108,117,125,.14); color: #495057; }
+  .dashboard-page .badge-soft-danger { background: rgba(220,53,69,.14); color: #b02a37; }
   .dashboard-page .nav-tabs-dash .nav-link {
     border: none;
     border-radius: 0.5rem;
@@ -121,6 +122,40 @@
     .dashboard-page .nav-tabs-dash { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
     .dashboard-page .nav-tabs-dash .nav-link { white-space: nowrap; }
   }
+  /* Stack key tables as cards on narrow screens */
+  @media (max-width: 767.98px) {
+    .dashboard-page .dash-stack-table thead { display: none !important; }
+    .dashboard-page .dash-stack-table tbody tr {
+      display: block;
+      border: 1px solid rgba(17, 24, 39, 0.1) !important;
+      border-radius: 0.65rem;
+      margin-bottom: 0.65rem;
+      padding: 0.5rem 0.65rem !important;
+      background: #fff;
+    }
+    .dashboard-page .dash-stack-table tbody td {
+      display: block !important;
+      width: 100% !important;
+      border: none !important;
+      border-bottom: 1px solid rgba(17, 24, 39, 0.06) !important;
+      padding: 0.45rem 0 !important;
+      text-align: left !important;
+    }
+    .dashboard-page .dash-stack-table tbody td:last-child { border-bottom: none !important; }
+    .dashboard-page .dash-stack-table tbody td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      margin-bottom: 0.3rem;
+    }
+    .dashboard-page .dash-stack-table tbody td.text-end { text-align: left !important; }
+    .dashboard-page .filters-card .row.g-3 > [class*="col-"] { min-width: 0; }
+    .dashboard-page .dash-table-scroll { max-height: none !important; }
+  }
 </style>
 <div class="dashboard-page">
   <?php
@@ -128,11 +163,25 @@
     $kpiTodayParcels = is_array($todayParcels ?? null) ? count($todayParcels) : 0;
     $kpiCollections = (float)($collectionsToday ?? 0);
     $kpiExpenses = (float)($expensesToday ?? 0);
+    $df = $df ?? date('Y-m-d');
+    $dt = $dt ?? date('Y-m-d');
+    $today = $today ?? date('Y-m-d');
+    $scopeAllBranches = !empty($scopeAllBranches);
+    $isSingleDay = isset($isSingleDay) ? (bool)$isSingleDay : ($df === $dt);
+    $isTodayRange = isset($isTodayRange) ? (bool)$isTodayRange : ($isSingleDay && $df === $today);
+    $rangeStr = htmlspecialchars($df === $dt ? $df : ($df . ' → ' . $dt));
+    $kpiParcelsTitle = ($isSingleDay && $df === $today && $dt === $today) ? "Today's Parcels" : 'Parcels (filtered)';
+    $kpiCollTitle = !$isSingleDay
+      ? 'Collections (' . htmlspecialchars($df) . '–' . htmlspecialchars($dt) . ')'
+      : ($isTodayRange ? "Today's Collections" : 'Collections (' . htmlspecialchars($df) . ')');
+    $kpiExpTitle = !$isSingleDay
+      ? 'Expenses (' . htmlspecialchars($df) . '–' . htmlspecialchars($dt) . ')'
+      : ($isTodayRange ? "Today's Expenses" : 'Expenses (' . htmlspecialchars($df) . ')');
   ?>
 
   <section class="mb-3">
     <p class="section-title">Overview</p>
-    <p class="section-subtitle">Key operational metrics for the selected branch and date range.</p>
+    <p class="section-subtitle">Key metrics for <?php echo $scopeAllBranches ? '<strong>all branches</strong>' : 'your branch filters'; ?> · <?php echo $isSingleDay ? 'Date: <strong>'.$rangeStr.'</strong>' : 'Range: <strong>'.$rangeStr.'</strong>'; ?>.</p>
     <div class="row g-3">
       <div class="col-12 col-md-6 col-xl-3">
         <div class="kpi-card">
@@ -150,19 +199,19 @@
         <div class="kpi-card">
           <div class="d-flex align-items-start justify-content-between gap-2">
             <div>
-              <div class="kpi-label">Today's Parcels</div>
+              <div class="kpi-label"><?php echo htmlspecialchars($kpiParcelsTitle); ?></div>
               <div class="kpi-value"><?php echo $kpiTodayParcels; ?></div>
             </div>
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(32,201,151,.12); color:#198754;"><i class="bi bi-box-seam"></i></div>
           </div>
-          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&from=' . urlencode($today ?? date('Y-m-d')) . '&to=' . urlencode($today ?? date('Y-m-d'))); ?>">View list</a></div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&from=' . urlencode($df) . '&to=' . urlencode($dt)); ?>">View list</a></div>
         </div>
       </div>
       <div class="col-12 col-md-6 col-xl-3">
         <div class="kpi-card">
           <div class="d-flex align-items-start justify-content-between gap-2">
             <div>
-              <div class="kpi-label">Today’s Collections</div>
+              <div class="kpi-label"><?php echo htmlspecialchars($kpiCollTitle); ?></div>
               <div class="kpi-value">Rs. <?php echo number_format($kpiCollections, 2); ?></div>
             </div>
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,110,253,.10); color:#0d6efd;"><i class="bi bi-cash-stack"></i></div>
@@ -174,7 +223,7 @@
         <div class="kpi-card">
           <div class="d-flex align-items-start justify-content-between gap-2">
             <div>
-              <div class="kpi-label">Today’s Expenses</div>
+              <div class="kpi-label"><?php echo htmlspecialchars($kpiExpTitle); ?></div>
               <div class="kpi-value">Rs. <?php echo number_format($kpiExpenses, 2); ?></div>
             </div>
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#8a6d00;"><i class="bi bi-wallet2"></i></div>
@@ -323,12 +372,15 @@
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">To Branch</label>
-        <select class="form-select form-select-sm" name="tb">
+        <select class="form-select form-select-sm" name="tb" aria-describedby="dashTbHint">
           <option value="0">All</option>
           <?php foreach (($branchesAll ?? []) as $b): ?>
             <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($tb ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
           <?php endforeach; ?>
         </select>
+        <?php if (!empty($isMain)): ?>
+        <div id="dashTbHint" class="form-text small mt-1 mb-0">“All” = every branch (main hub only).</div>
+        <?php endif; ?>
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">Customer</label>
@@ -350,19 +402,20 @@
     <div class="col-12">
       <div class="card card-dash w-100">
         <div class="card-header-dash d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <span>Today's Parcels</span>
-          <small class="text-muted fw-normal"><?php echo htmlspecialchars($today ?? ''); ?></small>
+          <span><?php echo $isSingleDay && $df === $today && $dt === $today ? 'Today\'s Parcels' : 'Parcels'; ?></span>
+          <small class="text-muted fw-normal"><?php echo $rangeStr; ?><?php echo $scopeAllBranches ? ' · All branches' : ''; ?></small>
         </div>
         <div class="card-body">
           <?php if (empty($todayParcels)): ?>
-            <p class="text-muted small mb-0">No parcels today.</p>
+            <p class="text-muted small mb-0">No parcels in this range.</p>
           <?php else: ?>
-          <div class="table-responsive" style="max-height:220px; overflow:auto;-webkit-overflow-scrolling:touch;">
-            <table class="table table-sm table-dash table-hover align-middle mb-0">
+          <div class="table-responsive dash-table-scroll" style="max-height:220px; overflow:auto;-webkit-overflow-scrolling:touch;">
+            <table class="table table-sm table-dash table-hover align-middle mb-0 dash-stack-table">
               <thead>
                 <tr>
                   <th>#</th>
                   <th>Customer</th>
+                  <th>To</th>
                   <th>Tracking</th>
                   <th>Vehicle</th>
                   <th>Status</th>
@@ -371,16 +424,17 @@
               <tbody>
                 <?php foreach ($todayParcels as $p): ?>
                 <tr>
-                  <td><?php echo (int)$p['id']; ?></td>
-                  <td><?php echo htmlspecialchars($p['customer_name'] ?? ''); ?></td>
-                  <td><?php echo htmlspecialchars($p['tracking_number'] ?? ''); ?></td>
-                  <td><?php echo htmlspecialchars($p['vehicle_no'] ?? ''); ?></td>
-                  <td>
+                  <td data-label="#"><?php echo (int)$p['id']; ?></td>
+                  <td data-label="Customer"><?php echo htmlspecialchars($p['customer_name'] ?? ''); ?></td>
+                  <td data-label="To"><?php echo htmlspecialchars($p['to_branch'] ?? '—'); ?></td>
+                  <td data-label="Tracking"><?php echo htmlspecialchars($p['tracking_number'] ?? ''); ?></td>
+                  <td data-label="Vehicle"><?php echo htmlspecialchars($p['vehicle_no'] ?? ''); ?></td>
+                  <td data-label="Status">
                     <?php
                       $st = (string)($p['status'] ?? '');
-                      $stClass = ($st === 'delivered') ? 'badge-soft-success' : (($st === 'in_transit') ? 'badge-soft-info' : 'badge-soft-warning');
+                      $stClass = Helpers::parcelStatusBadgeClass($st);
                     ?>
-                    <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars($st); ?></span>
+                    <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars(Helpers::parcelStatusLabel($st)); ?></span>
                   </td>
                 </tr>
                 <?php endforeach; ?>
@@ -399,7 +453,7 @@
         <div class="card-header-dash">All Branches (Today)</div>
         <div class="card-body p-0">
           <div class="table-responsive overflow-auto">
-            <table class="table table-sm table-dash table-hover align-middle mb-0">
+            <table class="table table-sm table-dash table-hover align-middle mb-0 dash-stack-table">
               <thead>
                 <tr>
                   <th>Branch</th>
@@ -413,20 +467,20 @@
               <tbody>
                 <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
                 <tr>
-                  <td class="fw-medium"><?php echo htmlspecialchars($b['name']); ?></td>
-                  <td class="text-end">
+                  <td class="fw-medium" data-label="Branch"><?php echo htmlspecialchars($b['name']); ?></td>
+                  <td class="text-end" data-label="Pending">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending&to_branch_id=' . $bid); ?>"><?php echo (int)($pendingByBranch[$bid] ?? 0); ?></a>
                   </td>
-                  <td class="text-end">
+                  <td class="text-end" data-label="Due">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=payments&branch_id=' . $bid); ?>">Rs. <?php echo number_format((float)($dueByBranch[$bid] ?? 0), 2); ?></a>
                   </td>
-                  <td class="text-end">
+                  <td class="text-end" data-label="Parcels today">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&to_branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>"><?php echo (int)($todayParcelsByBranch[$bid] ?? 0); ?></a>
                   </td>
-                  <td class="text-end">
+                  <td class="text-end" data-label="Collections">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=payments&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>">Rs. <?php echo number_format((float)($collectionsTodayByBranch[$bid] ?? 0), 2); ?></a>
                   </td>
-                  <td class="text-end">
+                  <td class="text-end" data-label="Expenses">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>">Rs. <?php echo number_format((float)($expensesTodayByBranch[$bid] ?? 0), 2); ?></a>
                   </td>
                 </tr>
@@ -444,7 +498,7 @@
       <div class="card card-dash stat-card stat-collections h-100">
         <div class="card-body">
           <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="text-muted small">Today's Collections</span>
+            <span class="text-muted small"><?php echo htmlspecialchars($kpiCollTitle); ?></span>
             <i class="bi bi-cash-stack text-success opacity-75"></i>
           </div>
           <div class="stat-value text-success">Rs. <?php echo number_format((float)($collectionsToday ?? 0), 2); ?></div>
@@ -456,7 +510,7 @@
       <div class="card card-dash stat-card stat-expenses h-100">
         <div class="card-body">
           <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="text-muted small">Today's Expenses</span>
+            <span class="text-muted small"><?php echo htmlspecialchars($kpiExpTitle); ?></span>
             <i class="bi bi-wallet2 text-warning opacity-75"></i>
           </div>
           <div class="stat-value text-warning">Rs. <?php echo number_format((float)($expensesToday ?? 0), 2); ?></div>
@@ -475,22 +529,22 @@
             <p class="text-muted small mb-0">No recent payments.</p>
           <?php else: ?>
           <div class="table-responsive overflow-auto" style="max-height:220px;-webkit-overflow-scrolling:touch;">
-            <table class="table table-sm table-dash table-hover align-middle mb-0">
+            <table class="table table-sm table-dash table-hover align-middle mb-0 dash-stack-table">
               <thead>
                 <tr>
                   <th>#</th>
                   <th>Customer</th>
                   <th>Amount</th>
-                  <th class="d-none d-sm-table-cell">Paid At</th>
+                  <th>Paid At</th>
                 </tr>
               </thead>
               <tbody>
                 <?php foreach ($recentPayments as $p): ?>
                 <tr>
-                  <td><?php echo (int)$p['id']; ?></td>
-                  <td><?php echo htmlspecialchars(($p['customer_name'] ?? '').' ('.($p['customer_phone'] ?? '').')'); ?></td>
-                  <td>Rs. <?php echo number_format((float)$p['amount'], 2); ?></td>
-                  <td class="d-none d-sm-table-cell"><small class="text-muted"><?php echo htmlspecialchars($p['paid_at']); ?></small></td>
+                  <td data-label="#"><?php echo (int)$p['id']; ?></td>
+                  <td data-label="Customer"><?php echo htmlspecialchars(($p['customer_name'] ?? '').' ('.($p['customer_phone'] ?? '').')'); ?></td>
+                  <td data-label="Amount">Rs. <?php echo number_format((float)$p['amount'], 2); ?></td>
+                  <td data-label="Paid at"><small class="text-muted"><?php echo htmlspecialchars($p['paid_at']); ?></small></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -506,7 +560,7 @@
 <?php
   // Helper to safely fetch status counts
   $getCnt = function(array $arr, int $bid, string $status): int {
-    return isset($arr[$bid][$status]) ? (int)$arr[$bid][$status] : 0;
+    return (int)(($arr[$bid] ?? [])[$status] ?? 0);
   };
 ?>
 
@@ -529,7 +583,7 @@
           <div class="tab-content">
             <div class="tab-pane fade show active" id="today-pane" role="tabpanel">
               <div class="table-responsive">
-                <table class="table table-sm table-dash table-hover align-middle mb-0">
+                <table class="table table-sm table-dash table-hover align-middle mb-0 dash-stack-table">
                   <thead>
                     <tr>
                       <th>Branch</th>
@@ -541,10 +595,10 @@
                   <tbody>
                     <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
                     <tr>
-                      <td class="fw-medium"><?php echo htmlspecialchars($b['name']); ?></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'pending'); ?></span></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'in_transit'); ?></span></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'delivered'); ?></span></td>
+                      <td class="fw-medium" data-label="Branch"><?php echo htmlspecialchars($b['name']); ?></td>
+                      <td class="text-end" data-label="Pending"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'pending'); ?></span></td>
+                      <td class="text-end" data-label="In transit"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'in_transit'); ?></span></td>
+                      <td class="text-end" data-label="Delivered"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['today'] ?? [], $bid, 'delivered'); ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                   </tbody>
@@ -553,7 +607,7 @@
             </div>
             <div class="tab-pane fade" id="yesterday-pane" role="tabpanel">
               <div class="table-responsive">
-                <table class="table table-sm table-dash table-hover align-middle mb-0">
+                <table class="table table-sm table-dash table-hover align-middle mb-0 dash-stack-table">
                   <thead>
                     <tr>
                       <th>Branch</th>
@@ -565,10 +619,10 @@
                   <tbody>
                     <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
                     <tr>
-                      <td class="fw-medium"><?php echo htmlspecialchars($b['name']); ?></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'pending'); ?></span></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'in_transit'); ?></span></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'delivered'); ?></span></td>
+                      <td class="fw-medium" data-label="Branch"><?php echo htmlspecialchars($b['name']); ?></td>
+                      <td class="text-end" data-label="Pending"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'pending'); ?></span></td>
+                      <td class="text-end" data-label="In transit"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'in_transit'); ?></span></td>
+                      <td class="text-end" data-label="Delivered"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['yesterday'] ?? [], $bid, 'delivered'); ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                   </tbody>
@@ -577,7 +631,7 @@
             </div>
             <div class="tab-pane fade" id="last30-pane" role="tabpanel">
               <div class="table-responsive">
-                <table class="table table-sm table-dash table-hover align-middle mb-0">
+                <table class="table table-sm table-dash table-hover align-middle mb-0 dash-stack-table">
                   <thead>
                     <tr>
                       <th>Branch</th>
@@ -589,10 +643,10 @@
                   <tbody>
                     <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
                     <tr>
-                      <td class="fw-medium"><?php echo htmlspecialchars($b['name']); ?></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'pending'); ?></span></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'in_transit'); ?></span></td>
-                      <td class="text-end"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'delivered'); ?></span></td>
+                      <td class="fw-medium" data-label="Branch"><?php echo htmlspecialchars($b['name']); ?></td>
+                      <td class="text-end" data-label="Pending"><span class="badge badge-soft badge-soft-warning"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'pending'); ?></span></td>
+                      <td class="text-end" data-label="In transit"><span class="badge badge-soft badge-soft-info"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'in_transit'); ?></span></td>
+                      <td class="text-end" data-label="Delivered"><span class="badge badge-soft badge-soft-success"><?php echo $getCnt($statusStats['last30'] ?? [], $bid, 'delivered'); ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                   </tbody>

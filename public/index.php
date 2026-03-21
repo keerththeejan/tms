@@ -175,24 +175,35 @@ switch ($page) {
         $tb = (int)($_GET['tb'] ?? 0); // to_branch_id
         $cust = (int)($_GET['cust'] ?? 0); // customer_id
 
-        // Pending parcels for selected/to branch (ignores date)
+        /** Main-branch user + “To branch: All” → metrics and lists across all branches */
+        $scopeAllBranches = $isMain && $tb === 0;
         $pendingBranchId = $tb > 0 ? $tb : $branchId;
-        $stmt = $pdo->prepare("SELECT COUNT(*) AS c FROM parcels WHERE to_branch_id = ? AND status = 'pending'");
-        $stmt->execute([$pendingBranchId]);
-        $row = $stmt->fetch();
-        $pendingParcels = (int)($row['c'] ?? 0);
+        $isSingleDay = ($df === $dt);
+        $isTodayRange = ($isSingleDay && $df === $today);
 
-        // Total payment due for selected branch (or current branch)
+        // Pending parcels for selected/to branch (ignores date)
+        if ($scopeAllBranches) {
+            $pendingParcels = (int)($pdo->query("SELECT COUNT(*) AS c FROM parcels WHERE status = 'pending'")->fetch()['c'] ?? 0);
+        } else {
+            $stmt = $pdo->prepare("SELECT COUNT(*) AS c FROM parcels WHERE to_branch_id = ? AND status = 'pending'");
+            $stmt->execute([$pendingBranchId]);
+            $pendingParcels = (int)($stmt->fetch()['c'] ?? 0);
+        }
+
+        // Total payment due for selected branch (or all branches when scoped)
         $dueSql = "SELECT COALESCE(SUM((dn.total_amount - COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)),0) AS total_due
                    FROM delivery_notes dn
                    LEFT JOIN (
                      SELECT delivery_note_id, SUM(amount) AS total_paid FROM payments GROUP BY delivery_note_id
-                   ) paid ON paid.delivery_note_id = dn.id
-                   WHERE dn.branch_id = ?";
-        $stmt = $pdo->prepare($dueSql);
-        $stmt->execute([$pendingBranchId]);
-        $dueRow = $stmt->fetch();
-        $totalDue = (float)($dueRow['total_due'] ?? 0);
+                   ) paid ON paid.delivery_note_id = dn.id";
+        if ($scopeAllBranches) {
+            $totalDue = (float)($pdo->query($dueSql)->fetch()['total_due'] ?? 0);
+        } else {
+            $dueSql .= ' WHERE dn.branch_id = ?';
+            $stmt = $pdo->prepare($dueSql);
+            $stmt->execute([$pendingBranchId]);
+            $totalDue = (float)($stmt->fetch()['total_due'] ?? 0);
+        }
 
         // Parcels list for range and filters with vehicle no
         $tpSql = "SELECT p.id, p.tracking_number, p.vehicle_no, p.status, p.created_at,
@@ -202,8 +213,13 @@ switch ($page) {
                   LEFT JOIN branches bt ON bt.id = p.to_branch_id
                   WHERE DATE(p.created_at) BETWEEN ? AND ?";
         $tpParams = [$df, $dt];
-        if ($tb > 0) { $tpSql .= ' AND p.to_branch_id = ?'; $tpParams[] = $tb; }
-        else { $tpSql .= ' AND p.to_branch_id = ?'; $tpParams[] = $branchId; }
+        if ($tb > 0) {
+            $tpSql .= ' AND p.to_branch_id = ?';
+            $tpParams[] = $tb;
+        } elseif (!$scopeAllBranches) {
+            $tpSql .= ' AND p.to_branch_id = ?';
+            $tpParams[] = $branchId;
+        }
         if ($fb > 0) { $tpSql .= ' AND p.from_branch_id = ?'; $tpParams[] = $fb; }
         if ($cust > 0) { $tpSql .= ' AND p.customer_id = ?'; $tpParams[] = $cust; }
         $tpSql .= ' ORDER BY p.created_at DESC, p.id DESC LIMIT 50';
@@ -211,29 +227,47 @@ switch ($page) {
         $tpStmt->execute($tpParams);
         $todayParcels = $tpStmt->fetchAll();
 
-        // Collections (payments) for range and selected branch
+        // Collections (payments) for range and branch scope
         $colSql = "SELECT COALESCE(SUM(p.amount),0) AS s
                    FROM payments p
                    LEFT JOIN delivery_notes dn ON dn.id = p.delivery_note_id
-                   WHERE dn.branch_id = ? AND DATE(p.paid_at) BETWEEN ? AND ?";
+                   WHERE DATE(p.paid_at) BETWEEN ? AND ?";
+        $colParams = [$df, $dt];
+        if (!$scopeAllBranches) {
+            $colSql .= ' AND dn.branch_id = ?';
+            $colParams[] = $pendingBranchId;
+        }
         $colStmt = $pdo->prepare($colSql);
-        $colStmt->execute([$pendingBranchId, $df, $dt]);
+        $colStmt->execute($colParams);
         $collectionsToday = (float)($colStmt->fetch()['s'] ?? 0);
 
-        // Expenses for this branch within range
-        $expStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE branch_id = ? AND expense_date BETWEEN ? AND ?');
-        $expStmt->execute([$pendingBranchId, $df, $dt]);
+        // Expenses for branch scope within range
+        if ($scopeAllBranches) {
+            $expStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?');
+            $expStmt->execute([$df, $dt]);
+        } else {
+            $expStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE branch_id = ? AND expense_date BETWEEN ? AND ?');
+            $expStmt->execute([$pendingBranchId, $df, $dt]);
+        }
         $expensesToday = (float)($expStmt->fetch()['s'] ?? 0);
 
-        // Recent payments list (range + branch)
+        // Recent payments list (range + branch scope)
         $rpSql = "SELECT p.id, p.amount, p.paid_at, c.name AS customer_name, c.phone AS customer_phone
                   FROM payments p
                   LEFT JOIN delivery_notes dn ON dn.id = p.delivery_note_id
                   LEFT JOIN customers c ON c.id = dn.customer_id
-                  WHERE dn.branch_id = ? AND DATE(p.paid_at) BETWEEN ? AND ?
+                  WHERE ";
+        $rpParams = [];
+        if (!$scopeAllBranches) {
+            $rpSql .= 'dn.branch_id = ? AND ';
+            $rpParams[] = $pendingBranchId;
+        }
+        $rpSql .= "DATE(p.paid_at) BETWEEN ? AND ?
                   ORDER BY p.paid_at DESC, p.id DESC LIMIT 10";
+        $rpParams[] = $df;
+        $rpParams[] = $dt;
         $rp = $pdo->prepare($rpSql);
-        $rp->execute([$pendingBranchId, $df, $dt]);
+        $rp->execute($rpParams);
         $recentPayments = $rp->fetchAll();
 
         // Per-branch aggregates and status stats across all branches
@@ -285,7 +319,12 @@ switch ($page) {
         // Customers list for filter
         $customersAll = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
 
-        Helpers::view('dashboard', compact('pendingParcels','totalDue','todayParcels','today','collectionsToday','expensesToday','recentPayments','isMain','branchesAll','pendingByBranch','dueByBranch','todayParcelsByBranch','collectionsTodayByBranch','expensesTodayByBranch','df','dt','fb','tb','cust','customersAll','statusStats'));
+        Helpers::view('dashboard', compact(
+            'pendingParcels','totalDue','todayParcels','today','collectionsToday','expensesToday','recentPayments',
+            'isMain','branchesAll','pendingByBranch','dueByBranch','todayParcelsByBranch','collectionsTodayByBranch','expensesTodayByBranch',
+            'df','dt','fb','tb','cust','customersAll','statusStats',
+            'scopeAllBranches','isSingleDay','isTodayRange'
+        ));
         break;
 
     case 'accounts':
@@ -1387,6 +1426,9 @@ switch ($page) {
         try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        try {
+            $pdo->exec("ALTER TABLE parcels MODIFY COLUMN status ENUM('pending','in_transit','delivered','cancelled','returned','failed','on_hold','out_for_delivery') NOT NULL DEFAULT 'pending'");
+        } catch (Throwable $e) { /* ignore if not permitted or already migrated */ }
         $user = Auth::user();
         $userBranchCode = (string)($user['branch_code'] ?? '');
         $userBranchName = (string)($user['branch_name'] ?? '');
@@ -1543,6 +1585,8 @@ switch ($page) {
             }
             
             $id = (int)($_POST['id'] ?? 0);
+            /** True when creating a new parcel row (used for same-bill DN link) */
+            $parcelWasCreate = ($id <= 0);
             $customer_id = (int)($_POST['customer_id'] ?? 0);
             $supplier_id = (int)($_POST['supplier_id'] ?? 0);
             if ($supplier_id <= 0) { $supplier_id = null; }
@@ -1602,7 +1646,7 @@ switch ($page) {
                 // Status-only update: parcel is In Transit and form submitted with status_only_edit
                 if ($existing && (string)($existing['status'] ?? '') === 'in_transit' && isset($_POST['status_only_edit']) && (int)$_POST['status_only_edit'] === 1) {
                     $status = $_POST['status'] ?? $existing['status'];
-                    $allowedStatus = ['pending', 'in_transit', 'delivered'];
+                    $allowedStatus = Helpers::parcelStatusValues();
                     if (!in_array($status, $allowedStatus, true)) { $status = 'in_transit'; }
                     $pdo->prepare('UPDATE parcels SET status=? WHERE id=?')->execute([$status, $id]);
                     Helpers::redirect('index.php?page=parcels&action=edit&id=' . $id);
@@ -1711,7 +1755,7 @@ switch ($page) {
                 break;
             }
 
-            $allowedStatus = ['pending','in_transit','delivered'];
+            $allowedStatus = Helpers::parcelStatusValues();
             if (!in_array($status, $allowedStatus, true)) { $status = 'pending'; }
 
             // Detect status transition to in_transit (for billing prompt)
@@ -1891,6 +1935,42 @@ switch ($page) {
                         }
                     } catch (Throwable $e) { /* ignore if table missing */ }
                 }
+            }
+            // Same bill: if a delivery note already exists for this customer, destination branch, and parcel day, attach this parcel
+            if ($parcelWasCreate && $id > 0 && $customer_id > 0 && $to_branch_id > 0) {
+                try {
+                    $existsDnp = $pdo->prepare('SELECT 1 FROM delivery_note_parcels WHERE parcel_id=? LIMIT 1');
+                    $existsDnp->execute([$id]);
+                    if (!$existsDnp->fetch()) {
+                        $dt = $pdo->prepare('SELECT DATE(created_at) AS d FROM parcels WHERE id=?');
+                        $dt->execute([$id]);
+                        $dd = $dt->fetch();
+                        $billYmd = $dd && !empty($dd['d']) ? (string)$dd['d'] : date('Y-m-d');
+                        $findDn = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
+                        $findDn->execute([$customer_id, $to_branch_id, $billYmd]);
+                        $dnR = $findDn->fetch();
+                        if ($dnR) {
+                            $dnId = (int)$dnR['id'];
+                            $amt = 0.0;
+                            $pr = $pdo->prepare('SELECT price FROM parcels WHERE id=?');
+                            $pr->execute([$id]);
+                            $pRow = $pr->fetch();
+                            if ($pRow && $pRow['price'] !== null && (float)$pRow['price'] > 0) {
+                                $amt = (float)$pRow['price'];
+                            } else {
+                                $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
+                                $sumItems->execute([$id]);
+                                $amt = (float)($sumItems->fetch()['s'] ?? 0);
+                            }
+                            $insDnp = $pdo->prepare('INSERT IGNORE INTO delivery_note_parcels (delivery_note_id, parcel_id, amount) VALUES (?,?,?)');
+                            $insDnp->execute([$dnId, $id, $amt]);
+                            $sumStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM delivery_note_parcels WHERE delivery_note_id=?');
+                            $sumStmt->execute([$dnId]);
+                            $s = (float)($sumStmt->fetch()['s'] ?? 0);
+                            $pdo->prepare('UPDATE delivery_notes SET total_amount=? WHERE id=?')->execute([$s, $dnId]);
+                        }
+                    }
+                } catch (Throwable $e) { /* ignore link errors */ }
             }
             $pdo->commit();
             
@@ -2422,7 +2502,7 @@ switch ($page) {
         if ($filter_type === 'route_planning') {
             if (!isset($_GET['from']) || $_GET['from'] === '') { $from = date('Y-m-d'); }
             if (!isset($_GET['to']) || $_GET['to'] === '') { $to = date('Y-m-d'); }
-            $where[] = "p.status IN ('pending','in_transit')";
+            $where[] = "p.status IN ('pending','in_transit','out_for_delivery')";
         }
         // Preset: Vehicle Routes — only parcels with vehicle assigned
         if ($filter_type === 'vehicle_routes') {
@@ -2477,7 +2557,7 @@ switch ($page) {
             $where[] = '(EXISTS (SELECT 1 FROM delivery_route_assignments dra WHERE dra.customer_id = p.customer_id AND ((dra.branch_id = p.to_branch_id AND dra.delivery_date = ?) OR (dra.branch_id = p.from_branch_id AND dra.delivery_date = ?))))';
             array_push($params, $route_date, $route_date);
         }
-        if (in_array($status, ['pending','in_transit','delivered'], true)) {
+        if (in_array($status, Helpers::parcelStatusValues(), true)) {
             $where[] = 'p.status = ?';
             $params[] = $status;
         }
@@ -2599,7 +2679,7 @@ switch ($page) {
         if ($route_date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $route_date)) {
             array_push($countParams, $route_date, $route_date);
         }
-        if (in_array($status, ['pending','in_transit','delivered'], true)) {
+        if (in_array($status, Helpers::parcelStatusValues(), true)) {
             $countParams[] = $status;
         }
         if ($from !== '' && $to !== '') {
@@ -2888,55 +2968,88 @@ switch ($page) {
                     break;
                 }
 
-                // Find PENDING parcels for that customer for THIS branch and direction, not already in any DN, and not delivered
+                // Find PENDING parcels for that customer, not already in any DN, and not delivered.
+                // Non–main-branch users: only parcels for their branch (from/to per direction).
+                // Main-branch users: all open parcels for the customer, grouped by destination (or origin) so each bill uses the parcel's branch (avoids duplicate DNs for the same destination+date).
                 // The selected delivery_date is used for the DN record, not as a filter for parcel created_at
                 $branchColGen = ($direction === 'from') ? 'p.from_branch_id' : 'p.to_branch_id';
-                $stmt = $pdo->prepare("SELECT p.* FROM parcels p
+                $groupKey = ($direction === 'from') ? 'from_branch_id' : 'to_branch_id';
+                $sql = "SELECT p.* FROM parcels p
                     LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
-                    WHERE p.customer_id = ? AND $branchColGen = ? AND dnp.id IS NULL AND (p.status IS NULL OR p.status <> 'delivered')");
-                $stmt->execute([$customer_id, $branchId]);
+                    WHERE p.customer_id = ? AND dnp.id IS NULL AND " . Helpers::parcelSqlEligibleForOpenBilling();
+                $params = [$customer_id];
+                if (!Auth::isMainBranch()) {
+                    $sql .= " AND $branchColGen = ?";
+                    $params[] = $branchId;
+                }
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
                 $rows = $stmt->fetchAll();
 
-                // Upsert delivery note
-                $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
-                $stmt->execute([$customer_id, $branchId, $delivery_date]);
-                $dn = $stmt->fetch();
-                if ($dn) {
-                    $dnId = (int)$dn['id'];
-                } else {
-                    $pdo->prepare('INSERT INTO delivery_notes (customer_id, branch_id, delivery_date, total_amount) VALUES (?,?,?,0)')->execute([$customer_id, $branchId, $delivery_date]);
-                    $dnId = (int)$pdo->lastInsertId();
-                }
-
-                $total = 0;
-                $parcelIds = [];
+                $groups = [];
                 foreach ($rows as $r) {
-                    $rawPrice = (string)($r['price'] ?? '0');
-                    $amount = (float)str_replace([',',' '], '', $rawPrice);
-                    if ($amount <= 0) {
-                        try {
-                            $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
-                            $sumItems->execute([(int)$r['id']]);
-                            $amount = (float)($sumItems->fetch()['s'] ?? 0);
-                        } catch (Throwable $e) { /* ignore */ }
+                    $gid = (int)($r[$groupKey] ?? 0);
+                    if ($gid <= 0) {
+                        continue;
                     }
-                    // Try insert; ignore if already added due to race
-                    $ins = $pdo->prepare('INSERT IGNORE INTO delivery_note_parcels (delivery_note_id, parcel_id, amount) VALUES (?,?,?)');
-                    $ins->execute([$dnId, (int)$r['id'], $amount]);
-                    $total += $amount;
-                    $parcelIds[] = (int)$r['id'];
+                    if (!isset($groups[$gid])) {
+                        $groups[$gid] = [];
+                    }
+                    $groups[$gid][] = $r;
                 }
-                // Recalculate total from table to be safe
-                $sum = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM delivery_note_parcels WHERE delivery_note_id=?');
-                $sum->execute([$dnId]);
-                $srow = $sum->fetch();
-                $pdo->prepare('UPDATE delivery_notes SET total_amount=? WHERE id=?')->execute([(float)$srow['s'], $dnId]);
 
-                // Mark included parcels as delivered (branch-to-customer leg completed)
-                if (!empty($parcelIds)) {
-                    $in = implode(',', array_fill(0, count($parcelIds), '?'));
-                    $upd = $pdo->prepare("UPDATE parcels SET status='delivered' WHERE id IN ($in)");
-                    $upd->execute($parcelIds);
+                $dnId = 0;
+                if (empty($groups)) {
+                    // Legacy: no matching parcels — still upsert an empty DN tied to the user's branch (same as before)
+                    $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
+                    $stmt->execute([$customer_id, $branchId, $delivery_date]);
+                    $dn = $stmt->fetch();
+                    if ($dn) {
+                        $dnId = (int)$dn['id'];
+                    } else {
+                        $pdo->prepare('INSERT INTO delivery_notes (customer_id, branch_id, delivery_date, total_amount) VALUES (?,?,?,0)')->execute([$customer_id, $branchId, $delivery_date]);
+                        $dnId = (int)$pdo->lastInsertId();
+                    }
+                } else {
+                    foreach ($groups as $dnBranchId => $groupRows) {
+                        $dnBranchId = (int)$dnBranchId;
+                        if ($dnBranchId <= 0) {
+                            continue;
+                        }
+                        $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
+                        $stmt->execute([$customer_id, $dnBranchId, $delivery_date]);
+                        $dn = $stmt->fetch();
+                        if ($dn) {
+                            $dnId = (int)$dn['id'];
+                        } else {
+                            $pdo->prepare('INSERT INTO delivery_notes (customer_id, branch_id, delivery_date, total_amount) VALUES (?,?,?,0)')->execute([$customer_id, $dnBranchId, $delivery_date]);
+                            $dnId = (int)$pdo->lastInsertId();
+                        }
+                        $parcelIds = [];
+                        foreach ($groupRows as $r) {
+                            $rawPrice = (string)($r['price'] ?? '0');
+                            $amount = (float)str_replace([',',' '], '', $rawPrice);
+                            if ($amount <= 0) {
+                                try {
+                                    $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
+                                    $sumItems->execute([(int)$r['id']]);
+                                    $amount = (float)($sumItems->fetch()['s'] ?? 0);
+                                } catch (Throwable $e) { /* ignore */ }
+                            }
+                            $ins = $pdo->prepare('INSERT IGNORE INTO delivery_note_parcels (delivery_note_id, parcel_id, amount) VALUES (?,?,?)');
+                            $ins->execute([$dnId, (int)$r['id'], $amount]);
+                            $parcelIds[] = (int)$r['id'];
+                        }
+                        $sum = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM delivery_note_parcels WHERE delivery_note_id=?');
+                        $sum->execute([$dnId]);
+                        $srow = $sum->fetch();
+                        $pdo->prepare('UPDATE delivery_notes SET total_amount=? WHERE id=?')->execute([(float)$srow['s'], $dnId]);
+                        if (!empty($parcelIds)) {
+                            $in = implode(',', array_fill(0, count($parcelIds), '?'));
+                            $upd = $pdo->prepare("UPDATE parcels SET status='delivered' WHERE id IN ($in)");
+                            $upd->execute($parcelIds);
+                        }
+                    }
                 }
 
                 // Auto-email the generated delivery note to the customer (best-effort)
@@ -3028,7 +3141,7 @@ switch ($page) {
 
             // If user targeted a specific customer but didn't pick a location, auto-pick when only one location exists
             if ($place === '' && $place_sel === '' && ($customer_id > 0 || $customer !== '' || $phone !== '')) {
-                $autoWhere = ['p.to_branch_id = ?','(p.status IS NULL OR p.status <> "delivered")','dnp.id IS NULL'];
+                $autoWhere = ['p.to_branch_id = ?', Helpers::parcelSqlEligibleForOpenBilling(), 'dnp.id IS NULL'];
                 $autoParams = [$branchId];
                 if ($customer_id > 0) { $autoWhere[] = 'c.id = ?'; $autoParams[] = $customer_id; }
                 elseif ($customer !== '') { $autoWhere[] = 'c.name LIKE ?'; $autoParams[] = "%$customer%"; }
@@ -3059,6 +3172,7 @@ switch ($page) {
             } catch (Throwable $e) { /* ignore */ }
 
             $branchCol = ($direction === 'from') ? 'p.from_branch_id' : 'p.to_branch_id';
+            $parcelOpenSql = Helpers::parcelSqlEligibleForOpenBilling();
             $sql = "SELECT c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
                            COALESCE(c.delivery_location, '') AS delivery_location,
                            COUNT(p.id) AS parcels_count,
@@ -3070,7 +3184,7 @@ switch ($page) {
                     LEFT JOIN parcels p
                       ON p.customer_id = c.id
                      AND $branchCol = ?
-                     AND (p.status IS NULL OR p.status <> 'delivered')
+                     AND $parcelOpenSql
                     LEFT JOIN (
                       SELECT parcel_id, SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)) AS items_total
                       FROM parcel_items
@@ -3104,7 +3218,7 @@ switch ($page) {
                         LEFT JOIN parcels p
                           ON p.customer_id = c.id
                          AND $branchCol2 = ?
-                         AND (p.status IS NULL OR p.status <> 'delivered')
+                         AND $parcelOpenSql
                         LEFT JOIN (
                           SELECT parcel_id, SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)) AS items_total
                           FROM parcel_items
@@ -3125,7 +3239,7 @@ switch ($page) {
                 }
             }
             // Totals for quick glance
-            $totalsSql = 'SELECT COUNT(*) AS parcels FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id=p.id WHERE ' . (($direction === 'from') ? 'p.from_branch_id' : 'p.to_branch_id') . ' = ? AND (p.status IS NULL OR p.status<>"delivered") AND dnp.id IS NULL';
+            $totalsSql = 'SELECT COUNT(*) AS parcels FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id=p.id WHERE ' . (($direction === 'from') ? 'p.from_branch_id' : 'p.to_branch_id') . ' = ? AND ' . Helpers::parcelSqlEligibleForOpenBilling() . ' AND dnp.id IS NULL';
             $totalsStmt = $pdo->prepare($totalsSql);
             $totalsStmt->execute([$branchId]);
             $parcels_total = (int)($totalsStmt->fetch()['parcels'] ?? 0);
@@ -3160,7 +3274,7 @@ switch ($page) {
                                    LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
                                    SET p.vehicle_no = ?
                                    WHERE p.customer_id = ? AND p.to_branch_id = ?
-                                     AND (p.status IS NULL OR p.status <> "delivered")
+                                     AND ' . Helpers::parcelSqlEligibleForOpenBilling() . '
                                      AND dnp.id IS NULL');
             $upd->execute([$vehicle_no, $customer_id, $branchId]);
             // Also upsert a planned assignment so the badge shows even if there are zero parcels
@@ -3384,12 +3498,12 @@ switch ($page) {
             // Backfill if empty
             if (!$items) {
                 // Try arrivals to this branch first
-                $sel = $pdo->prepare("SELECT p.* FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id WHERE p.customer_id=? AND p.to_branch_id=? AND dnp.id IS NULL AND (p.status IS NULL OR p.status <> 'delivered')");
+                $sel = $pdo->prepare("SELECT p.* FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id WHERE p.customer_id=? AND p.to_branch_id=? AND dnp.id IS NULL AND " . Helpers::parcelSqlEligibleForOpenBilling());
                 $sel->execute([(int)$dn['customer_id'], (int)$dn['branch_id']]);
                 $toAdd = $sel->fetchAll();
                 // If none, try dispatch from this branch
                 if (!$toAdd) {
-                    $sel2 = $pdo->prepare("SELECT p.* FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id WHERE p.customer_id=? AND p.from_branch_id=? AND dnp.id IS NULL AND (p.status IS NULL OR p.status <> 'delivered')");
+                    $sel2 = $pdo->prepare("SELECT p.* FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id WHERE p.customer_id=? AND p.from_branch_id=? AND dnp.id IS NULL AND " . Helpers::parcelSqlEligibleForOpenBilling());
                     $sel2->execute([(int)$dn['customer_id'], (int)$dn['branch_id']]);
                     $toAdd = $sel2->fetchAll();
                 }
@@ -3465,7 +3579,7 @@ switch ($page) {
             $items = $itemsStmt->fetchAll();
             // Backfill if empty
             if (!$items) {
-                $sel = $pdo->prepare("SELECT p.* FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id WHERE p.customer_id=? AND p.to_branch_id=? AND dnp.id IS NULL AND (p.status IS NULL OR p.status <> 'delivered')");
+                $sel = $pdo->prepare("SELECT p.* FROM parcels p LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id WHERE p.customer_id=? AND p.to_branch_id=? AND dnp.id IS NULL AND " . Helpers::parcelSqlEligibleForOpenBilling());
                 $sel->execute([(int)$dn['customer_id'], (int)$dn['branch_id']]);
                 $toAdd = $sel->fetchAll();
                 if ($toAdd) {
@@ -3676,12 +3790,12 @@ switch ($page) {
                 $dnId = (int)$row['id']; $cid = (int)$row['customer_id']; $bid = (int)$row['branch_id'];
                 // Attach pending parcels not already in any DN, not delivered
                 // Try arrivals (to_branch) first
-                $sel = $pdo->prepare('SELECT p.id, COALESCE(p.price,0) AS price FROM parcels p LEFT JOIN delivery_note_parcels x ON x.parcel_id=p.id WHERE p.customer_id=? AND p.to_branch_id=? AND x.id IS NULL AND (p.status IS NULL OR p.status<>"delivered")');
+                $sel = $pdo->prepare('SELECT p.id, COALESCE(p.price,0) AS price FROM parcels p LEFT JOIN delivery_note_parcels x ON x.parcel_id=p.id WHERE p.customer_id=? AND p.to_branch_id=? AND x.id IS NULL AND ' . Helpers::parcelSqlEligibleForOpenBilling());
                 $sel->execute([$cid, $bid]);
                 $prs = $sel->fetchAll();
                 // If none, try dispatch (from_branch)
                 if (!$prs) {
-                    $sel2 = $pdo->prepare('SELECT p.id, COALESCE(p.price,0) AS price FROM parcels p LEFT JOIN delivery_note_parcels x ON x.parcel_id=p.id WHERE p.customer_id=? AND p.from_branch_id=? AND x.id IS NULL AND (p.status IS NULL OR p.status<>"delivered")');
+                    $sel2 = $pdo->prepare('SELECT p.id, COALESCE(p.price,0) AS price FROM parcels p LEFT JOIN delivery_note_parcels x ON x.parcel_id=p.id WHERE p.customer_id=? AND p.from_branch_id=? AND x.id IS NULL AND ' . Helpers::parcelSqlEligibleForOpenBilling());
                     $sel2->execute([$cid, $bid]);
                     $prs = $sel2->fetchAll();
                 }
@@ -3745,7 +3859,7 @@ switch ($page) {
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Delivery note not found'; break; }
             // Enforce AFTER delivery: ensure all parcels in this DN are delivered
-            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND p.status <> "delivered"');
+            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND ' . Helpers::parcelSqlBlocksPaymentUntilDelivery());
             $undel->execute([$dnId]);
             $undelCnt = (int)$undel->fetchColumn();
             if ($undelCnt > 0) {
@@ -3776,7 +3890,7 @@ switch ($page) {
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Delivery note not found'; break; }
             // Block payments before delivery if any parcels are undelivered
-            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND p.status <> "delivered"');
+            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND ' . Helpers::parcelSqlBlocksPaymentUntilDelivery());
             $undel->execute([$id]);
             $undelCnt = (int)$undel->fetchColumn();
             $error = '';
@@ -5119,7 +5233,14 @@ switch ($page) {
         $email = trim($_POST['email'] ?? '');
         $address = trim($_POST['address'] ?? '');
         $delivery_location = trim($_POST['delivery_location'] ?? '');
-        $type = trim($_POST['customer_type'] ?? '');
+        $customer_type_raw = $_POST['customer_type'] ?? null;
+        $customer_type = null;
+        if (is_string($customer_type_raw)) {
+            $ct = strtolower(trim($customer_type_raw));
+            if ($ct === 'corporate' || $ct === 'regular') {
+                $customer_type = $ct;
+            }
+        }
         $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
                      || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
                      || (($_POST['ajax'] ?? '') === '1');
@@ -5128,6 +5249,7 @@ switch ($page) {
             Helpers::redirect('index.php?page=parcels&action=new');
             break;
         }
+        $phoneDb = ($phone === '') ? null : $phone;
         // Check if exists (by phone if provided)
         $cid = 0;
         if ($phone !== '') {
@@ -5140,14 +5262,22 @@ switch ($page) {
             try { $pdo->exec("ALTER TABLE customers MODIFY phone VARCHAR(20) NULL"); } catch (Throwable $e) { /* ignore */ }
             try {
                 $ins = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, customer_type) VALUES (?,?,?,?,?,?)');
-                $ins->execute([$name, ($phone!==''?$phone:null), ($email!==''?$email:null), $address, $delivery_location, $type !== '' ? $type : null]);
+                $ins->execute([$name, $phoneDb, ($email !== '' ? $email : null), $address, $delivery_location, $customer_type]);
                 $cid = (int)$pdo->lastInsertId();
             } catch (Throwable $e) {
-                if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['error'=>'Failed to save customer. ' . $e->getMessage()]); return; }
+                if ($wantsJson) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['error' => 'Failed to save customer. ' . $e->getMessage()]);
+                    return;
+                }
                 throw $e;
             }
         }
-        if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$cid,'name'=>$name,'phone'=>$phone,'email'=>$email,'address'=>$address,'delivery_location'=>$delivery_location]); return; }
+        if ($wantsJson) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['id' => $cid, 'name' => $name, 'phone' => $phone, 'email' => $email, 'address' => $address, 'delivery_location' => $delivery_location]);
+            return;
+        }
         Helpers::redirect('index.php?page=parcels&action=new&customer_id=' . $cid);
         break;
 

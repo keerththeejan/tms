@@ -1,4 +1,10 @@
- </div>
+<?php if ($user !== null): ?>
+</div>
+</main>
+</div>
+<?php else: ?>
+</main>
+<?php endif; ?>
  <!-- jQuery is required by some DataTables builds and third-party scripts -->
  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -27,7 +33,7 @@
         }
         // Ensure Bootstrap table classes for better mobile readability
         tbl.classList.add('table','table-striped','table-hover','align-middle');
-        // Initialize DataTable with horizontal scroll support
+        // Default: horizontal scroll + paging. (Parcels list uses server-side filters — no DataTables there; see parcels/index.php.)
         new DataTable(tbl, { paging: true, searching: true, order: [], scrollX: true });
       });
     }
@@ -39,8 +45,14 @@
     var openBtn = document.querySelector('[data-role="sidebar-open"]');
     var overlay = document.querySelector('[data-role="sidebar-overlay"]');
 
-    function openSidebar(){ body.classList.add('sidebar-open'); }
-    function closeSidebar(){ body.classList.remove('sidebar-open'); }
+    function openSidebar(){
+      body.classList.add('sidebar-open');
+      if (openBtn) openBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closeSidebar(){
+      body.classList.remove('sidebar-open');
+      if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
+    }
 
     function setCollapsed(on){
       if (on) body.classList.add('sidebar-collapsed');
@@ -58,6 +70,8 @@
 
     if (openBtn) openBtn.addEventListener('click', function(e){ e.preventDefault(); openSidebar(); });
     if (overlay) overlay.addEventListener('click', function(){ closeSidebar(); });
+    var closeBtn = document.querySelector('[data-role="sidebar-close"]');
+    if (closeBtn) closeBtn.addEventListener('click', function(e){ e.preventDefault(); closeSidebar(); });
 
     // Desktop collapse button (event delegation so it always works)
     document.addEventListener('click', function(e){

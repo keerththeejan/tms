@@ -359,7 +359,7 @@ CREATE TABLE IF NOT EXISTS `parcels` (
   `to_branch_id` bigint UNSIGNED NOT NULL,
   `weight` decimal(10,2) NOT NULL DEFAULT '0.00',
   `price` decimal(12,2) DEFAULT NULL,
-  `status` enum('pending','in_transit','delivered') NOT NULL DEFAULT 'pending',
+  `status` enum('pending','in_transit','delivered','cancelled','returned','failed','on_hold','out_for_delivery') NOT NULL DEFAULT 'pending',
   `tracking_number` varchar(50) DEFAULT NULL,
   `vehicle_no` varchar(50) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
