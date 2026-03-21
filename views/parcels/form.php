@@ -28,8 +28,8 @@
   /* Full width inside main content (matches parcels list — no side gutters) */
   .parcel-form-page.pf-saas .pf-page-wrap { max-width: none; width: 100%; margin-left: 0; margin-right: 0; }
   .parcel-form-page.pf-saas .page-header {
-    margin-bottom: 0.75rem;
-    padding: 1rem 1.15rem;
+    margin-bottom: 0.65rem;
+    padding: 0.75rem 0.9rem;
     border: 1px solid rgba(255,255,255,0.6);
     border-radius: var(--pf-card-radius);
     background: var(--pf-glass-bg);
@@ -272,6 +272,23 @@
   }
   .parcel-form-page .pf-main-grid { min-width: 0; }
   .parcel-form-page .pf-main-grid > .row > [class*="col-"] { min-width: 0; }
+  @media (min-width: 992px) {
+    .parcel-form-page .pf-main-grid > .row.pf-main-columns {
+      --bs-gutter-x: 0.75rem;
+      --bs-gutter-y: 0.75rem;
+    }
+  }
+  .parcel-form-page .pf-col-items .section-card,
+  .parcel-form-page .pf-col-items .receipt-box {
+    width: 100%;
+  }
+  /* Status row: use full width, no stray right margin */
+  .parcel-form-page .pf-status-row {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .parcel-form-page .pf-status-row .col-status { flex: 1 1 0; min-width: 0; max-width: 100%; }
   .parcel-form-page .pf-accordion-soft .accordion-item {
     background: transparent;
     border: 1px solid rgba(15, 23, 42, 0.08);
@@ -506,7 +523,7 @@
   }
 </style>
 <div class="parcel-form-page pf-compact-view pf-saas">
-<div class="container-fluid px-2 px-sm-2 px-lg-3 pf-page-wrap">
+<div class="container-fluid px-1 px-sm-2 px-lg-2 pf-page-wrap">
 
 <?php 
   $isEdit = (int)($parcel['id'] ?? 0) > 0; 
@@ -676,9 +693,9 @@
   <input type="hidden" name="idempotency_key" value="<?php echo bin2hex(random_bytes(16)); ?>">
 
   <div class="<?php echo $statusOnlyEdit ? 'd-none' : ''; ?>">
-  <div class="container-fluid px-0 px-lg-1">
-    <div class="row g-3 g-xl-4 align-items-start">
-      <div class="col-12 col-sm-12 col-md-12 col-lg-6 col-xl-5 pf-animate pf-animate-in">
+  <div class="container-fluid px-0">
+    <div class="row g-2 g-lg-3 align-items-start pf-main-columns">
+      <div class="col-12 col-lg-6 col-xl-6 pf-animate pf-animate-in">
   <!-- Parcel details — grouped compact cards -->
   <div class="pf-details-shell pf-dense pf-floating mb-2 mb-lg-0">
     <div class="pf-details-heading"><i class="bi bi-box-seam me-1 text-primary"></i> Parcel details</div>
@@ -886,7 +903,7 @@
     </div>
   </div>
       </div>
-      <div class="col-12 col-sm-12 col-md-12 col-lg-6 col-xl-7 pf-animate pf-animate-in pf-animate-delay-2 pf-col-items">
+      <div class="col-12 col-lg-6 col-xl-6 pf-animate pf-animate-in pf-animate-delay-2 pf-col-items">
 
   <!-- Full-width Previous Bill Preview (moved outside left column) -->
   <div id="billPreview" class="mb-3 pf-bill-preview" style="display:none;">
@@ -1069,20 +1086,21 @@
   </div><!-- /.statusOnly hide block -->
 
   <!-- Status and actions (native select: do not use Choices.js — keeps all 8 statuses visible) -->
-  <div class="container-fluid px-0 px-lg-1">
+  <div class="container-fluid px-0">
   <div class="section-card mt-2">
-    <div class="section-body py-2">
-      <div class="row g-2 align-items-end">
-        <div class="col-12 col-sm min-w-0">
-          <label class="form-label" for="parcelStatusSelect">Status</label>
-          <select name="status" id="parcelStatusSelect" class="form-select form-select-sm" data-enhance="false" <?php echo ($lockAll && !$statusOnlyEdit) ? 'disabled' : ''; ?> aria-label="Parcel status">
+    <div class="section-body py-2 px-2 px-sm-3">
+      <div class="row g-2 align-items-end pf-status-row">
+        <div class="col-12 col-lg col-status min-w-0">
+          <label class="form-label mb-1" for="parcelStatusSelect">Status</label>
+          <select name="status" id="parcelStatusSelect" class="form-select form-select-sm w-100" data-enhance="false" <?php echo ($lockAll && !$statusOnlyEdit) ? 'disabled' : ''; ?> aria-label="Parcel status">
             <?php foreach (Helpers::parcelStatusMap() as $stVal => $stLabel): ?>
             <option value="<?php echo htmlspecialchars($stVal); ?>" <?php echo (($parcel['status'] ?? '') === $stVal) ? 'selected' : ''; ?>><?php echo htmlspecialchars($stLabel); ?></option>
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-12 col-sm-auto d-none d-lg-block">
-          <button type="submit" id="parcelSubmitBtn" class="btn btn-primary btn-sm w-100 text-nowrap"><i class="bi bi-save me-1"></i> Save Parcel</button>
+        <div class="col-12 col-lg-auto d-none d-lg-block flex-shrink-0">
+          <label class="form-label mb-1 opacity-0 user-select-none" aria-hidden="true">&nbsp;</label>
+          <button type="submit" id="parcelSubmitBtn" class="btn btn-primary btn-sm text-nowrap"><i class="bi bi-save me-1"></i> Save Parcel</button>
         </div>
       </div>
     </div>

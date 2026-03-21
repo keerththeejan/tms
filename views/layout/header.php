@@ -127,9 +127,9 @@ $user = Auth::user();
           </div>
           <div class="d-flex align-items-center gap-2 flex-shrink-0 topbar-actions">
             <?php if (Auth::canCreateParcels()): ?>
-              <a class="btn btn-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new'); ?>">
+              <a class="btn btn-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new'); ?>" title="New parcel">
                 <i class="bi bi-plus-lg" aria-hidden="true"></i>
-                <span class="d-none d-md-inline ms-1">+ Parcel</span>
+                <span class="d-none d-md-inline ms-1">Parcel</span>
               </a>
             <?php endif; ?>
             <button class="btn btn-outline-secondary icon-btn" type="button" title="Notifications" aria-label="Notifications"><i class="bi bi-bell" aria-hidden="true"></i></button>

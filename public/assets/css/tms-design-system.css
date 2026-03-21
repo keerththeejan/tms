@@ -110,10 +110,15 @@ a:hover {
 main.content-wrapper .container-fluid.parcels-main-fluid {
   max-width: none !important;
   width: 100%;
+  /* Tighter side gutters on parcel list / new / edit */
+  padding-left: clamp(0.35rem, 1vw, 0.65rem);
+  padding-right: clamp(0.35rem, 1vw, 0.65rem);
 }
 main.content-wrapper .topbar .container-fluid.parcels-topbar-fluid {
   max-width: none !important;
   width: 100%;
+  padding-left: clamp(0.35rem, 1vw, 0.65rem);
+  padding-right: clamp(0.35rem, 1vw, 0.65rem);
 }
 
 /* Glass-style surfaces */

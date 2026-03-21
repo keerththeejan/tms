@@ -1269,12 +1269,17 @@ switch ($page) {
             if ($id > 0) {
                 $pdo->prepare('DELETE FROM delivery_routes WHERE id=?')->execute([$id]);
             }
-            Helpers::redirect('index.php?page=delivery_routes');
+            Helpers::redirect('index.php?page=delivery_routes&removed=1');
             break;
         }
 
         $routes = $pdo->query('SELECT * FROM delivery_routes ORDER BY name')->fetchAll();
-        $success = isset($_GET['saved']) && $_GET['saved'] === '1' ? 'Delivery route added.' : null;
+        $success = null;
+        if (isset($_GET['saved']) && $_GET['saved'] === '1') {
+            $success = 'Delivery route added.';
+        } elseif (isset($_GET['removed']) && $_GET['removed'] === '1') {
+            $success = 'Route removed from the common list.';
+        }
         $error = $error ?? null;
         Helpers::view('delivery_routes/index', compact('routes','success','error'));
         break;
@@ -1356,7 +1361,7 @@ switch ($page) {
                 echo json_encode(['id'=>$id, 'name'=>$name, 'phone'=>$phone, 'branch_id'=>$branch_id, 'supplier_code'=>$supplier_code]);
                 return;
             }
-            Helpers::redirect('index.php?page=suppliers');
+            Helpers::redirect('index.php?page=suppliers&saved=1');
             break;
         }
 
@@ -1366,7 +1371,7 @@ switch ($page) {
             if ($id > 0) {
                 $pdo->prepare('DELETE FROM suppliers WHERE id=?')->execute([$id]);
             }
-            Helpers::redirect('index.php?page=suppliers');
+            Helpers::redirect('index.php?page=suppliers&deleted=1');
             break;
         }
 
@@ -1413,7 +1418,13 @@ switch ($page) {
         } else {
             $suppliers = $pdo->query('SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id ORDER BY s.created_at DESC LIMIT 100')->fetchAll();
         }
-        Helpers::view('suppliers/index', compact('suppliers','q','name','phone','code','branch_id','branchesAll'));
+        $success = null;
+        if (isset($_GET['saved']) && $_GET['saved'] === '1') {
+            $success = 'Supplier saved successfully.';
+        } elseif (isset($_GET['deleted']) && $_GET['deleted'] === '1') {
+            $success = 'Supplier removed.';
+        }
+        Helpers::view('suppliers/index', compact('suppliers','q','name','phone','code','branch_id','branchesAll','success'));
         break;
 
     case 'parcels':
@@ -2899,7 +2910,7 @@ switch ($page) {
                 header('Content-Type: application/json'); echo json_encode(['ok'=>$ok?1:0,'delivery_location'=>$delivery_location]);
                 break;
             }
-            Helpers::redirect('index.php?page=delivery_notes&action=route&saved=' . ($ok?1:0));
+            Helpers::redirect('index.php?page=delivery_notes&action=route&loc_saved=' . ($ok ? '1' : '0'));
             break;
         }
 
