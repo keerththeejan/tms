@@ -2,6 +2,31 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
   /* —— SaaS dashboard tokens (8px grid, 12–16px cards) —— */
+  /* Mobile-first: fluid layout, no page-level horizontal scroll */
+  .parcel-form-page.pf-saas .pf-page-wrap {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  .parcel-form-page .pf-main-columns > [class*="col-"] {
+    min-width: 0;
+  }
+  .parcel-form-page .pf-form-sections .row {
+    --bs-gutter-x: 0.75rem;
+    --bs-gutter-y: 0.5rem;
+  }
+  .parcel-form-page .pf-input-group {
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+  .parcel-form-page .pf-input-group > .form-control,
+  .parcel-form-page .pf-input-group > .form-select,
+  .parcel-form-page .pf-input-group > .choices {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .parcel-form-page .pf-input-group .choices {
+    max-width: 100%;
+  }
   .parcel-form-page.pf-saas {
     --pf-space-1: 8px;
     --pf-space-2: 16px;
@@ -102,12 +127,368 @@
     justify-content: space-between;
     gap: 0.5rem;
   }
-  .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { border: 1px solid var(--bs-border-color); vertical-align: middle; padding: 0.4rem 0.5rem; }
-  .parcel-form-page .receipt-grid th { background: var(--bs-tertiary-bg); text-transform: uppercase; font-size: 0.75rem; font-weight: 600; }
-  .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 2rem; }
-  .parcel-form-page .receipt-total { background: var(--bs-primary-bg-subtle); border-top: 2px solid var(--bs-primary); font-weight: 700; padding: 0.75rem 1rem; }
+  .parcel-form-page .receipt-grid { border-collapse: separate; border-spacing: 0; font-size: 0.8125rem; }
+  .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { border: 1px solid rgba(15, 23, 42, 0.08); vertical-align: middle; padding: 0.45rem 0.55rem; }
+  .parcel-form-page .receipt-grid thead th {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    text-transform: uppercase; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; color: #475569;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+    white-space: nowrap;
+  }
+  /* Sticky thead only on large screens (table layout); mobile uses stacked cards */
+  .parcel-form-page .receipt-grid tbody tr { transition: background-color 0.15s ease; }
+  .parcel-form-page .receipt-grid tbody tr:hover { background: rgba(37, 99, 235, 0.04); }
+  .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 2rem; border-radius: 8px; }
+  .parcel-form-page .receipt-total {
+    background: linear-gradient(180deg, rgba(249, 250, 251, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+    border-top: 1px solid #e5e7eb;
+    font-weight: 700;
+    padding: 0.65rem 0.85rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.05);
+  }
+  .parcel-form-page .pf-items-section .receipt-total .row {
+    align-items: center;
+  }
   .parcel-form-page .serial-badge { border: 2px solid var(--bs-primary); padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600; }
   .parcel-form-page .table-responsive { -webkit-overflow-scrolling: touch; }
+  .parcel-form-page .pf-col-items {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .parcel-form-page .section-card.pf-items-section {
+    overflow: visible !important;
+  }
+  /* Branches: Choices.js dropdown is position:absolute — allow it to extend past card edges */
+  .parcel-form-page .section-card.pf-branches-section {
+    overflow: visible !important;
+  }
+  .parcel-form-page .pf-branches-section .section-body {
+    overflow: visible;
+  }
+  .parcel-form-page .pf-items-section .receipt-box {
+    max-width: 100%;
+    overflow: visible;
+  }
+  .parcel-form-page .pf-receipt-summary [class*="col-"] {
+    min-width: 0;
+  }
+  .parcel-form-page .pf-items-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    display: block;
+    box-sizing: border-box;
+    max-height: min(380px, 48vh);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 10px;
+    background: #fff;
+    -webkit-overflow-scrolling: touch;
+  }
+  .parcel-form-page .pf-items-scroll .table { margin-bottom: 0; }
+  /* Items grid: fit viewport width — no horizontal scroll (Excel-style) */
+  .parcel-form-page #itemsTable {
+    --pf-grid-line: #e5e7eb;
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border: 1px solid var(--pf-grid-line);
+    font-size: clamp(0.7rem, 0.12vw + 0.66rem, 0.8125rem);
+    background: #fff;
+  }
+  .parcel-form-page #itemsTable.receipt-grid th,
+  .parcel-form-page #itemsTable.receipt-grid td {
+    border: 1px solid var(--pf-grid-line);
+    vertical-align: middle;
+    padding: clamp(0.12rem, 0.35vw, 0.28rem) clamp(0.2rem, 0.45vw, 0.38rem);
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  .parcel-form-page #itemsTable.receipt-grid thead th {
+    background: #f9fafb;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+    white-space: nowrap;
+    border-bottom: 1px solid #d1d5db;
+  }
+  .parcel-form-page #itemsTable.receipt-grid tbody tr {
+    transition: background-color 0.12s ease;
+    background: #fff;
+  }
+  .parcel-form-page #itemsTable.receipt-grid tbody tr:hover {
+    background: #f0f7ff;
+  }
+  .parcel-form-page #itemsTable .form-control,
+  .parcel-form-page #itemsTable .form-control-sm {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    min-height: 1.35rem;
+    padding: 0.12rem 0.28rem;
+    font-size: inherit;
+    line-height: 1.3;
+  }
+  .parcel-form-page #itemsTable .form-control:focus,
+  .parcel-form-page #itemsTable .form-control-sm:focus {
+    background: #fff;
+    outline: none;
+    box-shadow: inset 0 0 0 2px #2563eb;
+    border-radius: 1px;
+  }
+  .parcel-form-page #itemsTable .form-control::placeholder {
+    color: #94a3b8;
+    font-size: 0.85em;
+  }
+  .parcel-form-page #itemsTable .form-control:disabled {
+    background: rgba(241, 245, 249, 0.65);
+    color: #64748b;
+    opacity: 1;
+  }
+  .parcel-form-page #itemsTable .pf-amount-readout {
+    display: block;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: #0f172a;
+    padding: 0.14rem 0.28rem;
+    min-height: 1.35rem;
+    line-height: 1.3;
+    background: #f9fafb;
+    border: 1px solid var(--pf-grid-line, #e5e7eb);
+    border-radius: 0;
+    text-align: center;
+  }
+  .parcel-form-page #itemsTable .pf-item-amt-cell {
+    min-width: 0;
+    vertical-align: middle;
+  }
+  .parcel-form-page #itemsTable .pf-item-amt-cell .item-amount.pf-amount-readout {
+    margin: 0;
+  }
+  .parcel-form-page #itemsTable .item-add-sum.pf-amount-readout {
+    font-size: 0.72rem;
+    padding: 0.1rem 0.22rem;
+    min-height: 1.25rem;
+    margin-bottom: 0.1rem;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-block {
+    gap: 0.25rem !important;
+  }
+  /* Excel-style additional amounts: single visible cell; hidden native rows submit as before */
+  .parcel-form-page #itemsTable .pf-item-add-block.pf-item-add-excel .item-add-list {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    pointer-events: none;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-block.pf-item-add-excel .add-amount-btn {
+    display: none !important;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem 0.35rem;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-height: 1.42rem;
+    padding: 0.12rem 0.35rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0;
+    background: #fff;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-wrap:focus-within {
+    border-color: rgba(37, 99, 235, 0.55);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    outline: 0;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-tokens {
+    display: contents;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-token {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.12rem;
+    flex: 0 0 auto;
+    max-width: 100%;
+    padding: 0.06rem 0.28rem 0.06rem 0.38rem;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+    color: #334155;
+    background: rgba(241, 245, 249, 0.95);
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 4px;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-token + .pf-item-add-excel-token::before {
+    content: '+';
+    display: inline;
+    margin-inline-end: 0.35rem;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0 0.12rem;
+    border: 0;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-remove:hover,
+  .parcel-form-page #itemsTable .pf-item-add-excel-remove:focus-visible {
+    color: #b91c1c;
+    background: rgba(254, 226, 226, 0.45);
+    outline: 0;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-field {
+    flex: 1 1 3.25rem;
+    min-width: 2.5rem;
+    max-width: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0.06rem 0.1rem;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+    color: #0f172a;
+    outline: 0;
+    box-shadow: none;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-field::placeholder {
+    color: #94a3b8;
+    font-size: 0.72rem;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-excel-field:disabled {
+    cursor: not-allowed;
+    opacity: 0.75;
+  }
+  .parcel-form-page #itemsTable .pf-item-add-block.pf-item-add-excel {
+    position: relative;
+    min-width: 0;
+  }
+  .parcel-form-page #itemsTable .item-add-list {
+    gap: 0.2rem !important;
+  }
+  .parcel-form-page #itemsTable .item-add-row .form-control-sm {
+    min-height: 1.4rem;
+    padding: 0.12rem 0.28rem;
+    font-size: 0.78rem;
+  }
+  .parcel-form-page #itemsTable .add-amount-btn {
+    align-self: flex-start;
+    padding: 0.1rem 0.35rem !important;
+    font-size: 0.65rem !important;
+    line-height: 1.2;
+    border-radius: 6px;
+    border-color: rgba(15, 23, 42, 0.14);
+    color: #64748b;
+    opacity: 0.92;
+  }
+  .parcel-form-page #itemsTable .add-amount-btn:hover {
+    opacity: 1;
+    border-color: rgba(37, 99, 235, 0.35);
+    color: var(--pf-accent, #2563eb);
+    background: rgba(37, 99, 235, 0.06);
+  }
+  .parcel-form-page #itemsTable .btn.remove-row,
+  .parcel-form-page #itemsTable .remove-row {
+    padding: 0.2rem 0.35rem !important;
+    min-height: 0;
+    line-height: 1;
+    border-radius: 8px;
+    border-color: rgba(15, 23, 42, 0.12);
+    color: #64748b;
+    background: transparent;
+  }
+  .parcel-form-page #itemsTable .btn.remove-row:hover,
+  .parcel-form-page #itemsTable .remove-row:hover {
+    border-color: rgba(220, 38, 38, 0.45);
+    color: #b91c1c;
+    background: rgba(254, 226, 226, 0.35);
+  }
+  .parcel-form-page #itemsTable .pf-item-remove-cell {
+    width: 2.5rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+  /* Desktop: column alignment (spreadsheet-style) */
+  @media (min-width: 992px) {
+    .parcel-form-page #itemsTable thead th:nth-child(1),
+    .parcel-form-page #itemsTable thead th:nth-child(3),
+    .parcel-form-page #itemsTable thead th:nth-child(4),
+    .parcel-form-page #itemsTable thead th:nth-child(5),
+    .parcel-form-page #itemsTable thead th:nth-child(6),
+    .parcel-form-page #itemsTable thead th:nth-child(7) {
+      text-align: center;
+    }
+    .parcel-form-page #itemsTable thead th:nth-child(2) {
+      text-align: left;
+    }
+    .parcel-form-page #itemsTable .item-desc {
+      text-align: left;
+    }
+    .parcel-form-page #itemsTable .item-qty,
+    .parcel-form-page #itemsTable .item-rate {
+      text-align: center;
+    }
+    .parcel-form-page #itemsTable .pf-item-amt-cell .pf-amount-readout,
+    .parcel-form-page #itemsTable .item-amount-cell .pf-amount-readout,
+    .parcel-form-page #itemsTable .item-amount-cell .item-add {
+      text-align: center;
+    }
+    .parcel-form-page .pf-items-scroll thead th {
+      position: sticky;
+      top: 0;
+      z-index: 6;
+      box-shadow: 0 1px 0 #e5e7eb;
+    }
+    .parcel-form-page .pf-items-scroll #itemsTable thead th {
+      background: #f3f4f6;
+    }
+  }
+  .parcel-form-page .pf-btn-icon-touch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+    padding: 0.35rem 0.65rem;
+  }
+  @media (min-width: 768px) {
+    .parcel-form-page .pf-btn-icon-touch {
+      min-height: 2rem;
+      min-width: auto;
+      padding: 0.25rem 0.5rem;
+    }
+  }
   .parcel-form-page .form-label { font-weight: 600; margin-bottom: 0.15rem; font-size: 0.8125rem; }
   .parcel-form-page .pf-customer-stack .form-control,
   .parcel-form-page .pf-customer-stack .form-select { margin-bottom: 0; }
@@ -212,19 +593,16 @@
   .parcel-form-page.pf-saas .form-control.is-invalid {
     border-color: var(--bs-danger);
   }
-  .parcel-form-page .pf-branches-row > [class*="col-"] { flex: 1 1 0; min-width: 0; }
-  /* Quick Add Branch modals: align checkbox row with text inputs */
-  .parcel-form-page .pf-modal-branch-row .pf-branch-modal-check {
-    min-height: var(--pf-input-h, 38px);
-    padding: 0.25rem 0.5rem;
-    border-color: rgba(15, 23, 42, 0.12);
-    background: #fff;
-    border-radius: 10px;
+  /* Branch row: keep both columns usable on narrow screens */
+  .parcel-form-page .pf-branches-row > [class*="col-"] {
+    flex: 1 1 0;
+    min-width: min(100%, 11rem);
   }
-  .parcel-form-page .pf-modal-branch-row .pf-branch-modal-check .form-check-input {
-    margin-top: 0;
-    width: 1em;
-    height: 1em;
+  .parcel-form-page .pf-branches-row .pf-branch-input-group {
+    width: 100%;
+  }
+  .parcel-form-page .pf-branches-row .pf-branch-input-group .form-select {
+    width: 100%;
   }
   /* Invoice & date: prevent overlap in narrow columns */
   .parcel-form-page .pf-invoice-date-row > [class*="col-"] {
@@ -289,6 +667,67 @@
     margin-right: 0;
   }
   .parcel-form-page .pf-status-row .col-status { flex: 1 1 0; min-width: 0; max-width: 100%; }
+  /* Delivery location: value stays inside field — ellipsis, no overflow misalignment */
+  .parcel-form-page .pf-form-sections [class*="col-"] .section-card,
+  .parcel-form-page .pf-floating-tight.form-floating {
+    min-width: 0;
+  }
+  .parcel-form-page .pf-floating-tight.form-floating > #deliveryLocationInput.form-control {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.35;
+  }
+  .parcel-form-page #deliveryLocationInput.form-control-sm {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.35;
+    min-height: var(--pf-input-h, 34px);
+    padding: 0.32rem 0.55rem;
+    box-sizing: border-box;
+  }
+  /* Status + Save row: compact native select aligned with other sm inputs */
+  .parcel-form-page .pf-status-row .form-label[for="parcelStatusSelect"] {
+    margin-bottom: 0.2rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+  .parcel-form-page .pf-status-row .form-label.opacity-0 {
+    margin-bottom: 0.2rem;
+    min-height: 0;
+    line-height: 1.2;
+  }
+  .parcel-form-page #parcelStatusSelect.form-select {
+    min-height: var(--pf-input-h, 34px);
+    padding: 0.22rem 2rem 0.22rem 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    background-position: right 0.45rem center;
+    background-size: 14px 10px;
+  }
+  @media (min-width: 992px) {
+    .parcel-form-page .pf-status-row #parcelStatusSelect.form-select {
+      width: auto;
+      min-width: 10rem;
+      max-width: min(260px, 100%);
+    }
+    .parcel-form-page .pf-status-row .col-status {
+      flex: 0 1 auto;
+    }
+    .parcel-form-page .pf-status-row > .col-lg-auto.flex-shrink-0 {
+      margin-left: auto;
+    }
+  }
+  @media (max-width: 991.98px) {
+    .parcel-form-page #parcelStatusSelect.form-select {
+      max-width: 100%;
+    }
+  }
   .parcel-form-page .pf-accordion-soft .accordion-item {
     background: transparent;
     border: 1px solid rgba(15, 23, 42, 0.08);
@@ -395,6 +834,71 @@
   .parcel-form-page .customer-search-results { position: relative; }
   .parcel-form-page .customer-search-results .list-group { position:absolute; z-index: 1050; width:100%; max-height: 260px; overflow:auto; }
   .parcel-form-page .pf-breadcrumb { font-size: 0.9rem; }
+  /* Structured sections (left column) */
+  .parcel-form-page .pf-form-sections { min-width: 0; }
+  .parcel-form-page .pf-form-sections > .section-card { margin-bottom: 0; }
+  .parcel-form-page .pf-page-hero h1 {
+    font-family: Poppins, Inter, system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+  .parcel-form-page .pf-aux-banner {
+    border: 1px solid rgba(37, 99, 235, 0.22);
+    border-radius: var(--pf-card-radius);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(99, 102, 241, 0.04));
+    box-shadow: var(--pf-soft-shadow);
+  }
+  .parcel-form-page .pf-aux-banner .card-body { padding: 0.65rem 1rem; }
+  .parcel-form-page .pf-btn-save {
+    border-radius: 12px !important;
+    font-weight: 600;
+    padding: 0.4rem 1rem !important;
+    min-height: 2.5rem;
+  }
+  .parcel-form-page .pf-btn-add-row {
+    border-radius: 12px !important;
+    font-weight: 600;
+    padding: 0.45rem 1.1rem !important;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
+    transition: transform 0.2s ease, box-shadow 0.25s ease, filter 0.2s ease;
+  }
+  /* Items section: compact primary “Add Row” (same #addRow / classes) */
+  .parcel-form-page.pf-saas .pf-items-section .pf-btn-add-row {
+    border-radius: 8px !important;
+    padding: 0.32rem 0.85rem !important;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(79, 70, 229, 0.2);
+  }
+  .parcel-form-page.pf-saas .pf-items-section .pf-items-scroll + .text-end {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  .parcel-form-page.pf-saas .pf-btn-save:hover,
+  .parcel-form-page.pf-saas .pf-btn-add-row:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.38);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .parcel-form-page.pf-saas .pf-btn-save:hover,
+    .parcel-form-page.pf-saas .pf-btn-add-row:hover {
+      transform: none;
+    }
+  }
+  .parcel-form-page .pf-floating-tight.form-floating > .form-control,
+  .parcel-form-page .pf-floating-tight.form-floating > .form-select {
+    min-height: calc(var(--pf-input-h) + 2px);
+    height: calc(var(--pf-input-h) + 2px);
+    padding-top: 1.1rem;
+    padding-bottom: 0.2rem;
+    font-size: 0.8125rem;
+  }
+  .parcel-form-page .pf-floating-tight.form-floating > label {
+    font-size: 0.75rem;
+    padding: 0.55rem 0.65rem;
+  }
   /* Choices.js — match compact parcel inputs (global script enhances selects) */
   .parcel-form-page .choices { margin-bottom: 0; font-size: 0.8125rem; }
   .parcel-form-page .choices__inner {
@@ -411,6 +915,23 @@
     box-shadow: 0 0 0 3px var(--pf-accent-ring);
   }
   .parcel-form-page .choices[data-type*="select-one"] .choices__button { display: none; }
+  /* Branch selects: native <select> (no Choices) — full width, reliable dropdown on all devices */
+  .parcel-form-page .pf-branch-input-group {
+    overflow: visible;
+    width: 100%;
+  }
+  .parcel-form-page .pf-branches-section .pf-branch-input-group .form-select {
+    width: 100%;
+    min-height: var(--pf-input-h, 38px);
+  }
+  .parcel-form-page .pf-branches-section .form-select.is-invalid {
+    border-color: var(--bs-danger);
+  }
+  @media (max-width: 575.98px) {
+    .parcel-form-page .pf-branches-section .pf-branch-input-group .form-select {
+      min-height: 44px;
+    }
+  }
   .parcel-form-page .pf-card { border: var(--pf-border); border-radius: 12px; box-shadow: 0 8px 20px rgba(2,6,23,.06); background: #fff; overflow:hidden; }
   .parcel-form-page .pf-card-h { padding: 0.85rem 1rem; background: linear-gradient(180deg, rgba(248,250,252,1), rgba(255,255,255,1)); border-bottom: var(--pf-border); font-weight: 700; }
   .parcel-form-page .pf-card-b { padding: 1rem; }
@@ -457,7 +978,7 @@
   .parcel-form-page.pf-compact-view .pf-items-scroll {
     max-height: min(220px, 32vh);
     overflow-y: auto;
-    overflow-x: auto;
+    overflow-x: hidden;
     border: 1px solid var(--bs-border-color-translucent);
     border-radius: 0.25rem;
   }
@@ -465,11 +986,28 @@
   @media (min-width: 1200px) {
     .parcel-form-page.pf-compact-view .pf-items-scroll { max-height: min(260px, 36vh); }
   }
-  /* —— Mobile: stack item rows as cards (no horizontal scroll) —— */
-  @media (max-width: 767.98px) {
-    .parcel-form-page #itemsTable thead { display: none !important; }
+  /* Below lg: stack line items as full-width cards (no sideways page scroll) */
+  @media (max-width: 991.98px) {
+    .parcel-form-page .pf-items-scroll {
+      max-height: none;
+      overflow: visible !important;
+      touch-action: manipulation;
+      border: 0;
+      background: transparent;
+      -webkit-overflow-scrolling: auto;
+    }
+    .parcel-form-page #itemsTable {
+      min-width: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .parcel-form-page #itemsTable thead {
+      display: none !important;
+    }
     .parcel-form-page #itemsTable tbody tr {
       display: block;
+      width: 100%;
+      box-sizing: border-box;
       border: 1px solid rgba(15, 23, 42, 0.12) !important;
       border-radius: 0.65rem;
       margin-bottom: 0.75rem;
@@ -480,13 +1018,17 @@
     .parcel-form-page #itemsTable tbody td {
       display: block !important;
       width: 100% !important;
+      max-width: 100%;
+      box-sizing: border-box;
       border: none !important;
       border-bottom: 1px solid rgba(15, 23, 42, 0.07) !important;
-      padding: 0.55rem 0 !important;
+      padding: 0.5rem 0 !important;
       text-align: left !important;
     }
-    .parcel-form-page #itemsTable tbody td:last-child { border-bottom: none !important; }
-    .parcel-form-page #itemsTable tbody td[data-label]::before {
+    .parcel-form-page #itemsTable tbody td:last-child {
+      border-bottom: none !important;
+    }
+    .parcel-form-page #itemsTable tbody td[data-label]:not(.pf-item-no-cell)::before {
       content: attr(data-label);
       display: block;
       font-size: 0.62rem;
@@ -496,19 +1038,54 @@
       color: #64748b;
       margin-bottom: 0.35rem;
     }
-    .parcel-form-page #itemsTable tbody td.pf-item-remove-cell::before { content: none !important; display: none !important; }
-    .parcel-form-page #itemsTable tbody td.item-amount-cell .item-add-list .item-add-row { flex-wrap: wrap; }
-    .parcel-form-page #itemsTable tbody td.item-amount-cell .item-add-row input { min-width: 0; flex: 1 1 8rem; }
-    .parcel-form-page .pf-items-scroll {
-      max-height: none !important;
-      overflow: visible !important;
-      border: none !important;
-      -webkit-overflow-scrolling: auto;
+    .parcel-form-page #itemsTable tbody td.pf-item-no-cell {
+      text-align: center !important;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding-bottom: 0.25rem !important;
     }
-    .parcel-form-page .pf-scroll-hint { display: none !important; }
-    .parcel-form-page .pf-page-wrap { padding-left: 0.35rem !important; padding-right: 0.35rem !important; }
-    .parcel-form-page .pf-details-shell { padding: 0.65rem !important; }
-    .parcel-form-page .pf-field-card { padding: 0.65rem !important; }
+    .parcel-form-page #itemsTable tbody td.pf-item-no-cell::before {
+      display: none !important;
+    }
+    .parcel-form-page #itemsTable tbody td.pf-item-remove-cell::before {
+      content: none !important;
+      display: none !important;
+    }
+    .parcel-form-page #itemsTable .pf-item-remove-cell .remove-row {
+      min-height: 2.65rem;
+      min-width: 2.65rem;
+      width: auto;
+      margin-left: auto;
+    }
+    .parcel-form-page #itemsTable tbody td.item-amount-cell .pf-item-add-excel-wrap {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    .parcel-form-page #itemsTable tbody td.item-amount-cell .item-add-list .item-add-row {
+      flex-wrap: wrap;
+    }
+    .parcel-form-page #itemsTable tbody td.item-amount-cell .item-add-row input {
+      min-width: 0;
+      flex: 1 1 8rem;
+    }
+    .parcel-form-page #itemsTable tbody td .pf-amount-readout {
+      text-align: center;
+    }
+    .parcel-form-page #itemsTable .receipt-grid .form-control,
+    .parcel-form-page #itemsTable .receipt-grid .form-control-sm {
+      width: 100%;
+      max-width: 100%;
+    }
+    .parcel-form-page .pf-scroll-hint {
+      display: none !important;
+    }
+    .parcel-form-page .pf-page-wrap {
+      padding-left: max(0.35rem, env(safe-area-inset-left)) !important;
+      padding-right: max(0.35rem, env(safe-area-inset-right)) !important;
+    }
+    .parcel-form-page .pf-form-sections .section-card .section-body {
+      padding: 0.65rem !important;
+    }
   }
   @media (max-width: 576px) {
     .parcel-form-page .clb-modal .modal-body { padding: 0.75rem; }
@@ -517,12 +1094,225 @@
     .parcel-form-page .page-header .d-flex.gap-2 .btn { flex: 1 1 auto; }
     .parcel-form-page .section-card .section-body { padding: 0.65rem; }
     .parcel-form-page .receipt-header { flex-direction: column; align-items: stretch; }
+    .parcel-form-page .receipt-header .serial-badge { width: 100%; justify-content: space-between; }
+    .parcel-form-page #serialInput { max-width: 100% !important; width: 100%; }
     .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { padding: 0.35rem 0.4rem; font-size: 0.85rem; }
     .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 1.85rem; font-size: 0.9rem; }
-    .parcel-form-page { padding-bottom: 90px; } /* space for sticky action bar */
+    /* Items table: stay compact on small screens (overrides generic receipt-grid sizing) */
+    .parcel-form-page #itemsTable .form-control,
+    .parcel-form-page #itemsTable .form-control-sm {
+      min-height: 1.38rem;
+      font-size: clamp(0.78rem, 2.8vw, 0.85rem);
+      padding: 0.12rem 0.3rem;
+    }
+    .parcel-form-page.pf-saas.pf-layout-optimized { padding-bottom: 76px; } /* space for sticky action bar */
+  }
+
+  /* —— Parcel form: dense dashboard layout (CSS only; no input/JS/PHP logic changes) —— */
+  .parcel-form-page.pf-saas.pf-layout-optimized {
+    --pf-space-1: 6px;
+    --pf-space-2: 10px;
+    --pf-space-3: 18px;
+    --pf-card-pad: 10px;
+    --pf-input-h: 34px;
+    --pf-soft-shadow: 0 2px 16px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-page-wrap {
+    padding-left: max(0.35rem, env(safe-area-inset-left));
+    padding-right: max(0.35rem, env(safe-area-inset-right));
+    padding-bottom: 0.25rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-breadcrumb {
+    margin-bottom: 0.3rem !important;
+    padding-top: 0.15rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .page-header {
+    margin-bottom: 0.45rem !important;
+    padding: 0.5rem 0.65rem !important;
+    gap: 0.5rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .page-header .h4,
+  .parcel-form-page.pf-saas.pf-layout-optimized .page-header h1.h4 {
+    font-size: 1.05rem;
+    line-height: 1.25;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .page-header .text-muted.small {
+    margin-top: 0.15rem !important;
+    font-size: 0.72rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-aux-banner {
+    margin-bottom: 0.45rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-aux-banner .card-body {
+    padding: 0.45rem 0.65rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .section-card {
+    margin-bottom: 0.45rem !important;
+    border-radius: clamp(10px, 1vw, 14px);
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .section-card .section-title {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.65rem;
+    line-height: 1.2;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .section-card .section-body {
+    padding: var(--pf-card-pad) !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .section-card .section-body.pt-2,
+  .parcel-form-page.pf-saas.pf-layout-optimized .section-card .section-body.pt-lg-3 {
+    padding-top: 0.5rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-form-sections.d-flex.flex-column {
+    gap: 0.45rem !important;
+  }
+  @media (min-width: 992px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-form-sections.d-flex.flex-column {
+      gap: 0.55rem !important;
+    }
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-form-sections > .row {
+    --bs-gutter-x: 0.4rem;
+    --bs-gutter-y: 0.4rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-label {
+    margin-bottom: 0.12rem;
+    font-size: 0.68rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .form-label {
+    margin-bottom: 0.12rem;
+    font-size: 0.78rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-form-sections .form-check.mt-1 {
+    margin-top: 0.25rem !important;
+  }
+  /* Desktop / tablet lg+: balanced two-column grid — details left, items right */
+  @media (min-width: 992px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .row.pf-main-columns {
+      display: grid !important;
+      grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.08fr);
+      gap: 0.5rem;
+      align-items: start;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      --bs-gutter-x: 0;
+      --bs-gutter-y: 0;
+    }
+    .parcel-form-page.pf-saas.pf-layout-optimized .row.pf-main-columns > [class*="col-"] {
+      width: 100% !important;
+      max-width: none !important;
+      flex: none !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+  }
+  @media (min-width: 1200px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .row.pf-main-columns {
+      grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.12fr);
+      gap: 0.65rem;
+    }
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-col-items {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized #billPreview {
+    margin-bottom: 0.45rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-section {
+    margin-top: 0 !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .receipt-header {
+    padding: 0.45rem 0.65rem !important;
+    gap: 0.35rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .receipt-header .small {
+    font-size: 0.75rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-receipt-summary {
+    font-size: 0.72rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-receipt-summary .mt-1 {
+    margin-top: 0.15rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .receipt-box > .px-2.py-1.border-bottom {
+    padding: 0.35rem 0.5rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-section .p-2.pt-1 {
+    padding: 0.45rem !important;
+    padding-top: 0.35rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .receipt-total {
+    padding: 0.45rem 0.65rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .receipt-total .fs-5 {
+    font-size: 1.1rem !important;
+  }
+  /* Items table: use remaining viewport height on large screens */
+  @media (min-width: 992px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-scroll {
+      max-height: clamp(160px, calc(100vh - 300px), 480px);
+    }
+  }
+  @media (min-width: 1200px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-scroll {
+      max-height: clamp(180px, calc(100vh - 280px), 520px);
+    }
+  }
+  /* Sticky status + Save on desktop (direct child .container-fluid is the status/actions strip only) */
+  @media (min-width: 992px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized #parcelForm > .container-fluid.px-0 {
+      position: sticky;
+      bottom: 0;
+      z-index: 30;
+      padding-top: 0.25rem;
+      margin-top: 0.25rem;
+      background: linear-gradient(180deg, rgba(238, 242, 247, 0), rgba(238, 242, 247, 0.88) 18%);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .parcel-form-page.pf-saas.pf-layout-optimized #parcelForm > .container-fluid.px-0 .section-card {
+      margin-bottom: 0 !important;
+    }
+    .parcel-form-page.pf-saas.pf-layout-optimized #parcelForm > .container-fluid.px-0 .section-body {
+      padding-top: 0.45rem !important;
+      padding-bottom: 0.45rem !important;
+    }
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-btn-save {
+    min-height: 2.15rem !important;
+    padding: 0.3rem 0.75rem !important;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-sticky-actions {
+    padding: 0.5rem 0.65rem;
+  }
+  .parcel-form-page.pf-saas.pf-layout-optimized .pf-sticky-actions .btn {
+    min-height: 2.35rem;
+  }
+  /* Tablet: slightly smaller type */
+  @media (min-width: 576px) and (max-width: 991.98px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized {
+      font-size: 0.8125rem;
+    }
+    .parcel-form-page.pf-saas.pf-layout-optimized .section-card .section-title {
+      font-size: 0.78rem;
+    }
+  }
+  /* Mobile: tighter stacks */
+  @media (max-width: 575.98px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .page-header {
+      gap: 0.45rem !important;
+    }
+    .parcel-form-page.pf-saas.pf-layout-optimized .section-card .section-body {
+      padding: 0.5rem 0.55rem !important;
+    }
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-form-sections .section-card .section-body {
+      padding: 0.5rem !important;
+    }
   }
 </style>
-<div class="parcel-form-page pf-compact-view pf-saas">
+<div class="parcel-form-page pf-saas pf-layout-optimized">
 <div class="container-fluid px-1 px-sm-2 px-lg-2 pf-page-wrap">
 
 <?php 
@@ -559,14 +1349,14 @@
     <li class="breadcrumb-item active" aria-current="page"><?php echo $parcel['id'] ? 'Edit' : 'New'; ?></li>
   </ol>
 </nav>
-<header class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+<header class="page-header pf-page-hero d-flex flex-wrap justify-content-between align-items-center gap-2">
   <div>
-    <h1 class="h4 mb-0 fw-bold"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
-    <div class="text-muted small d-none d-sm-block">Fast entry • consistent billing • modern workflow</div>
+    <h1 class="h4 mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
+    <div class="text-muted small d-none d-sm-block mt-1">Fast entry • consistent billing • logistics workflow</div>
   </div>
   <div class="d-flex flex-wrap gap-2">
-    <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Back to Parcels</span></a>
-    <button type="submit" form="parcelForm" class="btn btn-primary btn-sm" id="pfSaveBtnTop"><i class="bi bi-save"></i><span class="d-none d-md-inline ms-1">Save Parcel</span></button>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm rounded-3"><i class="bi bi-arrow-left" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Back to Parcels</span></a>
+    <button type="submit" form="parcelForm" class="btn btn-primary btn-sm pf-btn-save" id="pfSaveBtnTop"><i class="bi bi-save" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Save Parcel</span></button>
   </div>
 </header>
 
@@ -582,7 +1372,7 @@
     . '&date='.urlencode($sameDayDateNew)) : '';
 ?>
 <?php if (empty($parcel['id']) && ($isNewPrefilled || !empty($lastParcel))): ?>
-<div class="card mb-2 border-primary">
+<div class="card mb-2 pf-aux-banner shadow-sm">
   <div class="card-body py-2 px-3">
     <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center gap-2 pf-lastbill-actions">
       <?php if ($isNewPrefilled && $sameDayUrlNew !== ''): ?>
@@ -610,7 +1400,7 @@
     . '&to_branch_id='.(int)($parcel['to_branch_id'] ?? 0)
     . '&date='.urlencode($sameDayDate));
 ?>
-<div class="card mb-2 border-primary">
+<div class="card mb-2 pf-aux-banner shadow-sm">
   <div class="card-body py-2 px-3">
     <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center gap-2 pf-lastbill-actions">
       <span class="fw-semibold text-secondary small">Same day bill:</span>
@@ -696,14 +1486,11 @@
   <div class="container-fluid px-0">
     <div class="row g-2 g-lg-3 align-items-start pf-main-columns">
       <div class="col-12 col-lg-6 col-xl-6 pf-animate pf-animate-in">
-  <!-- Parcel details — grouped compact cards -->
-  <div class="pf-details-shell pf-dense pf-floating mb-2 mb-lg-0">
-    <div class="pf-details-heading"><i class="bi bi-box-seam me-1 text-primary"></i> Parcel details</div>
-    <div class="row g-2 g-md-3 align-items-stretch pf-details-field-row">
-      <!-- 1. Customer (first) -->
-      <div class="col-12">
-        <div class="pf-field-card pf-customer-stack">
-          <div class="pf-field-card-title"><i class="bi bi-person-badge"></i> Customer</div>
+  <div class="pf-form-sections d-flex flex-column gap-2 gap-lg-3 mb-2 mb-lg-0 pf-dense pf-floating">
+    <!-- Customer -->
+    <section class="section-card pf-customer-stack" role="region" aria-labelledby="pf-h-customer">
+      <div class="section-title" id="pf-h-customer"><i class="bi bi-person-badge me-2 text-primary" aria-hidden="true"></i>Customer</div>
+      <div class="section-body pt-2 pt-lg-3">
           <div class="row g-2 align-items-start pf-customer-row">
             <div class="col-12 col-lg-4">
               <label class="pf-label" for="customerSelectHidden">Select customer</label>
@@ -743,21 +1530,33 @@
           <div id="locResults" class="small" style="max-height: 140px; overflow:auto"></div>
         </div>
       </div>
-      <div id="customerSummary" class="mt-1 small pf-form-text"></div>
-        </div>
+      <div id="customerSummary" class="mt-1 small pf-form-text" role="status" aria-live="polite"></div>
       </div>
-      <!-- 2. Location -->
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="pf-field-card">
-          <div class="pf-field-card-title"><i class="bi bi-geo-alt"></i> Location</div>
+    </section>
+
+    <div class="row g-2 g-lg-3 align-items-stretch">
+      <!-- Location -->
+      <div class="col-12 col-lg-4">
+        <section class="section-card h-100" role="region" aria-labelledby="pf-h-location">
+          <div class="section-title" id="pf-h-location"><i class="bi bi-geo-alt me-2 text-primary" aria-hidden="true"></i>Location</div>
+          <div class="section-body pt-2 pt-lg-3">
+          <?php if ($lockAll || $priceOnly): ?>
           <label class="pf-label" for="deliveryLocationInput">Delivery location</label>
-          <input type="text" name="delivery_location" class="form-control form-control-sm" id="deliveryLocationInput" placeholder="Customer delivery location" value="<?php echo htmlspecialchars((string)($parcel['delivery_location'] ?? '')); ?>" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Delivery location">
-        </div>
+          <input type="text" name="delivery_location" class="form-control form-control-sm" id="deliveryLocationInput" placeholder="Customer delivery location" value="<?php echo htmlspecialchars((string)($parcel['delivery_location'] ?? '')); ?>" disabled aria-label="Delivery location">
+          <?php else: ?>
+          <div class="form-floating pf-floating-tight">
+            <input type="text" name="delivery_location" class="form-control" id="deliveryLocationInput" placeholder=" " value="<?php echo htmlspecialchars((string)($parcel['delivery_location'] ?? '')); ?>" autocomplete="off" aria-label="Delivery location" aria-required="true">
+            <label for="deliveryLocationInput">Delivery location</label>
+          </div>
+          <?php endif; ?>
+          </div>
+        </section>
       </div>
-      <!-- 3. Supplier -->
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="pf-field-card">
-          <div class="pf-field-card-title"><i class="bi bi-people"></i> Supplier</div>
+      <!-- Supplier -->
+      <div class="col-12 col-lg-4">
+        <section class="section-card h-100" role="region" aria-labelledby="pf-h-supplier">
+          <div class="section-title" id="pf-h-supplier"><i class="bi bi-people me-2 text-primary" aria-hidden="true"></i>Supplier</div>
+          <div class="section-body pt-2 pt-lg-3">
           <label class="pf-label" for="supplierSelect">Supplier (optional)</label>
           <div class="input-group input-group-sm pf-input-group">
             <select name="supplier_id" id="supplierSelect" class="form-select form-select-sm" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-choices-search="true" aria-label="Supplier">
@@ -777,12 +1576,14 @@
             <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddSupplier" aria-label="Quick add supplier"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
           </div>
           <div id="supplierPhoneHint" class="pf-form-text mb-0"></div>
-        </div>
+          </div>
+        </section>
       </div>
-      <!-- 4. Invoice & date (labels + grid — avoids narrow-column floating-label overlap) -->
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="pf-field-card">
-          <div class="pf-field-card-title"><i class="bi bi-file-earmark-text"></i> Invoice &amp; date</div>
+      <!-- Invoice & date -->
+      <div class="col-12 col-lg-4">
+        <section class="section-card h-100" role="region" aria-labelledby="pf-h-invoice">
+          <div class="section-title" id="pf-h-invoice"><i class="bi bi-file-earmark-text me-2 text-primary" aria-hidden="true"></i>Invoice &amp; date</div>
+          <div class="section-body pt-2 pt-lg-3">
           <div class="row g-2 pf-invoice-date-row">
             <div class="col-12 col-sm-6">
               <?php if ($lockAll && $isEdit): ?>
@@ -799,45 +1600,54 @@
               <input type="date" class="form-control form-control-sm" id="parcelDate" name="created_date" value="<?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?>" aria-label="Parcel date">
             </div>
           </div>
-        </div>
+          </div>
+        </section>
       </div>
-      <!-- 5. Branches -->
-      <div class="col-12">
-        <div class="pf-field-card">
-          <div class="pf-field-card-title"><i class="bi bi-diagram-3"></i> Branches</div>
+    </div>
+
+      <!-- Branches -->
+      <section class="section-card pf-branches-section" role="region" aria-labelledby="pf-h-branches">
+          <div class="section-title" id="pf-h-branches"><i class="bi bi-diagram-3 me-2 text-primary" aria-hidden="true"></i>Branches</div>
+          <div class="section-body pt-2 pt-lg-3">
+          <?php if (empty($branchesList)): ?>
+          <div class="alert alert-warning py-2 mb-2 small" role="alert">
+            <strong>No active branches available.</strong> An administrator must add or re-activate branches under <a href="<?php echo Helpers::baseUrl('index.php?page=settings#settings-operational-branches'); ?>">Settings → Operational branches</a> before you can save a parcel.
+          </div>
+          <?php endif; ?>
           <div class="row g-2 pf-branches-row">
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-6 col-lg-6">
               <label class="pf-label" for="fromBranchSelect">From branch</label>
-              <div class="input-group input-group-sm pf-input-group">
-                <select name="from_branch_id" id="fromBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-choices-search="true" aria-label="From branch">
+              <div class="pf-branch-input-group">
+                <select name="from_branch_id" id="fromBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="From branch">
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesList ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['from_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
         <?php endforeach; ?>
       </select>
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddFromBranch" title="Quick add branch" aria-label="Quick add from branch"><i class="bi bi-building-add" aria-hidden="true"></i></button>
               </div>
             </div>
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-6 col-lg-6">
               <label class="pf-label" for="toBranchSelect">To branch</label>
-              <div class="input-group input-group-sm pf-input-group">
-                <select name="to_branch_id" id="toBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-choices-search="true" aria-label="To branch">
+              <div class="pf-branch-input-group">
+                <select name="to_branch_id" id="toBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="To branch">
         <option value="">-- Select Branch --</option>
         <?php foreach (($branchesList ?? []) as $b): ?>
           <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['to_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
         <?php endforeach; ?>
       </select>
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddToBranch" title="Quick add branch" aria-label="Quick add to branch"><i class="bi bi-building-add" aria-hidden="true"></i></button>
               </div>
       <div id="toBranchSuggest" class="pf-form-text text-primary"></div>
             </div>
           </div>
-        </div>
-      </div>
-      <!-- 6. Vehicle -->
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="pf-field-card">
-          <div class="pf-field-card-title"><i class="bi bi-truck"></i> Vehicle</div>
+          </div>
+      </section>
+
+    <div class="row g-2 g-lg-3 align-items-stretch">
+      <!-- Vehicle -->
+      <div class="col-12 col-md-6">
+        <section class="section-card h-100" role="region" aria-labelledby="pf-h-vehicle">
+          <div class="section-title" id="pf-h-vehicle"><i class="bi bi-truck me-2 text-primary" aria-hidden="true"></i>Vehicle</div>
+          <div class="section-body pt-2 pt-lg-3">
       <?php if (!empty($vehiclesAll)): ?>
         <label class="pf-label" for="vehicleSelect">Vehicle</label>
         <div class="input-group input-group-sm pf-input-group">
@@ -877,13 +1687,15 @@
           Lorry Full (start next lorry after saving)
         </label>
       </div>
-        </div>
+          </div>
+        </section>
       </div>
 
-      <!-- 7. Route -->
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="pf-field-card">
-          <div class="pf-field-card-title"><i class="bi bi-signpost"></i> Route</div>
+      <!-- Route -->
+      <div class="col-12 col-md-6">
+        <section class="section-card h-100" role="region" aria-labelledby="pf-h-route">
+          <div class="section-title" id="pf-h-route"><i class="bi bi-signpost me-2 text-primary" aria-hidden="true"></i>Route</div>
+          <div class="section-body pt-2 pt-lg-3">
       <?php $drVal = trim((string)($parcel['delivery_route'] ?? '')); ?>
       <?php if (!empty($deliveryRoutesAll) && is_array($deliveryRoutesAll)): ?>
         <label class="pf-label" for="deliveryRouteField">Delivery route</label>
@@ -898,7 +1710,8 @@
         <label class="pf-label" for="deliveryRouteField">Delivery route</label>
         <input type="text" name="delivery_route" id="deliveryRouteField" class="form-control form-control-sm" placeholder="Route" value="<?php echo htmlspecialchars($drVal); ?>" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Delivery route">
       <?php endif; ?>
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -919,15 +1732,15 @@
   </div>
 
   <!-- Items & receipt section -->
-  <div class="section-card mt-1">
-    <div class="section-title"><i class="bi bi-list-ul me-1"></i> Items &amp; Total</div>
+  <div class="section-card pf-items-section mt-1" role="region" aria-labelledby="pf-h-items-total">
+    <div class="section-title" id="pf-h-items-total"><i class="bi bi-list-ul me-2 text-primary" aria-hidden="true"></i> Items &amp; Total</div>
     <div class="section-body p-0">
   <div class="receipt-box">
     <div class="receipt-header d-flex justify-content-between align-items-center">
       <div class="fw-semibold small">TS Transport</div>
       <div class="serial-badge d-flex align-items-center gap-1 flex-wrap justify-content-end">
         <label for="serialInput" class="mb-0 small">Serial:</label>
-        <input type="text" id="serialInput" name="tracking_number" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" />
+        <input type="text" id="serialInput" name="tracking_number" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" aria-label="Parcel serial or tracking number" autocomplete="off" />
       </div>
     </div>
     <div class="px-2 py-1 border-bottom bg-body-secondary bg-opacity-25">
@@ -944,17 +1757,26 @@
     </div>
 
     <div class="p-2 pt-1">
-      <div class="table-responsive overflow-x-auto pf-items-scroll mb-1">
-        <p class="small text-muted d-md-none mb-1 pf-scroll-hint" aria-hidden="true"><i class="bi bi-arrow-left-right me-1"></i>Scroll horizontally to see all columns.</p>
-        <table class="table receipt-grid mb-0" id="itemsTable">
+      <div class="pf-items-scroll mb-1">
+        <table class="table table-sm receipt-grid mb-0 align-middle" id="itemsTable" aria-describedby="pf-h-items-total">
+          <colgroup>
+            <col class="pf-col-no" style="width:4.5%" />
+            <col class="pf-col-desc" style="width:30%" />
+            <col class="pf-col-qty" style="width:8%" />
+            <col class="pf-col-rate" style="width:9%" />
+            <col class="pf-col-amt" style="width:10%" />
+            <col class="pf-col-addl" style="width:12%" />
+            <col class="pf-col-act" style="width:3.5rem" />
+          </colgroup>
           <thead>
             <tr>
-              <th style="width:6%">No</th>
-              <th>Description</th>
-              <th style="width:10%">Qty</th>
-              <th style="width:12%">Rate</th>
-              <th style="width:12%">Amount</th>
-              <th style="width:6%"></th>
+              <th scope="col">No</th>
+              <th scope="col">Description</th>
+              <th scope="col">Qty</th>
+              <th scope="col">Rate</th>
+              <th scope="col">Amount</th>
+              <th scope="col" title="Additional amounts">Additional</th>
+              <th scope="col"><span class="visually-hidden">Remove row</span></th>
             </tr>
           </thead>
           <tbody>
@@ -988,25 +1810,32 @@
               }
             ?>
             <tr>
-              <td class="text-center align-middle" data-label="#"><?php echo $rowIndex; ?></td>
+              <td class="text-center align-middle pf-item-no-cell" data-label=""><?php echo $rowIndex; ?></td>
               <td data-label="Description"><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
               <td data-label="Qty"><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
               <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
-              <td class="align-middle item-amount-cell" data-label="Amount">
-                <?php
-                  $addAmounts = [];
-                  if (!empty($it['additional_amounts'])) {
-                    $raw = $it['additional_amounts'];
-                    $addAmounts = is_string($raw) ? (json_decode($raw, true) ?: []) : (array)$raw;
-                  } elseif ((float)($it['additional_amount'] ?? 0) > 0) {
-                    $addAmounts = [(float)$it['additional_amount']];
-                  }
-                  if (empty($addAmounts)) { $addAmounts = ['']; }
-                  $rowTotal = $amt + array_sum(array_map('floatval', $addAmounts));
-                ?>
-                <div class="d-flex flex-column gap-1">
-                  <span class="item-amount fw-semibold"><?php echo $rowTotal > 0 ? number_format($rowTotal, 2) : '—'; ?></span>
-                  <label class="small text-muted mb-0">+ Add amounts:</label>
+              <?php
+                $addAmounts = [];
+                if (!empty($it['additional_amounts'])) {
+                  $raw = $it['additional_amounts'];
+                  $addAmounts = is_string($raw) ? (json_decode($raw, true) ?: []) : (array)$raw;
+                } elseif ((float)($it['additional_amount'] ?? 0) > 0) {
+                  $addAmounts = [(float)$it['additional_amount']];
+                }
+                if (empty($addAmounts)) { $addAmounts = ['']; }
+                $addSumPhp = array_sum(array_map('floatval', $addAmounts));
+              ?>
+              <td class="align-middle pf-item-amt-cell" data-label="Amount">
+                <span class="item-amount fw-semibold pf-amount-readout"><?php echo $amt > 0 ? number_format($amt, 2) : '—'; ?></span>
+              </td>
+              <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+                <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
+                  <span class="item-add-sum fw-semibold pf-amount-readout"><?php echo $addSumPhp > 0 ? number_format($addSumPhp, 2) : '—'; ?></span>
+                  <span class="visually-hidden">Additional line amounts</span>
+                  <div class="pf-item-add-excel-wrap">
+                    <div class="pf-item-add-excel-tokens" aria-hidden="true"></div>
+                    <input type="text" class="pf-item-add-excel-field" autocomplete="off" inputmode="decimal" placeholder="Amount, +, Enter" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> aria-label="Additional amounts">
+                  </div>
                   <div class="item-add-list d-flex flex-column gap-1">
                     <?php foreach ($addAmounts as $addVal): ?>
                     <div class="d-flex gap-1 align-items-center item-add-row">
@@ -1015,63 +1844,70 @@
                     </div>
                     <?php endforeach; ?>
                   </div>
-                  <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button><?php endif; ?>
+                  <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button><?php endif; ?>
                 </div>
               </td>
-              <td class="text-center pf-item-remove-cell"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row w-100 w-md-auto"><i class="bi bi-x"></i><span class="d-inline d-md-none ms-1">Remove line</span></button><?php endif; ?></td>
+              <td class="text-center pf-item-remove-cell"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button><?php endif; ?></td>
             </tr>
             <?php endforeach; ?>
             <?php if (empty($items)): ?>
             <tr>
-              <td class="text-center align-middle" data-label="#">1</td>
+              <td class="text-center align-middle pf-item-no-cell" data-label="">1</td>
               <td data-label="Description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
               <td data-label="Qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
               <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
-              <td class="align-middle item-amount-cell" data-label="Amount">
-                <div class="d-flex flex-column gap-1">
-                  <span class="item-amount fw-semibold">—</span>
-                  <label class="small text-muted mb-0">+ Add amounts:</label>
+              <td class="align-middle pf-item-amt-cell" data-label="Amount">
+                <span class="item-amount fw-semibold pf-amount-readout">—</span>
+              </td>
+              <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+                <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
+                  <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
+                  <span class="visually-hidden">Additional line amounts</span>
+                  <div class="pf-item-add-excel-wrap">
+                    <div class="pf-item-add-excel-tokens" aria-hidden="true"></div>
+                    <input type="text" class="pf-item-add-excel-field" autocomplete="off" inputmode="decimal" placeholder="Amount, +, Enter" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> aria-label="Additional amounts">
+                  </div>
                   <div class="item-add-list d-flex flex-column gap-1">
                     <div class="d-flex gap-1 align-items-center item-add-row">
                       <input type="number" step="0.01" min="0" name="items[1][additional_amounts][]" class="form-control form-control-sm item-add" placeholder="0" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?>>
                       <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button><?php endif; ?>
                     </div>
                   </div>
-                  <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button><?php endif; ?>
+                  <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button><?php endif; ?>
                 </div>
               </td>
-              <td class="text-center pf-item-remove-cell"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row w-100 w-md-auto"><i class="bi bi-x"></i><span class="d-inline d-md-none ms-1">Remove line</span></button><?php endif; ?></td>
+              <td class="text-center pf-item-remove-cell"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button><?php endif; ?></td>
             </tr>
             <?php endif; ?>
           </tbody>
         </table>
       </div>
-      <div class="text-end mb-1">
+      <div class="text-end mb-1 px-2">
           <?php if (!$lockAll): ?>
-            <button type="button" class="btn btn-sm btn-outline-primary" id="addRow"><i class="bi bi-plus-lg"></i> Add Row</button>
+            <button type="button" class="btn btn-sm btn-primary pf-btn-add-row w-100 w-md-auto" id="addRow" aria-label="Add line item"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add Row</button>
           <?php endif; ?>
       </div>
 
       <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
       <div class="receipt-total p-2 p-md-3">
-        <div class="row g-2 g-md-3 align-items-center justify-content-md-end">
-          <div class="col-6 col-md-auto">
-            <label class="col-form-label mb-0"><strong>Total</strong></label>
+        <div class="row g-2 g-md-3 align-items-center justify-content-lg-end">
+          <div class="col-12 col-sm-6 col-lg-auto">
+            <label class="col-form-label mb-0" for="totalPrice"><strong>Total</strong></label>
           </div>
-          <div class="col-6 col-md-auto">
-            <input type="number" step="0.01" min="0" class="form-control form-control-sm" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php 
+          <div class="col-12 col-sm-6 col-lg-auto">
+            <input type="number" step="0.01" min="0" class="form-control form-control-sm w-100" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php 
               echo ($lockAll || !$priceOnly) ? 'disabled' : '';
             ?> placeholder="0.00">
           </div>
           <?php if ($priceOnly && !$lockAll): ?>
-            <div class="col-6 col-md-auto">
-              <label class="col-form-label mb-0"><strong>Discount</strong></label>
+            <div class="col-12 col-sm-6 col-lg-auto">
+              <label class="col-form-label mb-0" for="discountInput"><strong>Discount</strong></label>
             </div>
-            <div class="col-6 col-md-auto">
-              <input type="number" step="0.01" min="0" class="form-control form-control-sm" name="discount" id="discountInput" value="" placeholder="0.00">
+            <div class="col-12 col-sm-6 col-lg-auto">
+              <input type="number" step="0.01" min="0" class="form-control form-control-sm w-100" name="discount" id="discountInput" value="" placeholder="0.00">
             </div>
           <?php endif; ?>
-          <div class="col-12 col-md-auto text-md-end">
+          <div class="col-12 col-lg-auto text-lg-end">
             <span class="fs-5 fw-bold" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
           </div>
         </div>
@@ -1100,7 +1936,7 @@
         </div>
         <div class="col-12 col-lg-auto d-none d-lg-block flex-shrink-0">
           <label class="form-label mb-1 opacity-0 user-select-none" aria-hidden="true">&nbsp;</label>
-          <button type="submit" id="parcelSubmitBtn" class="btn btn-primary btn-sm text-nowrap"><i class="bi bi-save me-1"></i> Save Parcel</button>
+          <button type="submit" id="parcelSubmitBtn" class="btn btn-primary btn-sm text-nowrap pf-btn-save"><i class="bi bi-save me-1" aria-hidden="true"></i> Save Parcel</button>
         </div>
       </div>
     </div>
@@ -1110,8 +1946,8 @@
   <!-- Mobile sticky action bar -->
   <div class="pf-sticky-actions d-lg-none">
     <div class="d-flex gap-2">
-      <button type="reset" class="btn btn-outline-secondary w-50" id="pfResetBtnMobile"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
-      <button type="submit" class="btn btn-primary w-50" id="pfSaveBtnMobile"><i class="bi bi-save me-1"></i> Save</button>
+      <button type="reset" class="btn btn-outline-secondary w-50 rounded-3" id="pfResetBtnMobile"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Reset</button>
+      <button type="submit" class="btn btn-primary w-50 pf-btn-save" id="pfSaveBtnMobile"><i class="bi bi-save me-1" aria-hidden="true"></i> Save</button>
     </div>
   </div>
 </form>
@@ -1216,75 +2052,6 @@
     </div>
   </div>
 
-  <!-- Quick Add Branch (From / To): outside parcel form -->
-  <div class="modal fade" id="quickAddFromBranch" tabindex="-1" aria-labelledby="quickAddFromBranchTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="quickAddFromBranchTitle">Quick Add Branch (From)</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-2 align-items-end pf-modal-branch-row">
-            <div class="col-12 col-sm-6 col-lg-5">
-              <label class="pf-label" for="fab_name">Branch name</label>
-              <input type="text" id="fab_name" class="form-control form-control-sm" autocomplete="off" aria-label="Branch name">
-            </div>
-            <div class="col-12 col-sm-6 col-lg-4">
-              <label class="pf-label" for="fab_code">Code</label>
-              <input type="text" id="fab_code" class="form-control form-control-sm" autocomplete="off" aria-label="Branch code">
-            </div>
-            <div class="col-12 col-sm-6 col-lg-3">
-              <span class="pf-label">Main</span>
-              <div class="d-flex align-items-center gap-2 border rounded pf-branch-modal-check">
-                <input class="form-check-input flex-shrink-0" type="checkbox" id="fab_main" aria-label="Mark as main branch">
-                <label class="form-check-label mb-0 small" for="fab_main">Main branch</label>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" id="fab_submit" class="btn btn-primary"><i class="bi bi-save"></i> Save &amp; Use</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal fade" id="quickAddToBranch" tabindex="-1" aria-labelledby="quickAddToBranchTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="quickAddToBranchTitle">Quick Add Branch (To)</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-2 align-items-end pf-modal-branch-row">
-            <div class="col-12 col-sm-6 col-lg-5">
-              <label class="pf-label" for="tab_name">Branch name</label>
-              <input type="text" id="tab_name" class="form-control form-control-sm" autocomplete="off" aria-label="Branch name">
-            </div>
-            <div class="col-12 col-sm-6 col-lg-4">
-              <label class="pf-label" for="tab_code">Code</label>
-              <input type="text" id="tab_code" class="form-control form-control-sm" autocomplete="off" aria-label="Branch code">
-            </div>
-            <div class="col-12 col-sm-6 col-lg-3">
-              <span class="pf-label">Main</span>
-              <div class="d-flex align-items-center gap-2 border rounded pf-branch-modal-check">
-                <input class="form-check-input flex-shrink-0" type="checkbox" id="tab_main" aria-label="Mark as main branch">
-                <label class="form-check-label mb-0 small" for="tab_main">Main branch</label>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" id="tab_submit" class="btn btn-primary"><i class="bi bi-save"></i> Save &amp; Use</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Quick Add Vehicle: outside parcel form -->
   <div class="modal fade" id="quickAddVehicle" tabindex="-1" aria-labelledby="quickAddVehicleTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -1365,6 +2132,20 @@
     try { return JSON.parse(t); } catch (_) { return null; }
   }
 
+  /** Keep native branch <select> and Choices.js UI in sync after programmatic value changes */
+  function syncBranchSelect(sel, value) {
+    if (!sel) return;
+    const v = value != null ? String(value) : '';
+    sel.value = v;
+    try {
+      if (sel._choices) {
+        const key = (v === '' || v === '0') ? '' : v;
+        sel._choices.setChoiceByValue(key);
+      }
+    } catch (_) { /* ignore */ }
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
   // Prevent double submission — all visible Save buttons (desktop status row, sticky mobile, header)
   const form = document.querySelector('form[action*="parcels&action=save"]');
   const saveBtns = [
@@ -1380,13 +2161,41 @@
       if (isSubmitting) {
         return false;
       }
+      // Delivery location: validate with a clear message (no duplicate HTML required + custom)
+      const deliveryLoc = document.getElementById('deliveryLocationInput');
+      if (deliveryLoc && !deliveryLoc.disabled) {
+        if (!String(deliveryLoc.value || '').trim()) {
+          deliveryLoc.setCustomValidity('Please enter a delivery location.');
+        } else {
+          deliveryLoc.setCustomValidity('');
+        }
+      }
+      const fromBranchEl = form.querySelector('select[name="from_branch_id"]');
+      const toBranchEl = form.querySelector('select[name="to_branch_id"]');
+      if (fromBranchEl && !fromBranchEl.disabled) {
+        const fv = String(fromBranchEl.value || '').trim();
+        if (!fv || fv === '0') {
+          fromBranchEl.setCustomValidity('Please select a from branch.');
+        } else {
+          fromBranchEl.setCustomValidity('');
+        }
+      }
+      if (toBranchEl && !toBranchEl.disabled) {
+        const tv = String(toBranchEl.value || '').trim();
+        if (!tv || tv === '0') {
+          toBranchEl.setCustomValidity('Please select a to branch.');
+        } else {
+          toBranchEl.setCustomValidity('');
+        }
+      }
       // Scroll to first invalid field (HTML5 validation)
       if (!form.checkValidity()) {
         form.classList.add('was-validated');
         const firstInvalid = form.querySelector(':invalid');
         if (firstInvalid) {
-          firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          firstInvalid.focus();
+          const scrollTarget = firstInvalid.closest('.choices') || firstInvalid;
+          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          try { firstInvalid.focus({ preventScroll: true }); } catch (_) { try { firstInvalid.focus(); } catch (_) {} }
         }
         return false;
       }
@@ -1428,9 +2237,15 @@
             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
             body: fd
           });
-          const data = await res.json().catch(() => null);
+          let data = null;
+          try {
+            const raw = await res.text();
+            data = raw ? JSON.parse(raw) : null;
+          } catch (_) {
+            data = null;
+          }
           if (!res.ok || !data || data.ok !== true) {
-            const msg = (data && data.error) ? String(data.error) : 'Save failed. Please check required fields.';
+            const msg = (data && data.error) ? String(data.error) : (res.status >= 500 ? 'Server error while saving. Please try again.' : 'Could not save. Check highlighted fields and try again.');
             showToast('error', 'Could not save', msg);
             // focus first invalid again
             const firstInvalid = form.querySelector(':invalid');
@@ -1452,8 +2267,8 @@
               const toId = qs.get('to_branch_id') || '';
               const veh = qs.get('vehicle_no') || '';
               if (cid && customerSel) { customerSel.value = cid; customerSel.dispatchEvent(new Event('change')); }
-              if (fromId && fromBranchSel) { fromBranchSel.value = fromId; fromBranchSel.dispatchEvent(new Event('change')); }
-              if (toId && toBranchSel) { toBranchSel.value = toId; toBranchSel.dispatchEvent(new Event('change')); }
+              if (fromId && fromBranchSel) { syncBranchSelect(fromBranchSel, fromId); }
+              if (toId && toBranchSel) { syncBranchSelect(toBranchSel, toId); }
               if (veh) {
                 if (vehicleSelect) { vehicleSelect.value = veh; vehicleSelect.dispatchEvent(new Event('change')); }
                 if (vehicleInput) { vehicleInput.value = veh; vehicleInput.dispatchEvent(new Event('input')); }
@@ -1464,24 +2279,31 @@
               if (tbody) {
                 tbody.innerHTML = `
                   <tr>
-                    <td class="text-center align-middle" data-label="#">1</td>
+                    <td class="text-center align-middle pf-item-no-cell" data-label="">1</td>
                     <td data-label="Description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description"></td>
                     <td data-label="Qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty"></td>
                     <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
-                    <td class="align-middle item-amount-cell" data-label="Amount">
-                      <div class="d-flex flex-column gap-1">
-                        <span class="item-amount fw-semibold">—</span>
-                        <label class="small text-muted mb-0">+ Add amounts:</label>
+                    <td class="align-middle pf-item-amt-cell" data-label="Amount">
+                      <span class="item-amount fw-semibold pf-amount-readout">—</span>
+                    </td>
+                    <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+                      <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
+                        <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
+                        <span class="visually-hidden">Additional line amounts</span>
+                        <div class="pf-item-add-excel-wrap">
+                          <div class="pf-item-add-excel-tokens" aria-hidden="true"></div>
+                          <input type="text" class="pf-item-add-excel-field" autocomplete="off" inputmode="decimal" placeholder="Amount, +, Enter" ${canEnterItemAmounts ? '' : 'disabled'} aria-label="Additional amounts">
+                        </div>
                         <div class="item-add-list d-flex flex-column gap-1">
                           <div class="d-flex gap-1 align-items-center item-add-row">
                             <input type="number" step="0.01" min="0" name="items[1][additional_amounts][]" class="form-control form-control-sm item-add" placeholder="0" ${canEnterItemAmounts ? '' : 'disabled'}>
                             ${canEnterItemAmounts ? '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button>' : ''}
                           </div>
                         </div>
-                        ${canEnterItemAmounts ? '<button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button>' : ''}
+                        ${canEnterItemAmounts ? '<button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button>' : ''}
                       </div>
                     </td>
-                    <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row w-100 w-md-auto"><i class="bi bi-x"></i><span class="d-inline d-md-none ms-1">Remove line</span></button></td>
+                    <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
                   </tr>`;
                 syncAddRemoveButtons(tbody);
                 recalc();
@@ -1542,7 +2364,9 @@
         const line = base + addSum;
         total += line;
         const amountEl = row.querySelector('.item-amount');
-        if (amountEl) amountEl.textContent = line > 0 ? line.toFixed(2) : '—';
+        const addSumEl = row.querySelector('.item-add-sum');
+        if (amountEl) amountEl.textContent = base > 0 ? base.toFixed(2) : '—';
+        if (addSumEl) addSumEl.textContent = addSum > 0 ? addSum.toFixed(2) : '—';
       });
       if (totalDisplay) totalDisplay.textContent = total > 0 ? total.toFixed(2) : '—';
       if (totalPrice && !totalPrice.disabled) totalPrice.value = total > 0 ? total.toFixed(2) : '';
@@ -1932,79 +2756,6 @@
       if (qvBtn) { qvBtn.disabled = false; qvBtn.innerHTML = '<i class="bi bi-save"></i> Save &amp; Use'; }
     }
   });
-  // Quick Add Branch: From Branch (fab_*)
-  const fabBtn = document.getElementById('fab_submit');
-  fabBtn?.addEventListener('click', async function(){
-    const name = (document.getElementById('fab_name')?.value || '').trim();
-    const code = (document.getElementById('fab_code')?.value || '').trim();
-    const isMain = !!document.getElementById('fab_main')?.checked;
-    if (!name || !code) { alert('Enter branch name and code'); return; }
-    if (fabBtn) { fabBtn.disabled = true; fabBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...'; }
-    try {
-      const created = await quickAdd(name, code, isMain);
-      const sel = document.querySelector('select[name="from_branch_id"]');
-      if (sel) {
-        // Avoid duplicate option and update label if present
-        const idStr = String(created.id);
-        const label = String(created.name||name);
-        let exists = false;
-        Array.from(sel.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; exists = true; } });
-        if (!exists) { const opt=document.createElement('option'); opt.value=idStr; opt.textContent=label; sel.appendChild(opt); }
-        const wasDisabled = sel.disabled; if (wasDisabled) sel.disabled = false;
-        sel.value = idStr;
-        sel.dispatchEvent(new Event('change'));
-        sel.dispatchEvent(new Event('input'));
-        if (wasDisabled) sel.disabled = true;
-      }
-      // Clear inputs and close collapse
-      ['fab_name','fab_code'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
-      const fabMain = document.getElementById('fab_main'); if (fabMain) fabMain.checked = false;
-      const m = document.getElementById('quickAddFromBranch');
-      if (m && window.bootstrap && window.bootstrap.Modal) {
-        bootstrap.Modal.getOrCreateInstance(m).hide();
-      }
-    } catch (e) {
-      alert(e && e.message ? e.message : 'Failed to add branch');
-    } finally {
-      if (fabBtn) { fabBtn.disabled = false; fabBtn.innerHTML = '<i class="bi bi-save"></i> Save &amp; Use'; }
-    }
-  });
-
-  // Quick Add Branch: To Branch (tab_*)
-  const tabBtn = document.getElementById('tab_submit');
-  tabBtn?.addEventListener('click', async function(){
-    const name = (document.getElementById('tab_name')?.value || '').trim();
-    const code = (document.getElementById('tab_code')?.value || '').trim();
-    const isMain = !!document.getElementById('tab_main')?.checked;
-    if (!name || !code) { alert('Enter branch name and code'); return; }
-    if (tabBtn) { tabBtn.disabled = true; tabBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...'; }
-    try {
-      const created = await quickAdd(name, code, isMain);
-      const sel = document.querySelector('select[name="to_branch_id"]');
-      if (sel) {
-        const idStr = String(created.id);
-        const label = String(created.name||name);
-        let exists = false;
-        Array.from(sel.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; exists = true; } });
-        if (!exists) { const opt=document.createElement('option'); opt.value=idStr; opt.textContent=label; sel.appendChild(opt); }
-        const wasDisabled = sel.disabled; if (wasDisabled) sel.disabled = false;
-        sel.value = idStr;
-        sel.dispatchEvent(new Event('change'));
-        sel.dispatchEvent(new Event('input'));
-        if (wasDisabled) sel.disabled = true;
-      }
-      ['tab_name','tab_code'].forEach(id=>{ const el=document.getElementById(id); if (el) el.value=''; });
-      const tabMain = document.getElementById('tab_main'); if (tabMain) tabMain.checked = false;
-      const m = document.getElementById('quickAddToBranch');
-      if (m && window.bootstrap && window.bootstrap.Modal) {
-        bootstrap.Modal.getOrCreateInstance(m).hide();
-      }
-    } catch (e) {
-      alert(e && e.message ? e.message : 'Failed to add branch');
-    } finally {
-      if (tabBtn) { tabBtn.disabled = false; tabBtn.innerHTML = '<i class="bi bi-save"></i> Save &amp; Use'; }
-    }
-  });
   // Quick Add Supplier handlers
   const qsBtn = document.getElementById('qs_submit');
   qsBtn?.addEventListener('click', async function(){
@@ -2080,30 +2831,6 @@
     }
   });
 
-  async function quickAdd(name, code, isMain){
-    const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
-    const form = new FormData();
-    form.append('csrf_token', csrf);
-    form.append('ajax', '1');
-    form.append('id', '0');
-    form.append('name', name);
-    form.append('code', code);
-    if (isMain) form.append('is_main', '1');
-    const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=branches&action=save'); ?>', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-      body: form
-    });
-    const raw = await res.text();
-    const data = parseJsonResponse(raw);
-    if (data && data.error) throw new Error(data.error);
-    if (!res.ok || !data || !data.id) {
-      throw new Error((raw && raw.length < 220 ? raw.trim() : '') || 'Could not save branch' + (res.status ? ' (' + res.status + ')' : ''));
-    }
-    return { id: data.id, name: data.name || name };
-  }
-
   table.addEventListener('input', function(e){
     const target = e.target;
     if (lockAll) return;
@@ -2115,7 +2842,14 @@
 
   function syncAddRemoveButtons(root){
     if (!root) return;
-    const lists = root.querySelectorAll ? root.querySelectorAll('.item-add-list') : [];
+    let lists = [];
+    if (root.querySelectorAll) {
+      if (root.classList && root.classList.contains('item-add-list')) {
+        lists = [root];
+      } else {
+        lists = root.querySelectorAll('.item-add-list');
+      }
+    }
     lists.forEach(function(list){
       const rows = list.querySelectorAll('.item-add-row');
       const hide = rows.length <= 1;
@@ -2177,24 +2911,31 @@
     const idx = tbody.querySelectorAll('tr').length + 1;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="text-center align-middle" data-label="#">${idx}</td>
+      <td class="text-center align-middle pf-item-no-cell" data-label="">${idx}</td>
       <td data-label="Description"><input type="text" name="items[${idx}][description]" class="form-control item-desc" placeholder="Description"></td>
       <td data-label="Qty"><input type="number" step="0.01" name="items[${idx}][qty]" class="form-control item-qty" placeholder="Qty"></td>
       <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[${idx}][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
-      <td class="align-middle item-amount-cell" data-label="Amount">
-        <div class="d-flex flex-column gap-1">
-          <span class="item-amount fw-semibold">—</span>
-          <label class="small text-muted mb-0">+ Add amounts:</label>
+      <td class="align-middle pf-item-amt-cell" data-label="Amount">
+        <span class="item-amount fw-semibold pf-amount-readout">—</span>
+      </td>
+      <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+        <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
+          <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
+          <span class="visually-hidden">Additional line amounts</span>
+          <div class="pf-item-add-excel-wrap">
+            <div class="pf-item-add-excel-tokens" aria-hidden="true"></div>
+            <input type="text" class="pf-item-add-excel-field" autocomplete="off" inputmode="decimal" placeholder="Amount, +, Enter" ${canEnterItemAmounts ? '' : 'disabled'} aria-label="Additional amounts">
+          </div>
           <div class="item-add-list d-flex flex-column gap-1">
             <div class="d-flex gap-1 align-items-center item-add-row">
               <input type="number" step="0.01" min="0" name="items[${idx}][additional_amounts][]" class="form-control form-control-sm item-add" placeholder="0" ${canEnterItemAmounts ? '' : 'disabled'}>
               <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button>
             </div>
           </div>
-          <button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn"><i class="bi bi-plus"></i> Add amount</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button>
         </div>
       </td>
-      <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row w-100 w-md-auto"><i class="bi bi-x"></i><span class="d-inline d-md-none ms-1">Remove line</span></button></td>
+      <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
     `;
     tbody.appendChild(tr);
     syncAddRemoveButtons(tr);
@@ -2204,6 +2945,135 @@
   });
 
   recalc();
+
+  /* Excel-style additional amounts: visual layer over existing item-add[] inputs (no changes to recalc / names / classes on those inputs). */
+  (function pfItemAddExcelLayer() {
+    if (!table) return;
+    function parseNumsFromText(s) {
+      if (!s || !String(s).trim()) return [];
+      return String(s).split(/\s*\+\s*/).map(function (p) { return p.trim(); })
+        .filter(Boolean)
+        .map(function (p) { return parseFloat(String(p).replace(',', '.')); })
+        .filter(function (n) { return !isNaN(n) && n >= 0; });
+    }
+    function readPositiveValues(list) {
+      var out = [];
+      if (!list) return out;
+      list.querySelectorAll('input.item-add').forEach(function (inp) {
+        var v = parseFloat(inp && inp.value);
+        if (!isNaN(v) && v > 0) out.push(v);
+      });
+      return out;
+    }
+    function ensureRowMarkup(baseName) {
+      var div = document.createElement('div');
+      div.className = 'd-flex gap-1 align-items-center item-add-row';
+      div.innerHTML = '<input type="number" step="0.01" min="0" name="' + baseName + '" class="form-control form-control-sm item-add" placeholder="0"><button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-add" title="Remove"><i class="bi bi-x"></i></button>';
+      return div;
+    }
+    function applyValues(list, values) {
+      var baseName = 'items[1][additional_amounts][]';
+      var nm = list.querySelector('input[name]');
+      if (nm && nm.name) baseName = nm.name;
+      var need = Math.max(1, values.length);
+      var rows = list.querySelectorAll('.item-add-row');
+      while (rows.length < need) {
+        list.appendChild(ensureRowMarkup(baseName));
+        rows = list.querySelectorAll('.item-add-row');
+      }
+      while (rows.length > need) {
+        rows[rows.length - 1].remove();
+        rows = list.querySelectorAll('.item-add-row');
+      }
+      rows = list.querySelectorAll('.item-add-row');
+      for (var i = 0; i < rows.length; i++) {
+        var inp = rows[i].querySelector('input.item-add');
+        if (!inp) continue;
+        if (i < values.length) {
+          inp.value = Number(values[i]).toFixed(2);
+        } else {
+          inp.value = '';
+        }
+      }
+      syncAddRemoveButtons(list);
+      var first = list.querySelector('input.item-add');
+      if (first) first.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    function initBlock(block) {
+      var wrap = block.querySelector('.pf-item-add-excel-wrap');
+      if (!wrap || wrap.dataset.pfExcelInit) return;
+      var list = block.querySelector('.item-add-list');
+      var field = wrap.querySelector('.pf-item-add-excel-field');
+      var tokensEl = wrap.querySelector('.pf-item-add-excel-tokens');
+      if (!list || !tokensEl) return;
+      wrap.dataset.pfExcelInit = '1';
+      try { list.setAttribute('inert', ''); } catch (_) {}
+      function render() {
+        tokensEl.innerHTML = '';
+        var vals = readPositiveValues(list);
+        vals.forEach(function (v, idx) {
+          var tok = document.createElement('span');
+          tok.className = 'pf-item-add-excel-token';
+          tok.appendChild(document.createTextNode(Number(v).toFixed(2)));
+          var rm = document.createElement('button');
+          rm.type = 'button';
+          rm.className = 'pf-item-add-excel-remove';
+          rm.setAttribute('aria-label', 'Remove');
+          rm.appendChild(document.createTextNode('\u00D7'));
+          rm.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (lockAll || !canEnterItemAmounts) return;
+            var cur = readPositiveValues(list);
+            cur.splice(idx, 1);
+            applyValues(list, cur);
+            render();
+          });
+          tok.appendChild(rm);
+          tokensEl.appendChild(tok);
+        });
+      }
+      function commitField() {
+        if (!field || field.disabled) return;
+        var t = field.value.trim();
+        if (t === '') return;
+        if (t.indexOf('+') !== -1) {
+          applyValues(list, parseNumsFromText(t));
+        } else {
+          var n = parseFloat(String(t).replace(',', '.'));
+          if (isNaN(n) || n < 0) {
+            field.value = '';
+            return;
+          }
+          var cur = readPositiveValues(list);
+          cur.push(n);
+          applyValues(list, cur);
+        }
+        field.value = '';
+        render();
+      }
+      render();
+      if (field && canEnterItemAmounts && !lockAll) {
+        field.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitField();
+          }
+        });
+        field.addEventListener('blur', function (e) {
+          if (wrap.contains(e.relatedTarget)) return;
+          commitField();
+        });
+      }
+    }
+    table.querySelectorAll('.pf-item-add-block.pf-item-add-excel').forEach(initBlock);
+    var tbody = table.querySelector('tbody');
+    if (tbody) {
+      var mo = new MutationObserver(function () {
+        tbody.querySelectorAll('.pf-item-add-block.pf-item-add-excel').forEach(initBlock);
+      });
+      mo.observe(tbody, { childList: true, subtree: true });
+    }
+  })();
 
   // Auto update Customer and To labels
   const customerSelect = document.querySelector('select[name="customer_id"]');
@@ -2219,11 +3089,31 @@
   const toBranchSuggest = document.getElementById('toBranchSuggest');
   const branchesData = <?php echo json_encode(array_map(function($b){ return ['id'=>(int)$b['id'],'name'=>$b['name']]; }, $branchesAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   const customersData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)$c['id'],'delivery_location'=>$c['delivery_location'] ?? '']; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+  /** Label for receipt summary — use value lookup (Choices.js can leave selectedIndex on placeholder while value is set) */
+  function branchSelectLabel(sel) {
+    if (!sel) return '—';
+    let v = String(sel.value || '').trim();
+    if (!v || v === '0') return '—';
+    try {
+      if (sel._choices && typeof sel._choices.getValue === 'function') {
+        var gv = sel._choices.getValue(true);
+        var raw = Array.isArray(gv) ? gv[0] : gv;
+        if (raw !== undefined && raw !== null && String(raw) !== '') v = String(raw);
+      }
+    } catch (_) { /* ignore */ }
+    var opt = Array.from(sel.options).find(function (o) { return String(o.value) === v; });
+    if (opt) {
+      var t = (opt.textContent || opt.text || '').trim();
+      if (t) return t;
+    }
+    var bd = branchesData.find(function (b) { return String(b.id) === v; });
+    return bd && bd.name ? String(bd.name) : '—';
+  }
   function updateMeta(){
     const selIdx = customerSelect?.selectedIndex ?? -1;
     const custText = customerSelect?.options[selIdx]?.text || '-- Select Customer --';
-    const fromText = fromBranchSelect?.options[fromBranchSelect?.selectedIndex]?.text || '—';
-    const toText = toBranchSelect?.options[toBranchSelect?.selectedIndex]?.text || '—';
+    const fromText = branchSelectLabel(fromBranchSelect);
+    const toText = branchSelectLabel(toBranchSelect);
     if (customerDisplay) customerDisplay.textContent = custText;
     if (fromBranchDisplay) fromBranchDisplay.textContent = fromText;
     if (toBranchDisplay) toBranchDisplay.textContent = toText;
@@ -2244,8 +3134,7 @@
       if (matches.length === 1) {
         // Auto-select
         if (toBranchSelect) {
-          toBranchSelect.value = String(matches[0].id);
-          toBranchSelect.dispatchEvent(new Event('change'));
+          syncBranchSelect(toBranchSelect, String(matches[0].id));
         }
       } else if (matches.length > 1 && toBranchSuggest) {
         const html = 'Suggested: ' + matches.map(m => `<a href="#" data-pick-branch="${m.id}">${m.name}</a>`).join(' | ');
@@ -2314,12 +3203,10 @@
       const d = payload.data;
       // Only set if current value is empty/zero
       if (fromBranchSelect && (!fromBranchSelect.value || fromBranchSelect.value === '0') && parseInt(d.from_branch_id||0) > 0) {
-        fromBranchSelect.value = String(d.from_branch_id);
-        fromBranchSelect.dispatchEvent(new Event('change'));
+        syncBranchSelect(fromBranchSelect, String(d.from_branch_id));
       }
       if (toBranchSelect && (!toBranchSelect.value || toBranchSelect.value === '0') && parseInt(d.to_branch_id||0) > 0) {
-        toBranchSelect.value = String(d.to_branch_id);
-        toBranchSelect.dispatchEvent(new Event('change'));
+        syncBranchSelect(toBranchSelect, String(d.to_branch_id));
       }
       const suppSel = document.getElementById('supplierSelect');
       if (suppSel && (!suppSel.value || suppSel.value === '0') && parseInt(d.supplier_id||0) > 0) {
@@ -2359,11 +3246,26 @@
   customerSelect?.addEventListener('change', applyPreviousBillingInfo);
   fromBranchSelect?.addEventListener('change', updateMeta);
   toBranchSelect?.addEventListener('change', updateMeta);
+  fromBranchSelect?.addEventListener('input', updateMeta);
+  toBranchSelect?.addEventListener('input', updateMeta);
+  document.getElementById('parcelForm')?.addEventListener('click', function (e) {
+    if (!e.target.closest('.pf-branches-section select.form-select')) return;
+    window.requestAnimationFrame(function () { try { updateMeta(); } catch (_) {} });
+  });
+  function clearBranchFieldInvalid(sel) {
+    if (!sel) return;
+    sel.setCustomValidity('');
+    sel.classList.remove('is-invalid');
+    const wrap = sel.closest('.choices');
+    if (wrap) wrap.classList.remove('is-invalid');
+  }
+  fromBranchSelect?.addEventListener('change', function () { clearBranchFieldInvalid(this); });
+  toBranchSelect?.addEventListener('change', function () { clearBranchFieldInvalid(this); });
   // If From Branch is empty on load, default to current user's branch
   const userBranchId = <?php echo (int)((Auth::user()['branch_id'] ?? 0)); ?>;
   if (fromBranchSelect && (!fromBranchSelect.value || fromBranchSelect.value === '0') && userBranchId > 0) {
     const opt = Array.from(fromBranchSelect.options).find(o => parseInt(o.value||'0') === userBranchId);
-    if (opt) { fromBranchSelect.value = String(userBranchId); fromBranchSelect.dispatchEvent(new Event('change')); }
+    if (opt) { syncBranchSelect(fromBranchSelect, String(userBranchId)); }
   }
   updateMeta();
   fetchCustomerSummary();
@@ -2414,8 +3316,7 @@
       e.preventDefault();
       const id = a.getAttribute('data-pick-branch');
       if (toBranchSelect) {
-        toBranchSelect.value = id;
-        toBranchSelect.dispatchEvent(new Event('change'));
+        syncBranchSelect(toBranchSelect, id);
       }
     }
   });

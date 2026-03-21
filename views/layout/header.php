@@ -53,7 +53,6 @@ $user = Auth::user();
     <ul class="nav nav-pills flex-column p-2 small" role="list">
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='dashboard'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>"<?php echo $navCurrent($currentPage==='dashboard'); ?>><i class="bi bi-speedometer2" aria-hidden="true"></i><span>Dashboard</span></a></li>
       <?php if (($user['role'] ?? '') === 'admin'): ?>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='branches'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=branches'); ?>"<?php echo $navCurrent($currentPage==='branches'); ?>><i class="bi bi-diagram-3" aria-hidden="true"></i><span>Branches</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='users'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>"<?php echo $navCurrent($currentPage==='users'); ?>><i class="bi bi-people" aria-hidden="true"></i><span>Users</span></a></li>
       <?php endif; ?>
       <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsCreateActive?'active':''; ?>" href="<?php echo $parcelsCreateUrl; ?>"<?php echo $navCurrent($isParcelsCreateActive); ?>><i class="bi bi-box-seam" aria-hidden="true"></i><span>Parcels</span></a></li>
@@ -88,7 +87,7 @@ $user = Auth::user();
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='reports'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=reports'); ?>"<?php echo $navCurrent($currentPage==='reports'); ?>><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Reports</span></a></li>
       <?php if (($user['role'] ?? '') === 'admin'): ?>
         <li class="nav-item nav-section">Admin</li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='settings'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>"<?php echo $navCurrent($currentPage==='settings'); ?>><i class="bi bi-gear" aria-hidden="true"></i><span>Settings</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='settings' || $currentPage==='branches')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>"<?php echo $navCurrent($currentPage==='settings' || $currentPage==='branches'); ?>><i class="bi bi-gear" aria-hidden="true"></i><span>Settings</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='backup'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=backup'); ?>"<?php echo $navCurrent($currentPage==='backup'); ?>><i class="bi bi-hdd" aria-hidden="true"></i><span>Backups</span></a></li>
       <?php endif; ?>
       <?php if ($user): ?>

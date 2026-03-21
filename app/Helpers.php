@@ -18,6 +18,16 @@ class Helpers
 
     public static function companyBranches(): array
     {
+        try {
+            if (class_exists('BranchRepository')) {
+                $rows = BranchRepository::branchesForCompanyPrint(Database::pdo());
+                if ($rows !== []) {
+                    return $rows;
+                }
+            }
+        } catch (Throwable $e) {
+            // fall back to JSON
+        }
         $company = self::company();
         $branches = $company['branches'] ?? [];
         return is_array($branches) ? $branches : [];
@@ -25,6 +35,21 @@ class Helpers
 
     public static function companyDefaultBranch(): array
     {
+        try {
+            if (class_exists('BranchRepository')) {
+                $row = BranchRepository::getDefaultForPrint(Database::pdo());
+                if ($row) {
+                    return [
+                        'name' => (string)($row['name'] ?? ''),
+                        'address_ta' => (string)($row['address_tamil'] ?? ''),
+                        'address_en' => (string)($row['address_english'] ?? ''),
+                        'phones' => (string)($row['phones'] ?? ''),
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            // fall back
+        }
         $branches = self::companyBranches();
         foreach ($branches as $b) {
             if (!is_array($b)) { continue; }

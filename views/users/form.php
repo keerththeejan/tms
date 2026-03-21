@@ -72,7 +72,13 @@
         <select name="branch_id" class="form-select">
           <option value="0">-- None --</option>
           <?php foreach (($branchesAll ?? []) as $b): ?>
-            <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($userRow['branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+            <?php
+              $bid = (int)$b['id'];
+              $inactive = isset($b['is_active']) && (int)$b['is_active'] === 0;
+              $selected = ((int)($userRow['branch_id'] ?? 0) === $bid);
+              $label = htmlspecialchars((string)($b['name'] ?? '')) . ($inactive ? ' (inactive)' : '');
+            ?>
+            <option value="<?php echo $bid; ?>" <?php echo $selected ? 'selected' : ''; ?><?php echo ($inactive && !$selected) ? ' disabled' : ''; ?>><?php echo $label; ?></option>
           <?php endforeach; ?>
         </select>
         <div class="collapse mt-2" id="quickAddUserBranch">

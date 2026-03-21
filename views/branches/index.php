@@ -1,5 +1,9 @@
 <?php
 /** @var array $branches */
+$branchListEmbed = $branchListEmbed ?? false;
+$error = $error ?? '';
+$branchListError = $branchListError ?? null;
+$brErr = $branchListError !== null ? (string)$branchListError : (string)$error;
 $newUrl = Helpers::baseUrl('index.php?page=branches&action=new');
 $deleteAction = Helpers::baseUrl('index.php?page=branches&action=delete');
 $csrf = Helpers::csrfToken();
@@ -265,11 +269,23 @@ $csrf = Helpers::csrfToken();
   }
 </style>
 
-<section class="branches-page" aria-labelledby="branches-heading">
+<section class="branches-page" aria-labelledby="branches-heading"<?php echo !empty($branchListEmbed) ? ' id="settings-operational-branches"' : ''; ?>>
+  <?php if (!empty($branchListEmbed)): ?>
+  <header class="mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+      <div>
+        <h1 id="branches-heading" class="h5 fw-bold mb-1">Operational branches</h1>
+        <p class="small text-muted mb-0">Parcels, users, delivery notes, and reports use this master list. Updates apply everywhere immediately.</p>
+      </div>
+      <a href="<?php echo htmlspecialchars($newUrl); ?>" class="btn btn-sm btn-primary flex-shrink-0"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">New branch</span><span class="d-sm-none">New</span></a>
+    </div>
+  </header>
+  <?php else: ?>
   <header class="branches-toolbar-sticky">
     <nav aria-label="Breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="<?php echo Helpers::baseUrl('index.php?page=settings'); ?>">Settings</a></li>
         <li class="breadcrumb-item active" aria-current="page">Branches</li>
       </ol>
     </nav>
@@ -283,12 +299,13 @@ $csrf = Helpers::csrfToken();
       </a>
     </div>
   </header>
-
-  <?php if (!empty($error)): ?>
-    <div class="alert alert-danger py-2 mb-3" role="alert"><?php echo htmlspecialchars((string)$error); ?></div>
   <?php endif; ?>
 
-  <div class="controls-card">
+  <?php if (!empty($brErr)): ?>
+    <div class="alert alert-danger py-2 mb-3" role="alert"><?php echo htmlspecialchars($brErr); ?></div>
+  <?php endif; ?>
+
+  <div class="controls-card" id="settings-branch-crud">
     <div class="row g-2 g-md-3 align-items-end">
       <div class="col-12 col-md-4 col-lg-3">
         <label class="form-label small fw-semibold mb-1" for="branchSearch">Search</label>
@@ -344,6 +361,7 @@ $csrf = Helpers::csrfToken();
             <th scope="col">Name</th>
             <th scope="col" class="col-code d-none d-lg-table-cell">Code</th>
             <th scope="col" class="col-main">Type</th>
+            <th scope="col" class="d-none d-xl-table-cell">Status</th>
             <th scope="col" class="text-end col-actions">Actions</th>
           </tr>
         </thead>
@@ -352,6 +370,7 @@ $csrf = Helpers::csrfToken();
             $bid = (int)$b['id'];
             $rowNum = (int)$index + 1;
             $isMain = (int)($b['is_main'] ?? 0) === 1;
+            $isActive = !isset($b['is_active']) || (int)($b['is_active'] ?? 1) === 1;
             $name = (string)($b['name'] ?? '');
             $code = (string)($b['code'] ?? '');
             $editUrl = Helpers::baseUrl('index.php?page=branches&action=edit&id=' . $bid);
@@ -373,6 +392,13 @@ $csrf = Helpers::csrfToken();
                 <span class="badge rounded-pill badge-main">Main</span>
               <?php else: ?>
                 <span class="badge rounded-pill badge-branch">Branch</span>
+              <?php endif; ?>
+            </td>
+            <td class="d-none d-xl-table-cell">
+              <?php if ($isActive): ?>
+                <span class="badge text-bg-success">Active</span>
+              <?php else: ?>
+                <span class="badge text-bg-secondary">Inactive</span>
               <?php endif; ?>
             </td>
             <td class="text-end">

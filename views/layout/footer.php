@@ -112,8 +112,9 @@
         allowHTML: false,
         removeItemButton: sel.multiple === true
       };
+      var selName = (sel.getAttribute('name')||'').toLowerCase();
       // Keep placeholder at top for supplier select by disabling sort
-      if ((sel.getAttribute('name')||'').toLowerCase() === 'supplier_id') {
+      if (selName === 'supplier_id') {
         cfg.shouldSort = false;
       }
       var instance = new Choices(sel, cfg);

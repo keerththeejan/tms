@@ -271,7 +271,7 @@ switch ($page) {
         $recentPayments = $rp->fetchAll();
 
         // Per-branch aggregates and status stats across all branches
-        $branchesAll = $pdo->query('SELECT id, name, code FROM branches ORDER BY name')->fetchAll();
+        $branchesAll = BranchRepository::forDashboard($pdo);
         $pendingByBranch = [];
         $dueByBranch = [];
         $todayParcelsByBranch = [];
@@ -440,6 +440,8 @@ switch ($page) {
     case 'settings':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         if (!Auth::hasRole('admin')) { http_response_code(403); echo 'Forbidden'; break; }
+        $pdoSettings = Database::pdo();
+        $branchesMaster = BranchRepository::allOrderedForAdmin($pdoSettings);
         $config = Helpers::config();
         $company = $config['company'] ?? [];
         $error = '';
@@ -498,80 +500,70 @@ switch ($page) {
                     }
                 }
 
-                $branchName = $_POST['branch_name'] ?? [];
-                $branchAddressTa = $_POST['branch_address_ta'] ?? [];
-                $branchAddressEn = $_POST['branch_address_en'] ?? [];
-                $branchPhones = $_POST['branch_phones'] ?? [];
                 $branchesData = [];
-                for ($i = 0; $i < 3; $i++) {
-                    $branchesData[] = [
-                        'name' => trim($branchName[$i] ?? ''),
-                        'address_ta' => trim($branchAddressTa[$i] ?? ''),
-                        'address_en' => trim($branchAddressEn[$i] ?? ''),
-                        'phones' => trim($branchPhones[$i] ?? ''),
+                if ($error === '') {
+                    try {
+                        $sync = BranchRepository::syncSettingsFromCompanyPost($pdoSettings, $_POST);
+                        $branchesData = $sync['mirror'];
+                    } catch (Throwable $e) {
+                        $error = 'Could not save branch addresses: ' . $e->getMessage();
+                    }
+                }
+
+                if ($error === '') {
+                    $routeParts = array_filter([$routePart1, $routePart2, $routePart3]);
+                    if (empty($routeParts)) {
+                        $routeParts = ['கொழும்பு', 'கிளிநொச்சி', 'முல்லைத்தீவு'];
+                    }
+
+                    $companyOverride = [
+                        'name' => $name ?: ($company['name'] ?? 'TS Transport'),
+                        'reg_no' => $regNo,
+                        'logo_display' => $logoDisplay,
+                        'logo_initials' => $logoInitials ?: 'TS',
+                        'logo_arch_color' => $logoArchColor,
+                        'logo_bar_bg' => $logoBarBg,
+                        'logo_bar_color' => $logoBarColor,
+                        'logo_title_color' => $logoTitleColor,
+                        'logo_url' => $logoUrl,
+                        'route_tamil_parts' => array_values($routeParts),
+                        'branches' => $branchesData,
+                        'footer_note' => $footerNote,
                     ];
-                }
+                    $toSave = [
+                        'company' => array_merge($company, $companyOverride),
+                        'google_maps_api_key' => $googleMapsKey,
+                    ];
+                    $configDir = realpath(__DIR__ . '/../config');
+                    $jsonPath = ($configDir ? ($configDir . DIRECTORY_SEPARATOR . 'company.json') : (__DIR__ . '/../config/company.json'));
 
-                // Default header/print branch: store by ordering (selected branch becomes index 0)
-                $defaultBranchIdx = isset($_POST['default_branch_idx']) ? (int)$_POST['default_branch_idx'] : 0;
-                if ($defaultBranchIdx < 0) { $defaultBranchIdx = 0; }
-                if ($defaultBranchIdx > 2) { $defaultBranchIdx = 2; }
-                if (isset($branchesData[$defaultBranchIdx])) {
-                    $selected = $branchesData[$defaultBranchIdx];
-                    array_splice($branchesData, $defaultBranchIdx, 1);
-                    array_unshift($branchesData, $selected);
-                }
-
-                $routeParts = array_filter([$routePart1, $routePart2, $routePart3]);
-                if (empty($routeParts)) {
-                    $routeParts = ['கொழும்பு', 'கிளிநொச்சி', 'முல்லைத்தீவு'];
-                }
-
-                $companyOverride = [
-                    'name' => $name ?: ($company['name'] ?? 'TS Transport'),
-                    'reg_no' => $regNo,
-                    'logo_display' => $logoDisplay,
-                    'logo_initials' => $logoInitials ?: 'TS',
-                    'logo_arch_color' => $logoArchColor,
-                    'logo_bar_bg' => $logoBarBg,
-                    'logo_bar_color' => $logoBarColor,
-                    'logo_title_color' => $logoTitleColor,
-                    'logo_url' => $logoUrl,
-                    'route_tamil_parts' => array_values($routeParts),
-                    'branches' => $branchesData,
-                    'footer_note' => $footerNote,
-                ];
-                $toSave = [
-                    'company' => array_merge($company, $companyOverride),
-                    'google_maps_api_key' => $googleMapsKey,
-                ];
-                $configDir = realpath(__DIR__ . '/../config');
-                $jsonPath = ($configDir ? ($configDir . DIRECTORY_SEPARATOR . 'company.json') : (__DIR__ . '/../config/company.json'));
-
-                $json = json_encode($toSave, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-                if ($json === false) {
-                    $error = 'Could not encode settings to JSON.';
-                } else if (!is_dir(dirname($jsonPath))) {
-                    $error = 'Config folder not found: ' . dirname($jsonPath);
-                } else if (!is_writable(dirname($jsonPath))) {
-                    $error = 'Config folder is not writable: ' . dirname($jsonPath);
-                } else {
-                    $written = @file_put_contents($jsonPath, $json, LOCK_EX);
-                    if ($written !== false) {
-                        $success = 'Company settings saved.';
-                        $company = array_merge($company, $companyOverride);
-                        $config['google_maps_api_key'] = $googleMapsKey;
+                    $json = json_encode($toSave, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                    if ($json === false) {
+                        $error = 'Could not encode settings to JSON.';
+                    } else if (!is_dir(dirname($jsonPath))) {
+                        $error = 'Config folder not found: ' . dirname($jsonPath);
+                    } else if (!is_writable(dirname($jsonPath))) {
+                        $error = 'Config folder is not writable: ' . dirname($jsonPath);
                     } else {
-                        $last = error_get_last();
-                        $extra = ($last && isset($last['message'])) ? (' Error: ' . $last['message']) : '';
-                        $error = 'Could not save settings to ' . $jsonPath . '. Check write permissions.' . $extra;
+                        $written = @file_put_contents($jsonPath, $json, LOCK_EX);
+                        if ($written !== false) {
+                            $success = 'Company settings saved.';
+                            $company = array_merge($company, $companyOverride);
+                            $config['google_maps_api_key'] = $googleMapsKey;
+                        } else {
+                            $last = error_get_last();
+                            $extra = ($last && isset($last['message'])) ? (' Error: ' . $last['message']) : '';
+                            $error = 'Could not save settings to ' . $jsonPath . '. Check write permissions.' . $extra;
+                        }
                     }
                 }
             }
             }
         }
 
-        Helpers::view('settings/index', compact('company', 'config', 'error', 'success'));
+        $settingsBranchSlots = BranchRepository::getSettingsFormBranches($pdoSettings, $company);
+        $defaultBranchSlotIndex = BranchRepository::getDefaultBranchSlotIndex($pdoSettings);
+        Helpers::view('settings/index', compact('company', 'config', 'error', 'success', 'branchesMaster', 'settingsBranchSlots', 'defaultBranchSlotIndex'));
         break;
 
     case 'branches':
@@ -581,7 +573,34 @@ switch ($page) {
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
 
-        
+        if ($action === 'index') {
+            Helpers::redirect('index.php?page=settings#settings-operational-branches');
+            break;
+        }
+
+        if ($action === 'json') {
+            if (!Auth::check()) {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['ok' => false, 'error' => 'Unauthorized']);
+                break;
+            }
+            $preserve = [];
+            if (isset($_GET['preserve_from'])) {
+                $preserve[] = (int)$_GET['preserve_from'];
+            }
+            if (isset($_GET['preserve_to'])) {
+                $preserve[] = (int)$_GET['preserve_to'];
+            }
+            if (isset($_GET['preserve'])) {
+                foreach (explode(',', (string)$_GET['preserve']) as $p) {
+                    $preserve[] = (int)trim($p);
+                }
+            }
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['ok' => true, 'branches' => BranchRepository::toJsonList($pdo, $preserve)], JSON_UNESCAPED_UNICODE);
+            break;
+        }
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
@@ -589,17 +608,20 @@ switch ($page) {
             $name = trim($_POST['name'] ?? '');
             $code = trim($_POST['code'] ?? '');
             $is_main = isset($_POST['is_main']) ? 1 : 0;
+            $location = trim($_POST['location'] ?? '');
+            $is_active = isset($_POST['is_active']) ? 1 : 0;
             if ($name === '' || $code === '') { $error = 'Name and Code are required.'; Helpers::view('branches/form', compact('error')); break; }
             $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
                          || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
                          || (($_POST['ajax'] ?? '') === '1');
 
+            BranchRepository::ensureSchema($pdo);
             if ($id > 0) {
-                $stmt = $pdo->prepare('UPDATE branches SET name=?, code=?, is_main=? WHERE id=?');
-                $stmt->execute([$name, $code, $is_main, $id]);
+                $stmt = $pdo->prepare('UPDATE branches SET name=?, code=?, is_main=?, location=?, is_active=? WHERE id=?');
+                $stmt->execute([$name, $code, $is_main, ($location !== '' ? $location : null), $is_active, $id]);
             } else {
-                $stmt = $pdo->prepare('INSERT INTO branches (name, code, is_main) VALUES (?,?,?)');
-                $stmt->execute([$name, $code, $is_main]);
+                $stmt = $pdo->prepare('INSERT INTO branches (name, code, is_main, location, is_active) VALUES (?,?,?,?,?)');
+                $stmt->execute([$name, $code, $is_main, ($location !== '' ? $location : null), $is_active]);
                 $id = (int)$pdo->lastInsertId();
             }
             if ($is_main) {
@@ -611,10 +633,10 @@ switch ($page) {
             }
             if ($wantsJson) {
                 header('Content-Type: application/json');
-                echo json_encode(['id'=>$id, 'name'=>$name, 'code'=>$code, 'is_main'=>$is_main]);
+                echo json_encode(['id'=>$id, 'name'=>$name, 'code'=>$code, 'is_main'=>$is_main, 'location'=>$location, 'is_active'=>$is_active]);
                 return;
             }
-            Helpers::redirect('index.php?page=branches');
+            Helpers::redirect('index.php?page=settings#settings-branch-crud');
             break;
         }
 
@@ -684,7 +706,7 @@ switch ($page) {
                     $countMain = $pdo->query('SELECT COUNT(*) AS c FROM branches WHERE is_main=1')->fetch();
                     if ((int)$countMain['c'] <= 1) {
                         $error = 'Cannot delete the only Main Branch.';
-                        $branches = $pdo->query('SELECT * FROM branches ORDER BY is_main DESC, name')->fetchAll();
+                        $branches = BranchRepository::allOrderedForAdmin($pdo);
                         Helpers::view('branches/index', compact('branches','error'));
                         break;
                     }
@@ -695,19 +717,19 @@ switch ($page) {
                     // Integrity constraint (e.g., referenced by expenses, users, parcels, etc.)
                     if ($e->getCode() === '23000') {
                         $error = 'Cannot delete this branch because it is used by other records (e.g., expenses, users, parcels). Delete or reassign those records first.';
-                        $branches = $pdo->query('SELECT * FROM branches ORDER BY is_main DESC, name')->fetchAll();
+                        $branches = BranchRepository::allOrderedForAdmin($pdo);
                         Helpers::view('branches/index', compact('branches','error'));
                         break;
                     }
                     throw $e;
                 }
             }
-            Helpers::redirect('index.php?page=branches');
+            Helpers::redirect('index.php?page=settings#settings-branch-crud');
             break;
         }
 
         if ($action === 'new') {
-            $branch = ['id'=>0,'name'=>'','code'=>'','is_main'=>0];
+            $branch = ['id'=>0,'name'=>'','code'=>'','is_main'=>0,'location'=>'','is_active'=>1];
             Helpers::view('branches/form', compact('branch'));
             break;
         }
@@ -723,7 +745,7 @@ switch ($page) {
         }
 
         // index
-        $branches = $pdo->query('SELECT * FROM branches ORDER BY is_main DESC, name')->fetchAll();
+        $branches = BranchRepository::allOrderedForAdmin($pdo);
         Helpers::view('branches/index', compact('branches'));
         break;
 
@@ -732,7 +754,7 @@ switch ($page) {
         if (!Auth::hasRole('admin')) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $branchesAll = BranchRepository::forDropdowns($pdo);
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
@@ -748,6 +770,7 @@ switch ($page) {
                 $error = 'Username and Full Name are required.';
                 $userRow = compact('id','username','full_name','role','branch_id','active');
                 $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
                 Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic'));
                 break;
             }
@@ -774,6 +797,7 @@ switch ($page) {
                 $error = 'Username already exists: ' . htmlspecialchars($conflict) . '. Try: ' . htmlspecialchars($suggestedUsername);
                 $userRow = compact('id','username','full_name','role','branch_id','active');
                 $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
                 Helpers::view('users/form', compact('userRow','branchesAll','error','suggestedUsername','rolesDynamic'));
                 break;
             }
@@ -791,7 +815,7 @@ switch ($page) {
                         $stmt->execute([$username,$full_name,$roleParam,($branch_id>0?$branch_id:null),$active,$id]);
                     }
                 } else {
-                    if ($password === '') { $error = 'Password is required for new user.'; $userRow = compact('id','username','full_name','role','branch_id','active'); $pdo->rollBack(); Helpers::view('users/form', compact('userRow','branchesAll','error')); break; }
+                    if ($password === '') { $error = 'Password is required for new user.'; $userRow = compact('id','username','full_name','role','branch_id','active'); $pdo->rollBack(); $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]); Helpers::view('users/form', compact('userRow','branchesAll','error')); break; }
                     $hash = password_hash($password, PASSWORD_BCRYPT);
                     $stmt = $pdo->prepare('INSERT INTO users (username, full_name, role, branch_id, active, password_hash) VALUES (?,?,?,?,?,?)');
                     $stmt->execute([$username,$full_name,$roleParam,($branch_id>0?$branch_id:null),$active,$hash]);
@@ -814,6 +838,7 @@ switch ($page) {
                 $error = $msg;
                 $userRow = compact('id','username','full_name','role','branch_id','active');
                 $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
                 Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic'));
                 break;
             }
@@ -833,6 +858,7 @@ switch ($page) {
         if ($action === 'new') {
             $userRow = ['id'=>0,'username'=>'','full_name'=>'','role'=>'','branch_id'=>0,'active'=>1];
             $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+            $branchesAll = BranchRepository::forDropdowns($pdo);
             Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic'));
             break;
         }
@@ -844,6 +870,7 @@ switch ($page) {
             $userRow = $stmt->fetch();
             if (!$userRow) { http_response_code(404); echo 'Not found'; break; }
             $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+            $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
             Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic'));
             break;
         }
@@ -866,6 +893,7 @@ switch ($page) {
         $stmt->execute($params);
         $users = $stmt->fetchAll();
         $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+        $branchesAll = BranchRepository::forFilters($pdo);
         Helpers::view('users/index', compact('users','branchesAll','rolesDynamic','usernameF','fullNameF','roleF','branchF','activeF'));
         break;
 
@@ -1322,9 +1350,6 @@ switch ($page) {
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
 
-        // Fetch branches for forms
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
-
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
@@ -1345,6 +1370,7 @@ switch ($page) {
                 }
                 $error = 'Valid Name and Branch are required.';
                 $supplier = compact('id','name','phone','branch_id','supplier_code');
+                $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($supplier['branch_id'] ?? 0)]);
                 Helpers::view('suppliers/form', compact('supplier','branchesAll','error'));
                 break;
             }
@@ -1377,6 +1403,7 @@ switch ($page) {
 
         if ($action === 'new') {
             $supplier = ['id'=>0,'name'=>'','phone'=>'','branch_id'=>0,'supplier_code'=>''];
+            $branchesAll = BranchRepository::forDropdowns($pdo);
             Helpers::view('suppliers/form', compact('supplier','branchesAll'));
             break;
         }
@@ -1387,6 +1414,7 @@ switch ($page) {
             $stmt->execute([$id]);
             $supplier = $stmt->fetch();
             if (!$supplier) { http_response_code(404); echo 'Not found'; break; }
+            $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($supplier['branch_id'] ?? 0)]);
             Helpers::view('suppliers/form', compact('supplier','branchesAll'));
             break;
         }
@@ -1424,6 +1452,7 @@ switch ($page) {
         } elseif (isset($_GET['deleted']) && $_GET['deleted'] === '1') {
             $success = 'Supplier removed.';
         }
+        $branchesAll = BranchRepository::forFilters($pdo);
         Helpers::view('suppliers/index', compact('suppliers','q','name','phone','code','branch_id','branchesAll','success'));
         break;
 
@@ -1457,7 +1486,7 @@ switch ($page) {
         $canCreateParcels = true;
 
         // data for forms
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $branchesAll = BranchRepository::forDropdowns($pdo);
         $customersAll = $pdo->query('SELECT id, name, phone, delivery_location, lat, lng FROM customers ORDER BY created_at DESC LIMIT 500')->fetchAll();
         $suppliersAll = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name')->fetchAll();
         // Ensure email log table exists
@@ -1614,6 +1643,7 @@ switch ($page) {
             $tracking_number = $tracking_number_raw; // keep as-is for update/insert
             $vehicle_no = trim($_POST['vehicle_no'] ?? '');
             $delivery_route = trim((string)($_POST['delivery_route'] ?? ''));
+            $delivery_location = trim((string)($_POST['delivery_location'] ?? ''));
             // Invoice number: manual or auto (next from 1)
             $invoice_no = (int)($_POST['invoice_no'] ?? 0);
             if ($id <= 0) {
@@ -1660,6 +1690,11 @@ switch ($page) {
                     $allowedStatus = Helpers::parcelStatusValues();
                     if (!in_array($status, $allowedStatus, true)) { $status = 'in_transit'; }
                     $pdo->prepare('UPDATE parcels SET status=? WHERE id=?')->execute([$status, $id]);
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode(['ok'=>true,'id'=>(int)$id,'redirect'=>Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$id)]);
+                        break;
+                    }
                     Helpers::redirect('index.php?page=parcels&action=edit&id=' . $id);
                     break;
                 }
@@ -1686,6 +1721,7 @@ switch ($page) {
                         echo json_encode(['ok'=>false,'error'=>$error]);
                         break;
                     }
+                    $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
                     Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error') + ['policy'=>['priceOnly'=>false,'lockAll'=>true,'canEnterItemAmounts'=>$canEnterItemAmounts]]);
                     break;
                 }
@@ -1731,6 +1767,7 @@ switch ($page) {
                             echo json_encode(['ok'=>false,'error'=>$error]);
                             break;
                         }
+                        $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
                         Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy'));
                         break;
                     }
@@ -1762,8 +1799,49 @@ switch ($page) {
                     echo json_encode(['ok'=>false,'error'=>$error]);
                     break;
                 }
+                $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
                 Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll'));
                 break;
+            }
+
+            if (!$priceOnlyEdit) {
+                $err = ParcelSaveService::validateParcelPayload($weight, $delivery_location, $priceOnlyEdit);
+                if ($err !== null) {
+                    $error = $err;
+                    $parcel = array_merge(
+                        compact('id', 'customer_id', 'supplier_id', 'from_branch_id', 'to_branch_id', 'weight', 'status', 'tracking_number', 'vehicle_no', 'delivery_route'),
+                        ['delivery_location' => $delivery_location]
+                    );
+                    try {
+                        $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
+                    } catch (Throwable $e) {
+                        try {
+                            $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
+                        } catch (Throwable $e2) {
+                            try {
+                                $vehiclesAll = $pdo->query('SELECT id, vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
+                            } catch (Throwable $e3) {
+                                $vehiclesAll = [];
+                            }
+                        }
+                    }
+                    $deliveryRoutesAll = [];
+                    try {
+                        $deliveryRoutesAll = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll();
+                    } catch (Throwable $e) {
+                        $deliveryRoutesAll = [];
+                    }
+                    $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        http_response_code(422);
+                        echo json_encode(['ok'=>false,'error'=>$error]);
+                        break;
+                    }
+                    $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
+                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll'));
+                    break;
+                }
             }
 
             $allowedStatus = Helpers::parcelStatusValues();
@@ -1773,6 +1851,7 @@ switch ($page) {
             $statusWas = $existing ? (string)($existing['status'] ?? '') : '';
             $becameInTransit = ($id > 0 && $existing && $statusWas !== 'in_transit' && $status === 'in_transit');
 
+            try {
             $pdo->beginTransaction();
             if ($id > 0) {
                 if ($isKilinochchi) {
@@ -1863,7 +1942,16 @@ switch ($page) {
                 $duplicateCheck->execute([$customer_id, $from_branch_id, $to_branch_id, $weight, $vehicle_no ?: '']);
                 $duplicate = $duplicateCheck->fetch();
                 if ($duplicate) {
-                    // Duplicate detected - redirect to prevent double entry
+                    if ($isAjax) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        http_response_code(409);
+                        echo json_encode([
+                            'ok' => false,
+                            'error' => 'A similar parcel was just saved. Please verify or continue from the duplicate.',
+                            'duplicate_id' => (int)$duplicate['id'],
+                        ]);
+                        break;
+                    }
                     Helpers::redirect('index.php?page=parcels&action=new&duplicate=' . (int)$duplicate['id'] . '&customer_id=' . urlencode((string)$customer_id) . '&vehicle_no=' . urlencode((string)$vehicle_no) . '&from_branch_id=' . urlencode((string)$from_branch_id) . '&to_branch_id=' . urlencode((string)$to_branch_id));
                     break;
                 }
@@ -1984,6 +2072,37 @@ switch ($page) {
                 } catch (Throwable $e) { /* ignore link errors */ }
             }
             $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                error_log('Parcel save failed: ' . $e->getMessage());
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    http_response_code(500);
+                    echo json_encode(['ok'=>false,'error'=>'Could not save parcel. Please try again.']);
+                    break;
+                }
+                throw $e;
+            }
+
+            $delivery_location = ParcelSaveService::sanitizeDeliveryLocation($delivery_location);
+            if ($customer_id > 0 && $delivery_location !== '' && !$priceOnlyEdit) {
+                ParcelSaveService::persistCustomerDeliveryLocation($pdo, $customer_id, $delivery_location);
+            }
+            $actorRow = Auth::user();
+            $actorUid = isset($actorRow['id']) ? (int)$actorRow['id'] : null;
+            ParcelSaveService::logParcelActivity(
+                $pdo,
+                (int)$id,
+                $parcelWasCreate ? 'created' : 'updated',
+                $actorUid,
+                [
+                    'weight' => $weight,
+                    'status' => $status,
+                    'tracking' => $tracking_number,
+                ]
+            );
             
             // Store idempotency key to prevent duplicate submissions
             if ($id > 0) {
@@ -2257,6 +2376,12 @@ switch ($page) {
                     }
                 } catch (Throwable $e) { /* ignore */ }
             }
+            if ((int)($parcel['from_branch_id'] ?? 0) <= 0) {
+                $defFrom = BranchRepository::getDefaultBranchIdForForms($pdo);
+                if ($defFrom > 0) {
+                    $parcel['from_branch_id'] = $defFrom;
+                }
+            }
             // Last bill (most recent parcel) for "Open last bill" / "Add more parcel" options
             $lastParcel = null;
             try {
@@ -2266,6 +2391,7 @@ switch ($page) {
 
             // Determine lock/priceOnly flags for UI
             $policy = ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>$canEnterItemAmounts];
+            $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
             Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel','deliveryRoutesAll'));
             break;
         }
@@ -2293,6 +2419,7 @@ switch ($page) {
                 $policy['lockAll'] = true;
                 $policy['statusOnlyEdit'] = true;
             }
+            $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
             Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy','deliveryRoutesAll'));
             break;
         }
@@ -2721,7 +2848,7 @@ switch ($page) {
         }
         // customers, branches, suppliers for filter
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
-        $branchesFilterList = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $branchesFilterList = BranchRepository::forFilters($pdo);
         $suppliersFilterList = $pdo->query('SELECT id, name FROM suppliers ORDER BY name LIMIT 300')->fetchAll();
         $deliveryRoutesFilterList = [];
         try { $deliveryRoutesFilterList = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesFilterList = []; }
@@ -4015,7 +4142,7 @@ switch ($page) {
         $payments = $paymentsStmt->fetchAll();
         
         // For main users, provide branches list for dropdown
-        $branchesAll = $isMain ? $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll() : [];
+        $branchesAll = $isMain ? BranchRepository::forDropdowns($pdo) : [];
         Helpers::view('payments/index', compact('dues','dueGroups','groupMode','payments','from','to','q','isMain','branchesAll','branchFilterId'));
         break;
 
@@ -4050,7 +4177,7 @@ switch ($page) {
             }
             if ($amount <= 0 || $branch_id <= 0) { $error = 'Amount and Branch are required.'; }
             if (!empty($error)) {
-                $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+                $branchesAll = BranchRepository::forDropdowns($pdo);
                 $expense = compact('id','expense_type','amount','branch_id','expense_date','notes','payment_mode','credit_party','credit_due_date');
                 $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
                 Helpers::view('expenses/form', compact('expense','branchesAll','error','typesDynamic'));
@@ -4126,7 +4253,7 @@ switch ($page) {
                 }
                 // Append DB error for visibility
                 $msg .= ' (' . $e->getMessage() . ')';
-                $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+                $branchesAll = BranchRepository::forDropdowns($pdo);
                 $expense = compact('id','expense_type','amount','branch_id','expense_date','notes','payment_mode','credit_party','credit_due_date');
                 $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
                 $error = $msg;
@@ -4219,7 +4346,7 @@ switch ($page) {
         }
 
         if ($action === 'new') {
-            $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            $branchesAll = BranchRepository::forDropdowns($pdo);
             $expense = ['id'=>0,'expense_type'=>'other','amount'=>'','branch_id'=>$branchId,'expense_date'=>date('Y-m-d'),'notes'=>'','payment_mode'=>'cash','credit_party'=>'','credit_due_date'=>''];
             $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
             Helpers::view('expenses/form', compact('expense','branchesAll','typesDynamic'));
@@ -4232,7 +4359,7 @@ switch ($page) {
             $stmt->execute([$id]);
             $expense = $stmt->fetch();
             if (!$expense) { http_response_code(404); echo 'Not found'; break; }
-            $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            $branchesAll = BranchRepository::forDropdowns($pdo);
             $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
             Helpers::view('expenses/form', compact('expense','branchesAll','typesDynamic'));
             break;
@@ -4323,7 +4450,7 @@ switch ($page) {
         $sumStmt->execute($params);
         $byBranch = $sumStmt->fetchAll();
         $overall = 0; foreach ($byBranch as $r) { $overall += (float)$r['total']; }
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $branchesAll = BranchRepository::forFilters($pdo);
         $typesDynamic = $pdo->query("SELECT DISTINCT expense_type FROM expenses WHERE expense_type IS NOT NULL AND expense_type<>'' ORDER BY expense_type")->fetchAll();
         // Totals card: Cash purchases, Credit purchases, Settlements paid in range (use effective mode)
         $cashWhere = $where; $cashParams = $params;
@@ -4631,7 +4758,7 @@ switch ($page) {
             if ($name === '' || $position === '' || $branch_id <= 0) {
                 $error = 'Name, Position and Branch are required.';
                 $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
-                $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+                $branchesAll = BranchRepository::forDropdowns($pdo);
                 // Load vehicles for dropdown (use reg_number explicitly)
                 try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
                 $rolesDynamic = [];
@@ -4694,7 +4821,7 @@ switch ($page) {
                     $error = 'Could not save employee. ' . $msg;
                 }
                 $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
-                $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+                $branchesAll = BranchRepository::forDropdowns($pdo);
                 try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
                 Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','error'));
                 break;
@@ -4716,7 +4843,7 @@ switch ($page) {
                 'position'=>'',
                 'branch_id'=>0
             ];
-            $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            $branchesAll = BranchRepository::forDropdowns($pdo);
             // Load vehicles for dropdown (use reg_number explicitly)
             try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
             $rolesDynamic = [];
@@ -4731,7 +4858,7 @@ switch ($page) {
             $stmt->execute([$id]);
             $employee = $stmt->fetch();
             if (!$employee) { http_response_code(404); echo 'Not found'; break; }
-            $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            $branchesAll = BranchRepository::forDropdowns($pdo);
             // Load vehicles for dropdown (id + best-guess number)
             try { $vehiclesAll = $pdo->query('SELECT id, COALESCE(vehicle_no, reg_number, plate_no) AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
             Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll'));
@@ -4768,7 +4895,7 @@ switch ($page) {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $employees = $stmt->fetchAll();
-            $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            $branchesAll = BranchRepository::forDropdowns($pdo);
             Helpers::view('employees/payroll', compact('employees','emp_code','name','position','branch_id','month_year','branchesAll'));
             break;
         }
@@ -4906,7 +5033,7 @@ switch ($page) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $employees = $stmt->fetchAll();
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $branchesAll = BranchRepository::forFilters($pdo);
         Helpers::view('employees/index', compact('employees','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_from','license_to','vehicle_like','branch_id','join_from','join_to','status','branchesAll'));
         break;
 
@@ -5018,7 +5145,7 @@ switch ($page) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $branchesAll = BranchRepository::forFilters($pdo);
         // Totals for current result set
         $total = 0; $paid = 0; $countTotal = 0; $countPaid = 0; $countPending = 0;
         foreach ($rows as $r) {
@@ -5149,7 +5276,7 @@ switch ($page) {
         
         // If no branch filter, ensure all branches are included (even with 0 revenue)
         if ($branchId === 0) {
-            $allBranches = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+            $allBranches = BranchRepository::forFilters($pdo);
             $branchMap = [];
             foreach ($revenueByBranch as $row) {
                 $branchMap[$row['branch_id']] = $row;
@@ -5198,7 +5325,7 @@ switch ($page) {
 
         // Suppliers for filter dropdown
         $suppliers = $pdo->query('SELECT id, name FROM suppliers ORDER BY name')->fetchAll();
-        $branchesAll = $pdo->query('SELECT id, name FROM branches ORDER BY name')->fetchAll();
+        $branchesAll = BranchRepository::forFilters($pdo);
 
         // CSV export
         if ($export === 'csv') {

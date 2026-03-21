@@ -31,22 +31,30 @@ DROP TABLE IF EXISTS `branches`;
 CREATE TABLE IF NOT EXISTS `branches` (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
+  `address_tamil` varchar(500) DEFAULT NULL,
+  `address_english` varchar(500) DEFAULT NULL,
+  `phones` varchar(255) DEFAULT NULL,
   `code` varchar(20) NOT NULL,
+  `location` varchar(255) DEFAULT NULL,
   `is_main` tinyint(1) NOT NULL DEFAULT '0',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `is_default` tinyint(1) NOT NULL DEFAULT '0',
+  `settings_slot` tinyint DEFAULT NULL COMMENT '0-2 Settings letterhead slots',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `code` (`code`)
+  UNIQUE KEY `code` (`code`),
+  KEY `idx_branches_active` (`is_active`)
 ) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `branches`
 --
 
-INSERT INTO `branches` (`id`, `name`, `code`, `is_main`, `created_at`, `updated_at`) VALUES
-(21, 'Main Branch', 'MAIN', 1, '2026-02-02 02:43:56', '2026-02-02 02:43:56'),
-(22, 'Branch A', 'BR-A', 0, '2026-02-02 02:43:56', '2026-02-02 02:43:56'),
-(23, 'Branch B', 'BR-B', 0, '2026-02-02 02:43:56', '2026-02-02 02:43:56');
+INSERT INTO `branches` (`id`, `name`, `code`, `is_main`, `is_default`, `created_at`, `updated_at`) VALUES
+(21, 'Main Branch', 'MAIN', 1, 1, '2026-02-02 02:43:56', '2026-02-02 02:43:56'),
+(22, 'Branch A', 'BR-A', 0, 0, '2026-02-02 02:43:56', '2026-02-02 02:43:56'),
+(23, 'Branch B', 'BR-B', 0, 0, '2026-02-02 02:43:56', '2026-02-02 02:43:56');
 
 -- --------------------------------------------------------
 
@@ -422,6 +430,24 @@ CREATE TABLE IF NOT EXISTS `parcel_items` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `parcel_activity_log` (created at runtime if missing; audit trail for parcel save)
+--
+
+CREATE TABLE IF NOT EXISTS `parcel_activity_log` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `parcel_id` bigint UNSIGNED NOT NULL,
+  `action` varchar(40) NOT NULL,
+  `user_id` bigint UNSIGNED DEFAULT NULL,
+  `meta_json` text,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_parcel_activity_parcel` (`parcel_id`),
+  KEY `idx_parcel_activity_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `payments`
 --
 
@@ -617,3 +643,4 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+

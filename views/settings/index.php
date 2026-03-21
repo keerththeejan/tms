@@ -1,10 +1,25 @@
 <?php
 $company = $company ?? [];
-$branches = $company['branches'] ?? [
-    ['name' => 'Colombo', 'address_ta' => '', 'address_en' => '', 'phones' => ''],
-    ['name' => 'Kilinochchi', 'address_ta' => '', 'address_en' => '', 'phones' => ''],
-    ['name' => 'Mullaitivu', 'address_ta' => '', 'address_en' => '', 'phones' => ''],
-];
+$settingsBranchSlots = $settingsBranchSlots ?? [];
+$defaultBranchSlotIndex = isset($defaultBranchSlotIndex) ? (int)$defaultBranchSlotIndex : 0;
+if ($defaultBranchSlotIndex < 0) {
+    $defaultBranchSlotIndex = 0;
+}
+if ($defaultBranchSlotIndex > 2) {
+    $defaultBranchSlotIndex = 2;
+}
+while (count($settingsBranchSlots) < 3) {
+    $settingsBranchSlots[] = ['id' => 0, 'name' => '', 'address_ta' => '', 'address_en' => '', 'phones' => ''];
+}
+$letterheadBranches = [];
+foreach ($settingsBranchSlots as $sb) {
+    $letterheadBranches[] = [
+        'name' => (string)($sb['name'] ?? ''),
+        'address_ta' => (string)($sb['address_ta'] ?? ''),
+        'address_en' => (string)($sb['address_en'] ?? ''),
+        'phones' => (string)($sb['phones'] ?? ''),
+    ];
+}
 $routeParts = $company['route_tamil_parts'] ?? ['கொழும்பு', 'கிளிநொச்சி', 'முல்லைத்தீவு'];
 $routeParts = array_values($routeParts);
 while (count($routeParts) < 3) { $routeParts[] = ''; }
@@ -56,6 +71,15 @@ $config = $config ?? [];
 <?php if (!empty($success)): ?>
   <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
 <?php endif; ?>
+
+<?php
+  $branchesMaster = $branchesMaster ?? [];
+  $branches = $branchesMaster;
+  $branchListEmbed = true;
+  $branchListError = '';
+  include dirname(__DIR__) . '/branches/index.php';
+?>
+<p class="small text-muted mb-4">The company &amp; letterhead section below uses the same <strong>branches</strong> table (addresses, default for print).</p>
 
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2000;">
   <div id="companyToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="polite" aria-atomic="true">
@@ -148,8 +172,12 @@ $config = $config ?? [];
           <div class="settings-section-label">Primary Branch - Header &amp; Billing Address</div>
           <div class="settings-helper mb-3">Displayed on invoices and official documents. The selected default is used in the website header, print views, and exports.</div>
 
-          <?php $b0 = $branches[0] ?? ['name'=>'','address_ta'=>'','address_en'=>'','phones'=>'']; ?>
-          <div class="branch-card mb-3 default" data-branch-index="0">
+          <?php
+            $b0 = $letterheadBranches[0] ?? ['name'=>'','address_ta'=>'','address_en'=>'','phones'=>''];
+            $id0 = (int)($settingsBranchSlots[0]['id'] ?? 0);
+          ?>
+          <div class="branch-card mb-3<?php echo ($defaultBranchSlotIndex === 0) ? ' default' : ''; ?>" data-branch-index="0">
+            <input type="hidden" name="branch_db_id[]" value="<?php echo (int)$id0; ?>">
             <div class="branch-top mb-2">
               <div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -160,7 +188,7 @@ $config = $config ?? [];
               </div>
               <div class="text-end">
                 <div class="form-check form-switch m-0">
-                  <input class="form-check-input" type="radio" name="default_branch_idx" value="0" id="default_branch_0" checked>
+                  <input class="form-check-input" type="radio" name="default_branch_idx" value="0" id="default_branch_0" <?php echo ($defaultBranchSlotIndex === 0) ? 'checked' : ''; ?>>
                   <label class="form-check-label small" for="default_branch_0">Use as Default Header &amp; Print Address</label>
                 </div>
               </div>
@@ -196,8 +224,9 @@ $config = $config ?? [];
           <div class="settings-section-label mt-4">Additional Branches</div>
           <div class="settings-helper mb-3">You can store up to 3 branch addresses. Choose which one is used as the default header &amp; print address.</div>
           <div class="branch-grid mb-4">
-            <?php for ($i = 1; $i < 3; $i++): $b = $branches[$i] ?? ['name'=>'','address_ta'=>'','address_en'=>'','phones'=>'']; ?>
-              <div class="branch-card" data-branch-index="<?php echo (int)$i; ?>">
+            <?php for ($i = 1; $i < 3; $i++): $b = $letterheadBranches[$i] ?? ['name'=>'','address_ta'=>'','address_en'=>'','phones'=>'']; $slotId = (int)($settingsBranchSlots[$i]['id'] ?? 0); ?>
+              <div class="branch-card<?php echo ($defaultBranchSlotIndex === $i) ? ' default' : ''; ?>" data-branch-index="<?php echo (int)$i; ?>">
+                <input type="hidden" name="branch_db_id[]" value="<?php echo (int)$slotId; ?>">
                 <div class="branch-top mb-2">
                   <div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -208,7 +237,7 @@ $config = $config ?? [];
                   </div>
                   <div class="text-end">
                     <div class="form-check form-switch m-0">
-                      <input class="form-check-input" type="radio" name="default_branch_idx" value="<?php echo (int)$i; ?>" id="default_branch_<?php echo (int)$i; ?>">
+                      <input class="form-check-input" type="radio" name="default_branch_idx" value="<?php echo (int)$i; ?>" id="default_branch_<?php echo (int)$i; ?>" <?php echo ($defaultBranchSlotIndex === $i) ? 'checked' : ''; ?>>
                       <label class="form-check-label small" for="default_branch_<?php echo (int)$i; ?>">Use as Default Header &amp; Print Address</label>
                     </div>
                   </div>

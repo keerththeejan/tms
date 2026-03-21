@@ -20,6 +20,8 @@ if (file_exists($vendor)) {
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Helpers.php';
+require_once __DIR__ . '/ParcelSaveService.php';
+require_once __DIR__ . '/BranchRepository.php';
 require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/Sms.php';
 require_once __DIR__ . '/DataReset.php';
@@ -27,6 +29,11 @@ require_once __DIR__ . '/DataReset.php';
 // Load config and initialize DB
 $config = require __DIR__ . '/../config/config.php';
 Database::init($config);
+try {
+    BranchRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* schema optional until DB ready */
+}
 
 // Initialize Mailer (available as $GLOBALS['mailer'])
 $mailCfgPath = __DIR__ . '/../config/mail.php';

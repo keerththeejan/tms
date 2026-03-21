@@ -15,7 +15,7 @@
 <div class="branches-form-page">
 <div class="d-flex justify-content-between align-items-center mb-3 page-header">
   <h3 class="mb-0"><?php echo $branch['id'] ? 'Edit Branch' : 'New Branch'; ?></h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=branches'); ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back</a>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=settings#settings-operational-branches'); ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Settings</a>
 </div>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
@@ -33,10 +33,20 @@
         <label class="form-label">Code</label>
         <input type="text" name="code" class="form-control" required value="<?php echo htmlspecialchars($branch['code']); ?>">
       </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Location (optional)</label>
+        <input type="text" name="location" class="form-control" value="<?php echo htmlspecialchars((string)($branch['location'] ?? '')); ?>" placeholder="City / area">
+      </div>
       <div class="col-12 col-sm-6 col-md-3 d-flex align-items-end pb-1">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="is_main" name="is_main" <?php echo !empty($branch['is_main']) ? 'checked' : ''; ?>>
           <label class="form-check-label" for="is_main">Main Branch</label>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3 d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="is_active" name="is_active" <?php echo !isset($branch['is_active']) || !empty($branch['is_active']) ? 'checked' : ''; ?>>
+          <label class="form-check-label" for="is_active">Active</label>
         </div>
       </div>
     </div>
