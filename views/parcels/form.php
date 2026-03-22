@@ -915,7 +915,7 @@
     box-shadow: 0 0 0 3px var(--pf-accent-ring);
   }
   .parcel-form-page .choices[data-type*="select-one"] .choices__button { display: none; }
-  /* Branch selects: native <select> (no Choices) — full width, reliable dropdown on all devices */
+  /* Branch selects: Choices.js search for compact, mobile-friendly selection */
   .parcel-form-page .pf-branch-input-group {
     overflow: visible;
     width: 100%;
@@ -1328,19 +1328,7 @@
   if ($parcelStatus === '' || !isset($parcelStatusMap[$parcelStatus])) {
     $parcel['status'] = 'pending';
   }
-  // Build unique branch list by case-insensitive name, prefer main branch
-  $branchesUnique = [];
-  foreach (($branchesAll ?? []) as $b) {
-    $nm = trim((string)($b['name'] ?? ''));
-    if ($nm === '') { continue; }
-    $key = strtolower($nm);
-    if (!isset($branchesUnique[$key])) { $branchesUnique[$key] = $b; continue; }
-    $curr = $branchesUnique[$key];
-    $isMainNew = !empty($b['is_main']);
-    $isMainCurr = !empty($curr['is_main']);
-    if ($isMainNew && !$isMainCurr) { $branchesUnique[$key] = $b; }
-  }
-  $branchesList = array_values($branchesUnique);
+  $branchesList = array_values($branchesAll ?? []);
 ?>
 <nav class="pf-breadcrumb mb-2" aria-label="breadcrumb">
   <ol class="breadcrumb mb-0">
@@ -1611,17 +1599,24 @@
           <div class="section-body pt-2 pt-lg-3">
           <?php if (empty($branchesList)): ?>
           <div class="alert alert-warning py-2 mb-2 small" role="alert">
-            <strong>No active branches available.</strong> An administrator must add or re-activate branches under <a href="<?php echo Helpers::baseUrl('index.php?page=settings#settings-operational-branches'); ?>">Settings → Operational branches</a> before you can save a parcel.
+            <strong>No active branches on first load.</strong> Branches are loaded from the server automatically. If the list stays empty, add or re-activate branches under <a href="<?php echo Helpers::baseUrl('index.php?page=settings&tab=branches#pane-branches'); ?>">Settings → Branches</a>.
           </div>
           <?php endif; ?>
+          <div id="pfBranchesDynamicMsg" class="small py-1 d-none" role="status" aria-live="polite"></div>
           <div class="row g-2 pf-branches-row">
             <div class="col-12 col-md-6 col-lg-6">
               <label class="pf-label" for="fromBranchSelect">From branch</label>
               <div class="pf-branch-input-group">
                 <select name="from_branch_id" id="fromBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="From branch">
-        <option value="">-- Select Branch --</option>
-        <?php foreach (($branchesList ?? []) as $b): ?>
-          <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['from_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+        <option value="">Select Branch</option>
+        <?php foreach (($branchesList ?? []) as $b):
+            $bid = (int)$b['id'];
+            ?>
+          <option value="<?php echo $bid; ?>" <?php echo ((int)($parcel['from_branch_id'] ?? 0) === $bid) ? 'selected' : ''; ?>
+            data-branch-name="<?php echo htmlspecialchars((string)($b['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+            data-address-ta="<?php echo htmlspecialchars((string)($b['address_tamil'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+            data-address-en="<?php echo htmlspecialchars((string)($b['address_english'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+            data-phones="<?php echo htmlspecialchars((string)($b['phones'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string)($b['name'] ?? '')); ?></option>
         <?php endforeach; ?>
       </select>
               </div>
@@ -1630,9 +1625,15 @@
               <label class="pf-label" for="toBranchSelect">To branch</label>
               <div class="pf-branch-input-group">
                 <select name="to_branch_id" id="toBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="To branch">
-        <option value="">-- Select Branch --</option>
-        <?php foreach (($branchesList ?? []) as $b): ?>
-          <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($parcel['to_branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+        <option value="">Select Branch</option>
+        <?php foreach (($branchesList ?? []) as $b):
+            $bid = (int)$b['id'];
+            ?>
+          <option value="<?php echo $bid; ?>" <?php echo ((int)($parcel['to_branch_id'] ?? 0) === $bid) ? 'selected' : ''; ?>
+            data-branch-name="<?php echo htmlspecialchars((string)($b['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+            data-address-ta="<?php echo htmlspecialchars((string)($b['address_tamil'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+            data-address-en="<?php echo htmlspecialchars((string)($b['address_english'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+            data-phones="<?php echo htmlspecialchars((string)($b['phones'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string)($b['name'] ?? '')); ?></option>
         <?php endforeach; ?>
       </select>
               </div>
@@ -2031,8 +2032,8 @@
             </div>
             <div class="col-12 col-sm-6">
               <label class="pf-label" for="qs_branch">Branch</label>
-              <select id="qs_branch" class="form-select form-select-sm" aria-label="Supplier branch">
-                <option value="0">-- Select Branch --</option>
+              <select id="qs_branch" class="form-select form-select-sm" aria-label="Supplier branch" data-enhance="false">
+                <option value="0">Select Branch</option>
                 <?php foreach (($branchesList ?? []) as $b): ?>
                   <option value="<?php echo (int)$b['id']; ?>"><?php echo htmlspecialchars($b['name']); ?></option>
                 <?php endforeach; ?>
@@ -2146,6 +2147,134 @@
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  const parcelBranchJsonUrl = <?php echo json_encode(Helpers::baseUrl('index.php?page=branches&action=json'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_SLASHES); ?>;
+  const parcelBranchPreserveFrom = <?php echo (int)($parcel['from_branch_id'] ?? 0); ?>;
+  const parcelBranchPreserveTo = <?php echo (int)($parcel['to_branch_id'] ?? 0); ?>;
+  let branchesData = <?php echo json_encode(array_map(function ($b) { return ['id' => (int)$b['id'], 'name' => $b['name']]; }, $branchesAll ?? []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+
+  async function loadParcelBranchesFromApi() {
+    const fromSel = document.querySelector('select[name="from_branch_id"]');
+    const toSel = document.querySelector('select[name="to_branch_id"]');
+    const msgEl = document.getElementById('pfBranchesDynamicMsg');
+    if (!fromSel || !toSel || fromSel.disabled || toSel.disabled) {
+      return;
+    }
+    const prevFrom = String(fromSel.value || '').trim();
+    const prevTo = String(toSel.value || '').trim();
+    const preserveFromId = parseInt(String(prevFrom || String(parcelBranchPreserveFrom || 0)), 10) || 0;
+    const preserveToId = parseInt(String(prevTo || String(parcelBranchPreserveTo || 0)), 10) || 0;
+    const url = parcelBranchJsonUrl
+      + (String(parcelBranchJsonUrl).indexOf('?') === -1 ? '?' : '&')
+      + 'preserve_from=' + encodeURIComponent(String(preserveFromId))
+      + '&preserve_to=' + encodeURIComponent(String(preserveToId));
+    if (msgEl) {
+      msgEl.classList.remove('d-none', 'text-danger', 'text-warning');
+      msgEl.classList.add('text-muted');
+      msgEl.textContent = 'Loading branches…';
+    }
+    try {
+      const res = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      const payload = parseJsonResponse(await res.text());
+      if (!res.ok || !payload || payload.ok !== true || !Array.isArray(payload.branches)) {
+        if (msgEl) {
+          msgEl.classList.remove('d-none', 'text-muted');
+          msgEl.classList.add('text-warning');
+          msgEl.textContent = 'Could not load branches from server. The list above is from when the page loaded.';
+        }
+        return;
+      }
+      const preserveIds = new Set([preserveFromId, preserveToId].filter(function (x) { return x > 0; }));
+      const active = payload.branches.filter(function (b) {
+        const id = parseInt(String(b.id), 10);
+        const isOn = parseInt(String(b.is_active != null ? b.is_active : 1), 10) === 1;
+        return isOn || preserveIds.has(id);
+      });
+      active.sort(function (a, b) {
+        const ma = parseInt(String(a.is_main ?? 0), 10) === 1;
+        const mb = parseInt(String(b.is_main ?? 0), 10) === 1;
+        if (ma !== mb) {
+          return ma ? -1 : 1;
+        }
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+      branchesData = active.map(function (b) {
+        return { id: parseInt(String(b.id), 10), name: String(b.name || '') };
+      });
+      function fillSelect(sel, selected) {
+        const keep = String(selected || '').trim();
+        sel.innerHTML = '';
+        const ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = 'Select Branch';
+        sel.appendChild(ph);
+        active.forEach(function (b) {
+          const o = document.createElement('option');
+          const id = parseInt(String(b.id), 10);
+          o.value = String(id);
+          o.textContent = (b.name && String(b.name).trim()) ? String(b.name) : ('Branch #' + id);
+          o.dataset.branchName = String(b.name || '');
+          o.dataset.addressTa = String(b.address_tamil || '');
+          o.dataset.addressEn = String(b.address_english || '');
+          o.dataset.phones = String(b.phones || '');
+          sel.appendChild(o);
+        });
+        if (keep && Array.from(sel.options).some(function (o) { return o.value === keep; })) {
+          sel.value = keep;
+        } else {
+          sel.value = '';
+        }
+      }
+      fillSelect(fromSel, prevFrom);
+      fillSelect(toSel, prevTo);
+      const qsBranch = document.getElementById('qs_branch');
+      if (qsBranch) {
+        const prevQs = String(qsBranch.value || '0');
+        const supplierOnly = active.filter(function (b) {
+          return parseInt(String(b.is_active != null ? b.is_active : 1), 10) === 1;
+        });
+        qsBranch.innerHTML = '';
+        const z = document.createElement('option');
+        z.value = '0';
+        z.textContent = 'Select Branch';
+        qsBranch.appendChild(z);
+        supplierOnly.forEach(function (b) {
+          const o = document.createElement('option');
+          const id = parseInt(String(b.id), 10);
+          o.value = String(id);
+          o.textContent = (b.name && String(b.name).trim()) ? String(b.name) : ('Branch #' + id);
+          qsBranch.appendChild(o);
+        });
+        if (prevQs !== '0' && Array.from(qsBranch.options).some(function (opt) { return opt.value === prevQs; })) {
+          qsBranch.value = prevQs;
+        } else {
+          qsBranch.value = '0';
+        }
+      }
+      if (active.length === 0) {
+        if (msgEl) {
+          msgEl.classList.remove('d-none', 'text-muted');
+          msgEl.classList.add('text-warning');
+          msgEl.textContent = 'No branches available. An administrator can add active branches under Settings → Branches.';
+        }
+      } else if (msgEl) {
+        msgEl.classList.add('d-none');
+        msgEl.textContent = '';
+      }
+      fromSel.dispatchEvent(new Event('change', { bubbles: true }));
+      toSel.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch (err) {
+      if (msgEl) {
+        msgEl.classList.remove('d-none', 'text-muted');
+        msgEl.classList.add('text-danger');
+        msgEl.textContent = 'Could not load branches. Check your connection and try again.';
+      }
+    }
+  }
+
+  window.TMS_refreshParcelBranches = function () {
+    return loadParcelBranchesFromApi();
+  };
+
   // Prevent double submission — all visible Save buttons (desktop status row, sticky mobile, header)
   const form = document.querySelector('form[action*="parcels&action=save"]');
   const saveBtns = [
@@ -2172,21 +2301,33 @@
       }
       const fromBranchEl = form.querySelector('select[name="from_branch_id"]');
       const toBranchEl = form.querySelector('select[name="to_branch_id"]');
+      let fromBranchErr = '';
+      let toBranchErr = '';
       if (fromBranchEl && !fromBranchEl.disabled) {
         const fv = String(fromBranchEl.value || '').trim();
         if (!fv || fv === '0') {
-          fromBranchEl.setCustomValidity('Please select a from branch.');
-        } else {
-          fromBranchEl.setCustomValidity('');
+          fromBranchErr = 'Please select a from branch.';
         }
       }
       if (toBranchEl && !toBranchEl.disabled) {
         const tv = String(toBranchEl.value || '').trim();
         if (!tv || tv === '0') {
-          toBranchEl.setCustomValidity('Please select a to branch.');
-        } else {
-          toBranchEl.setCustomValidity('');
+          toBranchErr = 'Please select a to branch.';
         }
+      }
+      if (fromBranchEl && toBranchEl && !fromBranchEl.disabled && !toBranchEl.disabled && !fromBranchErr && !toBranchErr) {
+        const fv = String(fromBranchEl.value || '').trim();
+        const tv = String(toBranchEl.value || '').trim();
+        if (fv === tv) {
+          fromBranchErr = 'From and To branch must be different.';
+          toBranchErr = 'From and To branch must be different.';
+        }
+      }
+      if (fromBranchEl && !fromBranchEl.disabled) {
+        fromBranchEl.setCustomValidity(fromBranchErr);
+      }
+      if (toBranchEl && !toBranchEl.disabled) {
+        toBranchEl.setCustomValidity(toBranchErr);
       }
       // Scroll to first invalid field (HTML5 validation)
       if (!form.checkValidity()) {
@@ -3087,7 +3228,6 @@
   let deliveryLocationTouched = false;
   deliveryLocationInput?.addEventListener('input', function(){ deliveryLocationTouched = true; });
   const toBranchSuggest = document.getElementById('toBranchSuggest');
-  const branchesData = <?php echo json_encode(array_map(function($b){ return ['id'=>(int)$b['id'],'name'=>$b['name']]; }, $branchesAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   const customersData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)$c['id'],'delivery_location'=>$c['delivery_location'] ?? '']; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   /** Label for receipt summary — use value lookup (Choices.js can leave selectedIndex on placeholder while value is set) */
   function branchSelectLabel(sel) {
@@ -3261,15 +3401,28 @@
   }
   fromBranchSelect?.addEventListener('change', function () { clearBranchFieldInvalid(this); });
   toBranchSelect?.addEventListener('change', function () { clearBranchFieldInvalid(this); });
-  // If From Branch is empty on load, default to current user's branch
-  const userBranchId = <?php echo (int)((Auth::user()['branch_id'] ?? 0)); ?>;
-  if (fromBranchSelect && (!fromBranchSelect.value || fromBranchSelect.value === '0') && userBranchId > 0) {
-    const opt = Array.from(fromBranchSelect.options).find(o => parseInt(o.value||'0') === userBranchId);
-    if (opt) { syncBranchSelect(fromBranchSelect, String(userBranchId)); }
+  function bootParcelBranchUi() {
+    const userBranchId = <?php echo (int)((Auth::user()['branch_id'] ?? 0)); ?>;
+    if (fromBranchSelect && (!fromBranchSelect.value || fromBranchSelect.value === '0') && userBranchId > 0) {
+      const opt = Array.from(fromBranchSelect.options).find(function (o) { return parseInt(o.value || '0', 10) === userBranchId; });
+      if (opt) { syncBranchSelect(fromBranchSelect, String(userBranchId)); }
+    }
+    updateMeta();
+    fetchCustomerSummary();
+    setTimeout(function () { applyPreviousBillingInfo(); }, 120);
   }
-  updateMeta();
-  fetchCustomerSummary();
-  setTimeout(function(){ applyPreviousBillingInfo(); }, 120);
+  loadParcelBranchesFromApi().then(bootParcelBranchUi).catch(bootParcelBranchUi);
+
+  let __pfBranchReloadTimer = null;
+  window.addEventListener('focus', function () {
+    if (lockAll || priceOnly) return;
+    if (__pfBranchReloadTimer) clearTimeout(__pfBranchReloadTimer);
+    __pfBranchReloadTimer = setTimeout(function () {
+      loadParcelBranchesFromApi().then(function () {
+        try { updateMeta(); } catch (_) {}
+      }).catch(function () {});
+    }, 400);
+  });
 
   // Show bill prompt modal when redirected after setting in_transit
   (function(){

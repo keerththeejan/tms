@@ -387,7 +387,11 @@
         <select class="form-select form-select-sm" name="cust">
           <option value="0">All</option>
           <?php foreach (($customersAll ?? []) as $c): ?>
-            <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($cust ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($c['name'].' ('.$c['phone'].')'); ?></option>
+            <?php
+              $cphone = trim((string)($c['phone'] ?? ''));
+              $clabel = ($c['name'] ?? '') . ($cphone !== '' ? ' (' . $cphone . ')' : '');
+            ?>
+            <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($cust ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($clabel); ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -424,7 +428,7 @@
               <tbody>
                 <?php foreach ($todayParcels as $p): ?>
                 <tr>
-                  <td data-label="#"><?php echo (int)$p['id']; ?></td>
+                  <td data-label="#"><?php if (Auth::canCreateParcels()): ?><a class="fw-semibold text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . (int)$p['id']); ?>"><?php echo (int)$p['id']; ?></a><?php else: echo (int)$p['id']; endif; ?></td>
                   <td data-label="Customer"><?php echo htmlspecialchars($p['customer_name'] ?? ''); ?></td>
                   <td data-label="To"><?php echo htmlspecialchars($p['to_branch'] ?? '—'); ?></td>
                   <td data-label="Tracking"><?php echo htmlspecialchars($p['tracking_number'] ?? ''); ?></td>
@@ -494,31 +498,7 @@
   </div>
   <?php endif; ?>
   <div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-lg-4">
-      <div class="card card-dash stat-card stat-collections h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="text-muted small"><?php echo htmlspecialchars($kpiCollTitle); ?></span>
-            <i class="bi bi-cash-stack text-success opacity-75"></i>
-          </div>
-          <div class="stat-value text-success">Rs. <?php echo number_format((float)($collectionsToday ?? 0), 2); ?></div>
-          <a class="small text-decoration-none mt-2 d-inline-block" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">Go to Payments <i class="bi bi-arrow-right"></i></a>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-sm-6 col-lg-4">
-      <div class="card card-dash stat-card stat-expenses h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="text-muted small"><?php echo htmlspecialchars($kpiExpTitle); ?></span>
-            <i class="bi bi-wallet2 text-warning opacity-75"></i>
-          </div>
-          <div class="stat-value text-warning">Rs. <?php echo number_format((float)($expensesToday ?? 0), 2); ?></div>
-          <a class="small text-decoration-none mt-2 d-inline-block" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Go to Expenses <i class="bi bi-arrow-right"></i></a>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-lg-4 d-flex align-items-stretch">
+    <div class="col-12 d-flex align-items-stretch">
       <div class="card card-dash w-100">
         <div class="card-header-dash d-flex justify-content-between align-items-center">
           <span>Recent Payments</span>
@@ -542,7 +522,11 @@
                 <?php foreach ($recentPayments as $p): ?>
                 <tr>
                   <td data-label="#"><?php echo (int)$p['id']; ?></td>
-                  <td data-label="Customer"><?php echo htmlspecialchars(($p['customer_name'] ?? '').' ('.($p['customer_phone'] ?? '').')'); ?></td>
+                  <td data-label="Customer"><?php
+                    $rpn = trim((string)($p['customer_name'] ?? ''));
+                    $rpp = trim((string)($p['customer_phone'] ?? ''));
+                    echo htmlspecialchars($rpn . ($rpp !== '' ? ' (' . $rpp . ')' : ''));
+                  ?></td>
                   <td data-label="Amount">Rs. <?php echo number_format((float)$p['amount'], 2); ?></td>
                   <td data-label="Paid at"><small class="text-muted"><?php echo htmlspecialchars($p['paid_at']); ?></small></td>
                 </tr>

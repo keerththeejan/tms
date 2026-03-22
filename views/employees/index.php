@@ -1,4 +1,5 @@
 <?php /** @var array $employees */ ?>
+<div class="hr-page">
 <style>
   /* Neater row spacing and truncation helpers scoped to employees page */
   #employeesTable td, #employeesTable th { vertical-align: middle; }
@@ -10,9 +11,9 @@
   /* Make action buttons tighter */
   #employeesTable .btn { padding: .15rem .4rem; }
 </style>
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center mb-3">
   <h3 class="mb-0">Employees</h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Employee</a>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new'); ?>" class="btn btn-primary w-100 w-md-auto"><i class="bi bi-plus-lg"></i> New Employee</a>
 </div>
 <form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="employees">
@@ -88,7 +89,7 @@
   </div>
 </form>
 <!-- Clean details-only view: no toolbar toggles -->
-<div class="table-responsive" style="width: 100%; overflow-x: auto;">
+<div class="hr-table-wrap table-responsive">
   <table class="table table-sm table-striped align-middle" id="employeesTable" style="width: 100%; min-width: 1100px;">
     <thead>
       <tr>
@@ -168,3 +169,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+</div><!-- /.hr-page -->

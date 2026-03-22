@@ -168,9 +168,10 @@ switch ($page) {
         $branchId = (int)($user['branch_id'] ?? 0);
         $today = date('Y-m-d');
         $isMain = Auth::isMainBranch();
-        // Filters
-        $df = $_GET['df'] ?? $today; // date from
-        $dt = $_GET['dt'] ?? $today; // date to
+        // Filters — validated Y-m-d (invalid GET params ignored)
+        $df = Helpers::parseDateOr((string)($_GET['df'] ?? ''), $today);
+        $dt = Helpers::parseDateOr((string)($_GET['dt'] ?? ''), $today);
+        [$df, $dt] = Helpers::orderDateRange($df, $dt);
         $fb = (int)($_GET['fb'] ?? 0); // from_branch_id
         $tb = (int)($_GET['tb'] ?? 0); // to_branch_id
         $cust = (int)($_GET['cust'] ?? 0); // customer_id
@@ -330,15 +331,16 @@ switch ($page) {
     case 'accounts':
         if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
-        $from = $_GET['from'] ?? date('Y-m-01');
-        $to = $_GET['to'] ?? date('Y-m-d');
+        $todayAcc = date('Y-m-d');
+        $from = Helpers::parseDateOr((string)($_GET['from'] ?? ''), date('Y-m-01'));
+        $to = Helpers::parseDateOr((string)($_GET['to'] ?? ''), $todayAcc);
+        [$from, $to] = Helpers::orderDateRange($from, $to);
         $branchId = (int)(Auth::user()['branch_id'] ?? 0);
-        // Placeholder: summary totals
-        $totalPayments = (float)($pdo->query("SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) BETWEEN '".$from."' AND '".$to."'")->fetch()['s'] ?? 0);
-        $totalExpenses = (float)($pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?')->execute([$from,$to]) || 0);
-        // Use safer separate statements
+        $payStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) BETWEEN ? AND ?');
+        $payStmt->execute([$from, $to]);
+        $totalPayments = (float)($payStmt->fetch()['s'] ?? 0);
         $expStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?');
-        $expStmt->execute([$from,$to]);
+        $expStmt->execute([$from, $to]);
         $totalExpenses = (float)($expStmt->fetch()['s'] ?? 0);
         Helpers::view('accounts/index', compact('from','to','totalPayments','totalExpenses','branchId'));
         break;
@@ -346,7 +348,7 @@ switch ($page) {
     case 'daybook':
         if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
-        $date = $_GET['date'] ?? date('Y-m-d');
+        $date = Helpers::parseDateOr((string)($_GET['date'] ?? ''), date('Y-m-d'));
         // Collect payments and expenses for the day
         $pb = $pdo->prepare("SELECT p.id, p.amount, p.paid_at, 'Payment' AS type FROM payments p WHERE DATE(p.paid_at)=? ORDER BY p.paid_at, p.id");
         $pb->execute([$date]);
@@ -360,8 +362,10 @@ switch ($page) {
     case 'ledger':
         if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
-        $from = $_GET['from'] ?? date('Y-m-01');
-        $to = $_GET['to'] ?? date('Y-m-d');
+        $todayLed = date('Y-m-d');
+        $from = Helpers::parseDateOr((string)($_GET['from'] ?? ''), date('Y-m-01'));
+        $to = Helpers::parseDateOr((string)($_GET['to'] ?? ''), $todayLed);
+        [$from, $to] = Helpers::orderDateRange($from, $to);
         $account = $_GET['account'] ?? 'customers'; // placeholder selector
         // For now, show payments vs expenses in range
         // Daily series
@@ -392,6 +396,22 @@ switch ($page) {
         $closingBalance = $openingBalance + $netMovement;
 
         Helpers::view('ledger/index', compact('from','to','account','pSeries','eSeries','openingBalance','netMovement','closingBalance','totalPayments','totalExpenses'));
+        break;
+
+    case 'cashbook':
+        if (!Auth::hasAnyRole(['admin', 'accountant'])) {
+            http_response_code(403);
+            echo 'Forbidden';
+            break;
+        }
+        $cbAction = $_GET['cb_action'] ?? $_POST['cb_action'] ?? '';
+        if ($cbAction !== '') {
+            CashbookApi::dispatch(Database::pdo());
+            break;
+        }
+        Helpers::view('cashbook/index', [
+            'csrf' => Helpers::csrfToken(),
+        ]);
         break;
 
     case 'routes':
@@ -446,6 +466,21 @@ switch ($page) {
         $company = $config['company'] ?? [];
         $error = '';
         $success = '';
+        $allowedSettingsTabs = ['general', 'branches', 'users', 'system'];
+        $settingsActiveTab = 'general';
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $t = strtolower(trim((string)($_GET['tab'] ?? '')));
+            if (in_array($t, $allowedSettingsTabs, true)) {
+                $settingsActiveTab = $t;
+            }
+            if (!empty($_SESSION['settings_flash_success'])) {
+                $success = (string)$_SESSION['settings_flash_success'];
+                unset($_SESSION['settings_flash_success']);
+            }
+        }
+
+        $configDir = realpath(__DIR__ . '/../config');
+        $companyJsonPath = ($configDir ? ($configDir . DIRECTORY_SEPARATOR . 'company.json') : (__DIR__ . '/../config/company.json'));
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['settings_section'])) {
             $error = 'Invalid request. Please refresh the page and try again.';
@@ -456,7 +491,12 @@ switch ($page) {
                 $error = 'Invalid CSRF. Please refresh the page and try again.';
             } else {
             $section = $_POST['settings_section'] ?? '';
-            if ($section === 'company') {
+            $rt = strtolower(trim((string)($_POST['settings_return_tab'] ?? '')));
+            if (in_array($rt, $allowedSettingsTabs, true)) {
+                $settingsActiveTab = $rt;
+            }
+
+            if ($section === 'general') {
                 $name = trim($_POST['company_name'] ?? '');
                 $regNo = trim($_POST['reg_no'] ?? '');
                 $logoDisplay = in_array($_POST['logo_display'] ?? '', ['image', 'builtin'], true) ? $_POST['logo_display'] : 'builtin';
@@ -477,13 +517,11 @@ switch ($page) {
                 $routePart1 = trim($_POST['route_1'] ?? '');
                 $routePart2 = trim($_POST['route_2'] ?? '');
                 $routePart3 = trim($_POST['route_3'] ?? '');
-                $googleMapsKey = trim($_POST['google_maps_api_key'] ?? '');
 
                 if ($removeLogo) {
                     $logoUrl = '';
                 }
 
-                // Logo file upload
                 if (!empty($_FILES['logo_file']['name']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
                     $uploadDir = __DIR__ . '/uploads';
                     if (!is_dir($uploadDir)) {
@@ -503,10 +541,9 @@ switch ($page) {
                 $branchesData = [];
                 if ($error === '') {
                     try {
-                        $sync = BranchRepository::syncSettingsFromCompanyPost($pdoSettings, $_POST);
-                        $branchesData = $sync['mirror'];
+                        $branchesData = BranchRepository::buildMirrorForSettingsSlots($pdoSettings);
                     } catch (Throwable $e) {
-                        $error = 'Could not save branch addresses: ' . $e->getMessage();
+                        $error = 'Could not read branch mirror: ' . $e->getMessage();
                     }
                 }
 
@@ -532,29 +569,84 @@ switch ($page) {
                     ];
                     $toSave = [
                         'company' => array_merge($company, $companyOverride),
-                        'google_maps_api_key' => $googleMapsKey,
+                        'google_maps_api_key' => trim((string)($config['google_maps_api_key'] ?? '')),
                     ];
-                    $configDir = realpath(__DIR__ . '/../config');
-                    $jsonPath = ($configDir ? ($configDir . DIRECTORY_SEPARATOR . 'company.json') : (__DIR__ . '/../config/company.json'));
-
                     $json = json_encode($toSave, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
                     if ($json === false) {
                         $error = 'Could not encode settings to JSON.';
-                    } else if (!is_dir(dirname($jsonPath))) {
-                        $error = 'Config folder not found: ' . dirname($jsonPath);
-                    } else if (!is_writable(dirname($jsonPath))) {
-                        $error = 'Config folder is not writable: ' . dirname($jsonPath);
+                    } else if (!is_dir(dirname($companyJsonPath))) {
+                        $error = 'Config folder not found: ' . dirname($companyJsonPath);
+                    } else if (!is_writable(dirname($companyJsonPath))) {
+                        $error = 'Config folder is not writable: ' . dirname($companyJsonPath);
                     } else {
-                        $written = @file_put_contents($jsonPath, $json, LOCK_EX);
+                        $written = @file_put_contents($companyJsonPath, $json, LOCK_EX);
                         if ($written !== false) {
-                            $success = 'Company settings saved.';
+                            $success = 'General settings saved.';
                             $company = array_merge($company, $companyOverride);
-                            $config['google_maps_api_key'] = $googleMapsKey;
                         } else {
                             $last = error_get_last();
                             $extra = ($last && isset($last['message'])) ? (' Error: ' . $last['message']) : '';
-                            $error = 'Could not save settings to ' . $jsonPath . '. Check write permissions.' . $extra;
+                            $error = 'Could not save settings to ' . $companyJsonPath . '. Check write permissions.' . $extra;
                         }
+                    }
+                }
+            } elseif ($section === 'branch_letterhead') {
+                if ($error === '') {
+                    try {
+                        $sync = BranchRepository::syncSettingsFromCompanyPost($pdoSettings, $_POST);
+                        $raw = @file_get_contents($companyJsonPath);
+                        $data = ($raw !== false && $raw !== '') ? json_decode($raw, true) : [];
+                        if (!is_array($data)) {
+                            $data = [];
+                        }
+                        $data['company'] = isset($data['company']) && is_array($data['company'])
+                            ? array_merge($company, $data['company'])
+                            : $company;
+                        $data['company']['branches'] = $sync['mirror'];
+                        if (!array_key_exists('google_maps_api_key', $data)) {
+                            $data['google_maps_api_key'] = trim((string)($config['google_maps_api_key'] ?? ''));
+                        }
+                        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                        if ($json === false) {
+                            $error = 'Could not encode settings to JSON.';
+                        } else if (!is_dir(dirname($companyJsonPath)) || !is_writable(dirname($companyJsonPath))) {
+                            $error = 'Config folder is not writable.';
+                        } else {
+                            $written = @file_put_contents($companyJsonPath, $json, LOCK_EX);
+                            if ($written !== false) {
+                                $success = 'Branch letterhead saved.';
+                                $company['branches'] = $sync['mirror'];
+                            } else {
+                                $error = 'Could not save company.json.';
+                            }
+                        }
+                    } catch (Throwable $e) {
+                        $error = 'Could not save branch letterhead: ' . $e->getMessage();
+                    }
+                }
+            } elseif ($section === 'system') {
+                $googleMapsKey = trim($_POST['google_maps_api_key'] ?? '');
+                $raw = @file_get_contents($companyJsonPath);
+                $data = ($raw !== false && $raw !== '') ? json_decode($raw, true) : [];
+                if (!is_array($data)) {
+                    $data = [];
+                }
+                if (!isset($data['company']) || !is_array($data['company'])) {
+                    $data['company'] = $company;
+                }
+                $data['google_maps_api_key'] = $googleMapsKey;
+                $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                if ($json === false) {
+                    $error = 'Could not encode settings to JSON.';
+                } else if (!is_dir(dirname($companyJsonPath)) || !is_writable(dirname($companyJsonPath))) {
+                    $error = 'Config folder is not writable.';
+                } else {
+                    $written = @file_put_contents($companyJsonPath, $json, LOCK_EX);
+                    if ($written !== false) {
+                        $success = 'System settings saved.';
+                        $config['google_maps_api_key'] = $googleMapsKey;
+                    } else {
+                        $error = 'Could not save company.json.';
                     }
                 }
             }
@@ -563,21 +655,14 @@ switch ($page) {
 
         $settingsBranchSlots = BranchRepository::getSettingsFormBranches($pdoSettings, $company);
         $defaultBranchSlotIndex = BranchRepository::getDefaultBranchSlotIndex($pdoSettings);
-        Helpers::view('settings/index', compact('company', 'config', 'error', 'success', 'branchesMaster', 'settingsBranchSlots', 'defaultBranchSlotIndex'));
+        Helpers::view('settings/index', compact('company', 'config', 'error', 'success', 'branchesMaster', 'settingsBranchSlots', 'defaultBranchSlotIndex', 'settingsActiveTab'));
         break;
 
     case 'branches':
-        // Admin only
-        if (!Auth::hasRole('admin')) { http_response_code(403); echo 'Forbidden'; break; }
-
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
 
-        if ($action === 'index') {
-            Helpers::redirect('index.php?page=settings#settings-operational-branches');
-            break;
-        }
-
+        // Logged-in users (not admin-only): parcel forms and other screens need active branches.
         if ($action === 'json') {
             if (!Auth::check()) {
                 http_response_code(401);
@@ -599,6 +684,17 @@ switch ($page) {
             }
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['ok' => true, 'branches' => BranchRepository::toJsonList($pdo, $preserve)], JSON_UNESCAPED_UNICODE);
+            break;
+        }
+
+        if (!Auth::hasRole('admin')) {
+            http_response_code(403);
+            echo 'Forbidden';
+            break;
+        }
+
+        if ($action === 'index') {
+            Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
             break;
         }
 
@@ -636,7 +732,26 @@ switch ($page) {
                 echo json_encode(['id'=>$id, 'name'=>$name, 'code'=>$code, 'is_main'=>$is_main, 'location'=>$location, 'is_active'=>$is_active]);
                 return;
             }
-            Helpers::redirect('index.php?page=settings#settings-branch-crud');
+            Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
+            break;
+        }
+
+        if ($action === 'set_default' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $id = (int)($_POST['id'] ?? 0);
+            BranchRepository::ensureSchema($pdo);
+            if ($id > 0) {
+                $chk = $pdo->prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1');
+                $chk->execute([$id]);
+                if ($chk->fetch()) {
+                    $pdo->exec('UPDATE branches SET is_default = 0');
+                    $pdo->prepare('UPDATE branches SET is_default = 1 WHERE id = ?')->execute([$id]);
+                    $_SESSION['settings_flash_success'] = 'Default header/billing branch updated.';
+                } else {
+                    $_SESSION['branch_list_flash_err'] = 'Cannot set default: branch not found or inactive.';
+                }
+            }
+            Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
             break;
         }
 
@@ -724,7 +839,7 @@ switch ($page) {
                     throw $e;
                 }
             }
-            Helpers::redirect('index.php?page=settings#settings-branch-crud');
+            Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
             break;
         }
 
@@ -1472,7 +1587,12 @@ switch ($page) {
         $user = Auth::user();
         $userBranchCode = (string)($user['branch_code'] ?? '');
         $userBranchName = (string)($user['branch_name'] ?? '');
-        $isKilinochchi = (strcasecmp($userBranchCode, 'KIL') === 0) || (strcasecmp($userBranchName, 'Kilinochchi') === 0);
+        BranchRepository::ensureSchema($pdo);
+        $mainBranchId = BranchRepository::getMainBranchId($pdo);
+        $isKilinochchi = $mainBranchId > 0 && (int)($user['branch_id'] ?? 0) === $mainBranchId;
+        if (!$isKilinochchi) {
+            $isKilinochchi = (strcasecmp($userBranchCode, 'KIL') === 0) || (strcasecmp($userBranchName, 'Kilinochchi') === 0);
+        }
         $isColombo = (strcasecmp($userBranchCode, 'COL') === 0) || (strcasecmp($userBranchName, 'Colombo') === 0);
         $isMullaitivu = (strcasecmp($userBranchCode, 'MLT') === 0)
                          || (stripos($userBranchName, 'Mullaitivu') !== false)
@@ -1632,10 +1752,6 @@ switch ($page) {
             if ($supplier_id <= 0) { $supplier_id = null; }
             $from_branch_id = (int)($_POST['from_branch_id'] ?? 0);
             $to_branch_id = (int)($_POST['to_branch_id'] ?? 0);
-            // If From Branch not provided, default to current user's branch
-            if ($from_branch_id <= 0) {
-                $from_branch_id = (int)($user['branch_id'] ?? 0);
-            }
             $weight = (float)($_POST['weight'] ?? 0);
             $status = $_POST['status'] ?? 'pending';
             // Serial/tracking number handling
@@ -2119,9 +2235,8 @@ switch ($page) {
                 try {
                     // Assign route and load number for the main trip
                     RouteHelper::assignRouteAndLoadNumber($pdo, $id, $from_branch_id, $to_branch_id);
-                    
-                    // If this is a delivery to Kilinochchi, assign a return load
-                    if ($to_branch_id == 1) { // Kilinochchi is branch ID 1
+                    $hubId = BranchRepository::getMainBranchId($pdo);
+                    if ($hubId > 0 && $to_branch_id === $hubId) {
                         RouteHelper::checkAndAssignReturnLoad($pdo, $id, $from_branch_id, $to_branch_id);
                     }
                 } catch (Exception $e) {
@@ -2582,6 +2697,120 @@ switch ($page) {
             break;
         }
 
+        // AJAX: inline quick edit from parcels list (status, delivery_route, vehicle_no)
+        if ($action === 'quick_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            header('Content-Type: application/json; charset=utf-8');
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'Invalid CSRF']);
+                break;
+            }
+            $id = (int)($_POST['id'] ?? 0);
+            $field = trim((string)($_POST['field'] ?? ''));
+            $value = $_POST['value'] ?? '';
+            $allowed = ['status', 'delivery_route', 'vehicle_no'];
+            if ($id <= 0 || !in_array($field, $allowed, true)) {
+                echo json_encode(['ok' => false, 'error' => 'Invalid request']);
+                break;
+            }
+            $st = $pdo->prepare('SELECT id, price, status FROM parcels WHERE id=?');
+            $st->execute([$id]);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                echo json_encode(['ok' => false, 'error' => 'Parcel not found']);
+                break;
+            }
+            $isBilled = ($row['price'] !== null && (float)$row['price'] > 0);
+            if ($isBilled && $field === 'status') {
+                echo json_encode(['ok' => false, 'error' => 'Cannot change status on a billed parcel']);
+                break;
+            }
+            if ($field === 'status') {
+                $v = trim((string)$value);
+                if (!in_array($v, Helpers::parcelStatusValues(), true)) {
+                    echo json_encode(['ok' => false, 'error' => 'Invalid status']);
+                    break;
+                }
+                $pdo->prepare('UPDATE parcels SET status=? WHERE id=?')->execute([$v, $id]);
+                echo json_encode([
+                    'ok' => true,
+                    'value' => $v,
+                    'label' => Helpers::parcelStatusLabel($v),
+                    'badgeClass' => Helpers::parcelStatusBadgeClass($v),
+                ], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            if ($field === 'delivery_route') {
+                $v = trim((string)$value);
+                if (strlen($v) > 255) {
+                    $v = substr($v, 0, 255);
+                }
+                $pdo->prepare('UPDATE parcels SET delivery_route=? WHERE id=?')->execute([$v === '' ? null : $v, $id]);
+                echo json_encode(['ok' => true, 'value' => $v, 'display' => $v !== '' ? $v : '—'], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            if ($field === 'vehicle_no') {
+                $v = trim((string)$value);
+                if (strlen($v) > 64) {
+                    $v = substr($v, 0, 64);
+                }
+                $pdo->prepare('UPDATE parcels SET vehicle_no=? WHERE id=?')->execute([$v === '' ? null : $v, $id]);
+                echo json_encode(['ok' => true, 'value' => $v, 'display' => $v !== '' ? $v : '—'], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            echo json_encode(['ok' => false, 'error' => 'Unsupported field']);
+            break;
+        }
+
+        // AJAX: parcel line items for list expand (lazy load + cache on client)
+        if ($action === 'parcel_items_json') {
+            header('Content-Type: application/json; charset=utf-8');
+            $id = (int)($_GET['id'] ?? 0);
+            if ($id <= 0) {
+                echo json_encode(['ok' => false, 'error' => 'id required']);
+                break;
+            }
+            try {
+                $st = $pdo->prepare('SELECT id, qty, description, rate, additional_amount, additional_amounts FROM parcel_items WHERE parcel_id=? ORDER BY id');
+                $st->execute([$id]);
+                $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {
+                echo json_encode(['ok' => false, 'error' => 'failed']);
+                break;
+            }
+            $out = [];
+            $n = 0;
+            foreach ($rows as $r) {
+                $n++;
+                $qty = (float)($r['qty'] ?? 0);
+                $rate = array_key_exists('rate', $r) && $r['rate'] !== null && $r['rate'] !== '' ? (float)$r['rate'] : null;
+                $amount = ($rate !== null && $qty > 0) ? round($qty * $rate, 2) : null;
+                $addStored = array_key_exists('additional_amount', $r) && $r['additional_amount'] !== null && $r['additional_amount'] !== ''
+                    ? (float)$r['additional_amount'] : 0.0;
+                $tags = [];
+                if (!empty($r['additional_amounts'])) {
+                    $decoded = json_decode((string)$r['additional_amounts'], true);
+                    if (is_array($decoded)) {
+                        foreach ($decoded as $v) {
+                            $tags[] = round((float)$v, 2);
+                        }
+                    }
+                }
+                $add = $addStored > 0 ? $addStored : ($tags ? round(array_sum($tags), 2) : null);
+                $out[] = [
+                    'no' => $n,
+                    'description' => (string)($r['description'] ?? ''),
+                    'qty' => $qty,
+                    'rate' => $rate,
+                    'amount' => $amount,
+                    'additional' => $add !== null && $add > 0 ? $add : null,
+                    'additionalTags' => $tags,
+                ];
+            }
+            echo json_encode(['ok' => true, 'items' => $out], JSON_UNESCAPED_UNICODE);
+            break;
+        }
+
         // AJAX: dedicated last delivery note id (used by parcel last-bill modal)
         if ($action === 'last_delivery_note_id_for_customer') {
             header('Content-Type: application/json; charset=utf-8');
@@ -2616,7 +2845,8 @@ switch ($page) {
         $delivery_route_filter = trim($_GET['delivery_route'] ?? '');
         $route_date = trim($_GET['route_date'] ?? '');
         $filter_type = trim($_GET['filter_type'] ?? '');
-        
+        $idsCsv = trim($_GET['ids'] ?? '');
+
         // Handle date filter persistence in session
         // If dates are provided in GET, save them to session
         if (isset($_GET['from']) && $_GET['from'] !== '') {
@@ -2703,14 +2933,27 @@ switch ($page) {
             $where[] = 'DATE(p.created_at) BETWEEN ? AND ?';
             array_push($params, $from, $to);
         }
+        if ($idsCsv !== '') {
+            $idList = array_values(array_unique(array_filter(array_map('intval', explode(',', $idsCsv)))));
+            if ($idList) {
+                $inPh = implode(',', array_fill(0, count($idList), '?'));
+                $where[] = 'p.id IN (' . $inPh . ')';
+                foreach ($idList as $ii) {
+                    $params[] = $ii;
+                }
+            }
+        }
         // Build list query, optionally joining email status if table exists
         $hasEmailLog = false;
         try { $pdo->query('SELECT 1 FROM parcel_emails LIMIT 1'); $hasEmailLog = true; } catch (Throwable $e) { $hasEmailLog = false; }
         if ($hasEmailLog) {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
+                           p.tracking_number,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
+                           NULLIF(TRIM(COALESCE(p.vehicle_no, "")), "") AS vehicle_no_db,
                            COALESCE(dra_to.delivery_date, "") AS route_date_to, COALESCE(dra_from.delivery_date, "") AS route_date_from,
                            p.delivery_route,
+                           (SELECT COUNT(*) FROM parcel_items pi WHERE pi.parcel_id = p.id) AS item_line_count,
                            c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS customer_delivery_location, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            COALESCE(pe.status, p.last_email_status) AS email_status,
                            COALESCE(pe.created_at, p.last_emailed_at) AS emailed_at,
@@ -2741,9 +2984,12 @@ switch ($page) {
                      AND dra_from.delivery_date = DATE(p.created_at)';
         } else {
             $sql = 'SELECT p.id, p.customer_id, p.supplier_id, p.from_branch_id, p.to_branch_id, p.weight, p.price, p.status, p.created_at, p.updated_at,
+                           p.tracking_number,
                            COALESCE(NULLIF(p.vehicle_no, ""), dra_to.vehicle_no, dra_from.vehicle_no) AS vehicle_no,
+                           NULLIF(TRIM(COALESCE(p.vehicle_no, "")), "") AS vehicle_no_db,
                            COALESCE(dra_to.delivery_date, "") AS route_date_to, COALESCE(dra_from.delivery_date, "") AS route_date_from,
                            p.delivery_route,
+                           (SELECT COUNT(*) FROM parcel_items pi WHERE pi.parcel_id = p.id) AS item_line_count,
                            c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS customer_delivery_location, s.name AS supplier_name, bf.name AS from_branch, bt.name AS to_branch,
                            p.last_email_status AS email_status, p.last_emailed_at AS emailed_at,
                            pit.item_descriptions
@@ -2768,10 +3014,11 @@ switch ($page) {
         }
         if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
         
-        // Pagination: 10 items per page
+        // Pagination: compact list — more rows per page (print view loads full filtered set)
         $page = max(1, (int)($_GET['page_num'] ?? 1));
-        $perPage = 10;
+        $perPage = 25;
         $offset = ($page - 1) * $perPage;
+        $isPrintList = ($action === 'print_list');
         
         // Get total count for pagination (simplified query without dra joins)
         $countSql = 'SELECT COUNT(DISTINCT p.id) as total FROM parcels p
@@ -2823,14 +3070,23 @@ switch ($page) {
         if ($from !== '' && $to !== '') {
             array_push($countParams, $from, $to);
         }
+        if ($idsCsv !== '') {
+            $idList = array_values(array_unique(array_filter(array_map('intval', explode(',', $idsCsv)))));
+            foreach ($idList as $ii) {
+                $countParams[] = $ii;
+            }
+        }
         $countStmt->execute($countParams);
         $totalCount = (int)$countStmt->fetch()['total'];
         $totalPages = max(1, ceil($totalCount / $perPage));
         
-        $sql .= ' ORDER BY p.created_at DESC, p.id DESC LIMIT ? OFFSET ?';
+        $sql .= ' ORDER BY p.created_at DESC, p.id DESC';
+        if (!$isPrintList) {
+            $sql .= ' LIMIT ? OFFSET ?';
+            $params[] = $perPage;
+            $params[] = $offset;
+        }
         $stmt = $pdo->prepare($sql);
-        $params[] = $perPage;
-        $params[] = $offset;
         $stmt->execute($params);
         $parcels = $stmt->fetchAll();
         // If we just sent an email and DB join isn't available, mark that parcel as sent in-memory
@@ -2846,17 +3102,58 @@ switch ($page) {
             unset($row);
             unset($_SESSION['email_sent_parcel_id']);
         }
+        $parcelItemsById = [];
+        if ($parcels) {
+            $pidList = [];
+            foreach ($parcels as $prow) {
+                $pid = (int)($prow['id'] ?? 0);
+                if ($pid > 0) {
+                    $pidList[$pid] = true;
+                }
+            }
+            $ids = array_keys($pidList);
+            if ($ids) {
+                try {
+                    $ph = implode(',', array_fill(0, count($ids), '?'));
+                    $itSt = $pdo->prepare("SELECT parcel_id, id, qty, description, rate, additional_amount, additional_amounts FROM parcel_items WHERE parcel_id IN ($ph) ORDER BY parcel_id, id");
+                    $itSt->execute($ids);
+                    while ($ir = $itSt->fetch(PDO::FETCH_ASSOC)) {
+                        $pk = (int)$ir['parcel_id'];
+                        if (!isset($parcelItemsById[$pk])) {
+                            $parcelItemsById[$pk] = [];
+                        }
+                        $parcelItemsById[$pk][] = $ir;
+                    }
+                } catch (Throwable $e) {
+                    $parcelItemsById = [];
+                }
+            }
+        }
         // customers, branches, suppliers for filter
         $customersList = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
         $branchesFilterList = BranchRepository::forFilters($pdo);
         $suppliersFilterList = $pdo->query('SELECT id, name FROM suppliers ORDER BY name LIMIT 300')->fetchAll();
         $deliveryRoutesFilterList = [];
         try { $deliveryRoutesFilterList = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesFilterList = []; }
-        $parcelRowStart = ($page - 1) * $perPage; // 0-based start for sequential # column (1, 2, 3...)
+        $vehiclesQuickList = [];
+        try {
+            $vehiclesQuickList = $pdo->query('SELECT reg_number AS vehicle_no FROM vehicles WHERE reg_number IS NOT NULL AND TRIM(reg_number) <> "" ORDER BY reg_number ASC LIMIT 400')->fetchAll();
+        } catch (Throwable $e) {
+            try {
+                $vehiclesQuickList = $pdo->query('SELECT plate_no AS vehicle_no FROM vehicles WHERE plate_no IS NOT NULL AND TRIM(plate_no) <> "" ORDER BY plate_no ASC LIMIT 400')->fetchAll();
+            } catch (Throwable $e2) {
+                try {
+                    $vehiclesQuickList = $pdo->query('SELECT vehicle_no FROM vehicles WHERE vehicle_no IS NOT NULL AND TRIM(vehicle_no) <> "" ORDER BY vehicle_no ASC LIMIT 400')->fetchAll();
+                } catch (Throwable $e3) {
+                    $vehiclesQuickList = [];
+                }
+            }
+        }
+        $parcelRowStart = $isPrintList ? 0 : (($page - 1) * $perPage); // print: numbering from 1 over full set
         if ($action === 'print_list') {
-            Helpers::view('parcels/print_list', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','route_date','filter_type','from','to','totalCount','parcelRowStart'));
+            Helpers::view('parcels/print_list', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','delivery_route_filter','route_date','filter_type','from','to','totalCount','parcelRowStart','parcelItemsById'));
         } else {
-            Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','delivery_route_filter','route_date','filter_type','customersList','from','to','branchesFilterList','suppliersFilterList','deliveryRoutesFilterList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount','parcelRowStart'));
+            Helpers::view('parcels/index', compact('parcels','q','status','vehicle_no','customer_filter_id','from_branch_filter_id','to_branch_filter_id','supplier_filter_id','tracking_filter','invoice_no_filter','delivery_location_filter','delivery_route_filter','route_date','filter_type','customersList','from','to','branchesFilterList','suppliersFilterList','deliveryRoutesFilterList','vehiclesQuickList','isMain','canCreateParcels','isKilinochchi','page','totalPages','totalCount','parcelRowStart','parcelItemsById'));
         }
         break;
 
@@ -2925,6 +3222,9 @@ switch ($page) {
         $it = $pdo->prepare('SELECT * FROM parcel_items WHERE parcel_id=? ORDER BY id');
         $it->execute([$id]);
         $items = $it->fetchAll();
+        BranchRepository::ensureSchema($pdo);
+        $invoiceHeaderBranches = BranchRepository::invoiceHeaderBranchesThree($pdo);
+        $printEmbed = isset($_GET['embed']) && (string)$_GET['embed'] === '1';
         include __DIR__ . '/../views/parcels/print.php';
         break;
 

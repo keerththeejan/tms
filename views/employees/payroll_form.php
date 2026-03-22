@@ -1,13 +1,14 @@
 <?php /** @var array $employee */ /** @var array $branchesAll */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="hr-page">
+<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-3">
   <h3 class="mb-0">New Payroll Entry</h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>" class="btn btn-outline-secondary w-100 w-md-auto"><i class="bi bi-arrow-left"></i> Back</a>
 </div>
 
 <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=employees&action=save_payroll'); ?>" class="row g-3">
   <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
   <input type="hidden" name="id" value="<?php echo (int)($employee['id'] ?? 0); ?>">
-  <div class="col-md-6">
+  <div class="col-12 col-md-6">
     <label class="form-label">Employee</label>
     <select name="employee_id" class="form-select" required>
       <option value="">Select Employee</option>
@@ -19,7 +20,7 @@
       <?php endforeach; ?>
     </select>
   </div>
-  <div class="col-md-3">
+  <div class="col-12 col-sm-6 col-md-3">
     <label class="form-label">Month-Year</label>
     <input type="text" name="month_year" id="month_year" maxlength="7" class="form-control" placeholder="YYYY-MM" value="<?php echo htmlspecialchars((string)($employee['month_year'] ?? date('Y-m'))); ?>">
   </div>
@@ -54,9 +55,10 @@
     <input type="text" id="net_salary_preview" class="form-control" value="" readonly>
   </div>
   <div class="col-12">
-    <button class="btn btn-primary"><i class="bi bi-save"></i> Save Payroll</button>
+    <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="bi bi-save"></i> Save Payroll</button>
   </div>
 </form>
+</div><!-- /.hr-page -->
 
 <script>
 (function(){

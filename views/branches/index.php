@@ -6,6 +6,7 @@ $branchListError = $branchListError ?? null;
 $brErr = $branchListError !== null ? (string)$branchListError : (string)$error;
 $newUrl = Helpers::baseUrl('index.php?page=branches&action=new');
 $deleteAction = Helpers::baseUrl('index.php?page=branches&action=delete');
+$setDefaultAction = Helpers::baseUrl('index.php?page=branches&action=set_default');
 $csrf = Helpers::csrfToken();
 ?>
 <style>
@@ -128,7 +129,10 @@ $csrf = Helpers::csrfToken();
   .branches-page .col-id { width: 64px; }
   .branches-page .col-code { width: 110px; }
   .branches-page .col-main { width: 100px; }
-  .branches-page .col-actions { width: 96px; }
+  .branches-page .col-actions { width: 132px; }
+  .branches-page .branches-table tbody tr.branch-row-default td:first-child {
+    box-shadow: inset 3px 0 0 0 #0d6efd;
+  }
   .branches-page .badge-main {
     background: rgba(22, 163, 74, 0.12);
     color: #15803d;
@@ -358,10 +362,10 @@ $csrf = Helpers::csrfToken();
         <thead>
           <tr>
             <th scope="col" class="col-id">#</th>
-            <th scope="col">Name</th>
+            <th scope="col">Branch name</th>
             <th scope="col" class="col-code d-none d-lg-table-cell">Code</th>
             <th scope="col" class="col-main">Type</th>
-            <th scope="col" class="d-none d-xl-table-cell">Status</th>
+            <th scope="col" class="d-none d-md-table-cell">Status</th>
             <th scope="col" class="text-end col-actions">Actions</th>
           </tr>
         </thead>
@@ -370,16 +374,19 @@ $csrf = Helpers::csrfToken();
             $bid = (int)$b['id'];
             $rowNum = (int)$index + 1;
             $isMain = (int)($b['is_main'] ?? 0) === 1;
+            $isDefault = (int)($b['is_default'] ?? 0) === 1;
             $isActive = !isset($b['is_active']) || (int)($b['is_active'] ?? 1) === 1;
             $name = (string)($b['name'] ?? '');
             $code = (string)($b['code'] ?? '');
             $editUrl = Helpers::baseUrl('index.php?page=branches&action=edit&id=' . $bid);
           ?>
           <tr
+            class="<?php echo $isDefault ? 'branch-row-default' : ''; ?>"
             data-branch-id="<?php echo $bid; ?>"
             data-name="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>"
             data-code="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>"
             data-main="<?php echo $isMain ? '1' : '0'; ?>"
+            data-default="<?php echo $isDefault ? '1' : '0'; ?>"
           >
             <td class="text-muted branch-row-num"><?php echo $rowNum; ?></td>
             <td>
@@ -394,11 +401,14 @@ $csrf = Helpers::csrfToken();
                 <span class="badge rounded-pill badge-branch">Branch</span>
               <?php endif; ?>
             </td>
-            <td class="d-none d-xl-table-cell">
+            <td class="d-none d-md-table-cell">
               <?php if ($isActive): ?>
                 <span class="badge text-bg-success">Active</span>
               <?php else: ?>
                 <span class="badge text-bg-secondary">Inactive</span>
+              <?php endif; ?>
+              <?php if ($isDefault): ?>
+                <span class="badge text-bg-primary ms-1">Default</span>
               <?php endif; ?>
             </td>
             <td class="text-end">
@@ -406,6 +416,15 @@ $csrf = Helpers::csrfToken();
                 <a class="btn btn-sm btn-outline-secondary btn-icon-action" href="<?php echo htmlspecialchars($editUrl); ?>" title="Edit branch" aria-label="Edit <?php echo htmlspecialchars($name); ?>">
                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
                 </a>
+                <?php if ($isDefault): ?>
+                  <button type="button" class="btn btn-sm btn-primary btn-icon-action" disabled title="Default for header &amp; billing"><i class="bi bi-star-fill" aria-hidden="true"></i></button>
+                <?php else: ?>
+                  <form method="post" action="<?php echo htmlspecialchars($setDefaultAction); ?>" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
+                    <input type="hidden" name="id" value="<?php echo $bid; ?>">
+                    <button type="submit" class="btn btn-sm btn-outline-warning btn-icon-action" title="Set as default header &amp; billing" aria-label="Set <?php echo htmlspecialchars($name); ?> as default"<?php echo $isActive ? '' : ' disabled'; ?>><i class="bi bi-star" aria-hidden="true"></i></button>
+                  </form>
+                <?php endif; ?>
                 <button type="button" class="btn btn-sm btn-outline-danger btn-icon-action branch-delete-open" title="Delete branch"
                   aria-label="Delete <?php echo htmlspecialchars($name); ?>"
                   data-branch-id="<?php echo $bid; ?>"
@@ -427,17 +446,20 @@ $csrf = Helpers::csrfToken();
       $bid = (int)$b['id'];
       $rowNum = (int)$index + 1;
       $isMain = (int)($b['is_main'] ?? 0) === 1;
+      $isDefault = (int)($b['is_default'] ?? 0) === 1;
+      $isActive = !isset($b['is_active']) || (int)($b['is_active'] ?? 1) === 1;
       $name = (string)($b['name'] ?? '');
       $code = (string)($b['code'] ?? '');
       $editUrl = Helpers::baseUrl('index.php?page=branches&action=edit&id=' . $bid);
     ?>
-    <details class="branch-card" data-branch-id="<?php echo $bid; ?>" data-name="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" data-code="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" data-main="<?php echo $isMain ? '1' : '0'; ?>">
+    <details class="branch-card<?php echo $isDefault ? ' border-primary border-2' : ''; ?>" data-branch-id="<?php echo $bid; ?>" data-name="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" data-code="<?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>" data-main="<?php echo $isMain ? '1' : '0'; ?>" data-default="<?php echo $isDefault ? '1' : '0'; ?>">
       <summary>
         <div class="min-w-0">
           <div class="branch-card-title text-truncate"><?php echo htmlspecialchars($name); ?></div>
           <div class="branch-card-meta text-muted"><?php echo htmlspecialchars($code); ?> · #<span class="branch-row-num"><?php echo $rowNum; ?></span></div>
         </div>
-        <div class="flex-shrink-0">
+        <div class="flex-shrink-0 text-end">
+          <?php if ($isDefault): ?><span class="badge text-bg-primary me-1">Default</span><?php endif; ?>
           <?php if ($isMain): ?>
             <span class="badge rounded-pill badge-main">Main</span>
           <?php else: ?>
@@ -451,11 +473,21 @@ $csrf = Helpers::csrfToken();
           <dt>#</dt><dd class="branch-row-num"><?php echo $rowNum; ?></dd>
           <dt>Record ID</dt><dd class="text-muted small"><?php echo $bid; ?></dd>
           <dt>Type</dt><dd><?php echo $isMain ? 'Main hub' : 'Branch office'; ?></dd>
+          <dt>Status</dt><dd><?php echo $isActive ? 'Active' : 'Inactive'; ?></dd>
         </dl>
         <div class="branch-card-actions">
           <a class="btn btn-sm btn-outline-secondary btn-icon-action" href="<?php echo htmlspecialchars($editUrl); ?>" title="Edit" aria-label="Edit <?php echo htmlspecialchars($name); ?>">
             <i class="bi bi-pencil-square" aria-hidden="true"></i>
           </a>
+          <?php if ($isDefault): ?>
+            <button type="button" class="btn btn-sm btn-primary btn-icon-action" disabled title="Default header/billing"><i class="bi bi-star-fill" aria-hidden="true"></i></button>
+          <?php else: ?>
+            <form method="post" action="<?php echo htmlspecialchars($setDefaultAction); ?>" class="d-inline">
+              <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
+              <input type="hidden" name="id" value="<?php echo $bid; ?>">
+              <button type="submit" class="btn btn-sm btn-outline-warning btn-icon-action" title="Set as default"<?php echo $isActive ? '' : ' disabled'; ?>><i class="bi bi-star" aria-hidden="true"></i></button>
+            </form>
+          <?php endif; ?>
           <button type="button" class="btn btn-sm btn-outline-danger btn-icon-action branch-delete-open" title="Delete"
             aria-label="Delete <?php echo htmlspecialchars($name); ?>"
             data-branch-id="<?php echo $bid; ?>"
@@ -532,6 +564,8 @@ $csrf = Helpers::csrfToken();
       var idb = parseInt(b.getAttribute('data-branch-id') || '0', 10);
       var ma = a.getAttribute('data-main') === '1';
       var mb = b.getAttribute('data-main') === '1';
+      var da = a.getAttribute('data-default') === '1';
+      var db = b.getAttribute('data-default') === '1';
       switch (mode) {
         case 'name_asc': return na.localeCompare(nb);
         case 'name_desc': return nb.localeCompare(na);
@@ -540,6 +574,7 @@ $csrf = Helpers::csrfToken();
         case 'main_first':
         default:
           if (ma !== mb) return ma ? -1 : 1;
+          if (da !== db) return da ? -1 : 1;
           return na.localeCompare(nb);
       }
     });

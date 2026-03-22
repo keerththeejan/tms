@@ -1,6 +1,7 @@
 <?php /** @var array $parcels */ 
   $filter_type = $filter_type ?? '';
   $today = date('Y-m-d');
+  $parcelItemsById = $parcelItemsById ?? [];
 ?>
 <style>
   /* Parcels list: one-viewport fit — tight filters + scrollable table (Bootstrap 5) */
@@ -38,7 +39,9 @@
   .parcels-page .skeleton-cell { height: 16px; width: 80%; }
   .parcels-page .parcels-table .cell-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display:block; }
   .parcels-page .parcels-table .cell-tight { white-space: nowrap; }
-  .parcels-page .parcels-table .col-actions { width: 120px; }
+  .parcels-page .parcels-table .col-actions { width: auto; min-width: 148px; white-space: nowrap; }
+  .parcels-page .parcel-actions-inline { display: inline-flex; align-items: center; gap: 2px; margin-right: 2px; vertical-align: middle; }
+  .parcels-page .parcel-actions-inline .btn { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; }
   .parcels-page .parcels-table .col-num { width: 56px; }
   .parcels-page .parcels-table .col-status { min-width: 118px; width: 128px; }
   .parcels-page .parcels-table .col-email { width: 120px; }
@@ -47,7 +50,7 @@
   .parcels-page .badge.badge-soft { font-weight: 700; border: 1px solid rgba(17,24,39,.10); }
   .parcels-page .badge-soft-success { background: rgba(25,135,84,.12); color: #146c43; }
   .parcels-page .badge-soft-warning { background: rgba(255,193,7,.16); color: #8a6d00; }
-  .parcels-page .badge-soft-info { background: rgba(13,202,240,.16); color: #055160; }
+  .parcels-page .badge-soft-info { background: rgba(13, 110, 253, 0.14); color: #084298; }
   .parcels-page .badge-soft-secondary { background: rgba(108,117,125,.14); color: #495057; }
   .parcels-page .badge-soft-danger { background: rgba(220,53,69,.14); color: #b02a37; }
   .parcels-page .btn-icon { width: 30px; height: 30px; padding: 0; display:inline-flex; align-items:center; justify-content:center; }
@@ -79,20 +82,324 @@
   .parcels-page .filters-card .form-control,
   .parcels-page .filters-card .form-select { padding-top: .15rem; padding-bottom: .15rem; font-size: .8rem; min-height: calc(1.45em + .35rem + 2px); }
   .parcels-page .filters-card .btn { border-radius: 8px; }
+  .parcels-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .bi-chevron-down { transform: rotate(-90deg); }
+  .parcels-page .filters-card [data-bs-toggle="collapse"] .bi-chevron-down { transition: transform 0.2s ease; }
   .parcels-page .filters-presets .btn { white-space: nowrap; }
   .parcels-page .filters-tools .btn { padding: .2rem .45rem; font-size: .75rem; }
   .parcels-page .filters-actions-row { border-top: 1px solid rgba(0,0,0,.06); margin-top: .25rem; padding-top: .35rem !important; }
   .parcels-page .parcels-toolbar { margin-bottom: .35rem !important; }
   /* Pull list slightly closer to topbar (less dead space under global header) */
   main.content-wrapper > .container-fluid .parcels-page { margin-top: -0.35rem; }
+  .parcels-page .pf-qe { cursor: pointer; }
+  .parcels-page .pf-qe.pf-qe-busy { opacity: 0.65; pointer-events: none; }
+  .parcels-page .col-chk { width: 36px; text-align: center; }
+  .parcels-page .col-exp { width: 28px; vertical-align: middle !important; }
+  .parcels-page .parcel-expand-btn { line-height: 1; color: #64748b !important; }
+  .parcels-page .parcel-expand-btn .parcel-exp-ico { transition: transform 0.2s ease; display: inline-block; }
+  .parcels-page .parcel-expand-btn[aria-expanded="true"] .parcel-exp-ico { transform: rotate(90deg); }
+  .parcels-page .parcel-expand-btn .parcel-exp-ico-m { transition: transform 0.2s ease; display: inline-block; }
+  .parcels-page .parcel-expand-btn[aria-expanded="true"] .parcel-exp-ico-m { transform: rotate(180deg); }
+  .parcels-page .parcel-items-panel { border-radius: 0 0 8px 8px; }
+  .parcels-page .parcel-items-nested { font-size: 11.5px; margin-bottom: 0; background: #fff; border: 1px solid rgba(17,24,39,.08); border-radius: 8px; }
+  .parcels-page .parcel-items-nested thead th { background: #f1f5f9; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: #64748b; }
+  .parcels-page .parcel-items-nested td, .parcels-page .parcel-items-nested th { padding: 4px 8px !important; }
+  .parcels-page .parcel-items-nested .pf-add-tag { font-size: 10px; font-weight: 600; }
+  .parcels-page .parcel-items-nested tfoot td { font-weight: 700; background: #f8fafc; }
+  .parcels-page .parcel-items-loading { min-height: 2rem; }
+  @media (max-width: 767.98px) {
+    .parcels-page .parcel-items-nested { font-size: 11px; }
+  }
+  /* Print-only document (screen hidden) */
+  .parcels-print-document { display: none !important; }
+  .ppd-head { margin: 0 0 8px; padding: 0; }
+  .ppd-title { font-size: 16px; font-weight: 800; margin: 0 0 4px; letter-spacing: 0.02em; }
+  .ppd-sub { font-size: 10px; margin: 0; color: #333; line-height: 1.3; }
+  .ppd-block {
+    margin: 0 0 10px;
+    padding: 0 0 8px;
+    border-bottom: 1px solid #bbb;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .ppd-block:last-child { border-bottom: none; }
+  .ppd-sum-table, .ppd-items-table {
+    width: 100%;
+    max-width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+    line-height: 1.2;
+    table-layout: fixed;
+  }
+  .ppd-sum-table th, .ppd-sum-table td,
+  .ppd-items-table th, .ppd-items-table td {
+    border: 1px solid #000;
+    padding: 2px 4px;
+    vertical-align: top;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .ppd-sum-table th, .ppd-items-table th {
+    background: #eee;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 9px;
+  }
+  .ppd-items-caption { font-size: 10px; font-weight: 700; margin: 4px 0 2px; }
+  .ppd-num { text-align: right; }
+  .ppd-empty { font-size: 10px; color: #555; margin: 8px 0; }
+  .ppd-empty-tight { margin: 2px 0 0 !important; }
+  .ppd-foot-sub td { font-weight: 700; }
+  .ppd-foot-total td { font-weight: 800; font-size: 9px; }
+  /* Column share (table-layout: fixed); percentages only — fits A4 */
+  .ppd-s-id { width: 5%; }
+  .ppd-s-serial { width: 8%; }
+  .ppd-s-date { width: 9%; }
+  .ppd-s-customer { width: 15%; }
+  .ppd-s-branches { width: 13%; }
+  .ppd-s-route { width: 19%; }
+  .ppd-s-weight { width: 8%; }
+  .ppd-s-total { width: 8%; }
+  .ppd-s-status { width: 15%; }
+  .ppd-i-no { width: 6%; }
+  .ppd-i-desc { width: 40%; }
+  .ppd-i-qty { width: 10%; }
+  .ppd-i-rate { width: 12%; }
+  .ppd-i-amt { width: 12%; }
+  .ppd-i-add { width: 20%; }
+  @media print {
+    @page { size: A4; margin: 8mm; }
+    /* Shell: no flex scrollbars, full usable width */
+    html {
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+      overflow-y: visible !important;
+      height: auto !important;
+    }
+    body {
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+      overflow-y: visible !important;
+      min-width: 0 !important;
+      height: auto !important;
+      max-height: none !important;
+      background: #fff !important;
+      background-image: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .app-shell.d-flex,
+    .app-shell {
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+      flex: none !important;
+    }
+    #sidebar,
+    .sidebar-overlay,
+    .sidebar-toggle-floating,
+    .topbar,
+    .skip-link,
+    .no-print,
+    .no-print-parcels,
+    .modal,
+    .modal-backdrop,
+    .offcanvas,
+    .toast,
+    .toast-container {
+      display: none !important;
+    }
+    main.content-wrapper,
+    #main-content {
+      display: block !important;
+      flex: none !important;
+      flex-grow: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      margin-left: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+    .container-fluid,
+    .container,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      margin: 0 !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      overflow: visible !important;
+    }
+    .row {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      --bs-gutter-x: 0 !important;
+      --bs-gutter-y: 0 !important;
+    }
+    .table-responsive,
+    .table-wrap,
+    .parcels-table-scroll,
+    .parcels-page .table-responsive,
+    .parcels-page .table-wrap,
+    .parcels-page .parcels-table-scroll {
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      overflow: visible !important;
+      overflow-x: visible !important;
+      overflow-y: visible !important;
+      max-height: none !important;
+      -webkit-overflow-scrolling: auto !important;
+    }
+    .parcels-page .card,
+    .parcels-page .card-body,
+    .parcels-page .collapse,
+    .wrapper {
+      overflow: visible !important;
+      max-height: none !important;
+      min-width: 0 !important;
+    }
+    .parcels-page .parcels-table,
+    .parcels-page .parcel-items-nested {
+      min-width: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    * {
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+    body * {
+      background-image: none !important;
+    }
+    .parcels-print-document th {
+      background: #fff !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .parcels-page {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      overflow: visible !important;
+    }
+    .parcels-print-document {
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow-x: hidden !important;
+      overflow-y: visible !important;
+      font-family: "Courier New", Courier, "Liberation Mono", monospace, "Noto Sans Tamil", "Latha", Tahoma, sans-serif !important;
+      color: #000 !important;
+      -webkit-font-smoothing: auto !important;
+    }
+    .ppd-print-hide {
+      display: none !important;
+    }
+    .ppd-head {
+      margin: 0 0 5px !important;
+      padding: 0 !important;
+    }
+    .ppd-title {
+      font-size: 16px !important;
+      font-weight: 800 !important;
+      margin: 0 0 2px !important;
+    }
+    .ppd-sub {
+      font-size: 11px !important;
+      margin: 0 !important;
+      line-height: 1.35 !important;
+      color: #000 !important;
+    }
+    .ppd-block {
+      margin: 0 0 5px !important;
+      padding: 0 0 5px !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    .ppd-block:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      border-bottom: none !important;
+    }
+    .ppd-items-caption {
+      margin: 3px 0 1px !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+    }
+    .ppd-sum-table,
+    .ppd-items-table {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      table-layout: fixed !important;
+      font-size: 12px !important;
+    }
+    .ppd-sum-table th,
+    .ppd-sum-table td,
+    .ppd-items-table th,
+    .ppd-items-table td {
+      min-width: 0 !important;
+      padding: 3px 4px !important;
+      font-size: 12px !important;
+      border-color: #000 !important;
+      color: #000 !important;
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      white-space: normal !important;
+    }
+    .ppd-sum-table th,
+    .ppd-items-table th {
+      font-size: 11px !important;
+      font-weight: 800 !important;
+      background: #fff !important;
+      border-bottom: 2px solid #000 !important;
+    }
+    .ppd-empty,
+    .ppd-empty-tight {
+      margin: 2px 0 !important;
+      font-size: 11px !important;
+    }
+    .ppd-foot-sub td,
+    .ppd-foot-total td {
+      font-size: 11px !important;
+      color: #000 !important;
+    }
+  }
 </style>
 
 <div class="parcels-page">
 
+<div class="no-print">
+
 <div class="card border shadow-sm mb-1 filters-card">
   <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-1 py-1 px-2">
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <span class="fw-semibold small mb-0"><i class="bi bi-funnel me-1"></i>Filters</span>
+      <button class="btn btn-link btn-sm text-decoration-none text-dark p-0 fw-semibold small" type="button" data-bs-toggle="collapse" data-bs-target="#parcelsFiltersBody" aria-expanded="true" aria-controls="parcelsFiltersBody" title="Show / hide filters">
+        <i class="bi bi-chevron-down parcel-filter-chevron"></i><span class="ms-1">Filters</span>
+      </button>
       <div class="btn-group btn-group-sm filters-presets flex-wrap" role="group" aria-label="Quick filters">
         <span class="input-group-text bg-light border-0 text-muted py-0 px-1 small d-none d-sm-inline">Presets</span>
         <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=route_planning&from='.$today.'&to='.$today); ?>" class="btn <?php echo $filter_type==='route_planning'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-geo-alt me-1"></i><span class="d-none d-md-inline">Route planning</span><span class="d-md-none">Route</span></a>
@@ -106,13 +413,7 @@
       <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary"><i class="bi bi-truck-front"></i><span class="d-none d-lg-inline ms-1">Vehicle routes</span></a>
     </div>
   </div>
-  <div class="d-flex align-items-center justify-content-between px-2 pt-1 d-md-none border-top border-light">
-    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#parcelsFilters" aria-expanded="true" aria-controls="parcelsFilters">
-      <i class="bi bi-sliders"></i>
-      <span class="ms-1">Toggle filters</span>
-    </button>
-  </div>
-  <div id="parcelsFilters" class="card-body collapse show py-1 px-2">
+  <div id="parcelsFiltersBody" class="card-body collapse show py-1 px-2 border-top border-light">
     <?php if ($filter_type === 'route_planning'): ?>
     <div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-info-circle me-1"></i> <strong>Route planning</strong> preset: pending / in transit, today.</div>
     <?php elseif ($filter_type === 'vehicle_routes'): ?>
@@ -120,11 +421,11 @@
     <?php elseif ($filter_type === 'customers'): ?>
     <div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-info-circle me-1"></i> Pick a <strong>customer</strong> below, then Apply.</div>
     <?php endif; ?>
-    <form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+    <form id="parcelsFilterForm" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="parcel-filters-form">
       <input type="hidden" name="page" value="parcels">
       <?php if ($filter_type !== ''): ?><input type="hidden" name="filter_type" value="<?php echo htmlspecialchars($filter_type); ?>"><?php endif; ?>
 
-      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-1 align-items-end">
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-2 align-items-end">
         <div class="col">
           <label class="form-label" for="filter_customer_id">Customer</label>
           <select class="form-select form-select-sm" id="filter_customer_id" name="customer_id">
@@ -163,7 +464,7 @@
         </div>
       </div>
 
-      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-1 align-items-end">
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-2 align-items-end">
         <div class="col">
           <label class="form-label" for="filter_q">Search</label>
           <input type="text" class="form-control form-control-sm" id="filter_q" name="q" placeholder="Name, phone, tracking" value="<?php echo htmlspecialchars($q ?? ''); ?>" title="Customer name, phone, or tracking">
@@ -191,7 +492,7 @@
         </div>
       </div>
 
-      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-1 align-items-end">
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-2 align-items-end">
         <div class="col">
           <label class="form-label" for="filter_delivery_location">Delivery location</label>
           <input type="text" class="form-control form-control-sm" id="filter_delivery_location" name="delivery_location" placeholder="Location" value="<?php echo htmlspecialchars($delivery_location_filter ?? ''); ?>">
@@ -224,13 +525,31 @@
           <input type="date" class="form-control form-control-sm" id="filter_route_date" name="route_date" value="<?php echo htmlspecialchars($route_date ?? ''); ?>" title="Parcels with delivery route on this date">
         </div>
       </div>
-      <div class="filters-actions-row d-flex flex-wrap justify-content-end align-items-center gap-2">
-        <button type="submit" class="btn btn-primary btn-sm py-1 px-2"><i class="bi bi-funnel me-1"></i> Apply</button>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm py-1 px-2">Reset</a>
-        <?php if (isset($_SESSION['parcels_filter_from']) || isset($_SESSION['parcels_filter_to'])): ?>
-          <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&clear_dates=1'); ?>" class="btn btn-outline-danger btn-sm py-1 px-2" title="Clear saved date filter"><i class="bi bi-x-circle"></i></a>
-        <?php endif; ?>
+      <div class="filters-actions-row d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="form-check form-check-inline small mb-0">
+          <input class="form-check-input" type="checkbox" id="parcelsAutoApplyToggle" value="1">
+          <label class="form-check-label text-muted" for="parcelsAutoApplyToggle" title="Submit immediately when any filter changes">Auto-apply on change</label>
+        </div>
+        <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 ms-auto">
+          <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm py-1 px-2" title="Clear all filters"><i class="bi bi-x-lg me-1"></i>Clear all</a>
+          <button type="submit" class="btn btn-primary btn-sm py-1 px-2"><i class="bi bi-funnel me-1"></i>Apply</button>
+          <?php if (isset($_SESSION['parcels_filter_from']) || isset($_SESSION['parcels_filter_to'])): ?>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&clear_dates=1'); ?>" class="btn btn-outline-danger btn-sm py-1 px-2" title="Clear saved date filter"><i class="bi bi-calendar-x"></i></a>
+          <?php endif; ?>
+        </div>
       </div>
+      <datalist id="pfParcelRouteDatalist">
+        <?php foreach (($deliveryRoutesFilterList ?? []) as $r): ?>
+          <?php $rn = trim((string)($r['name'] ?? '')); if ($rn === '') continue; ?>
+          <option value="<?php echo htmlspecialchars($rn); ?>"></option>
+        <?php endforeach; ?>
+      </datalist>
+      <datalist id="pfParcelVehicleDatalist">
+        <?php foreach (($vehiclesQuickList ?? []) as $v): ?>
+          <?php $vn = trim((string)($v['vehicle_no'] ?? '')); if ($vn === '') continue; ?>
+          <option value="<?php echo htmlspecialchars($vn); ?>"></option>
+        <?php endforeach; ?>
+      </datalist>
     </form>
   </div>
 </div>
@@ -258,18 +577,23 @@
           $veh = trim((string)($p['vehicle_no'] ?? ''));
           $fromBr = (string)($p['from_branch'] ?? '—');
           $toBr = (string)($p['to_branch'] ?? '—');
-          $items = trim((string)($p['item_descriptions'] ?? ''));
           $priceText = is_null($p['price']) ? '-' : number_format((float)$p['price'], 2);
           $weightText = number_format((float)($p['weight'] ?? 0), 2);
+          $mPid = (int)$p['id'];
+          $mTrack = trim((string)($p['tracking_number'] ?? ''));
+          $mItemLines = (int)($p['item_line_count'] ?? 0);
+          $mSavedRoute = trim((string)($p['delivery_route'] ?? ''));
+          $mRouteDisp = $mSavedRoute !== '' ? $mSavedRoute : ($fromBr . ' → ' . $toBr);
         ?>
         <div class="card shadow-sm">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start gap-2">
               <div>
                 <div class="title">
-                  <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>">
-                    #<?php echo (int)$p['id']; ?>
+                  <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.$mPid); ?>">
+                    #<?php echo $mPid; ?>
                   </a>
+                  <?php if ($mTrack !== ''): ?><span class="small text-muted ms-1"><?php echo htmlspecialchars($mTrack); ?></span><?php endif; ?>
                   <span class="badge badge-soft <?php echo $stClass; ?> ms-1"><?php echo htmlspecialchars(Helpers::parcelStatusLabel($st)); ?></span>
                 </div>
                 <div class="meta">
@@ -277,24 +601,32 @@
                 </div>
               </div>
               <div class="text-end">
-                <div class="kv"><span class="k">Price</span><span class="v"><?php echo $priceText; ?></span></div>
+                <div class="kv"><span class="k">Total</span><span class="v fw-bold"><?php echo $priceText; ?></span></div>
                 <div class="kv"><span class="k">Weight</span><span class="v"><?php echo $weightText; ?></span></div>
               </div>
             </div>
 
             <div class="mt-2">
               <div class="kv"><span class="k">Customer</span><span class="v text-truncate" style="max-width: 65%"><a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&customer_id=' . $cid); ?>"><?php echo htmlspecialchars($custLabel); ?></a></span></div>
-              <div class="kv"><span class="k">Route</span><span class="v text-truncate" style="max-width: 65%"><span><?php echo htmlspecialchars($fromBr); ?></span> <span class="text-muted">→</span> <span><?php echo htmlspecialchars($toBr); ?></span></span></div>
+              <div class="kv"><span class="k">Branches</span><span class="v text-truncate" style="max-width: 65%"><span><?php echo htmlspecialchars($fromBr); ?></span> <span class="text-muted">→</span> <span><?php echo htmlspecialchars($toBr); ?></span></span></div>
+              <div class="kv"><span class="k">Delivery route</span><span class="v text-truncate" style="max-width: 65%"><?php echo htmlspecialchars($mRouteDisp); ?></span></div>
               <div class="kv"><span class="k">Vehicle</span><span class="v text-truncate" style="max-width: 65%">
                 <?php if ($veh !== ''): ?>
                   <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&vehicle_no=' . urlencode($veh)); ?>"><?php echo htmlspecialchars($veh); ?></a>
                 <?php else: ?>—<?php endif; ?>
               </span></div>
-              <div class="kv"><span class="k">Items</span><span class="v text-truncate" style="max-width: 65%"><?php echo $items !== '' ? htmlspecialchars($items) : '—'; ?></span></div>
+            </div>
+
+            <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2 d-flex justify-content-between align-items-center parcel-expand-btn" data-bs-toggle="collapse" data-bs-target="#parcel-items-m-<?php echo $mPid; ?>" aria-expanded="false" data-parcel-id="<?php echo $mPid; ?>">
+              <span><i class="bi bi-list-ul me-1"></i>Line items<?php if ($mItemLines > 0): ?> <span class="badge bg-light text-dark border"><?php echo $mItemLines; ?></span><?php endif; ?></span>
+              <i class="bi bi-chevron-down small parcel-exp-ico-m"></i>
+            </button>
+            <div class="collapse parcel-items-collapse" id="parcel-items-m-<?php echo $mPid; ?>" data-parcel-id="<?php echo $mPid; ?>">
+              <div class="parcel-items-host mt-2 border rounded bg-light p-2" data-parcel-id="<?php echo $mPid; ?>"></div>
             </div>
 
             <div class="actions d-flex gap-2 flex-wrap mt-3">
-              <a class="btn btn-outline-secondary btn-sm" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer me-1"></i>Print</a>
+              <button type="button" class="btn btn-outline-primary btn-sm btn-parcel-print" data-parcel-id="<?php echo (int)$p['id']; ?>"><i class="bi bi-printer me-1"></i>Print</button>
               <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square me-1"></i>Edit</a>
               <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id='.(int)$p['id']); ?>"><i class="bi bi-envelope me-1"></i>Email</a>
               <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" onsubmit="return confirm('Delete this parcel?');" class="ms-auto">
@@ -310,97 +642,123 @@
   <?php endif; ?>
 </div>
 
-<div class="d-flex flex-wrap align-items-center gap-2 parcels-toolbar">
-  <a href="<?php echo Helpers::baseUrl('index.php?' . http_build_query(array_merge($_GET, ['page'=>'parcels','action'=>'print_list']))); ?>" target="_blank" class="btn btn-outline-primary btn-sm py-1"><i class="bi bi-printer me-1"></i> Print list</a>
+<div class="d-flex flex-wrap align-items-center gap-2 parcels-toolbar no-print-parcels">
+  <button type="button" class="btn btn-outline-primary btn-sm py-1" id="parcelsPrintSelectedBtn" title="Print selected rows (current page, browser print)"><i class="bi bi-printer me-1"></i>Print selected</button>
+  <button type="button" class="btn btn-outline-primary btn-sm py-1" id="parcelsPrintListBtn" title="Print parcels list (this page, browser print)"><i class="bi bi-files me-1"></i>Print list</button>
   <?php if (!empty($vehicle_no)): ?>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_detail&vehicle_no=' . urlencode($vehicle_no) . '&from=' . urlencode($from ?? date('Y-m-d')) . '&to=' . urlencode($to ?? date('Y-m-d')) . '&direction=from'); ?>" target="_blank" class="btn btn-outline-secondary btn-sm py-1"><i class="bi bi-signpost me-1"></i> Route print</a>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_detail&vehicle_no=' . urlencode($vehicle_no) . '&from=' . urlencode($from ?? date('Y-m-d')) . '&to=' . urlencode($to ?? date('Y-m-d')) . '&direction=from'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm py-1" title="Route print"><i class="bi bi-signpost me-1"></i>Route print</a>
   <?php endif; ?>
 </div>
 
+<?php $parcelTableColspan = 17; ?>
 <div class="table-responsive table-wrap parcels-table-scroll d-none d-md-block">
   <table class="table table-sm table-striped table-hover align-middle parcels-table mb-0">
     <thead class="table-light">
       <tr>
+        <th class="col-exp"><span class="visually-hidden">Expand</span></th>
+        <th class="col-chk"><input type="checkbox" class="form-check-input" id="parcelsSelectAll" title="Select all on page" aria-label="Select all"></th>
         <th class="col-num">#</th>
+        <th>Parcel</th>
+        <th class="cell-tight">Date</th>
         <th>Customer</th>
-        <th>Supplier</th>
-        <th>From Branch</th>
-        <th>To Branch</th>
-        <th>Vehicle</th>
-        <th>Delivery Route</th>
-        <th>Items</th>
-        <th class="col-weight">Weight</th>
-        <th class="col-price">Price</th>
+        <th class="d-none d-xl-table-cell">Supplier</th>
+        <th class="d-none d-md-table-cell">From</th>
+        <th class="d-none d-md-table-cell">To</th>
+        <th class="d-none d-md-table-cell" title="Vehicle"><i class="bi bi-truck-front"></i></th>
+        <th class="d-none d-md-table-cell" title="Delivery route"><i class="bi bi-signpost"></i></th>
+        <th class="d-none d-lg-table-cell text-center" title="Line count">Ln</th>
+        <th class="col-weight d-none d-md-table-cell">Wt.</th>
+        <th class="col-price">Total</th>
         <th class="col-status">Status</th>
-        <th class="col-email">Email</th>
-        <th class="text-end col-actions">Actions</th>
+        <th class="col-email d-none d-xxl-table-cell">Email</th>
+        <th class="text-end col-actions"><span class="small text-muted fw-semibold">Actions</span></th>
       </tr>
     </thead>
     <tbody>
-      <?php $rowNum = (int)($parcelRowStart ?? 0); foreach ($parcels as $p): $rowNum++; ?>
-        <tr>
-          <td><?php echo $rowNum; ?></td>
+      <?php $rowNum = (int)($parcelRowStart ?? 0); foreach ($parcels as $p): $rowNum++;
+        $pid = (int)$p['id'];
+        $isBilled = ($p['price'] !== null && (float)$p['price'] > 0);
+        $savedRoute = trim((string)($p['delivery_route'] ?? ''));
+        $custLoc = trim((string)($p['customer_delivery_location'] ?? ''));
+        $rdTo = trim((string)($p['route_date_to'] ?? ''));
+        $rdFrom = trim((string)($p['route_date_from'] ?? ''));
+        $veh = trim((string)($p['vehicle_no'] ?? ''));
+        $vehDb = trim((string)($p['vehicle_no_db'] ?? ''));
+        ob_start();
+        if ($savedRoute !== '') {
+          echo '<span class="cell-ellipsis" title="' . htmlspecialchars($savedRoute) . '">' . htmlspecialchars($savedRoute) . '</span>';
+        } elseif ($custLoc !== '') {
+          echo '<span class="cell-ellipsis" title="' . htmlspecialchars($custLoc) . '">' . htmlspecialchars($custLoc) . '</span>';
+        } elseif ($rdTo !== '' || $rdFrom !== '') {
+          $parts = [];
+          if ($rdTo !== '') {
+            $parts[] = 'To: ' . $rdTo;
+          }
+          if ($rdFrom !== '') {
+            $parts[] = 'From: ' . $rdFrom;
+          }
+          if ($veh !== '') {
+            array_unshift($parts, $veh);
+          }
+          $routeLabel = implode(' · ', $parts);
+          echo '<span class="cell-ellipsis" title="' . htmlspecialchars($routeLabel) . '">' . htmlspecialchars($routeLabel) . '</span>';
+        } elseif ($veh !== '') {
+          echo '<span class="cell-ellipsis" title="' . htmlspecialchars($veh) . '">' . htmlspecialchars($veh) . '</span>';
+        } else {
+          echo '—';
+        }
+        $routeCellInner = ob_get_clean();
+        $st = (string)($p['status'] ?? '');
+        $stClass = Helpers::parcelStatusBadgeClass($st);
+        $track = trim((string)($p['tracking_number'] ?? ''));
+        $itemLineCount = (int)($p['item_line_count'] ?? 0);
+        $createdShort = substr((string)($p['created_at'] ?? ''), 0, 16);
+        $cid = (int)$p['customer_id'];
+        $nm = (string)($p['customer_name'] ?? '');
+        $ph = trim((string)($p['customer_phone'] ?? ''));
+        $isPH = preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1;
+        $custLabel = $nm . (!$isPH && $ph !== '' ? ' (' . $ph . ')' : '');
+      ?>
+        <tr class="parcel-main-row" data-parcel-id="<?php echo $pid; ?>">
+          <td class="col-exp">
+            <button type="button" class="btn btn-link btn-sm text-muted parcel-expand-btn py-0 px-1" data-bs-toggle="collapse" data-bs-target="#parcel-items-d-<?php echo $pid; ?>" aria-expanded="false" aria-controls="parcel-items-d-<?php echo $pid; ?>" data-parcel-id="<?php echo $pid; ?>" title="Show line items">
+              <i class="bi bi-chevron-right parcel-exp-ico" aria-hidden="true"></i><span class="visually-hidden">Expand</span>
+            </button>
+          </td>
+          <td class="col-chk"><input type="checkbox" class="form-check-input parcel-row-check" name="parcel_ids[]" value="<?php echo $pid; ?>" aria-label="Select parcel <?php echo $pid; ?>"></td>
+          <td class="cell-tight"><a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>" title="Edit"><?php echo $rowNum; ?></a></td>
+          <td class="cell-tight">
+            <a class="text-decoration-none fw-semibold" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>">#<?php echo $pid; ?></a>
+            <?php if ($track !== ''): ?><div class="small text-muted text-truncate" style="max-width:7rem" title="<?php echo htmlspecialchars($track); ?>"><?php echo htmlspecialchars($track); ?></div><?php endif; ?>
+          </td>
+          <td class="cell-tight small text-muted"><?php echo htmlspecialchars($createdShort); ?></td>
           <td>
-            <?php $cid = (int)$p['customer_id']; ?>
             <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&customer_id=' . $cid); ?>" class="text-decoration-none">
-              <?php $nm = (string)($p['customer_name'] ?? ''); $ph = trim((string)($p['customer_phone'] ?? '')); $isPH = preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1; $label = $nm . (!$isPH && $ph !== '' ? ' (' . $ph . ')' : ''); ?>
-              <span class="cell-ellipsis" title="<?php echo htmlspecialchars($label); ?>"><?php echo htmlspecialchars($label); ?></span>
+              <span class="cell-ellipsis" title="<?php echo htmlspecialchars($custLabel); ?>"><?php echo htmlspecialchars($custLabel); ?></span>
             </a>
           </td>
-          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['supplier_name'] ?? '')); ?>"><?php echo htmlspecialchars($p['supplier_name'] ?? ''); ?></span></td>
-          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['from_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['from_branch'] ?? ''); ?></span></td>
-          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['to_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['to_branch'] ?? ''); ?></span></td>
-          <td>
-            <?php if (!empty($p['vehicle_no'])): ?>
-              <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&vehicle_no=' . urlencode($p['vehicle_no'])); ?>" class="text-decoration-none">
-                <span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)$p['vehicle_no']); ?>"><?php echo htmlspecialchars($p['vehicle_no']); ?></span>
-              </a>
+          <td class="d-none d-xl-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['supplier_name'] ?? '')); ?>"><?php echo htmlspecialchars($p['supplier_name'] ?? ''); ?></span></td>
+          <td class="d-none d-md-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['from_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['from_branch'] ?? ''); ?></span></td>
+          <td class="d-none d-md-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['to_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['to_branch'] ?? ''); ?></span></td>
+          <td class="d-none d-md-table-cell pf-qe" data-parcel-id="<?php echo $pid; ?>" data-qe-field="vehicle_no" data-qe-value="<?php echo htmlspecialchars($vehDb); ?>" title="Click to edit vehicle">
+            <?php if ($veh !== ''): ?>
+              <span class="cell-ellipsis" title="<?php echo htmlspecialchars($veh); ?>"><?php echo htmlspecialchars($veh); ?></span>
             <?php else: ?>
               —
             <?php endif; ?>
           </td>
-          <td class="small">
-            <?php
-              $savedRoute = trim((string)($p['delivery_route'] ?? ''));
-              $custLoc = trim((string)($p['customer_delivery_location'] ?? ''));
-              $rdTo = trim((string)($p['route_date_to'] ?? ''));
-              $rdFrom = trim((string)($p['route_date_from'] ?? ''));
-              $veh = trim((string)($p['vehicle_no'] ?? ''));
-              if ($savedRoute !== ''):
-                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($savedRoute) . '">' . htmlspecialchars($savedRoute) . '</span>';
-              elseif ($custLoc !== ''):
-                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($custLoc) . '">' . htmlspecialchars($custLoc) . '</span>';
-              elseif ($rdTo !== '' || $rdFrom !== ''):
-                $parts = [];
-                if ($rdTo !== '') $parts[] = 'To: ' . $rdTo;
-                if ($rdFrom !== '') $parts[] = 'From: ' . $rdFrom;
-                if ($veh !== '') array_unshift($parts, $veh);
-                $routeLabel = implode(' · ', $parts);
-                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($routeLabel) . '">' . htmlspecialchars($routeLabel) . '</span>';
-              elseif ($veh !== ''):
-                echo '<span class="cell-ellipsis" title="' . htmlspecialchars($veh) . '">' . htmlspecialchars($veh) . '</span>';
-              else:
-                echo '—';
-              endif;
-            ?>
+          <td class="small d-none d-md-table-cell pf-qe" data-parcel-id="<?php echo $pid; ?>" data-qe-field="delivery_route" data-qe-value="<?php echo htmlspecialchars($savedRoute); ?>" title="Click to edit route">
+            <?php echo $routeCellInner; ?>
           </td>
-          <td>
-            <?php 
-              $desc = trim((string)($p['item_descriptions'] ?? ''));
-              if ($desc === '') { echo '—'; }
-              else { echo '<span class="cell-ellipsis" title="' . htmlspecialchars($desc) . '">' . htmlspecialchars($desc) . '</span>'; }
-            ?>
+          <td class="text-center cell-tight d-none d-lg-table-cell">
+            <?php if ($itemLineCount > 0): ?><span class="badge rounded-pill bg-light text-dark border"><?php echo $itemLineCount; ?></span><?php else: ?><span class="text-muted">0</span><?php endif; ?>
           </td>
-          <td class="text-end cell-tight"><?php echo number_format((float)$p['weight'], 2); ?></td>
-          <td class="text-end cell-tight"><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
-          <td>
-            <?php
-              $st = (string)($p['status'] ?? '');
-              $stClass = Helpers::parcelStatusBadgeClass($st);
-            ?>
+          <td class="text-end cell-tight d-none d-md-table-cell"><?php echo number_format((float)$p['weight'], 2); ?></td>
+          <td class="text-end cell-tight <?php echo $p['price'] !== null ? 'fw-bold' : ''; ?>"><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
+          <td class="col-status <?php echo $isBilled ? '' : 'pf-qe'; ?>" data-parcel-id="<?php echo $pid; ?>" data-qe-field="status" data-qe-value="<?php echo htmlspecialchars($st); ?>" title="<?php echo $isBilled ? '' : 'Click to edit status'; ?>">
             <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars(Helpers::parcelStatusLabel($st)); ?></span>
           </td>
-          <td>
+          <td class="d-none d-xxl-table-cell">
             <?php if (!empty($p['email_status'])): ?>
               <?php if ($p['email_status'] === 'sent'): ?>
                 <span class="badge badge-soft badge-soft-success">Sent</span>
@@ -412,28 +770,41 @@
               <span class="badge badge-soft badge-soft-secondary">Not sent</span>
             <?php endif; ?>
             <div>
-              <a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=email_log&id='.(int)$p['id']); ?>">View log</a>
+              <a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=email_log&id=' . $pid); ?>">View log</a>
             </div>
           </td>
-          <td class="text-end position-relative">
+          <td class="text-end position-relative col-actions">
+            <div class="parcel-actions-inline" role="group" aria-label="Parcel actions">
+              <button type="button" class="btn btn-outline-primary btn-sm btn-parcel-print" data-parcel-id="<?php echo (int)$pid; ?>" title="Print invoice in preview"><i class="bi bi-printer" aria-hidden="true"></i><span class="visually-hidden">Print</span></button>
+              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>" title="Edit"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="visually-hidden">Edit</span></a>
+              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id=' . $pid); ?>" title="Email"><i class="bi bi-envelope" aria-hidden="true"></i><span class="visually-hidden">Email</span></a>
+            </div>
             <div class="dropdown d-inline parcels-actions-dd">
-              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true" data-bs-popper-config='{"strategy":"fixed","modifiers":[{"name":"preventOverflow","options":{"boundary":"viewport"}}]}' aria-expanded="false" title="Actions">
-                <i class="bi bi-three-dots-vertical"></i>
+              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true" data-bs-popper-config='{"strategy":"fixed","modifiers":[{"name":"preventOverflow","options":{"boundary":"viewport"}}]}' aria-expanded="false" title="More">
+                <i class="bi bi-three-dots-vertical" aria-hidden="true"></i><span class="visually-hidden">More</span>
               </button>
               <ul class="dropdown-menu dropdown-menu-end shadow">
-                <li><a class="dropdown-item" target="_blank" href="<?php echo Helpers::baseUrl('index.php?page=parcel_print&id='.(int)$p['id']); ?>"><i class="bi bi-printer me-2"></i>Print</a></li>
-                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id='.(int)$p['id']); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a></li>
-                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route&customer_id='.(int)$p['customer_id']); ?>"><i class="bi bi-signpost me-2"></i>Delivery Route</a></li>
-                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id='.(int)$p['id']); ?>"><i class="bi bi-envelope me-2"></i>Email</a></li>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route&customer_id=' . $cid); ?>"><i class="bi bi-signpost me-2"></i>Delivery route</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
                   <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" class="px-3" onsubmit="return confirm('Delete this parcel?');">
                     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-                    <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
-                    <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash me-2"></i>Delete</button>
+                    <input type="hidden" name="id" value="<?php echo $pid; ?>">
+                    <button type="submit" class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash me-2"></i>Delete</button>
                   </form>
                 </li>
               </ul>
+            </div>
+          </td>
+        </tr>
+        <tr class="parcel-items-tr parcel-items-tr-<?php echo $pid; ?>">
+          <td colspan="<?php echo (int)$parcelTableColspan; ?>" class="p-0 border-0">
+            <div id="parcel-items-d-<?php echo $pid; ?>" class="collapse parcel-items-collapse" data-parcel-id="<?php echo $pid; ?>">
+              <div class="parcel-items-panel px-2 py-2 border-top border-light bg-light bg-opacity-50">
+                <div class="table-responsive">
+                  <div class="parcel-items-host" data-parcel-id="<?php echo $pid; ?>"></div>
+                </div>
+              </div>
             </div>
           </td>
         </tr>
@@ -442,11 +813,11 @@
   </table>
   <!-- Skeleton loader (hidden by default, shown via JS when loading) -->
   <table id="parcelsSkeleton" class="table table-sm parcels-table" style="display:none;">
-    <thead class="table-light"><tr><th class="col-num">#</th><th>Customer</th><th>Supplier</th><th>From</th><th>To</th><th>Vehicle</th><th>Route</th><th>Items</th><th>Weight</th><th>Price</th><th>Status</th><th>Email</th><th>Actions</th></tr></thead>
+    <thead class="table-light"><tr><th class="col-chk"></th><th class="col-num">#</th><th>Customer</th><th>Supplier</th><th>From</th><th>To</th><th>Veh</th><th>Route</th><th>Items</th><th>Weight</th><th>Price</th><th>Status</th><th>Email</th><th>Act</th></tr></thead>
     <tbody>
-      <tr class="skeleton-row"><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
-      <tr class="skeleton-row"><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
-      <tr class="skeleton-row"><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
+      <tr class="skeleton-row"><td></td><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
+      <tr class="skeleton-row"><td></td><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
+      <tr class="skeleton-row"><td></td><td><div class="skeleton skeleton-cell" style="width:40%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:60%"></div></td><td><div class="skeleton skeleton-cell" style="width:50%"></div></td><td><div class="skeleton skeleton-cell" style="width:30%"></div></td></tr>
     </tbody>
   </table>
 </div>
@@ -531,5 +902,217 @@
   </nav>
 </div>
 <?php endif; ?>
+
+</div><!-- /.no-print -->
+
+<div class="parcels-print-document">
+  <header class="ppd-head">
+    <h1 class="ppd-title">Parcels List</h1>
+    <p class="ppd-sub">Date range: <?php echo htmlspecialchars($from ?? '—'); ?> to <?php echo htmlspecialchars($to ?? '—'); ?> — Total: <?php echo (int)($totalCount ?? 0); ?> parcel(s) — Page <?php echo (int)($page ?? 1); ?> of <?php echo (int)($totalPages ?? 1); ?> (<?php echo count($parcels); ?> on this page)</p>
+  </header>
+  <?php if (empty($parcels)): ?>
+    <p class="ppd-empty">No parcels on this page.</p>
+  <?php else: ?>
+    <?php foreach ($parcels as $p): ?>
+      <?php
+        $ppid = (int)($p['id'] ?? 0);
+        $pst = (string)($p['status'] ?? '');
+        $ptrack = trim((string)($p['tracking_number'] ?? ''));
+        $pdate = htmlspecialchars(substr((string)($p['created_at'] ?? ''), 0, 16));
+        $pnm = (string)($p['customer_name'] ?? '');
+        $pph = trim((string)($p['customer_phone'] ?? ''));
+        $pisPH = preg_match('/^NA\d{10}-\d{3}$/', $pph) === 1;
+        $pcust = htmlspecialchars($pnm . (!$pisPH && $pph !== '' ? ' (' . $pph . ')' : ''));
+        $pfrom = htmlspecialchars((string)($p['from_branch'] ?? ''));
+        $pto = htmlspecialchars((string)($p['to_branch'] ?? ''));
+        $pwt = number_format((float)($p['weight'] ?? 0), 2);
+        $pprice = $p['price'] === null ? '—' : number_format((float)$p['price'], 2);
+        $pstLabel = htmlspecialchars(Helpers::parcelStatusLabel($pst));
+        $savedRoute = trim((string)($p['delivery_route'] ?? ''));
+        $custLoc = trim((string)($p['customer_delivery_location'] ?? ''));
+        $rdTo = trim((string)($p['route_date_to'] ?? ''));
+        $rdFrom = trim((string)($p['route_date_from'] ?? ''));
+        $pveh = trim((string)($p['vehicle_no'] ?? ''));
+        if ($savedRoute !== '') {
+          $proute = htmlspecialchars($savedRoute);
+        } elseif ($custLoc !== '') {
+          $proute = htmlspecialchars($custLoc);
+        } elseif ($rdTo !== '' || $rdFrom !== '') {
+          $rparts = [];
+          if ($rdTo !== '') {
+            $rparts[] = 'To: ' . $rdTo;
+          }
+          if ($rdFrom !== '') {
+            $rparts[] = 'From: ' . $rdFrom;
+          }
+          if ($pveh !== '') {
+            array_unshift($rparts, $pveh);
+          }
+          $proute = htmlspecialchars(implode(' · ', $rparts));
+        } elseif ($pveh !== '') {
+          $proute = htmlspecialchars($pveh);
+        } else {
+          $proute = '—';
+        }
+        $pitems = $parcelItemsById[$ppid] ?? [];
+      ?>
+      <section class="ppd-block" data-parcel-id="<?php echo $ppid; ?>">
+        <table class="ppd-sum-table">
+          <colgroup>
+            <col class="ppd-s-id">
+            <col class="ppd-s-serial">
+            <col class="ppd-s-date">
+            <col class="ppd-s-customer">
+            <col class="ppd-s-branches">
+            <col class="ppd-s-route">
+            <col class="ppd-s-weight">
+            <col class="ppd-s-total">
+            <col class="ppd-s-status">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Serial</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>From / To</th>
+              <th>Route</th>
+              <th class="ppd-num">Weight</th>
+              <th class="ppd-num">Total</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><?php echo $ppid; ?></td>
+              <td><?php echo $ptrack !== '' ? htmlspecialchars($ptrack) : '—'; ?></td>
+              <td><?php echo $pdate; ?></td>
+              <td><?php echo $pcust; ?></td>
+              <td><?php echo $pfrom; ?> → <?php echo $pto; ?></td>
+              <td><?php echo $proute; ?></td>
+              <td class="ppd-num"><?php echo htmlspecialchars($pwt); ?></td>
+              <td class="ppd-num"><?php echo htmlspecialchars($pprice); ?></td>
+              <td><?php echo $pstLabel; ?></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="ppd-items-caption">Line items</div>
+        <?php if (empty($pitems)): ?>
+          <p class="ppd-empty ppd-empty-tight">No line items.</p>
+        <?php else: ?>
+          <table class="ppd-items-table">
+            <colgroup>
+              <col class="ppd-i-no">
+              <col class="ppd-i-desc">
+              <col class="ppd-i-qty">
+              <col class="ppd-i-rate">
+              <col class="ppd-i-amt">
+              <col class="ppd-i-add">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Description</th>
+                <th class="ppd-num">Qty</th>
+                <th class="ppd-num">Rate</th>
+                <th class="ppd-num">Amount</th>
+                <th>Additional</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php
+              $pln = 0;
+              $sumAmt = 0.0;
+              $sumAdd = 0.0;
+              foreach ($pitems as $ir):
+                $pln++;
+                $pq = (float)($ir['qty'] ?? 0);
+                $pr = array_key_exists('rate', $ir) && $ir['rate'] !== null && $ir['rate'] !== '' ? (float)$ir['rate'] : null;
+                $pamt = ($pr !== null && $pq > 0) ? round($pq * $pr, 2) : 0.0;
+                $sumAmt += $pamt;
+                $addStored = array_key_exists('additional_amount', $ir) && $ir['additional_amount'] !== null && $ir['additional_amount'] !== ''
+                  ? (float)$ir['additional_amount'] : 0.0;
+                $tagVals = [];
+                if (!empty($ir['additional_amounts'])) {
+                  $dec = json_decode((string)$ir['additional_amounts'], true);
+                  if (is_array($dec)) {
+                    foreach ($dec as $tv) {
+                      $tagVals[] = round((float)$tv, 2);
+                    }
+                  }
+                }
+                $add = $addStored > 0 ? $addStored : ($tagVals ? round(array_sum($tagVals), 2) : 0.0);
+                $sumAdd += $add;
+              ?>
+              <tr>
+                <td class="ppd-num"><?php echo $pln; ?></td>
+                <td><?php echo htmlspecialchars((string)($ir['description'] ?? '')); ?></td>
+                <td class="ppd-num"><?php echo htmlspecialchars(number_format($pq, 2)); ?></td>
+                <td class="ppd-num"><?php echo $pr !== null ? htmlspecialchars(number_format($pr, 2)) : '—'; ?></td>
+                <td class="ppd-num"><?php echo $pamt > 0 ? htmlspecialchars(number_format($pamt, 2)) : '—'; ?></td>
+                <td>
+                  <?php if ($tagVals): ?>
+                    <?php
+                    $addParts = [];
+                    foreach ($tagVals as $tv) {
+                      $addParts[] = '+' . number_format($tv, 2);
+                    }
+                    echo htmlspecialchars(implode(' ', $addParts));
+                    ?>
+                  <?php elseif ($add > 0): ?>
+                    +<?php echo htmlspecialchars(number_format($add, 2)); ?>
+                  <?php else: ?>
+                    —
+                  <?php endif; ?>
+                </td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+              <tr class="ppd-foot-sub">
+                <td colspan="4" class="ppd-num">Subtotals</td>
+                <td class="ppd-num"><?php echo htmlspecialchars(number_format($sumAmt, 2)); ?></td>
+                <td class="ppd-num"><?php echo $sumAdd > 0 ? '+' . htmlspecialchars(number_format($sumAdd, 2)) : '—'; ?></td>
+              </tr>
+              <tr class="ppd-foot-total">
+                <td colspan="6" class="ppd-num">Lines + additional: <?php echo htmlspecialchars(number_format($sumAmt + $sumAdd, 2)); ?></td>
+              </tr>
+            </tfoot>
+          </table>
+        <?php endif; ?>
+      </section>
+    <?php endforeach; ?>
+  <?php endif; ?>
+</div>
+
+<div class="modal fade no-print no-print-parcels" id="parcelPrintModal" tabindex="-1" aria-labelledby="parcelPrintModalLabel" aria-hidden="true" data-bs-backdrop="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-lg-down modal-xl modal-dialog-centered">
+    <div class="modal-content shadow">
+      <div class="modal-header py-2 px-3">
+        <h5 class="modal-title fs-6" id="parcelPrintModalLabel">Invoice preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0 position-relative bg-secondary bg-opacity-10" style="min-height: 50vh;">
+        <div id="parcelPrintLoading" class="position-absolute top-50 start-50 translate-middle text-muted small">Loading invoice…</div>
+        <iframe id="parcelPrintFrame" class="w-100 border-0 d-none" style="min-height: 65vh; height: 65vh; background: #fff;" title="Invoice"></iframe>
+      </div>
+      <div class="modal-footer py-2 px-3 gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary btn-sm" id="parcelPrintModalPrintBtn" disabled><i class="bi bi-printer me-1"></i>Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="parcelsToastHost" class="toast-container position-fixed bottom-0 end-0 p-3 no-print no-print-parcels" style="z-index:1090"></div>
+<script>
+window.TMS_PARCELS = <?php echo json_encode([
+  'indexUrl' => Helpers::baseUrl('index.php'),
+  'csrf' => Helpers::csrfToken(),
+  'quickUpdateUrl' => Helpers::baseUrl('index.php?page=parcels&action=quick_update'),
+  'statusOptions' => Helpers::parcelStatusMap(),
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+</script>
+<script src="<?php echo Helpers::baseUrl('assets/js/parcels.js'); ?>"></script>
 
 </div><!-- /.parcels-page -->

@@ -1,8 +1,9 @@
 <?php /** @var array $employees */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="hr-page">
+<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-3">
   <h3 class="mb-0">Employees - Payroll Report</h3>
-  <div class="d-flex gap-2">
-    <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new_payroll'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Employees Payroll</a>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new_payroll'); ?>" class="btn btn-primary w-100 w-md-auto"><i class="bi bi-plus-lg"></i> Employees Payroll</a>
   </div>
 </div>
 
@@ -36,23 +37,23 @@
   </div>
 </form>
 
-<div class="table-responsive" style="width: 100%; overflow-x: auto;">
+<div class="hr-table-wrap table-responsive">
   <table class="table table-sm table-striped align-middle" id="employeesPayrollTable" style="width: 100%; min-width: 1400px;">
     <thead>
       <tr>
         <th>#</th>
         <th>Employee Code</th>
         <th>Name</th>
-        <th>Position</th>
-        <th>Branch</th>
-        <th>Basic</th>
-        <th>EPF (Emp.)</th>
-        <th>EPF (Empr.)</th>
-        <th>ETF</th>
-        <th>Allowance</th>
-        <th>Deductions</th>
+        <th class="d-none d-md-table-cell">Position</th>
+        <th class="d-none d-lg-table-cell">Branch</th>
+        <th class="d-none d-xl-table-cell">Basic</th>
+        <th class="d-none d-xl-table-cell">EPF (Emp.)</th>
+        <th class="d-none d-xl-table-cell">EPF (Empr.)</th>
+        <th class="d-none d-xl-table-cell">ETF</th>
+        <th class="d-none d-xl-table-cell">Allowance</th>
+        <th class="d-none d-xl-table-cell">Deductions</th>
         <th>Net</th>
-        <th>Month-Year</th>
+        <th class="d-none d-sm-table-cell">Month-Year</th>
         <th class="text-end">Actions</th>
       </tr>
     </thead>
@@ -62,17 +63,17 @@
           <td><?php echo (int)$e['id']; ?></td>
           <td><?php echo htmlspecialchars($e['emp_code'] ?? ''); ?></td>
           <td><?php echo htmlspecialchars($e['name'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($e['position'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($e['branch_name'] ?? ''); ?></td>
+          <td class="d-none d-md-table-cell"><?php echo htmlspecialchars($e['position'] ?? ''); ?></td>
+          <td class="d-none d-lg-table-cell"><?php echo htmlspecialchars($e['branch_name'] ?? ''); ?></td>
           <?php $hasP = !empty($e['payroll_id']); ?>
-          <td class="text-end">&nbsp;<?php echo $hasP ? number_format((float)($e['basic_salary'] ?? 0), 2) : ''; ?></td>
-          <td class="text-end">&nbsp;<?php echo $hasP ? number_format((float)($e['epf_employee'] ?? 0), 2) : ''; ?></td>
-          <td class="text-end">&nbsp;<?php echo $hasP ? number_format((float)($e['epf_employer'] ?? 0), 2) : ''; ?></td>
-          <td class="text-end">&nbsp;<?php echo $hasP ? number_format((float)($e['etf'] ?? 0), 2) : ''; ?></td>
-          <td class="text-end">&nbsp;<?php echo $hasP ? number_format((float)($e['allowance'] ?? 0), 2) : ''; ?></td>
-          <td class="text-end">&nbsp;<?php echo $hasP ? number_format((float)($e['deductions'] ?? 0), 2) : ''; ?></td>
+          <td class="text-end d-none d-xl-table-cell">&nbsp;<?php echo $hasP ? number_format((float)($e['basic_salary'] ?? 0), 2) : ''; ?></td>
+          <td class="text-end d-none d-xl-table-cell">&nbsp;<?php echo $hasP ? number_format((float)($e['epf_employee'] ?? 0), 2) : ''; ?></td>
+          <td class="text-end d-none d-xl-table-cell">&nbsp;<?php echo $hasP ? number_format((float)($e['epf_employer'] ?? 0), 2) : ''; ?></td>
+          <td class="text-end d-none d-xl-table-cell">&nbsp;<?php echo $hasP ? number_format((float)($e['etf'] ?? 0), 2) : ''; ?></td>
+          <td class="text-end d-none d-xl-table-cell">&nbsp;<?php echo $hasP ? number_format((float)($e['allowance'] ?? 0), 2) : ''; ?></td>
+          <td class="text-end d-none d-xl-table-cell">&nbsp;<?php echo $hasP ? number_format((float)($e['deductions'] ?? 0), 2) : ''; ?></td>
           <td class="text-end">&nbsp;<?php echo $hasP ? number_format((float)($e['net_salary'] ?? 0), 2) : ''; ?></td>
-          <td><?php echo $hasP ? htmlspecialchars($e['month_year'] ?? '') : ''; ?></td>
+          <td class="d-none d-sm-table-cell"><?php echo $hasP ? htmlspecialchars($e['month_year'] ?? '') : ''; ?></td>
           <td class="text-end">
             <?php $pid = (int)($e['payroll_id'] ?? 0); $eid=(int)($e['id'] ?? 0); ?>
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo $pid ? Helpers::baseUrl('index.php?page=employees&action=edit_payroll&id='.$pid) : Helpers::baseUrl('index.php?page=employees&action=new_payroll&employee_id='.$eid); ?>"><i class="bi bi-pencil-square"></i> Edit</a>
@@ -133,3 +134,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+</div><!-- /.hr-page -->

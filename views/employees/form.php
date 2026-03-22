@@ -1,7 +1,8 @@
 <?php /** @var array $employee */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="hr-page">
+<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-3">
   <h3 class="mb-0"><?php echo $employee['id'] ? 'Edit Employee' : 'New Employee'; ?></h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>" class="btn btn-outline-secondary w-100 w-md-auto"><i class="bi bi-arrow-left"></i> Back</a>
 </div>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
@@ -143,9 +144,10 @@
     </div>
   </div>
   <div class="card-footer text-end">
-    <button class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+    <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="bi bi-save"></i> Save</button>
   </div>
 </form>
+</div><!-- /.hr-page -->
 <?php if (!empty($error)): ?>
 <script>
   // Show a popup alert for errors (e.g., duplicate email or employee code)

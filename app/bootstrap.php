@@ -25,6 +25,8 @@ require_once __DIR__ . '/BranchRepository.php';
 require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/Sms.php';
 require_once __DIR__ . '/DataReset.php';
+require_once __DIR__ . '/CashbookRepository.php';
+require_once __DIR__ . '/CashbookApi.php';
 
 // Load config and initialize DB
 $config = require __DIR__ . '/../config/config.php';
@@ -33,6 +35,11 @@ try {
     BranchRepository::ensureSchema(Database::pdo());
 } catch (Throwable $e) {
     /* schema optional until DB ready */
+}
+try {
+    CashbookRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* cashbook optional until DB ready */
 }
 
 // Initialize Mailer (available as $GLOBALS['mailer'])

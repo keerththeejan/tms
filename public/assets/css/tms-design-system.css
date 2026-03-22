@@ -606,3 +606,67 @@ body.sidebar-open .sidebar-toggle-floating {
   outline: 3px solid rgba(37, 99, 235, 0.35);
   outline-offset: 2px;
 }
+
+/* --------------------------------------------------------------------------
+   Print: hide app chrome globally (loaded from <head> so it always wins over
+   page-local <style> blocks and matches the real header class: .topbar, not .navbar)
+   -------------------------------------------------------------------------- */
+@media print {
+  #sidebar,
+  nav#sidebar,
+  .sidebar-overlay,
+  .sidebar-toggle-floating,
+  .topbar,
+  main.content-wrapper > .topbar,
+  div.topbar[role="banner"],
+  .skip-link {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  .app-shell.d-flex,
+  .app-shell {
+    display: block !important;
+  }
+  main.content-wrapper,
+  #main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+    flex-grow: 0 !important;
+    min-height: 0 !important;
+  }
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  /* Kill horizontal scrollbars from Bootstrap / DataTables in print preview */
+  html {
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+  }
+  body {
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+  }
+  .table-responsive {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    max-width: 100% !important;
+  }
+  .overflow-auto,
+  .overflow-x-auto,
+  .overflow-x-scroll {
+    overflow: visible !important;
+    overflow-x: visible !important;
+  }
+  .dataTables_wrapper .dt-scroll-body,
+  .dataTables_wrapper .dt-scroll-head,
+  .dataTables_scrollBody,
+  .dataTables_scrollHead {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    max-width: 100% !important;
+  }
+}

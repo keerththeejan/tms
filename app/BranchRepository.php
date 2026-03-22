@@ -89,7 +89,36 @@ final class BranchRepository
     }
 
     /**
-     * Shape for Helpers::companyBranches() — up to 3 active branches, default first.
+     * Normalized shape for print / Helpers::companyBranches().
+     *
+     * @return array{name:string,address_ta:string,address_en:string,phones:string}
+     */
+    public static function rowToCompanyBranchShape(array $b): array
+    {
+        return [
+            'name' => (string)($b['name'] ?? ''),
+            'address_ta' => (string)($b['address_tamil'] ?? $b['address_ta'] ?? ''),
+            'address_en' => (string)($b['address_english'] ?? $b['address_en'] ?? ''),
+            'phones' => (string)($b['phones'] ?? ''),
+        ];
+    }
+
+    /** Operational hub (pricing / return-load hub): single row with is_main = 1. */
+    public static function getMainBranchId(\PDO $pdo): int
+    {
+        self::ensureSchema($pdo);
+        $stmt = $pdo->query('SELECT id FROM branches WHERE is_main = 1 AND is_active = 1 ORDER BY id ASC LIMIT 1');
+        $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
+        if ($row && (int)$row['id'] > 0) {
+            return (int)$row['id'];
+        }
+        $stmt = $pdo->query('SELECT id FROM branches WHERE is_active = 1 ORDER BY id ASC LIMIT 1');
+        $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
+        return $row ? (int)$row['id'] : 0;
+    }
+
+    /**
+     * All active branches for letterhead / multi-column prints (DB order: default, settings slot, main, name).
      *
      * @return list<array{name:string,address_ta:string,address_en:string,phones:string}>
      */
@@ -97,19 +126,97 @@ final class BranchRepository
     {
         self::ensureSchema($pdo);
         $stmt = $pdo->query(
-            'SELECT id, name, address_tamil, address_english, phones, is_default, is_main FROM branches WHERE is_active = 1 ORDER BY is_default DESC, is_main DESC, id ASC LIMIT 3'
+            'SELECT id, name, address_tamil, address_english, phones, is_default, is_main, settings_slot FROM branches WHERE is_active = 1 ORDER BY is_default DESC, settings_slot IS NULL, settings_slot ASC, is_main DESC, name ASC'
         );
         $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
         $out = [];
         foreach ($rows as $b) {
-            $out[] = [
-                'name' => (string)($b['name'] ?? ''),
-                'address_ta' => (string)($b['address_tamil'] ?? ''),
-                'address_en' => (string)($b['address_english'] ?? ''),
-                'phones' => (string)($b['phones'] ?? ''),
-            ];
+            $shape = self::rowToCompanyBranchShape($b);
+            $shape['id'] = (int)($b['id'] ?? 0);
+            $out[] = $shape;
         }
         return $out;
+    }
+
+    /**
+     * Three invoice header columns in fixed order: Colombo, Kilinochchi, Mullaitivu.
+     * Uses active branches only; matches branch name (case-insensitive) against known keywords.
+     *
+     * @return array{0: ?array{id:int,name:string,address_ta:string,address_en:string,phones:string}, 1: ?array, 2: ?array}
+     */
+    public static function invoiceHeaderBranchesThree(\PDO $pdo): array
+    {
+        self::ensureSchema($pdo);
+        $stmt = $pdo->query(
+            'SELECT id, name, address_tamil, address_english, phones FROM branches WHERE is_active = 1 ORDER BY id ASC'
+        );
+        $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+        $usedIds = [];
+        $keywordsByColumn = [
+            ['colombo'],
+            ['kilinochchi', 'kilinochi'],
+            ['mullaitivu', 'mullaithivu', 'mullativu', 'mulllaitivu'],
+        ];
+        $result = [null, null, null];
+        foreach ($keywordsByColumn as $colIdx => $keywords) {
+            foreach ($rows as $r) {
+                $id = (int)($r['id'] ?? 0);
+                if ($id <= 0 || isset($usedIds[$id])) {
+                    continue;
+                }
+                $rawName = trim((string)($r['name'] ?? ''));
+                $nameNorm = function_exists('mb_strtolower')
+                    ? mb_strtolower($rawName, 'UTF-8')
+                    : strtolower($rawName);
+                foreach ($keywords as $kw) {
+                    if ($kw === '') {
+                        continue;
+                    }
+                    if (str_contains($nameNorm, $kw)) {
+                        $shape = self::rowToCompanyBranchShape($r);
+                        $shape['id'] = $id;
+                        $result[$colIdx] = $shape;
+                        $usedIds[$id] = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Active branches for parcel/courier letterhead: $prioritizeBranchId (usually from_branch_id) is listed first.
+     *
+     * @return list<array{id:int,name:string,address_ta:string,address_en:string,phones:string}>
+     */
+    public static function branchesForParcelLetterhead(\PDO $pdo, int $prioritizeBranchId = 0): array
+    {
+        $rows = self::branchesForCompanyPrint($pdo);
+        if ($prioritizeBranchId <= 0 || $rows === []) {
+            return $rows;
+        }
+        $prio = null;
+        $rest = [];
+        foreach ($rows as $r) {
+            if ((int)($r['id'] ?? 0) === $prioritizeBranchId) {
+                $prio = $r;
+            } else {
+                $rest[] = $r;
+            }
+        }
+        if ($prio === null) {
+            $fb = self::findById($pdo, $prioritizeBranchId);
+            if ($fb && (int)($fb['is_active'] ?? 1) === 1) {
+                $shape = self::rowToCompanyBranchShape($fb);
+                $shape['id'] = (int)$fb['id'];
+                array_unshift($rest, $shape);
+                return $rest;
+            }
+            return $rows;
+        }
+        return array_merge([$prio], $rest);
     }
 
     /**
@@ -402,6 +509,9 @@ final class BranchRepository
                 'is_active' => (int)($r['is_active'] ?? 1),
                 'is_default' => (int)($r['is_default'] ?? 0),
                 'location' => isset($r['location']) ? (string)$r['location'] : null,
+                'address_tamil' => (string)($r['address_tamil'] ?? ''),
+                'address_english' => (string)($r['address_english'] ?? ''),
+                'phones' => (string)($r['phones'] ?? ''),
             ];
         }
         return $out;

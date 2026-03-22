@@ -51,7 +51,7 @@
 <?php 
   // Company branding for print header
   $brand = Helpers::company();
-  $addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 3);
+  $addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 50, 'all');
 ?>
 <div class="mb-2 p-2 border rounded print-header-card">
   <div class="d-flex align-items-center gap-2">

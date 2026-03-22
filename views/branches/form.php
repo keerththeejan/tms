@@ -15,7 +15,7 @@
 <div class="branches-form-page">
 <div class="d-flex justify-content-between align-items-center mb-3 page-header">
   <h3 class="mb-0"><?php echo $branch['id'] ? 'Edit Branch' : 'New Branch'; ?></h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=settings#settings-operational-branches'); ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Settings</a>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=settings&tab=branches#pane-branches'); ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Settings</a>
 </div>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>

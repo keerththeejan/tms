@@ -1,5 +1,5 @@
 <?php /** @var string $vehicle_no */ /** @var string $from */ /** @var string $to */ /** @var array $grouped */ /** @var array $customers */ ?>
-<?php $brand = Helpers::company(); $addresses = Helpers::companyHeaderAddressLines('', 3); ?>
+<?php $brand = Helpers::company(); $addresses = Helpers::companyHeaderAddressLines('', 50, 'all'); ?>
 <style>
   @media print {
     .print-header-card { border: 0 !important; background: transparent !important; padding: 0 !important; }

@@ -1,7 +1,8 @@
 <?php /** @var array $advance */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="hr-page">
+<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-3">
   <h3 class="mb-0"><?php echo ($advance['id'] ?? 0) ? 'Edit Advance' : 'New Advance'; ?></h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+  <a href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>" class="btn btn-outline-secondary w-100 w-md-auto"><i class="bi bi-arrow-left"></i> Back</a>
 </div>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
@@ -22,11 +23,11 @@
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-sm-6 col-md-3">
         <label class="form-label">Amount</label>
         <input type="number" step="0.01" name="amount" class="form-control" required value="<?php echo htmlspecialchars((string)($advance['amount'] ?? '')); ?>">
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-sm-6 col-md-3">
         <label class="form-label">Date</label>
         <input type="date" name="advance_date" class="form-control" required value="<?php echo htmlspecialchars($advance['advance_date'] ?? date('Y-m-d')); ?>">
       </div>
@@ -37,6 +38,7 @@
     </div>
   </div>
   <div class="card-footer text-end">
-    <button class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+    <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="bi bi-save"></i> Save</button>
   </div>
 </form>
+</div><!-- /.hr-page -->

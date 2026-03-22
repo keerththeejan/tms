@@ -1,503 +1,112 @@
 <?php
 $company = $company ?? [];
-$settingsBranchSlots = $settingsBranchSlots ?? [];
-$defaultBranchSlotIndex = isset($defaultBranchSlotIndex) ? (int)$defaultBranchSlotIndex : 0;
-if ($defaultBranchSlotIndex < 0) {
-    $defaultBranchSlotIndex = 0;
-}
-if ($defaultBranchSlotIndex > 2) {
-    $defaultBranchSlotIndex = 2;
-}
-while (count($settingsBranchSlots) < 3) {
-    $settingsBranchSlots[] = ['id' => 0, 'name' => '', 'address_ta' => '', 'address_en' => '', 'phones' => ''];
-}
-$letterheadBranches = [];
-foreach ($settingsBranchSlots as $sb) {
-    $letterheadBranches[] = [
-        'name' => (string)($sb['name'] ?? ''),
-        'address_ta' => (string)($sb['address_ta'] ?? ''),
-        'address_en' => (string)($sb['address_en'] ?? ''),
-        'phones' => (string)($sb['phones'] ?? ''),
-    ];
-}
-$routeParts = $company['route_tamil_parts'] ?? ['கொழும்பு', 'கிளிநொச்சி', 'முல்லைத்தீவு'];
-$routeParts = array_values($routeParts);
-while (count($routeParts) < 3) { $routeParts[] = ''; }
 $config = $config ?? [];
+$settingsActiveTab = $settingsActiveTab ?? 'general';
+$allowedSettingsTabs = ['general', 'branches', 'users', 'system'];
+if (!in_array($settingsActiveTab, $allowedSettingsTabs, true)) {
+    $settingsActiveTab = 'general';
+}
 ?>
 <style>
   :root { --ui-bg: #f8f9fb; --ui-border: rgba(17,24,39,.10); --ui-shadow: 0 1px 2px rgba(16,24,40,.06); --ui-shadow-hover: 0 6px 18px rgba(16,24,40,.10); --ui-radius: 14px; }
-  .settings-page { background: var(--ui-bg); border-radius: var(--ui-radius); padding: 16px; border: 1px solid rgba(17,24,39,.06); }
+  .settings-page { background: var(--ui-bg); border-radius: var(--ui-radius); padding: 12px; border: 1px solid rgba(17,24,39,.06); }
   .settings-card { border: 1px solid var(--ui-border); border-radius: var(--ui-radius); box-shadow: var(--ui-shadow); overflow: hidden; background: #fff; }
-  .settings-card .card-header { background: #fff; border-bottom: 1px solid var(--ui-border); padding: 14px 16px; }
-  .settings-card .card-body { padding: 16px; }
-  .settings-card .card-footer { background: #fff; border-top: 1px solid var(--ui-border); padding: 14px 16px; }
-  .settings-title { font-weight: 800; font-size: 1.05rem; margin: 0; letter-spacing: -.01em; }
-  .settings-subtitle { color: #6b7280; font-size: .875rem; margin-top: 2px; }
-  .settings-section-label { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: #6c757d; font-weight: 700; margin-bottom: 10px; }
-  .settings-page .form-label { font-size: .85rem; font-weight: 600; color: #374151; }
-  .settings-page .form-control, .settings-page .form-select { border-radius: 12px; border-color: rgba(17,24,39,.16); }
-  .settings-page .form-control:focus, .settings-page .form-select:focus { box-shadow: 0 0 0 .25rem rgba(13,110,253,.12); border-color: rgba(13,110,253,.45); }
-  .settings-helper { color: #6c757d; font-size: .85rem; margin-top: 6px; }
+  .settings-card .card-header { background: #fff; border-bottom: 1px solid var(--ui-border); padding: 10px 14px; }
+  .settings-card .card-body { padding: 14px; }
+  .settings-title { font-weight: 800; font-size: 1rem; margin: 0; letter-spacing: -.01em; }
+  .settings-subtitle { color: #6b7280; font-size: .8125rem; margin-top: 2px; }
+  .settings-section-label { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: #6c757d; font-weight: 700; margin-bottom: 8px; }
+  .settings-page .form-label { font-size: .8rem; font-weight: 600; color: #374151; margin-bottom: 4px; }
+  .settings-page .form-control-sm, .settings-page .form-select-sm { border-radius: 10px; }
+  .settings-helper { color: #6c757d; font-size: .78rem; margin-top: 4px; }
   .field-error { border-color: rgba(220,53,69,.65) !important; }
-  .error-text { color: #dc3545; font-size: .85rem; margin-top: 6px; display:none; }
-  .logo-drop { border: 1.5px dashed rgba(17,24,39,.22); border-radius: var(--ui-radius); background: #fbfcfe; padding: 14px; display:flex; align-items:center; justify-content:space-between; gap: 12px; cursor: pointer; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease; }
+  .error-text { color: #dc3545; font-size: .78rem; margin-top: 4px; display: none; }
+  .logo-drop { border: 1.5px dashed rgba(17,24,39,.22); border-radius: 12px; background: #fbfcfe; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
   .logo-drop:hover { background: #f4f8ff; border-color: rgba(13,110,253,.55); }
-  .logo-drop.is-dragover { background: rgba(13,110,253,.08); border-color: rgba(13,110,253,.65); box-shadow: 0 0 0 .25rem rgba(13,110,253,.10); }
-  .logo-preview { width: 120px; height: 64px; border-radius: 10px; border: 1px solid rgba(16,24,40,.12); background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; flex: 0 0 auto; }
+  .logo-drop.is-dragover { background: rgba(13,110,253,.08); border-color: rgba(13,110,253,.65); }
+  .logo-preview { border-radius: 8px; border: 1px solid rgba(16,24,40,.12); background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: 0 0 auto; }
   .logo-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
   .badge-soft { background: rgba(13,110,253,.1); color: #0d6efd; border: 1px solid rgba(13,110,253,.18); font-weight: 700; }
-  .branch-card { border: 1px solid var(--ui-border); border-radius: var(--ui-radius); padding: 14px; background: #fff; box-shadow: var(--ui-shadow); }
-  .branch-card.default { border-color: rgba(13,110,253,.35); box-shadow: 0 0 0 .25rem rgba(13,110,253,.08), var(--ui-shadow); }
-  .branch-top { display:flex; align-items:flex-start; justify-content:space-between; gap: 10px; }
-  .branch-name { font-weight: 700; margin: 0; }
-  .addr-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .branch-card { border: 1px solid var(--ui-border); border-radius: var(--ui-radius); padding: 12px; background: #fff; box-shadow: var(--ui-shadow); }
+  .branch-card.default { border-color: rgba(13,110,253,.35); box-shadow: 0 0 0 .2rem rgba(13,110,253,.08), var(--ui-shadow); }
+  .branch-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .branch-name { font-weight: 700; margin: 0; font-size: .95rem; }
+  .addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   @media (max-width: 992px) { .addr-grid { grid-template-columns: 1fr; } }
-  .print-hint { font-size: .85rem; color:#6c757d; }
-
-  .branch-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   @media (max-width: 992px) { .branch-grid { grid-template-columns: 1fr; } }
-  .default-badge { display:none; }
-  .branch-card.default .default-badge { display:inline-flex; }
+  .default-badge { display: none; }
+  .branch-card.default .default-badge { display: inline-flex; }
+  #settingsMainTabs.nav-tabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; gap: 2px; border-bottom: 1px solid var(--ui-border); }
+  #settingsMainTabs .nav-item { flex-shrink: 0; }
+  #settingsMainTabs .nav-link { border-radius: 10px 10px 0 0; padding: 0.45rem 0.9rem; font-size: 0.875rem; font-weight: 600; color: #64748b; border: 1px solid transparent; }
+  #settingsMainTabs .nav-link:hover { color: #0d6efd; }
+  #settingsMainTabs .nav-link.active { color: #0d6efd; background: #fff; border-color: var(--ui-border) var(--ui-border) #fff; }
+  .settings-tabs-sticky { position: sticky; top: 0; z-index: 1010; background: linear-gradient(180deg, var(--ui-bg) 70%, rgba(248,249,251,0.92)); padding-top: 4px; margin-bottom: 0 !important; }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">TMS Settings</h3>
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h3 class="mb-0 h5 fw-bold">TMS Settings</h3>
 </div>
 
 <?php if (!empty($error)): ?>
-  <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+  <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 <?php if (!empty($success)): ?>
-  <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+  <div class="alert alert-success py-2"><?php echo htmlspecialchars($success); ?></div>
 <?php endif; ?>
 
-<?php
-  $branchesMaster = $branchesMaster ?? [];
-  $branches = $branchesMaster;
-  $branchListEmbed = true;
-  $branchListError = '';
-  include dirname(__DIR__) . '/branches/index.php';
-?>
-<p class="small text-muted mb-4">The company &amp; letterhead section below uses the same <strong>branches</strong> table (addresses, default for print).</p>
-
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2000;">
-  <div id="companyToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="polite" aria-atomic="true">
+  <div id="settingsSuccessToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="polite" aria-atomic="true">
     <div class="d-flex">
-      <div class="toast-body">Company details updated successfully.</div>
+      <div class="toast-body" id="settingsToastBody"><?php echo !empty($success) ? htmlspecialchars($success) : 'Saved.'; ?></div>
       <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
     </div>
   </div>
 </div>
 
-<div class="row settings-page">
-  <div class="col-lg-8">
-    <div class="settings-card mb-4">
-      <div class="card-header">
-        <div class="d-flex align-items-start justify-content-between gap-3">
-          <div>
-            <div class="settings-title"><i class="bi bi-buildings me-1"></i> Company Address &amp; Branch Management</div>
-            <div class="settings-subtitle">Centralized company settings. The default branch address is used across website header, invoices, print views, and exports.</div>
-          </div>
-        </div>
-      </div>
-      <div class="card-body">
-        <?php $baseUrlForLogo = rtrim(Helpers::baseUrl(''), '/'); ?>
-        <form method="post" action="<?php echo htmlspecialchars((string)($_SERVER['REQUEST_URI'] ?? Helpers::baseUrl('index.php?page=settings'))); ?>" enctype="multipart/form-data" id="companySettingsForm" novalidate>
-          <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-          <input type="hidden" name="settings_section" value="company">
-          <input type="hidden" id="baseUrlForLogo" value="<?php echo htmlspecialchars($baseUrlForLogo); ?>">
+<div class="settings-page">
+  <ul class="nav nav-tabs settings-tabs-sticky mb-3" id="settingsMainTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link <?php echo $settingsActiveTab === 'general' ? 'active' : ''; ?>" id="tab-general" data-bs-toggle="tab" data-bs-target="#pane-general" type="button" role="tab" aria-controls="pane-general" aria-selected="<?php echo $settingsActiveTab === 'general' ? 'true' : 'false'; ?>">General</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link <?php echo $settingsActiveTab === 'branches' ? 'active' : ''; ?>" id="tab-branches" data-bs-toggle="tab" data-bs-target="#pane-branches" type="button" role="tab" aria-controls="pane-branches" aria-selected="<?php echo $settingsActiveTab === 'branches' ? 'true' : 'false'; ?>">Branches</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link <?php echo $settingsActiveTab === 'users' ? 'active' : ''; ?>" id="tab-users" data-bs-toggle="tab" data-bs-target="#pane-users" type="button" role="tab" aria-controls="pane-users" aria-selected="<?php echo $settingsActiveTab === 'users' ? 'true' : 'false'; ?>">Users</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link <?php echo $settingsActiveTab === 'system' ? 'active' : ''; ?>" id="tab-system" data-bs-toggle="tab" data-bs-target="#pane-system" type="button" role="tab" aria-controls="pane-system" aria-selected="<?php echo $settingsActiveTab === 'system' ? 'true' : 'false'; ?>">System</button>
+    </li>
+  </ul>
 
-          <div id="settingsClientError" class="alert alert-danger d-none" role="alert"></div>
-
-          <input type="hidden" name="logo_display" value="image">
-          <input type="hidden" name="logo_initials" value="<?php echo htmlspecialchars($company['logo_initials'] ?? 'TS'); ?>">
-          <input type="hidden" name="logo_arch_color" value="<?php echo htmlspecialchars($company['logo_arch_color'] ?? 'c00'); ?>">
-          <input type="hidden" name="logo_bar_bg" value="<?php echo htmlspecialchars($company['logo_bar_bg'] ?? '000'); ?>">
-          <input type="hidden" name="logo_bar_color" value="<?php echo htmlspecialchars($company['logo_bar_color'] ?? 'fff'); ?>">
-          <input type="hidden" name="logo_title_color" value="<?php echo htmlspecialchars($company['logo_title_color'] ?? 'c00'); ?>">
-          <input type="hidden" name="remove_logo" id="removeLogo" value="0">
-
-          <div class="settings-section-label">Company Information</div>
-          <div class="row g-3 mb-4">
-            <div class="col-12 col-md-6">
-              <label class="form-label">Company Name</label>
-              <input type="text" name="company_name" class="form-control" value="<?php echo htmlspecialchars($company['name'] ?? 'TS Transport'); ?>" required>
-              <div class="settings-helper">Displayed in the app header and print headers.</div>
-              <div class="error-text" data-error-for="company_name">Company name is required.</div>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label">Reg No</label>
-              <input type="text" name="reg_no" class="form-control" value="<?php echo htmlspecialchars($company['reg_no'] ?? ''); ?>" placeholder="e.g. KN/KR/1443">
-              <div class="settings-helper">Shown on receipts/invoices where applicable.</div>
-            </div>
-          </div>
-
-          <div class="settings-section-label">Company Logo</div>
-          <?php
-            $currentLogoUrl = $company['logo_url'] ?? '';
-            $previewSrc = '';
-            if ($currentLogoUrl !== '') {
-              $previewSrc = (strpos($currentLogoUrl, 'http') === 0 || strpos($currentLogoUrl, '//') === 0) ? $currentLogoUrl : Helpers::baseUrl($currentLogoUrl);
-            }
-          ?>
-          <div class="row g-3 mb-4">
-            <div class="col-12">
-              <div id="logoDrop" class="logo-drop" role="button" tabindex="0" aria-label="Upload company logo">
-                <div class="d-flex flex-column">
-                  <div class="fw-semibold">Drag &amp; drop your logo here</div>
-                  <div class="settings-helper mb-0">PNG, JPG, GIF or WebP. Used in invoice/print headers and PDF exports.</div>
-                  <div class="print-hint mt-1">Tip: Use a transparent PNG for best results on A4 invoices.</div>
-                </div>
-                <div class="logo-preview">
-                  <img id="previewMainLogo" src="<?php echo $previewSrc ? htmlspecialchars($previewSrc) : ''; ?>" alt="Company logo" style="<?php echo $previewSrc ? '' : 'display:none;'; ?>" onerror="this.style.display='none'; document.getElementById('previewPlaceholder')&&(document.getElementById('previewPlaceholder').style.display='');">
-                  <span id="previewPlaceholder" class="text-muted small" style="<?php echo $previewSrc ? 'display:none' : ''; ?>">No logo</span>
-                </div>
-              </div>
-              <input type="file" name="logo_file" id="logoFileInput" class="d-none" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
-              <div class="row g-2 mt-2">
-                <div class="col-12 col-md-8">
-                  <label class="form-label">Logo URL (optional)</label>
-                  <input type="text" name="logo_url" id="logoUrlInput" class="form-control" value="<?php echo htmlspecialchars($company['logo_url'] ?? ''); ?>" placeholder="e.g. uploads/logo.png or https://...">
-                  <div class="settings-helper">If you upload a file, this will be updated automatically.</div>
-                </div>
-                <div class="col-12 col-md-4 d-flex align-items-end gap-2">
-                  <button type="button" class="btn btn-outline-primary w-100" id="logoReplaceBtn"><i class="bi bi-upload me-1"></i> Replace</button>
-                  <button type="button" class="btn btn-outline-danger w-100" id="logoRemoveBtn"><i class="bi bi-trash me-1"></i> Remove</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-section-label">Primary Branch - Header &amp; Billing Address</div>
-          <div class="settings-helper mb-3">Displayed on invoices and official documents. The selected default is used in the website header, print views, and exports.</div>
-
-          <?php
-            $b0 = $letterheadBranches[0] ?? ['name'=>'','address_ta'=>'','address_en'=>'','phones'=>''];
-            $id0 = (int)($settingsBranchSlots[0]['id'] ?? 0);
-          ?>
-          <div class="branch-card mb-3<?php echo ($defaultBranchSlotIndex === 0) ? ' default' : ''; ?>" data-branch-index="0">
-            <input type="hidden" name="branch_db_id[]" value="<?php echo (int)$id0; ?>">
-            <div class="branch-top mb-2">
-              <div>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <h6 class="branch-name mb-0">Primary Branch</h6>
-                  <span class="badge badge-soft default-badge">Default for Header &amp; Billing</span>
-                </div>
-                <div class="settings-helper mb-0">Keep Tamil &amp; English addresses accurate for billing and customer clarity.</div>
-              </div>
-              <div class="text-end">
-                <div class="form-check form-switch m-0">
-                  <input class="form-check-input" type="radio" name="default_branch_idx" value="0" id="default_branch_0" <?php echo ($defaultBranchSlotIndex === 0) ? 'checked' : ''; ?>>
-                  <label class="form-check-label small" for="default_branch_0">Use as Default Header &amp; Print Address</label>
-                </div>
-              </div>
-            </div>
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Branch Name</label>
-                <input type="text" name="branch_name[]" class="form-control" value="<?php echo htmlspecialchars($b0['name']); ?>" placeholder="e.g. Colombo" required>
-                <div class="error-text" data-error-for="branch_name_0">Branch name is required.</div>
-              </div>
-            </div>
-            <div class="addr-grid mt-3">
-              <div>
-                <label class="form-label">Address (Tamil)</label>
-                <input type="text" name="branch_address_ta[]" class="form-control" value="<?php echo htmlspecialchars($b0['address_ta']); ?>" placeholder="தமிழ் முகவரி">
-                <div class="settings-helper">Used on bilingual headers where applicable.</div>
-              </div>
-              <div>
-                <label class="form-label">Address (English)</label>
-                <input type="text" name="branch_address_en[]" class="form-control" value="<?php echo htmlspecialchars($b0['address_en']); ?>" placeholder="English address" required>
-                <div class="error-text" data-error-for="branch_address_en_0">English address is required.</div>
-              </div>
-            </div>
-            <div class="row g-3 mt-1">
-              <div class="col-12">
-                <label class="form-label">Phones</label>
-                <input type="text" name="branch_phones[]" class="form-control" value="<?php echo htmlspecialchars($b0['phones']); ?>" placeholder="e.g. 077 2474 905 | 077 2474 177">
-                <div class="settings-helper">Separate multiple numbers using <code>|</code>.</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-section-label mt-4">Additional Branches</div>
-          <div class="settings-helper mb-3">You can store up to 3 branch addresses. Choose which one is used as the default header &amp; print address.</div>
-          <div class="branch-grid mb-4">
-            <?php for ($i = 1; $i < 3; $i++): $b = $letterheadBranches[$i] ?? ['name'=>'','address_ta'=>'','address_en'=>'','phones'=>'']; $slotId = (int)($settingsBranchSlots[$i]['id'] ?? 0); ?>
-              <div class="branch-card<?php echo ($defaultBranchSlotIndex === $i) ? ' default' : ''; ?>" data-branch-index="<?php echo (int)$i; ?>">
-                <input type="hidden" name="branch_db_id[]" value="<?php echo (int)$slotId; ?>">
-                <div class="branch-top mb-2">
-                  <div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                      <h6 class="branch-name mb-0">Branch <?php echo (int)($i + 1); ?></h6>
-                      <span class="badge badge-soft default-badge">Default for Header &amp; Billing</span>
-                    </div>
-                    <div class="settings-helper mb-0">This branch will also appear in header/print when configured.</div>
-                  </div>
-                  <div class="text-end">
-                    <div class="form-check form-switch m-0">
-                      <input class="form-check-input" type="radio" name="default_branch_idx" value="<?php echo (int)$i; ?>" id="default_branch_<?php echo (int)$i; ?>" <?php echo ($defaultBranchSlotIndex === $i) ? 'checked' : ''; ?>>
-                      <label class="form-check-label small" for="default_branch_<?php echo (int)$i; ?>">Use as Default Header &amp; Print Address</label>
-                    </div>
-                  </div>
-                </div>
-                <div class="row g-3">
-                  <div class="col-12">
-                    <label class="form-label">Branch Name</label>
-                    <input type="text" name="branch_name[]" class="form-control" value="<?php echo htmlspecialchars($b['name']); ?>" placeholder="e.g. Kilinochchi">
-                    <div class="error-text" data-error-for="branch_name_<?php echo (int)$i; ?>">Branch name is required.</div>
-                  </div>
-                </div>
-                <div class="addr-grid mt-3">
-                  <div>
-                    <label class="form-label">Address (Tamil)</label>
-                    <input type="text" name="branch_address_ta[]" class="form-control" value="<?php echo htmlspecialchars($b['address_ta']); ?>" placeholder="தமிழ் முகவரி">
-                  </div>
-                  <div>
-                    <label class="form-label">Address (English)</label>
-                    <input type="text" name="branch_address_en[]" class="form-control" value="<?php echo htmlspecialchars($b['address_en']); ?>" placeholder="English address">
-                    <div class="error-text" data-error-for="branch_address_en_<?php echo (int)$i; ?>">English address is required.</div>
-                  </div>
-                </div>
-                <div class="row g-3 mt-1">
-                  <div class="col-12">
-                    <label class="form-label">Phones</label>
-                    <input type="text" name="branch_phones[]" class="form-control" value="<?php echo htmlspecialchars($b['phones']); ?>" placeholder="e.g. 077 2474 905 | 077 2474 177">
-                    <div class="settings-helper">Separate multiple numbers using <code>|</code>.</div>
-                  </div>
-                </div>
-              </div>
-            <?php endfor; ?>
-          </div>
-
-          <div class="settings-section-label">Route Bar (Tamil)</div>
-          <div class="row g-2 mb-4">
-            <div class="col-12 col-md-4"><label class="form-label">Part 1</label><input type="text" name="route_1" class="form-control" value="<?php echo htmlspecialchars($routeParts[0] ?? ''); ?>" placeholder="கொழும்பு"></div>
-            <div class="col-12 col-md-4"><label class="form-label">Part 2</label><input type="text" name="route_2" class="form-control" value="<?php echo htmlspecialchars($routeParts[1] ?? ''); ?>" placeholder="கிளிநொச்சி"></div>
-            <div class="col-12 col-md-4"><label class="form-label">Part 3</label><input type="text" name="route_3" class="form-control" value="<?php echo htmlspecialchars($routeParts[2] ?? ''); ?>" placeholder="முல்லைத்தீவு"></div>
-            <div class="col-12"><div class="settings-helper">Displayed on some print templates as a route banner.</div></div>
-          </div>
-
-          <div class="settings-section-label">Print Footer</div>
-          <div class="mb-4">
-            <label class="form-label">Footer Note (on print)</label>
-            <textarea name="footer_note" class="form-control" rows="2"><?php echo htmlspecialchars($company['footer_note'] ?? ''); ?></textarea>
-            <div class="settings-helper">Appears at the bottom of receipts/invoices.</div>
-          </div>
-
-          <div class="settings-section-label">Integrations</div>
-          <div class="mb-4">
-            <label class="form-label">Google Maps API Key (optional)</label>
-            <input type="text" name="google_maps_api_key" class="form-control" value="<?php echo htmlspecialchars($config['google_maps_api_key'] ?? ''); ?>" placeholder="AIza...">
-            <div class="settings-helper">Used for Places Autocomplete (if enabled) in customer/delivery location forms.</div>
-          </div>
-
-          <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button type="submit" class="btn btn-primary" id="saveCompanyBtn"><span class="save-label"><i class="bi bi-check-lg me-1"></i> Save Changes</span><span class="save-loading d-none"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...</span></button>
-            <span class="text-muted small">Changes reflect everywhere automatically (single source of truth).</span>
-          </div>
-        </form>
-
-        <script>
-          (function(){
-            var form = document.getElementById('companySettingsForm');
-            if (!form) return;
-            var baseUrl = (document.getElementById('baseUrlForLogo') && document.getElementById('baseUrlForLogo').value) || '';
-            var drop = document.getElementById('logoDrop');
-            var fileInput = document.getElementById('logoFileInput');
-            var urlInput = document.getElementById('logoUrlInput');
-            var mainLogo = document.getElementById('previewMainLogo');
-            var placeholder = document.getElementById('previewPlaceholder');
-            var removeLogo = document.getElementById('removeLogo');
-            var replaceBtn = document.getElementById('logoReplaceBtn');
-            var removeBtn = document.getElementById('logoRemoveBtn');
-
-            function showPreview(src){
-              if (mainLogo) { mainLogo.src = src || ''; mainLogo.style.display = src ? '' : 'none'; }
-              if (placeholder) placeholder.style.display = src ? 'none' : '';
-            }
-            function resolveUrl(v){
-              v = (v || '').trim();
-              if (!v) return '';
-              return (v.indexOf('http') === 0 || v.indexOf('//') === 0) ? v : (baseUrl + '/' + v.replace(/^\//, ''));
-            }
-            function updateFromUrl(){
-              var v = (urlInput && urlInput.value || '').trim();
-              if (!v) { showPreview(''); return; }
-              showPreview(resolveUrl(v));
-            }
-
-            if (urlInput) urlInput.addEventListener('input', function(){ if (removeLogo) removeLogo.value = '0'; updateFromUrl(); });
-
-            function pickFile(){ if (fileInput) fileInput.click(); }
-            var dirty = false;
-            var saveBtn = document.getElementById('saveCompanyBtn');
-            function setDirty(on){ dirty = !!on; }
-            form.addEventListener('input', function(){ setDirty(true); });
-            window.addEventListener('beforeunload', function(e){ if (!dirty) return; e.preventDefault(); e.returnValue = ''; });
-
-            if (drop) {
-              drop.addEventListener('click', pickFile);
-              drop.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickFile(); } });
-              drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('is-dragover'); });
-              drop.addEventListener('dragleave', function(){ drop.classList.remove('is-dragover'); });
-              drop.addEventListener('drop', function(e){
-                e.preventDefault();
-                drop.classList.remove('is-dragover');
-                if (!fileInput) return;
-                var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-                if (!f) return;
-                if (!/^image\//.test(f.type)) return;
-                fileInput.files = e.dataTransfer.files;
-                if (removeLogo) removeLogo.value = '0';
-                var r = new FileReader();
-                r.onload = function(ev){ showPreview(ev.target.result); };
-                r.readAsDataURL(f);
-              });
-            }
-
-            if (fileInput) {
-              fileInput.addEventListener('change', function(){
-                var f = this.files && this.files[0];
-                if (f && /^image\//.test(f.type)) {
-                  if (removeLogo) removeLogo.value = '0';
-                  var r = new FileReader();
-                  r.onload = function(e){ showPreview(e.target.result); };
-                  r.readAsDataURL(f);
-                }
-              });
-            }
-            if (replaceBtn) replaceBtn.addEventListener('click', pickFile);
-            if (removeBtn) {
-              removeBtn.addEventListener('click', function(){
-                if (removeLogo) removeLogo.value = '1';
-                if (urlInput) urlInput.value = '';
-                if (fileInput) fileInput.value = '';
-                showPreview('');
-              });
-            }
-
-            // Inline validation (clean states)
-            function setErr(input, on, msg){
-              if (!input) return;
-              if (on) input.classList.add('field-error'); else input.classList.remove('field-error');
-              if (!msg) return;
-            }
-            function validate(){
-              var ok = true;
-              var companyName = form.querySelector('input[name="company_name"]');
-              if (companyName && companyName.value.trim() === '') { ok = false; setErr(companyName, true); var e1 = form.querySelector('[data-error-for="company_name"]'); if (e1) e1.style.display = ''; }
-              else { setErr(companyName, false); var e1b = form.querySelector('[data-error-for="company_name"]'); if (e1b) e1b.style.display = 'none'; }
-
-              // Branch validation
-              // - Primary branch (index 0) is required
-              // - Additional branches are optional unless user starts filling one of their fields
-              var branchNames = form.querySelectorAll('input[name="branch_name[]"]');
-              var branchEns = form.querySelectorAll('input[name="branch_address_en[]"]');
-              var branchTas = form.querySelectorAll('input[name="branch_address_ta[]"]');
-              var branchPhones = form.querySelectorAll('input[name="branch_phones[]"]');
-
-              for (var i=0; i<branchNames.length; i++) {
-                var bn = branchNames[i];
-                var be = branchEns[i];
-                var bt = branchTas[i];
-                var bp = branchPhones[i];
-
-                var bnV = bn ? bn.value.trim() : '';
-                var beV = be ? be.value.trim() : '';
-                var btV = bt ? bt.value.trim() : '';
-                var bpV = bp ? bp.value.trim() : '';
-
-                var hasAny = (bnV !== '' || beV !== '' || btV !== '' || bpV !== '');
-                var required = (i === 0) || hasAny;
-
-                if (required) {
-                  if (bn && bnV === '') { ok = false; setErr(bn, true); } else { setErr(bn, false); }
-                  if (be && beV === '') { ok = false; setErr(be, true); } else { setErr(be, false); }
-                } else {
-                  if (bn) setErr(bn, false);
-                  if (be) setErr(be, false);
-                }
-              }
-              return ok;
-            }
-            function showClientError(msg){
-              var box = document.getElementById('settingsClientError');
-              if (!box) return;
-              box.textContent = msg || 'Please fix validation errors and try again.';
-              box.classList.remove('d-none');
-            }
-            function scrollToFirstError(){
-              var first = form.querySelector('.field-error');
-              if (!first) return;
-              try { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) { first.scrollIntoView(true); }
-              try { first.focus({ preventScroll: true }); } catch(e) { try { first.focus(); } catch(e2) {} }
-            }
-            form.addEventListener('submit', function(e){
-              var ok = validate();
-              if (!ok) {
-                e.preventDefault();
-                e.stopPropagation();
-                showClientError('Please fill all required fields (Company Name, Branch Names, and English Address).');
-                scrollToFirstError();
-                return;
-              }
-              if (saveBtn) {
-                saveBtn.disabled = true;
-                var a = saveBtn.querySelector('.save-label');
-                var b = saveBtn.querySelector('.save-loading');
-                if (a) a.classList.add('d-none');
-                if (b) b.classList.remove('d-none');
-              }
-            });
-            form.addEventListener('input', function(){ validate(); });
-
-            // Default branch selection: keep in sync with visual default state
-            var radios = form.querySelectorAll('input[name="default_branch_idx"]');
-            function refreshDefault(){
-              var selected = 0;
-              for (var i=0;i<radios.length;i++){ if (radios[i].checked) { selected = parseInt(radios[i].value || '0',10) || 0; break; } }
-              var cards = form.querySelectorAll('.branch-card');
-              for (var c=0;c<cards.length;c++) {
-                var idx = parseInt(cards[c].getAttribute('data-branch-index') || '0', 10) || 0;
-                if (idx === selected) { cards[c].classList.add('default'); }
-                else { cards[c].classList.remove('default'); }
-              }
-            }
-            for (var r=0;r<radios.length;r++){ radios[r].addEventListener('change', refreshDefault); }
-            refreshDefault();
-            updateFromUrl();
-
-            try {
-              var success = <?php echo !empty($success) ? 'true' : 'false'; ?>;
-              if (success && window.bootstrap && bootstrap.Toast) {
-                var el = document.getElementById('companyToast');
-                if (el) { new bootstrap.Toast(el, { delay: 2500 }).show(); }
-              }
-            } catch(e) {}
-          })();
-        </script>
-      </div>
+  <div class="tab-content" id="settingsTabContent">
+    <div class="tab-pane fade <?php echo $settingsActiveTab === 'general' ? 'show active' : ''; ?>" id="pane-general" role="tabpanel" aria-labelledby="tab-general" tabindex="0">
+      <?php include __DIR__ . '/tabs/general.php'; ?>
     </div>
-  </div>
-
-  <div class="col-lg-4">
-    <div class="card shadow-sm mb-4">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-key me-1"></i> Password</h5></div>
-      <div class="card-body">
-        <p class="text-muted small">Change your login password.</p>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=change_password'); ?>" class="btn btn-outline-primary w-100"><i class="bi bi-lock me-1"></i> Change Password</a>
-      </div>
+    <div class="tab-pane fade <?php echo $settingsActiveTab === 'branches' ? 'show active' : ''; ?>" id="pane-branches" role="tabpanel" aria-labelledby="tab-branches" tabindex="0">
+      <?php include __DIR__ . '/tabs/branches.php'; ?>
     </div>
-
-    <div class="card shadow-sm mb-4">
-      <div class="card-header"><h5 class="mb-0"><i class="bi bi-people me-1"></i> Users</h5></div>
-      <div class="card-body">
-        <p class="text-muted small">Create and manage user accounts.</p>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>" class="btn btn-outline-secondary w-100 mb-2"><i class="bi bi-list me-1"></i> View Users</a>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=users&action=new'); ?>" class="btn btn-primary w-100"><i class="bi bi-person-plus me-1"></i> Create New User</a>
-      </div>
+    <div class="tab-pane fade <?php echo $settingsActiveTab === 'users' ? 'show active' : ''; ?>" id="pane-users" role="tabpanel" aria-labelledby="tab-users" tabindex="0">
+      <?php include __DIR__ . '/tabs/users.php'; ?>
+    </div>
+    <div class="tab-pane fade <?php echo $settingsActiveTab === 'system' ? 'show active' : ''; ?>" id="pane-system" role="tabpanel" aria-labelledby="tab-system" tabindex="0">
+      <?php include __DIR__ . '/tabs/system.php'; ?>
     </div>
   </div>
 </div>
+
+<script src="<?php echo Helpers::baseUrl('assets/js/settings.js'); ?>"></script>
+<script src="<?php echo Helpers::baseUrl('assets/js/settings-general.js'); ?>"></script>
+<script src="<?php echo Helpers::baseUrl('assets/js/branches.js'); ?>"></script>
+<script>
+(function () {
+  var msg = <?php echo json_encode((string)($success ?? ''), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE); ?>;
+  if (!msg || typeof bootstrap === 'undefined' || !bootstrap.Toast) return;
+  var el = document.getElementById('settingsSuccessToast');
+  var body = document.getElementById('settingsToastBody');
+  if (body) body.textContent = msg;
+  if (el) new bootstrap.Toast(el, { delay: 2800 }).show();
+})();
+</script>

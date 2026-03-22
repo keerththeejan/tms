@@ -13,6 +13,9 @@ $user = Auth::user();
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/css/dataTables.bootstrap5.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/tms-design-system.css'); ?>">
+  <?php if (in_array($_GET['page'] ?? '', ['employees', 'salaries', 'advances'], true)): ?>
+  <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/hr-responsive.css'); ?>">
+  <?php endif; ?>
 </head>
 <body>
 <?php 
@@ -34,8 +37,8 @@ $user = Auth::user();
   $navCurrent = static function (bool $active): string {
     return $active ? ' aria-current="page"' : '';
   };
-  /** Full-width main + topbar (no max-width gutter) for Parcels list / new / edit */
-  $parcelsFullWidth = ($currentPage === 'parcels');
+  /** Full-width main + topbar (no max-width gutter) for Parcels list / new / edit, Cash Book */
+  $parcelsFullWidth = ($currentPage === 'parcels' || $currentPage === 'cashbook');
 ?>
 <?php if ($user): ?>
 <a href="#main-content" class="skip-link visually-hidden-focusable">Skip to main content</a>
@@ -77,6 +80,7 @@ $user = Auth::user();
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='salaries'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=salaries'); ?>"<?php echo $navCurrent($currentPage==='salaries'); ?>><i class="bi bi-cash-coin" aria-hidden="true"></i><span>Salaries</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='advances'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>"<?php echo $navCurrent($currentPage==='advances'); ?>><i class="bi bi-cash-stack" aria-hidden="true"></i><span>Advances</span></a></li>
         <li class="nav-item nav-section">Accounts</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='cashbook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=cashbook'); ?>"<?php echo $navCurrent($currentPage==='cashbook'); ?>><i class="bi bi-cash-stack" aria-hidden="true"></i><span>Cash Book</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='accounts'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts'); ?>"<?php echo $navCurrent($currentPage==='accounts'); ?>><i class="bi bi-journal-richtext" aria-hidden="true"></i><span>Accounts</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='daybook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=daybook'); ?>"<?php echo $navCurrent($currentPage==='daybook'); ?>><i class="bi bi-journal-text" aria-hidden="true"></i><span>Daybook</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='ledger'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=ledger'); ?>"<?php echo $navCurrent($currentPage==='ledger'); ?>><i class="bi bi-journal-check" aria-hidden="true"></i><span>Account Ledger</span></a></li>
@@ -107,7 +111,7 @@ $user = Auth::user();
       $uiHeaderAddr = Helpers::companyHeaderAddressLines('', 3);
       $pageTitle = 'Dashboard';
       if ($currentPage && $currentPage !== 'dashboard') {
-        $pageTitle = ucwords(str_replace('_', ' ', (string)$currentPage));
+        $pageTitle = $currentPage === 'cashbook' ? 'Cash Book' : ucwords(str_replace('_', ' ', (string)$currentPage));
       }
     ?>
     <div class="topbar" role="banner">

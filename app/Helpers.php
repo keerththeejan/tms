@@ -33,6 +33,20 @@ class Helpers
         return is_array($branches) ? $branches : [];
     }
 
+    /** Normalize phone strings for display (preserve | separators, trim segments). */
+    public static function formatPhonesDisplay(string $phones): string
+    {
+        $phones = trim(str_replace(["\r", "\n"], '', $phones));
+        if ($phones === '') {
+            return '';
+        }
+        $parts = preg_split('/\s*\|\s*/u', $phones) ?: [];
+        $parts = array_filter(array_map('trim', $parts), static function ($p) {
+            return $p !== '';
+        });
+        return implode(' | ', $parts);
+    }
+
     public static function companyDefaultBranch(): array
     {
         try {
@@ -64,7 +78,12 @@ class Helpers
         return [];
     }
 
-    public static function companyHeaderAddressLines(?string $addrOverrideParam = null, int $limit = 3): array
+    /**
+     * Header subtitle lines for billing / app chrome (English, default branch first).
+     *
+     * @param 'default'|'all' $scope default = only the branch flagged is_default; all = every active branch
+     */
+    public static function companyHeaderAddressLines(?string $addrOverrideParam = null, int $limit = 3, string $scope = 'default'): array
     {
         $addrOverrideParam = (string)($addrOverrideParam ?? '');
         $addrOverrideParam = str_replace(["\r"], '', $addrOverrideParam);
@@ -81,11 +100,28 @@ class Helpers
 
         $branches = self::companyBranches();
         if (!empty($branches)) {
+            if ($scope === 'default') {
+                $def = self::companyDefaultBranch();
+                if (!empty($def)) {
+                    $b = $def;
+                    $name = trim((string)($b['name'] ?? ''));
+                    $addrEn = trim((string)($b['address_en'] ?? ''));
+                    $phones = self::formatPhonesDisplay((string)($b['phones'] ?? ''));
+                    $parts = [];
+                    if ($name !== '') { $parts[] = $name; }
+                    if ($addrEn !== '') { $parts[] = $addrEn; }
+                    if ($phones !== '') { $parts[] = $phones; }
+                    if ($parts !== []) {
+                        $lines[] = implode(' — ', $parts);
+                    }
+                    return array_slice($lines, 0, max(0, $limit));
+                }
+            }
             foreach ($branches as $b) {
                 if (!is_array($b)) { continue; }
                 $name = trim((string)($b['name'] ?? ''));
                 $addrEn = trim((string)($b['address_en'] ?? ''));
-                $phones = trim((string)($b['phones'] ?? ''));
+                $phones = self::formatPhonesDisplay((string)($b['phones'] ?? ''));
                 $line = trim(($name !== '' ? ($name . ': ') : '') . $addrEn);
                 if ($phones !== '') {
                     $line = trim($line . ' | ' . $phones);
@@ -220,5 +256,23 @@ class Helpers
         include __DIR__ . '/../views/layout/header.php';
         include $viewFile;
         include __DIR__ . '/../views/layout/footer.php';
+    }
+
+    /** Accept only Y-m-d from user input; otherwise return $fallback. */
+    public static function parseDateOr(string $value, string $fallback): string
+    {
+        $v = trim($value);
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : $fallback;
+    }
+
+    /** Ensure chronological order for two Y-m-d strings. */
+    public static function orderDateRange(string $from, string $to): array
+    {
+        if ($from > $to) {
+            return [$to, $from];
+        }
+
+        return [$from, $to];
     }
 }

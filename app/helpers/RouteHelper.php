@@ -102,8 +102,12 @@ class RouteHelper {
      */
     public static function checkAndAssignReturnLoad($pdo, $parcelId, $fromBranchId, $toBranchId) {
         try {
-            // For now, we'll assume all parcels from Kilinochchi (ID 1) need a return load
-            if ($toBranchId == 1) { // Kilinochchi is the main branch
+            $mainId = 0;
+            if (class_exists('BranchRepository')) {
+                BranchRepository::ensureSchema($pdo);
+                $mainId = BranchRepository::getMainBranchId($pdo);
+            }
+            if ($mainId > 0 && (int)$toBranchId === $mainId) {
                 return self::assignRouteAndLoadNumber($pdo, $parcelId, $toBranchId, $fromBranchId, true);
             }
             return false;
