@@ -7,11 +7,13 @@
   /* Parcels list: one-viewport fit — tight filters + scrollable table (Bootstrap 5) */
   .parcels-page { --p-gap: 6px; max-width: none !important; width: 100%; margin: 0; padding-bottom: .35rem; }
   .parcels-page .table-wrap { border: 1px solid rgba(17,24,39,.10); border-radius: 12px; background:#fff; }
-  /* Vertical scroll for table body; horizontal scroll for wide grid — dropdowns use Popper fixed strategy (see Actions btn) */
+  /* Vertical scroll only — table fits viewport width (table-layout: fixed, no horizontal scroll) */
   .parcels-page .parcels-table-scroll {
     max-height: min(640px, calc(100vh - 240px));
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: auto;
+    width: 100%;
+    max-width: 100%;
     -webkit-overflow-scrolling: touch;
   }
   @media (max-width: 991.98px) {
@@ -37,16 +39,45 @@
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   .parcels-page .skeleton-row td { padding: 10px 8px !important; }
   .parcels-page .skeleton-cell { height: 16px; width: 80%; }
-  .parcels-page .parcels-table .cell-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display:block; }
+  .parcels-page .parcels-table .cell-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; max-width: 100%; }
   .parcels-page .parcels-table .cell-tight { white-space: nowrap; }
-  .parcels-page .parcels-table .col-actions { width: auto; min-width: 148px; white-space: nowrap; }
-  .parcels-page .parcel-actions-inline { display: inline-flex; align-items: center; gap: 2px; margin-right: 2px; vertical-align: middle; }
-  .parcels-page .parcel-actions-inline .btn { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; }
-  .parcels-page .parcels-table .col-num { width: 56px; }
-  .parcels-page .parcels-table .col-status { min-width: 118px; width: 128px; }
-  .parcels-page .parcels-table .col-email { width: 120px; }
-  .parcels-page .parcels-table .col-weight { width: 84px; }
-  .parcels-page .parcels-table .col-price { width: 84px; }
+  /* Fixed layout: allow ellipsis in flexible columns */
+  .parcels-page .parcels-table td.col-min-0,
+  .parcels-page .parcels-table th.col-min-0 { min-width: 0; }
+  .parcels-page .parcels-table .col-actions {
+    width: 4.75rem;
+    min-width: 4.75rem;
+    max-width: 5.25rem;
+    text-align: right;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .parcels-page .parcels-table .col-actions .parcel-actions-cell {
+    justify-content: flex-end;
+  }
+  .parcels-page .parcels-table .col-actions .btn-icon {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+  }
+  .parcels-page .parcels-table .col-num { width: 2.5rem; min-width: 2.25rem; max-width: 2.75rem; }
+  .parcels-page .parcels-table .col-parcel { width: 7%; min-width: 0; }
+  .parcels-page .parcels-table .col-date { width: 6.5rem; min-width: 0; max-width: 7rem; }
+  .parcels-page .parcels-table .col-customer { width: 14%; min-width: 0; }
+  .parcels-page .parcels-table .col-supplier { width: 9%; min-width: 0; }
+  .parcels-page .parcels-table .col-branch { width: 6%; min-width: 0; }
+  .parcels-page .parcels-table .col-veh { width: 5%; min-width: 0; }
+  .parcels-page .parcels-table .col-route { width: 9%; min-width: 0; }
+  .parcels-page .parcels-table .col-ln { width: 2.25rem; min-width: 0; }
+  .parcels-page .parcels-table .col-status { width: 7.5rem; min-width: 0; max-width: 9rem; }
+  .parcels-page .parcels-table .col-status .badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
+  .parcels-page .parcels-table .col-email { width: 8%; min-width: 0; max-width: 9rem; }
+  .parcels-page .parcels-table .col-weight { width: 3.25rem; min-width: 0; }
+  .parcels-page .parcels-table .col-price { width: 4.25rem; min-width: 0; }
   .parcels-page .badge.badge-soft { font-weight: 700; border: 1px solid rgba(17,24,39,.10); }
   .parcels-page .badge-soft-success { background: rgba(25,135,84,.12); color: #146c43; }
   .parcels-page .badge-soft-warning { background: rgba(255,193,7,.16); color: #8a6d00; }
@@ -106,6 +137,9 @@
   .parcels-page .parcel-items-nested .pf-add-tag { font-size: 10px; font-weight: 600; }
   .parcels-page .parcel-items-nested tfoot td { font-weight: 700; background: #f8fafc; }
   .parcels-page .parcel-items-loading { min-height: 2rem; }
+  .parcels-page .parcel-items-panel .table-responsive {
+    overflow-x: hidden;
+  }
   @media (max-width: 767.98px) {
     .parcels-page .parcel-items-nested { font-size: 11px; }
   }
@@ -651,27 +685,27 @@
 </div>
 
 <?php $parcelTableColspan = 17; ?>
-<div class="table-responsive table-wrap parcels-table-scroll d-none d-md-block">
-  <table class="table table-sm table-striped table-hover align-middle parcels-table mb-0">
+<div class="table-wrap parcels-table-scroll d-none d-md-block">
+  <table class="table table-sm table-striped table-hover align-middle parcels-table mb-0 w-100">
     <thead class="table-light">
       <tr>
         <th class="col-exp"><span class="visually-hidden">Expand</span></th>
         <th class="col-chk"><input type="checkbox" class="form-check-input" id="parcelsSelectAll" title="Select all on page" aria-label="Select all"></th>
         <th class="col-num">#</th>
-        <th>Parcel</th>
-        <th class="cell-tight">Date</th>
-        <th>Customer</th>
-        <th class="d-none d-xl-table-cell">Supplier</th>
-        <th class="d-none d-md-table-cell">From</th>
-        <th class="d-none d-md-table-cell">To</th>
-        <th class="d-none d-md-table-cell" title="Vehicle"><i class="bi bi-truck-front"></i></th>
-        <th class="d-none d-md-table-cell" title="Delivery route"><i class="bi bi-signpost"></i></th>
-        <th class="d-none d-lg-table-cell text-center" title="Line count">Ln</th>
-        <th class="col-weight d-none d-md-table-cell">Wt.</th>
+        <th class="col-parcel">Parcel</th>
+        <th class="cell-tight col-date">Date</th>
+        <th class="col-customer">Customer</th>
+        <th class="col-supplier d-none d-xl-table-cell">Supplier</th>
+        <th class="col-branch d-none d-lg-table-cell">From</th>
+        <th class="col-branch d-none d-lg-table-cell">To</th>
+        <th class="col-veh d-none d-lg-table-cell" title="Vehicle"><i class="bi bi-truck-front"></i></th>
+        <th class="col-route d-none d-lg-table-cell" title="Delivery route"><i class="bi bi-signpost"></i></th>
+        <th class="col-ln d-none d-xl-table-cell text-center" title="Line count">Ln</th>
+        <th class="col-weight d-none d-lg-table-cell">Wt.</th>
         <th class="col-price">Total</th>
         <th class="col-status">Status</th>
-        <th class="col-email d-none d-xxl-table-cell">Email</th>
-        <th class="text-end col-actions"><span class="small text-muted fw-semibold">Actions</span></th>
+        <th class="col-email d-none d-xl-table-cell">Email</th>
+        <th class="text-end col-actions" scope="col"><span class="small text-muted fw-semibold" title="Print (always) and more actions"><i class="bi bi-printer" aria-hidden="true"></i><span class="mx-1">·</span>⋮</span><span class="visually-hidden">Print and row actions</span></th>
       </tr>
     </thead>
     <tbody>
@@ -726,74 +760,76 @@
             </button>
           </td>
           <td class="col-chk"><input type="checkbox" class="form-check-input parcel-row-check" name="parcel_ids[]" value="<?php echo $pid; ?>" aria-label="Select parcel <?php echo $pid; ?>"></td>
-          <td class="cell-tight"><a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>" title="Edit"><?php echo $rowNum; ?></a></td>
-          <td class="cell-tight">
+          <td class="cell-tight col-min-0"><a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>" title="Edit"><?php echo $rowNum; ?></a></td>
+          <td class="cell-tight col-parcel col-min-0">
             <a class="text-decoration-none fw-semibold" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>">#<?php echo $pid; ?></a>
-            <?php if ($track !== ''): ?><div class="small text-muted text-truncate" style="max-width:7rem" title="<?php echo htmlspecialchars($track); ?>"><?php echo htmlspecialchars($track); ?></div><?php endif; ?>
+            <?php if ($track !== ''): ?><div class="small text-muted text-truncate" title="<?php echo htmlspecialchars($track); ?>"><?php echo htmlspecialchars($track); ?></div><?php endif; ?>
           </td>
-          <td class="cell-tight small text-muted"><?php echo htmlspecialchars($createdShort); ?></td>
-          <td>
+          <td class="cell-tight small text-muted col-date col-min-0"><?php echo htmlspecialchars($createdShort); ?></td>
+          <td class="col-customer col-min-0">
             <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&customer_id=' . $cid); ?>" class="text-decoration-none">
               <span class="cell-ellipsis" title="<?php echo htmlspecialchars($custLabel); ?>"><?php echo htmlspecialchars($custLabel); ?></span>
             </a>
           </td>
-          <td class="d-none d-xl-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['supplier_name'] ?? '')); ?>"><?php echo htmlspecialchars($p['supplier_name'] ?? ''); ?></span></td>
-          <td class="d-none d-md-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['from_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['from_branch'] ?? ''); ?></span></td>
-          <td class="d-none d-md-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['to_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['to_branch'] ?? ''); ?></span></td>
-          <td class="d-none d-md-table-cell pf-qe" data-parcel-id="<?php echo $pid; ?>" data-qe-field="vehicle_no" data-qe-value="<?php echo htmlspecialchars($vehDb); ?>" title="Click to edit vehicle">
+          <td class="d-none d-xl-table-cell col-supplier col-min-0"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['supplier_name'] ?? '')); ?>"><?php echo htmlspecialchars($p['supplier_name'] ?? ''); ?></span></td>
+          <td class="d-none d-lg-table-cell col-branch col-min-0"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['from_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['from_branch'] ?? ''); ?></span></td>
+          <td class="d-none d-lg-table-cell col-branch col-min-0"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($p['to_branch'] ?? '')); ?>"><?php echo htmlspecialchars($p['to_branch'] ?? ''); ?></span></td>
+          <td class="d-none d-lg-table-cell col-veh col-min-0 pf-qe" data-parcel-id="<?php echo $pid; ?>" data-qe-field="vehicle_no" data-qe-value="<?php echo htmlspecialchars($vehDb); ?>" title="Click to edit vehicle">
             <?php if ($veh !== ''): ?>
               <span class="cell-ellipsis" title="<?php echo htmlspecialchars($veh); ?>"><?php echo htmlspecialchars($veh); ?></span>
             <?php else: ?>
               —
             <?php endif; ?>
           </td>
-          <td class="small d-none d-md-table-cell pf-qe" data-parcel-id="<?php echo $pid; ?>" data-qe-field="delivery_route" data-qe-value="<?php echo htmlspecialchars($savedRoute); ?>" title="Click to edit route">
+          <td class="small d-none d-lg-table-cell col-route col-min-0 pf-qe" data-parcel-id="<?php echo $pid; ?>" data-qe-field="delivery_route" data-qe-value="<?php echo htmlspecialchars($savedRoute); ?>" title="Click to edit route">
             <?php echo $routeCellInner; ?>
           </td>
-          <td class="text-center cell-tight d-none d-lg-table-cell">
+          <td class="text-center cell-tight d-none d-xl-table-cell col-ln col-min-0">
             <?php if ($itemLineCount > 0): ?><span class="badge rounded-pill bg-light text-dark border"><?php echo $itemLineCount; ?></span><?php else: ?><span class="text-muted">0</span><?php endif; ?>
           </td>
-          <td class="text-end cell-tight d-none d-md-table-cell"><?php echo number_format((float)$p['weight'], 2); ?></td>
-          <td class="text-end cell-tight <?php echo $p['price'] !== null ? 'fw-bold' : ''; ?>"><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
-          <td class="col-status <?php echo $isBilled ? '' : 'pf-qe'; ?>" data-parcel-id="<?php echo $pid; ?>" data-qe-field="status" data-qe-value="<?php echo htmlspecialchars($st); ?>" title="<?php echo $isBilled ? '' : 'Click to edit status'; ?>">
+          <td class="text-end cell-tight d-none d-lg-table-cell col-weight col-min-0"><?php echo number_format((float)$p['weight'], 2); ?></td>
+          <td class="text-end cell-tight col-price col-min-0 <?php echo $p['price'] !== null ? 'fw-bold' : ''; ?>"><?php echo is_null($p['price']) ? '-' : number_format((float)$p['price'], 2); ?></td>
+          <td class="col-status col-min-0 <?php echo $isBilled ? '' : 'pf-qe'; ?>" data-parcel-id="<?php echo $pid; ?>" data-qe-field="status" data-qe-value="<?php echo htmlspecialchars($st); ?>" title="<?php echo $isBilled ? '' : 'Click to edit status'; ?>">
             <span class="badge badge-soft <?php echo $stClass; ?>"><?php echo htmlspecialchars(Helpers::parcelStatusLabel($st)); ?></span>
           </td>
-          <td class="d-none d-xxl-table-cell">
+          <td class="d-none d-xl-table-cell col-email col-min-0">
             <?php if (!empty($p['email_status'])): ?>
               <?php if ($p['email_status'] === 'sent'): ?>
                 <span class="badge badge-soft badge-soft-success">Sent</span>
               <?php else: ?>
                 <span class="badge badge-soft badge-soft-danger">Failed</span>
               <?php endif; ?>
-              <small class="text-muted d-block"><?php echo htmlspecialchars($p['emailed_at'] ?? ''); ?></small>
+              <small class="text-muted d-block text-truncate"><?php echo htmlspecialchars($p['emailed_at'] ?? ''); ?></small>
             <?php else: ?>
               <span class="badge badge-soft badge-soft-secondary">Not sent</span>
             <?php endif; ?>
             <div>
-              <a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=email_log&id=' . $pid); ?>">View log</a>
+              <a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=email_log&id=' . $pid); ?>">Log</a>
             </div>
           </td>
           <td class="text-end position-relative col-actions">
-            <div class="parcel-actions-inline" role="group" aria-label="Parcel actions">
-              <button type="button" class="btn btn-outline-primary btn-sm btn-parcel-print" data-parcel-id="<?php echo (int)$pid; ?>" title="Print invoice in preview"><i class="bi bi-printer" aria-hidden="true"></i><span class="visually-hidden">Print</span></button>
-              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>" title="Edit"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="visually-hidden">Edit</span></a>
-              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id=' . $pid); ?>" title="Email"><i class="bi bi-envelope" aria-hidden="true"></i><span class="visually-hidden">Email</span></a>
-            </div>
-            <div class="dropdown d-inline parcels-actions-dd">
-              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true" data-bs-popper-config='{"strategy":"fixed","modifiers":[{"name":"preventOverflow","options":{"boundary":"viewport"}}]}' aria-expanded="false" title="More">
-                <i class="bi bi-three-dots-vertical" aria-hidden="true"></i><span class="visually-hidden">More</span>
+            <div class="d-inline-flex align-items-center gap-1 parcel-actions-cell">
+              <button type="button" class="btn btn-outline-primary btn-sm btn-icon btn-parcel-print" data-parcel-id="<?php echo (int)$pid; ?>" title="Print invoice in preview" aria-label="Print parcel <?php echo (int)$pid; ?>">
+                <i class="bi bi-printer" aria-hidden="true"></i>
+              </button>
+              <div class="dropdown parcels-actions-dd">
+              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true" data-bs-popper-config='{"strategy":"fixed","modifiers":[{"name":"preventOverflow","options":{"boundary":"viewport"}}]}' aria-expanded="false" title="More actions" aria-label="More actions for parcel <?php echo (int)$pid; ?>">
+                <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
               </button>
               <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=edit&id=' . $pid); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a></li>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=email_form&id=' . $pid); ?>"><i class="bi bi-envelope me-2"></i>Email</a></li>
                 <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route&customer_id=' . $cid); ?>"><i class="bi bi-signpost me-2"></i>Delivery route</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
-                  <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" class="px-3" onsubmit="return confirm('Delete this parcel?');">
+                  <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=delete'); ?>" class="px-3 mb-0" onsubmit="return confirm('Delete this parcel?');">
                     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
                     <input type="hidden" name="id" value="<?php echo $pid; ?>">
                     <button type="submit" class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash me-2"></i>Delete</button>
                   </form>
                 </li>
               </ul>
+              </div>
             </div>
           </td>
         </tr>

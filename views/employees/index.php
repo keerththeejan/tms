@@ -36,13 +36,13 @@ if (!function_exists('emp_index_status_badge')) {
     function emp_index_status_badge(string $status): string
     {
         if ($status === 'active') {
-            return '<span class="badge bg-success">Active</span>';
+            return '<span class="badge badge-soft badge-soft-success">Active</span>';
         }
         if ($status === 'suspended') {
-            return '<span class="badge bg-warning text-dark">Suspended</span>';
+            return '<span class="badge badge-soft badge-soft-warning">Suspended</span>';
         }
 
-        return '<span class="badge bg-secondary">Inactive</span>';
+        return '<span class="badge badge-soft badge-soft-secondary">Inactive</span>';
     }
 }
 
@@ -62,9 +62,10 @@ $deleteUrl = Helpers::baseUrl('index.php?page=employees&action=delete');
 $editBase = Helpers::baseUrl('index.php?page=employees&action=edit&id=');
 $newUrl = Helpers::baseUrl('index.php?page=employees&action=new');
 $clearUrl = Helpers::baseUrl('index.php?page=employees');
+$payrollUrl = Helpers::baseUrl('index.php?page=employees&action=payroll');
 $rolesForFilter = $rolesForFilter ?? [];
 $q = $q ?? '';
-$filterCollapseShow = $filterActive > 0;
+$stCur = (string)($status ?? '');
 ?>
 <div
   class="hr-page emp-page"
@@ -74,91 +75,95 @@ $filterCollapseShow = $filterActive > 0;
   data-delete-url="<?php echo htmlspecialchars($deleteUrl, ENT_QUOTES, 'UTF-8'); ?>"
   data-edit-base="<?php echo htmlspecialchars($editBase, ENT_QUOTES, 'UTF-8'); ?>"
 >
-  <form id="empFilterForm" class="card border-0 shadow-sm emp-shell mb-3" method="get" action="<?php echo htmlspecialchars(Helpers::baseUrl('index.php'), ENT_QUOTES, 'UTF-8'); ?>">
-    <input type="hidden" name="page" value="employees">
-
-    <div class="card-header emp-page-header border-0 pb-2">
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-2">
-        <h3 class="mb-0 d-flex align-items-center gap-2">
-          <i class="bi bi-people text-primary" aria-hidden="true"></i>
-          Employees
-        </h3>
-        <a href="<?php echo htmlspecialchars($newUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary btn-sm px-3 w-100 w-md-auto">
-          <i class="bi bi-plus-lg" aria-hidden="true"></i> New Employee
-        </a>
-      </div>
-      <label class="visually-hidden" for="empLiveSearch">Quick search</label>
-      <div class="input-group input-group-sm mt-1">
-        <span class="input-group-text bg-body-secondary border-end-0"><i class="bi bi-search" aria-hidden="true"></i></span>
-        <input
-          type="search"
-          name="q"
-          id="empLiveSearch"
-          class="form-control form-control-sm border-start-0"
-          placeholder="Quick search name, code, phone, email…"
-          value="<?php echo htmlspecialchars((string)$q, ENT_QUOTES, 'UTF-8'); ?>"
-          autocomplete="off"
-        >
-      </div>
-    </div>
-
-    <div class="card-body pt-2 pb-3">
-      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+  <div class="card border shadow-sm mb-1 filters-card">
+    <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-1 py-1 px-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
         <button
-          class="btn btn-sm btn-outline-secondary emp-filter-toggle"
+          class="btn btn-link btn-sm text-decoration-none text-dark p-0 fw-semibold small"
           type="button"
           data-bs-toggle="collapse"
-          data-bs-target="#empFilterCollapse"
-          aria-expanded="<?php echo $filterCollapseShow ? 'true' : 'false'; ?>"
-          aria-controls="empFilterCollapse"
+          data-bs-target="#empFiltersBody"
+          aria-expanded="true"
+          aria-controls="empFiltersBody"
+          title="Show / hide filters"
         >
-          <i class="bi bi-funnel me-1" aria-hidden="true"></i> Filters
-          <span class="badge <?php echo $filterActive > 0 ? 'bg-primary' : 'bg-secondary'; ?> ms-1" id="empFilterBadge"><?php echo (int)$filterActive; ?></span>
+          <i class="bi bi-chevron-down emp-filter-chevron" aria-hidden="true"></i><span class="ms-1">Filters</span>
+          <span class="badge <?php echo $filterActive > 0 ? 'bg-primary' : 'bg-secondary'; ?> ms-1 align-middle" id="empFilterBadge"><?php echo (int)$filterActive; ?></span>
         </button>
-        <span class="small text-muted">Refine the list; quick search updates live.</span>
+        <div class="btn-group btn-group-sm filters-presets flex-wrap" role="group" aria-label="Quick filters">
+          <span class="input-group-text bg-light border-0 text-muted py-0 px-1 small d-none d-sm-inline">Presets</span>
+          <a href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=employees&status=active'), ENT_QUOTES, 'UTF-8'); ?>" class="btn <?php echo $stCur === 'active' ? 'btn-primary' : 'btn-outline-primary'; ?>"><i class="bi bi-check-circle me-1" aria-hidden="true"></i><span class="d-none d-md-inline">Active</span><span class="d-md-none">Act</span></a>
+          <a href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=employees&status=inactive'), ENT_QUOTES, 'UTF-8'); ?>" class="btn <?php echo $stCur === 'inactive' ? 'btn-primary' : 'btn-outline-primary'; ?>"><i class="bi bi-pause-circle me-1" aria-hidden="true"></i><span class="d-none d-md-inline">Inactive</span><span class="d-md-none">Off</span></a>
+          <a href="<?php echo htmlspecialchars($clearUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary" title="All employees"><i class="bi bi-people me-1" aria-hidden="true"></i><span class="d-none d-md-inline">All</span></a>
+          <a href="<?php echo htmlspecialchars($clearUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary" title="Reset filters"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></a>
+        </div>
       </div>
+      <div class="btn-group btn-group-sm filters-tools" role="group" aria-label="Actions">
+        <a href="<?php echo htmlspecialchars($newUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i><span class="d-none d-lg-inline">New Employee</span><span class="d-lg-none">New</span></a>
+        <a href="<?php echo htmlspecialchars($payrollUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary" title="Salary report"><i class="bi bi-clipboard-data me-1" aria-hidden="true"></i><span class="d-none d-xl-inline">Salary report</span></a>
+      </div>
+    </div>
+    <div id="empFiltersBody" class="card-body collapse show py-1 px-2 border-top border-light">
+      <form id="empFilterForm" method="get" action="<?php echo htmlspecialchars(Helpers::baseUrl('index.php'), ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="page" value="employees">
 
-      <div id="empFilterCollapse" class="collapse <?php echo $filterCollapseShow ? 'show' : ''; ?>">
-        <div class="emp-filters-inner">
-          <div class="small text-uppercase text-muted fw-semibold mb-2">Basic</div>
-          <div class="row g-2">
-            <div class="col-6 col-md-4 col-lg-3">
-              <label class="form-label small mb-0 text-muted">Employee code</label>
-              <input type="text" name="emp_code" class="form-control form-control-sm" placeholder="Code" value="<?php echo htmlspecialchars((string)($emp_code ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+        <div class="row g-2 mb-1">
+          <div class="col-12">
+            <label class="form-label" for="empLiveSearch">Quick search</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-light border-end-0"><i class="bi bi-search" aria-hidden="true"></i></span>
+              <input
+                type="search"
+                name="q"
+                id="empLiveSearch"
+                class="form-control form-control-sm"
+                placeholder="Name, code, phone, email…"
+                value="<?php echo htmlspecialchars((string)$q, ENT_QUOTES, 'UTF-8'); ?>"
+                autocomplete="off"
+              >
             </div>
-            <div class="col-6 col-md-4 col-lg-3">
-              <label class="form-label small mb-0 text-muted">Name</label>
-              <input type="text" name="name" class="form-control form-control-sm" placeholder="Search name" value="<?php echo htmlspecialchars((string)($name ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+        </div>
+
+          <div class="small text-uppercase text-muted fw-semibold mb-1">Basic</div>
+          <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-2 align-items-end mb-2">
+            <div class="col">
+              <label class="form-label" for="filter_emp_code">Employee code</label>
+              <input id="filter_emp_code" type="text" name="emp_code" class="form-control form-control-sm" placeholder="Code" value="<?php echo htmlspecialchars((string)($emp_code ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
             </div>
-            <div class="col-12 col-md-4 col-lg-3">
-              <label class="form-label small mb-0 text-muted">Phone</label>
-              <input type="text" name="phone" class="form-control form-control-sm" placeholder="Phone" value="<?php echo htmlspecialchars((string)($phone ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="col">
+              <label class="form-label" for="filter_emp_name">Name</label>
+              <input id="filter_emp_name" type="text" name="name" class="form-control form-control-sm" placeholder="Search name" value="<?php echo htmlspecialchars((string)($name ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div class="col">
+              <label class="form-label" for="filter_emp_phone">Phone</label>
+              <input id="filter_emp_phone" type="text" name="phone" class="form-control form-control-sm" placeholder="Phone" value="<?php echo htmlspecialchars((string)($phone ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
             </div>
           </div>
 
-          <div class="small text-uppercase text-muted fw-semibold mt-3 mb-2">Advanced</div>
-          <div class="row g-2">
-            <div class="col-12 col-md-4 col-lg-3">
-              <label class="form-label small mb-0 text-muted">Branch</label>
-              <select name="branch_id" class="form-select form-select-sm">
+          <div class="small text-uppercase text-muted fw-semibold mt-2 mb-1">Advanced</div>
+          <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-2 align-items-end mb-1">
+            <div class="col">
+              <label class="form-label" for="filter_emp_branch">Branch</label>
+              <select id="filter_emp_branch" name="branch_id" class="form-select form-select-sm">
                 <option value="0" <?php echo ((int)($branch_id ?? 0) === 0) ? 'selected' : ''; ?>>All branches</option>
                 <?php foreach (($branchesAll ?? []) as $b): ?>
                   <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($branch_id ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars((string)($b['name'] ?? '')); ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-12 col-md-4 col-lg-3">
-              <label class="form-label small mb-0 text-muted">Role</label>
-              <input type="text" name="role" class="form-control form-control-sm" list="empRoleOptions" placeholder="Role" value="<?php echo htmlspecialchars((string)($role ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="col">
+              <label class="form-label" for="filter_emp_role">Role</label>
+              <input id="filter_emp_role" type="text" name="role" class="form-control form-control-sm" list="empRoleOptions" placeholder="Role" value="<?php echo htmlspecialchars((string)($role ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
               <datalist id="empRoleOptions">
                 <?php foreach ($rolesForFilter as $rv): ?>
                   <option value="<?php echo htmlspecialchars((string)$rv, ENT_QUOTES, 'UTF-8'); ?>"></option>
                 <?php endforeach; ?>
               </datalist>
             </div>
-            <div class="col-12 col-md-4 col-lg-3">
-              <label class="form-label small mb-0 text-muted">Status</label>
-              <select name="status" class="form-select form-select-sm">
+            <div class="col">
+              <label class="form-label" for="filter_emp_status">Status</label>
+              <select id="filter_emp_status" name="status" class="form-select form-select-sm">
                 <?php $st = (string)($status ?? ''); ?>
                 <option value="" <?php echo $st === '' ? 'selected' : ''; ?>>Any</option>
                 <option value="active" <?php echo $st === 'active' ? 'selected' : ''; ?>>Active</option>
@@ -166,21 +171,21 @@ $filterCollapseShow = $filterActive > 0;
                 <option value="suspended" <?php echo $st === 'suspended' ? 'selected' : ''; ?>>Suspended</option>
               </select>
             </div>
-            <div class="col-6 col-md-3 col-lg-2">
-              <label class="form-label small mb-0 text-muted">Join from</label>
-              <input type="date" name="join_from" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($join_from ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="col">
+              <label class="form-label" for="filter_join_from">Join from</label>
+              <input id="filter_join_from" type="date" name="join_from" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($join_from ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
             </div>
-            <div class="col-6 col-md-3 col-lg-2">
-              <label class="form-label small mb-0 text-muted">Join to</label>
-              <input type="date" name="join_to" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($join_to ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="col">
+              <label class="form-label" for="filter_join_to">Join to</label>
+              <input id="filter_join_to" type="date" name="join_to" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($join_to ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
             </div>
-            <div class="col-6 col-md-3 col-lg-2">
-              <label class="form-label small mb-0 text-muted">License expiry from</label>
-              <input type="date" name="license_from" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($license_from ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="col">
+              <label class="form-label" for="filter_license_from">License expiry from</label>
+              <input id="filter_license_from" type="date" name="license_from" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($license_from ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
             </div>
-            <div class="col-6 col-md-3 col-lg-2">
-              <label class="form-label small mb-0 text-muted">License expiry to</label>
-              <input type="date" name="license_to" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($license_to ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="col">
+              <label class="form-label" for="filter_license_to">License expiry to</label>
+              <input id="filter_license_to" type="date" name="license_to" class="form-control form-control-sm" value="<?php echo htmlspecialchars((string)($license_to ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
             </div>
           </div>
 
@@ -220,87 +225,27 @@ $filterCollapseShow = $filterActive > 0;
             </div>
           </div>
 
-          <div class="d-flex flex-wrap gap-2 mt-3">
-            <button type="submit" class="btn btn-primary btn-sm" id="empFilterApply">
-              <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Apply
-            </button>
-            <a class="btn btn-outline-secondary btn-sm" href="<?php echo htmlspecialchars($clearUrl, ENT_QUOTES, 'UTF-8'); ?>">Clear</a>
+        <div class="filters-actions-row d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div class="form-check form-check-inline small mb-0">
+            <input class="form-check-input" type="checkbox" id="empAutoApplyToggle" value="1">
+            <label class="form-check-label text-muted" for="empAutoApplyToggle" title="Apply filters when any field changes">Auto-apply on change</label>
+          </div>
+          <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 ms-auto">
+            <a href="<?php echo htmlspecialchars($clearUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary btn-sm py-1 px-2" title="Clear all filters"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear all</a>
+            <button type="submit" class="btn btn-primary btn-sm py-1 px-2" id="empFilterApply"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
           </div>
         </div>
-      </div>
+      </form>
     </div>
-  </form>
+  </div>
 
-  <div class="card border-0 shadow-sm emp-table-card">
-    <div class="card-body p-0">
-      <div id="empEmptyState" class="emp-empty <?php echo empty($employees) ? '' : 'd-none'; ?>">
-        <i class="bi bi-inbox display-6 d-block mb-2 opacity-50" aria-hidden="true"></i>
-        No employees match your criteria.
-      </div>
+  <div id="empEmptyState" class="emp-empty border-bottom <?php echo empty($employees) ? '' : 'd-none'; ?>">
+    <i class="bi bi-inbox display-6 d-block mb-2 opacity-50" aria-hidden="true"></i>
+    No employees match your criteria.
+  </div>
 
-      <div class="d-none d-lg-block emp-table-wrap px-0">
-        <table class="table table-sm table-hover align-middle mb-0" id="employeesTable">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Role</th>
-              <th>Branch</th>
-              <th>Status</th>
-              <th class="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($employees as $e): ?>
-              <?php
-                $eid = (int)$e['id'];
-                $payload = rawurlencode(json_encode($e, JSON_UNESCAPED_UNICODE));
-                $dn = emp_index_display_name($e);
-                $code = trim((string)($e['emp_code'] ?? ''));
-              ?>
-              <tr data-emp-payload="<?php echo htmlspecialchars($payload, ENT_QUOTES, 'UTF-8'); ?>">
-                <td class="text-muted small"><?php echo $eid; ?></td>
-                <td class="emp-name-cell">
-                  <div class="emp-name-main emp-truncate" title="<?php echo htmlspecialchars($dn, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($dn, ENT_QUOTES, 'UTF-8'); ?></div>
-                  <?php if ($code !== ''): ?>
-                    <div class="emp-code-sub emp-truncate"><?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?></div>
-                  <?php endif; ?>
-                </td>
-                <td class="emp-truncate"><?php echo htmlspecialchars((string)($e['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                <td class="emp-truncate"><?php echo htmlspecialchars((string)($e['role'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                <td class="emp-truncate"><?php echo htmlspecialchars((string)($e['branch_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo emp_index_status_badge((string)($e['status'] ?? '')); ?></td>
-                <td class="text-end">
-                  <div class="dropdown emp-actions-dd d-inline-block">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      <li>
-                        <button type="button" class="dropdown-item emp-act-view" data-id="<?php echo $eid; ?>">
-                          <i class="bi bi-eye me-2"></i>View
-                        </button>
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="<?php echo htmlspecialchars($editBase . $eid, ENT_QUOTES, 'UTF-8'); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a>
-                      </li>
-                      <li><hr class="dropdown-divider"></li>
-                      <li>
-                        <form method="post" action="<?php echo htmlspecialchars($deleteUrl, ENT_QUOTES, 'UTF-8'); ?>" class="px-0 mb-0" onsubmit="return confirm('Delete this employee?');">
-                          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8'); ?>">
-                          <input type="hidden" name="id" value="<?php echo $eid; ?>">
-                          <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Delete</button>
-                        </form>
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="d-lg-none px-2 py-3 emp-cards" id="empCards">
+  <div class="cards-wrap d-md-none mb-2">
+    <div class="d-flex flex-column gap-2 px-1" id="empCards">
         <?php foreach ($employees as $e): ?>
           <?php
             $eid = (int)$e['id'];
@@ -308,13 +253,13 @@ $filterCollapseShow = $filterActive > 0;
             $dn = emp_index_display_name($e);
             $code = trim((string)($e['emp_code'] ?? ''));
           ?>
-          <div class="card emp-card" data-emp-payload="<?php echo htmlspecialchars($payload, ENT_QUOTES, 'UTF-8'); ?>">
+          <div class="card shadow-sm emp-card" data-emp-payload="<?php echo htmlspecialchars($payload, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="card-body py-3 px-3">
               <div class="d-flex justify-content-between align-items-start gap-2">
                 <div class="min-w-0">
                   <div class="emp-card-title emp-truncate"><?php echo htmlspecialchars($dn, ENT_QUOTES, 'UTF-8'); ?></div>
                   <?php if ($code !== ''): ?>
-                    <div class="emp-card-meta"><?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div class="meta"><?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?></div>
                   <?php endif; ?>
                   <div class="mt-2 small">
                     <div><i class="bi bi-telephone me-1" aria-hidden="true"></i><?php echo htmlspecialchars((string)($e['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
@@ -348,8 +293,69 @@ $filterCollapseShow = $filterActive > 0;
             </div>
           </div>
         <?php endforeach; ?>
-      </div>
     </div>
+  </div>
+
+  <div class="table-responsive table-wrap emp-table-scroll d-none d-md-block mb-1">
+    <table class="table table-sm table-striped table-hover align-middle mb-0 emp-table" id="employeesTable">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Role</th>
+          <th>Branch</th>
+          <th>Status</th>
+          <th class="text-end"><span class="small text-muted fw-semibold">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($employees as $e): ?>
+          <?php
+            $eid = (int)$e['id'];
+            $payload = rawurlencode(json_encode($e, JSON_UNESCAPED_UNICODE));
+            $dn = emp_index_display_name($e);
+            $code = trim((string)($e['emp_code'] ?? ''));
+          ?>
+          <tr data-emp-payload="<?php echo htmlspecialchars($payload, ENT_QUOTES, 'UTF-8'); ?>">
+            <td class="text-muted small"><?php echo $eid; ?></td>
+            <td class="emp-name-cell">
+              <div class="emp-name-main emp-truncate" title="<?php echo htmlspecialchars($dn, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($dn, ENT_QUOTES, 'UTF-8'); ?></div>
+              <?php if ($code !== ''): ?>
+                <div class="emp-code-sub emp-truncate"><?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?></div>
+              <?php endif; ?>
+            </td>
+            <td class="emp-truncate"><?php echo htmlspecialchars((string)($e['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td class="emp-truncate"><?php echo htmlspecialchars((string)($e['role'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td class="emp-truncate"><?php echo htmlspecialchars((string)($e['branch_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php echo emp_index_status_badge((string)($e['status'] ?? '')); ?></td>
+            <td class="text-end">
+              <div class="dropdown emp-actions-dd d-inline-block">
+                <button type="button" class="btn btn-sm btn-light border" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <button type="button" class="dropdown-item emp-act-view" data-id="<?php echo $eid; ?>">
+                      <i class="bi bi-eye me-2"></i>View
+                    </button>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="<?php echo htmlspecialchars($editBase . $eid, ENT_QUOTES, 'UTF-8'); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                  </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <form method="post" action="<?php echo htmlspecialchars($deleteUrl, ENT_QUOTES, 'UTF-8'); ?>" class="px-0 mb-0" onsubmit="return confirm('Delete this employee?');">
+                      <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8'); ?>">
+                      <input type="hidden" name="id" value="<?php echo $eid; ?>">
+                      <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Delete</button>
+                    </form>
+                  </li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
   </div>
 
   <div class="modal fade" id="empViewModal" tabindex="-1" aria-labelledby="empViewModalLabel" aria-hidden="true">

@@ -43,8 +43,8 @@ $user = Auth::user();
   $navCurrent = static function (bool $active): string {
     return $active ? ' aria-current="page"' : '';
   };
-  /** Full-width main + topbar (no max-width gutter) for Parcels list / new / edit, Cash Book */
-  $parcelsFullWidth = ($currentPage === 'parcels' || $currentPage === 'cashbook');
+  /** Full-width main + topbar (no max-width gutter) for Parcels list / new / edit, Cash Book, Employees list */
+  $parcelsFullWidth = ($currentPage === 'parcels' || $currentPage === 'cashbook' || ($currentPage === 'employees' && $action !== 'payroll'));
 ?>
 <?php if ($user): ?>
 <a href="#main-content" class="skip-link visually-hidden-focusable">Skip to main content</a>

@@ -29,9 +29,13 @@
 
   function statusBadge(status) {
     var s = String(status || '');
-    if (s === 'active') return '<span class="badge bg-success">Active</span>';
-    if (s === 'suspended') return '<span class="badge bg-warning text-dark">Suspended</span>';
-    return '<span class="badge bg-secondary">Inactive</span>';
+    if (s === 'active') {
+      return '<span class="badge badge-soft badge-soft-success">Active</span>';
+    }
+    if (s === 'suspended') {
+      return '<span class="badge badge-soft badge-soft-warning">Suspended</span>';
+    }
+    return '<span class="badge badge-soft badge-soft-secondary">Inactive</span>';
   }
 
   function buildRowsHtml(employees, cfg) {
@@ -376,6 +380,21 @@
       e.preventDefault();
       loadEmployees(true);
     });
+
+    var autoApply = document.getElementById('empAutoApplyToggle');
+    if (autoApply && form) {
+      form.addEventListener(
+        'change',
+        function (e) {
+          if (!autoApply.checked) return;
+          var t = e.target;
+          if (!t || !t.name || t.id === 'empAutoApplyToggle') return;
+          if (t.name === 'q' || t.id === 'empLiveSearch') return;
+          loadEmployees(true);
+        },
+        true
+      );
+    }
 
     document.addEventListener(
       'click',

@@ -1,72 +1,63 @@
-/* Employees index — card layout, sticky regions, mobile cards */
+/* Employees index — aligned with Parcels list: dense filters, bordered table, viewport-fit scroll */
 
 .emp-page {
-  --emp-radius: 12px;
-}
-
-.emp-page .emp-shell {
-  border-radius: var(--emp-radius);
-  overflow: hidden;
-}
-
-.emp-page .emp-page-header {
-  position: sticky;
-  top: 0;
-  z-index: 1020;
-  background: var(--bs-body-bg);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  padding: 1rem 1.25rem;
-}
-
-.emp-page .emp-page-header h3 {
-  font-size: clamp(1.15rem, 3.5vw, 1.4rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.emp-page .emp-table-card {
-  border-radius: var(--emp-radius);
-}
-
-.emp-page .emp-table-wrap {
+  --emp-gap: 6px;
+  max-width: none !important;
   width: 100%;
+  margin: 0;
+  padding-bottom: 0.35rem;
+}
+
+main.content-wrapper > .container-fluid .emp-page {
+  margin-top: -0.35rem;
+}
+
+.emp-page .table-wrap {
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.emp-page .emp-table-scroll {
+  max-height: min(640px, calc(100vh - 260px));
   overflow-x: auto;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-.emp-page .emp-table-wrap thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--bs-body-bg);
-  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--bs-secondary-color);
-  white-space: nowrap;
+@media (max-width: 991.98px) {
+  .emp-page .emp-table-scroll {
+    max-height: none;
+  }
 }
 
-.emp-page #employeesTable {
-  font-size: 0.875rem;
+.emp-page .emp-table {
+  table-layout: fixed;
+  font-size: 12.5px;
 }
 
-.emp-page #employeesTable td {
+.emp-page .emp-table th,
+.emp-page .emp-table td {
+  padding: 4px 6px !important;
   vertical-align: middle;
 }
 
-.emp-page .emp-name-cell {
-  max-width: 220px;
+.emp-page .emp-table thead th {
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
 }
 
-.emp-page .emp-name-cell .emp-name-main {
-  font-weight: 500;
-  line-height: 1.25;
+.emp-page .emp-table tbody tr:hover {
+  background: rgba(2, 6, 23, 0.035);
 }
 
-.emp-page .emp-name-cell .emp-code-sub {
-  font-size: 0.75rem;
-  color: var(--bs-secondary-color);
+@media (min-width: 768px) {
+  .emp-page .emp-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8f9fa;
+  }
 }
 
 .emp-page .emp-truncate {
@@ -75,59 +66,138 @@
   white-space: nowrap;
 }
 
-.emp-page .emp-actions-dd .btn {
-  padding: 0.2rem 0.45rem;
-  line-height: 1;
-  border-radius: 8px;
+.emp-page .emp-name-cell .emp-name-main {
+  font-weight: 600;
+}
+
+.emp-page .emp-name-cell .emp-code-sub {
+  font-size: 11px;
+  color: #64748b;
 }
 
 .emp-page .emp-actions-dd .dropdown-menu {
-  min-width: 10rem;
-  border-radius: 10px;
-  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.1);
-}
-
-.emp-page .emp-filter-toggle {
+  z-index: 1060;
+  min-width: 12rem;
   border-radius: 10px;
 }
 
-.emp-page .emp-filters-inner {
-  background: rgba(var(--bs-secondary-rgb), 0.06);
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
+.emp-page .emp-actions-dd .btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+/* Filters card — match Parcels density */
+.emp-page .page-title-row {
+  margin-bottom: 0.5rem !important;
+}
+
+.emp-page .filters-card {
+  margin-bottom: 0.5rem !important;
+  border-radius: 12px;
+}
+
+.emp-page .filters-card .card-header {
+  padding: 0.35rem 0.65rem !important;
+}
+
+.emp-page .filters-card .card-body {
+  padding: 0.5rem 0.65rem !important;
+}
+
+.emp-page .filters-card .form-label {
+  margin-bottom: 0.1rem !important;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.emp-page .filters-card .form-control,
+.emp-page .filters-card .form-select {
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  font-size: 0.8rem;
+  min-height: calc(1.45em + 0.35rem + 2px);
+}
+
+.emp-page .filters-card .btn {
+  border-radius: 8px;
+}
+
+.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .emp-filter-chevron {
+  transform: rotate(-90deg);
+}
+
+.emp-page .filters-card [data-bs-toggle="collapse"] .emp-filter-chevron {
+  transition: transform 0.2s ease;
+}
+
+.emp-page .filters-presets .btn {
+  white-space: nowrap;
+}
+
+.emp-page .filters-tools .btn {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+.emp-page .filters-actions-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 0.25rem;
+  padding-top: 0.35rem !important;
+}
+
+.emp-page .emp-toolbar {
+  margin-bottom: 0.35rem !important;
+}
+
+/* Soft status badges (Parcels-style) */
+.emp-page .badge.badge-soft {
+  font-weight: 700;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+}
+
+.emp-page .badge-soft-success {
+  background: rgba(25, 135, 84, 0.12);
+  color: #146c43;
+}
+
+.emp-page .badge-soft-warning {
+  background: rgba(255, 193, 7, 0.16);
+  color: #8a6d00;
+}
+
+.emp-page .badge-soft-secondary {
+  background: rgba(108, 117, 125, 0.14);
+  color: #495057;
+}
+
+/* Mobile cards */
+.emp-page .cards-wrap .card {
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 12px;
+}
+
+.emp-page .cards-wrap .card .card-body {
+  padding: 0.7rem 0.85rem;
+}
+
+.emp-page .cards-wrap .meta {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.emp-page .cards-wrap .emp-card-title {
+  font-weight: 800;
 }
 
 .emp-page .emp-empty {
-  padding: 2.5rem 1rem;
+  padding: 1.25rem 1rem;
   text-align: center;
-  color: var(--bs-secondary-color);
-}
-
-/* Mobile card list */
-.emp-page .emp-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.emp-page .emp-card {
-  border-radius: var(--emp-radius);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.04);
-}
-
-.emp-page .emp-card .emp-card-title {
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.emp-page .emp-card .emp-card-meta {
-  font-size: 0.8125rem;
-  color: var(--bs-secondary-color);
-}
-
-@media (max-width: 991.98px) {
-  .emp-page .emp-page-header {
-    padding: 0.75rem 1rem;
-  }
+  color: #64748b;
+  font-size: 0.9rem;
 }
