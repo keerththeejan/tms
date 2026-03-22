@@ -5031,6 +5031,13 @@ switch ($page) {
         if (!($isAdmin || $isAccountant)) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
 
+        if ($action === 'list_json') {
+            header('Content-Type: application/json; charset=utf-8');
+            $employees = EmployeeListService::fetchFiltered($pdo, $_GET);
+            echo json_encode(['ok' => true, 'employees' => $employees, 'count' => count($employees)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            break;
+        }
+
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
@@ -5287,7 +5294,7 @@ switch ($page) {
             return;
         }
 
-        // index - filters for many fields
+        // index - filters for many fields (shared with list_json via EmployeeListService)
         $emp_code = trim($_GET['emp_code'] ?? '');
         $name = trim($_GET['name'] ?? '');
         $first_name = trim($_GET['first_name'] ?? '');
@@ -5304,37 +5311,40 @@ switch ($page) {
         $branch_id = (int)($_GET['branch_id'] ?? 0);
         $join_from = trim($_GET['join_from'] ?? '');
         $join_to = trim($_GET['join_to'] ?? '');
-        $status = trim($_GET['status'] ?? ''); // '', 'active', 'inactive'
+        $status = trim($_GET['status'] ?? '');
+        $q = trim($_GET['q'] ?? '');
 
-        $sql = 'SELECT e.*, b.name AS branch_name, v.id AS vehicle_id_join, v.reg_number AS vehicle_no_join
-                FROM employees e
-                LEFT JOIN branches b ON b.id = e.branch_id
-                LEFT JOIN vehicles v ON v.id = e.vehicle_id
-                WHERE 1=1';
-        $params = [];
-        if ($emp_code !== '') { $sql .= ' AND e.emp_code LIKE ?'; $params[] = "%$emp_code%"; }
-        if ($name !== '') { $sql .= ' AND e.name LIKE ?'; $params[] = "%$name%"; }
-        if ($first_name !== '') { $sql .= ' AND e.first_name LIKE ?'; $params[] = "%$first_name%"; }
-        if ($last_name !== '') { $sql .= ' AND e.last_name LIKE ?'; $params[] = "%$last_name%"; }
-        if ($email !== '') { $sql .= ' AND e.email LIKE ?'; $params[] = "%$email%"; }
-        if ($phone !== '') { $sql .= ' AND e.phone LIKE ?'; $params[] = "%$phone%"; }
-        if ($address !== '') { $sql .= ' AND e.address LIKE ?'; $params[] = "%$address%"; }
-        if ($position !== '') { $sql .= ' AND e.position LIKE ?'; $params[] = "%$position%"; }
-        if ($role !== '') { $sql .= ' AND e.role LIKE ?'; $params[] = "%$role%"; }
-        if ($license_number !== '') { $sql .= ' AND e.license_number LIKE ?'; $params[] = "%$license_number%"; }
-        if ($license_from !== '') { $sql .= ' AND e.license_expiry >= ?'; $params[] = $license_from; }
-        if ($license_to !== '') { $sql .= ' AND e.license_expiry <= ?'; $params[] = $license_to; }
-        if ($vehicle_like !== '') { $sql .= ' AND COALESCE(v.reg_number, v.plate_no, v.vehicle_no, "") LIKE ?'; $params[] = "%$vehicle_like%"; }
-        if ($branch_id > 0) { $sql .= ' AND e.branch_id = ?'; $params[] = $branch_id; }
-        if ($join_from !== '') { $sql .= ' AND e.join_date >= ?'; $params[] = $join_from; }
-        if ($join_to !== '') { $sql .= ' AND e.join_date <= ?'; $params[] = $join_to; }
-        if ($status !== '') { $sql .= ' AND e.status = ?'; $params[] = $status; }
-        $sql .= ' ORDER BY e.created_at DESC, e.id DESC LIMIT 500';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $employees = $stmt->fetchAll();
+        $employees = EmployeeListService::fetchFiltered($pdo, $_GET);
         $branchesAll = BranchRepository::forFilters($pdo);
-        Helpers::view('employees/index', compact('employees','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_from','license_to','vehicle_like','branch_id','join_from','join_to','status','branchesAll'));
+        $rolesForFilter = [];
+        try {
+            $rolesForFilter = $pdo->query("SELECT DISTINCT role FROM employees WHERE role IS NOT NULL AND TRIM(role) <> '' ORDER BY role")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        } catch (Throwable $e) {
+            $rolesForFilter = [];
+        }
+        Helpers::view('employees/index', compact(
+            'employees',
+            'emp_code',
+            'name',
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'address',
+            'position',
+            'role',
+            'license_number',
+            'license_from',
+            'license_to',
+            'vehicle_like',
+            'branch_id',
+            'join_from',
+            'join_to',
+            'status',
+            'q',
+            'branchesAll',
+            'rolesForFilter'
+        ));
         break;
 
     case 'salaries':

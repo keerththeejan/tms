@@ -16,6 +16,12 @@ $user = Auth::user();
   <?php if (in_array($_GET['page'] ?? '', ['employees', 'salaries', 'advances'], true)): ?>
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/hr-responsive.css'); ?>">
   <?php endif; ?>
+  <?php
+  $hdrPage = $_GET['page'] ?? '';
+  $hdrEmpAction = $_GET['action'] ?? '';
+  if ($hdrPage === 'employees' && ($hdrEmpAction === '' || $hdrEmpAction === 'index')): ?>
+  <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/employees-page.css'); ?>">
+  <?php endif; ?>
 </head>
 <body>
 <?php 

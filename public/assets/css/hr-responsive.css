@@ -32,7 +32,7 @@
 /* Slightly lower minimum widths on small tablets */
 @media (max-width: 991.98px) {
   .hr-page #employeesTable {
-    min-width: 720px !important;
+    min-width: 560px !important;
   }
   .hr-page #employeesPayrollTable {
     min-width: 640px !important;
