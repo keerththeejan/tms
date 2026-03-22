@@ -2,6 +2,22 @@
   $filter_type = $filter_type ?? '';
   $today = date('Y-m-d');
   $parcelItemsById = $parcelItemsById ?? [];
+  $parcelsFiltersActive = ($filter_type !== '')
+    || (int)($customer_filter_id ?? 0) > 0
+    || (int)($from_branch_filter_id ?? 0) > 0
+    || (int)($to_branch_filter_id ?? 0) > 0
+    || (int)($supplier_filter_id ?? 0) > 0
+    || trim((string)($q ?? '')) !== ''
+    || trim((string)($tracking_filter ?? '')) !== ''
+    || trim((string)($invoice_no_filter ?? '')) !== ''
+    || trim((string)($vehicle_no ?? '')) !== ''
+    || trim((string)($delivery_location_filter ?? '')) !== ''
+    || trim((string)($delivery_route_filter ?? '')) !== ''
+    || trim((string)($status ?? '')) !== ''
+    || trim((string)($route_date ?? '')) !== ''
+    || trim((string)($_GET['ids'] ?? '')) !== ''
+    || isset($_GET['from'])
+    || isset($_GET['to']);
 ?>
 <style>
   /* Parcels list: one-viewport fit — tight filters + scrollable table (Bootstrap 5) */
@@ -106,17 +122,112 @@
   /* Compact page spacing */
   .parcels-page .page-title-row { margin-bottom: .5rem !important; }
   .parcels-page .filters-card { margin-bottom: .5rem !important; }
-  .parcels-page .filters-card .card-header { padding: .35rem .65rem !important; }
+  .parcels-page .filters-card .card-header:not(.parcels-toolbar-header) { padding: .35rem .65rem !important; }
   .parcels-page .filters-card .card-body { padding: .5rem .65rem !important; }
   .parcels-page .filters-card .form-label { margin-bottom: .1rem !important; font-size: .72rem; font-weight: 600; color: #64748b; }
   .parcels-page .filters-card { border-radius: 12px; }
   .parcels-page .filters-card .form-control,
   .parcels-page .filters-card .form-select { padding-top: .15rem; padding-bottom: .15rem; font-size: .8rem; min-height: calc(1.45em + .35rem + 2px); }
   .parcels-page .filters-card .btn { border-radius: 8px; }
-  .parcels-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .bi-chevron-down { transform: rotate(-90deg); }
-  .parcels-page .filters-card [data-bs-toggle="collapse"] .bi-chevron-down { transition: transform 0.2s ease; }
-  .parcels-page .filters-presets .btn { white-space: nowrap; }
-  .parcels-page .filters-tools .btn { padding: .2rem .45rem; font-size: .75rem; }
+  /* Filters toggle: ▼ collapsed / ▲ expanded (smooth) */
+  .parcels-page .filters-card .parcel-filter-chevron {
+    transition: transform 0.25s ease;
+    display: inline-block;
+  }
+  .parcels-page .filters-card [data-bs-toggle="collapse"].collapsed .parcel-filter-chevron,
+  .parcels-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .parcel-filter-chevron {
+    transform: rotate(0deg);
+  }
+  .parcels-page .filters-card [data-bs-toggle="collapse"]:not(.collapsed) .parcel-filter-chevron,
+  .parcels-page .filters-card [data-bs-toggle="collapse"][aria-expanded="true"] .parcel-filter-chevron {
+    transform: rotate(180deg);
+  }
+  /* Toolbar: flex, wrap, gap — scroll container prevents page overflow */
+  .parcels-page .filters-card .card-header.parcels-toolbar-header {
+    padding: .35rem .5rem !important;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .parcels-page .parcels-toolbar-scroll {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+  }
+  .parcels-page .parcels-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .parcels-page .parcels-toolbar-main {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .parcels-page .parcels-toolbar-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+  }
+  .parcels-page .parcels-toolbar-label {
+    font-size: .7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #64748b;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0 .15rem;
+  }
+  .parcels-page .parcels-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: auto;
+  }
+  .parcels-page .parcels-toolbar-plan {
+    gap: 6px !important;
+  }
+  .parcels-page .filters-toolbar .btn {
+    white-space: nowrap;
+    max-width: 100%;
+    border-radius: 50rem;
+    padding: .25rem .55rem;
+    font-size: .8125rem;
+    line-height: 1.25;
+  }
+  .parcels-page .filters-toolbar .btn i { flex-shrink: 0; }
+  .parcels-page .filters-toolbar .filters-toggle-btn:not(.collapsed) {
+    color: #fff !important;
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+  }
+  .parcels-page .filters-toolbar .filters-toggle-btn.collapsed {
+    color: inherit;
+  }
+  .parcels-page .filters-toolbar .filters-toggle-btn.collapsed .parcels-filter-active {
+    color: var(--bs-primary) !important;
+  }
+  .parcels-page .filters-toolbar .filters-toggle-btn:not(.collapsed) .parcels-filter-active {
+    color: rgba(255, 255, 255, 0.95) !important;
+  }
   .parcels-page .filters-actions-row { border-top: 1px solid rgba(0,0,0,.06); margin-top: .25rem; padding-top: .35rem !important; }
   .parcels-page .parcels-toolbar { margin-bottom: .35rem !important; }
   /* Pull list slightly closer to topbar (less dead space under global header) */
@@ -429,25 +540,38 @@
 <div class="no-print">
 
 <div class="card border shadow-sm mb-1 filters-card">
-  <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-1 py-1 px-2">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-      <button class="btn btn-link btn-sm text-decoration-none text-dark p-0 fw-semibold small" type="button" data-bs-toggle="collapse" data-bs-target="#parcelsFiltersBody" aria-expanded="true" aria-controls="parcelsFiltersBody" title="Show / hide filters">
-        <i class="bi bi-chevron-down parcel-filter-chevron"></i><span class="ms-1">Filters</span>
-      </button>
-      <div class="btn-group btn-group-sm filters-presets flex-wrap" role="group" aria-label="Quick filters">
-        <span class="input-group-text bg-light border-0 text-muted py-0 px-1 small d-none d-sm-inline">Presets</span>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=route_planning&from='.$today.'&to='.$today); ?>" class="btn <?php echo $filter_type==='route_planning'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-geo-alt me-1"></i><span class="d-none d-md-inline">Route planning</span><span class="d-md-none">Route</span></a>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=vehicle_routes'); ?>" class="btn <?php echo $filter_type==='vehicle_routes'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-truck-front me-1"></i><span class="d-none d-md-inline">Vehicles</span><span class="d-md-none">Veh</span></a>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=customers'); ?>" class="btn <?php echo $filter_type==='customers'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-people me-1"></i><span class="d-none d-md-inline">Customers</span><span class="d-md-none">Cust</span></a>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary" title="Reset all filters"><i class="bi bi-arrow-counterclockwise"></i></a>
+  <div class="card-header bg-light parcels-toolbar-header">
+    <div class="parcels-toolbar-scroll">
+      <div class="parcels-toolbar filters-toolbar" role="toolbar" aria-label="Parcel filters and presets">
+        <div class="parcels-toolbar-main">
+          <button class="btn btn-sm rounded-pill btn-outline-secondary filters-toggle-btn collapsed px-2 py-1 fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#parcelsFiltersBody" aria-expanded="false" aria-controls="parcelsFiltersBody" title="Show / hide filters">
+            <i class="bi bi-chevron-down parcel-filter-chevron" aria-hidden="true"></i><span class="ms-1">Filters<span id="parcelsFilterActiveLabel" class="<?php echo $parcelsFiltersActive ? 'fw-semibold parcels-filter-active' : 'd-none'; ?>"> (Active)</span></span>
+          </button>
+          <div class="parcels-toolbar-presets" role="group" aria-label="Presets">
+            <span class="parcels-toolbar-label d-none d-sm-inline">Presets</span>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=route_planning&from='.$today.'&to='.$today); ?>" class="btn btn-sm rounded-pill <?php echo $filter_type==='route_planning'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-geo-alt me-1"></i><span class="d-none d-md-inline">Route planning</span><span class="d-md-none">Route</span></a>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=vehicle_routes'); ?>" class="btn btn-sm rounded-pill <?php echo $filter_type==='vehicle_routes'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-truck-front me-1"></i><span class="d-none d-md-inline">Vehicles</span><span class="d-md-none">Veh</span></a>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=customers'); ?>" class="btn btn-sm rounded-pill <?php echo $filter_type==='customers'?'btn-primary':'btn-outline-primary'; ?>"><i class="bi bi-people me-1"></i><span class="d-none d-md-inline">Customers</span><span class="d-md-none">Cust</span></a>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-sm rounded-pill btn-outline-secondary" title="Reset all filters" aria-label="Refresh list and clear filters"><i class="bi bi-arrow-counterclockwise me-sm-1"></i><span class="d-none d-sm-inline">Refresh</span></a>
+          </div>
+        </div>
+        <div class="parcels-toolbar-actions">
+          <div class="parcels-toolbar-plan d-none d-md-flex flex-wrap align-items-center" role="group" aria-label="Planning tools">
+            <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm rounded-pill btn-outline-secondary"><i class="bi bi-map me-1"></i><span class="d-none d-xl-inline">Plan routes</span><span class="d-xl-none">Plan</span></a>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm rounded-pill btn-outline-secondary"><i class="bi bi-truck-front me-1"></i><span class="d-none d-xl-inline">Vehicle routes</span><span class="d-xl-none">Veh routes</span></a>
+          </div>
+          <div class="dropdown d-md-none">
+            <button class="btn btn-sm rounded-pill btn-outline-secondary px-2 py-1" type="button" id="parcelsToolbarMore" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions"><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="parcelsToolbarMore">
+              <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-map me-2 text-muted"></i>Plan routes</a></li>
+              <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-truck-front me-2 text-muted"></i>Vehicle routes</a></li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="btn-group btn-group-sm filters-tools" role="group" aria-label="Planning tools">
-      <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary"><i class="bi bi-map"></i><span class="d-none d-lg-inline ms-1">Plan routes</span></a>
-      <a href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary"><i class="bi bi-truck-front"></i><span class="d-none d-lg-inline ms-1">Vehicle routes</span></a>
-    </div>
   </div>
-  <div id="parcelsFiltersBody" class="card-body collapse show py-1 px-2 border-top border-light">
+  <div id="parcelsFiltersBody" class="card-body collapse py-1 px-2 border-top border-light">
     <?php if ($filter_type === 'route_planning'): ?>
     <div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-info-circle me-1"></i> <strong>Route planning</strong> preset: pending / in transit, today.</div>
     <?php elseif ($filter_type === 'vehicle_routes'): ?>

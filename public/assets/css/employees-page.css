@@ -128,12 +128,24 @@ main.content-wrapper > .container-fluid .emp-page {
   border-radius: 8px;
 }
 
-.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .emp-filter-chevron {
-  transform: rotate(-90deg);
+/* Filters toggle: ▼ collapsed / ▲ expanded (smooth) */
+.emp-page .filters-card .emp-filter-chevron {
+  transition: transform 0.25s ease;
+  display: inline-block;
 }
 
-.emp-page .filters-card [data-bs-toggle="collapse"] .emp-filter-chevron {
-  transition: transform 0.2s ease;
+.emp-page .filters-card [data-bs-toggle="collapse"].collapsed .emp-filter-chevron,
+.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .emp-filter-chevron {
+  transform: rotate(0deg);
+}
+
+.emp-page .filters-card [data-bs-toggle="collapse"]:not(.collapsed) .emp-filter-chevron,
+.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="true"] .emp-filter-chevron {
+  transform: rotate(180deg);
+}
+
+.emp-page .filters-card .filters-toggle-btn:not(.collapsed) {
+  color: var(--bs-primary) !important;
 }
 
 .emp-page .filters-presets .btn {

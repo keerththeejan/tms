@@ -234,12 +234,16 @@
     return n;
   }
 
-  function updateFilterBadge(form, badge) {
-    if (!badge) return;
+  function updateFilterActiveLabel(form, labelEl) {
+    if (!labelEl) return;
     var c = countActiveFilters(form);
-    badge.textContent = String(c);
-    badge.classList.toggle('bg-primary', c > 0);
-    badge.classList.toggle('bg-secondary', c === 0);
+    if (c > 0) {
+      labelEl.classList.remove('d-none');
+      labelEl.classList.add('text-primary', 'fw-semibold');
+    } else {
+      labelEl.classList.add('d-none');
+      labelEl.classList.remove('text-primary', 'fw-semibold');
+    }
   }
 
   function buildListUrl(form, listHref) {
@@ -317,13 +321,13 @@
     var tbody = document.querySelector('#employeesTable tbody');
     var cardsEl = document.getElementById('empCards');
     var emptyEl = document.getElementById('empEmptyState');
-    var badge = document.getElementById('empFilterBadge');
+    var activeLabel = document.getElementById('empFilterActiveLabel');
     var searchInput = document.getElementById('empLiveSearch');
     var modalEl = document.getElementById('empViewModal');
 
     if (!form || !tbody || !cardsEl) return;
 
-    updateFilterBadge(form, badge);
+    updateFilterActiveLabel(form, activeLabel);
 
     destroyDataTableIfAny();
     initDataTable();
@@ -357,7 +361,7 @@
           }
           destroyDataTableIfAny();
           initDataTable();
-          updateFilterBadge(form, badge);
+          updateFilterActiveLabel(form, activeLabel);
           if (pushUrl) {
             try {
               history.pushState({}, '', buildIndexUrl(form));
@@ -371,7 +375,7 @@
 
     if (searchInput) {
       searchInput.addEventListener('input', function () {
-        updateFilterBadge(form, badge);
+        updateFilterActiveLabel(form, activeLabel);
         scheduleSearch();
       });
     }

@@ -79,16 +79,15 @@ $stCur = (string)($status ?? '');
     <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-1 py-1 px-2">
       <div class="d-flex flex-wrap align-items-center gap-2">
         <button
-          class="btn btn-link btn-sm text-decoration-none text-dark p-0 fw-semibold small"
+          class="btn btn-link btn-sm text-decoration-none text-dark p-0 fw-semibold small filters-toggle-btn collapsed"
           type="button"
           data-bs-toggle="collapse"
           data-bs-target="#empFiltersBody"
-          aria-expanded="true"
+          aria-expanded="false"
           aria-controls="empFiltersBody"
           title="Show / hide filters"
         >
-          <i class="bi bi-chevron-down emp-filter-chevron" aria-hidden="true"></i><span class="ms-1">Filters</span>
-          <span class="badge <?php echo $filterActive > 0 ? 'bg-primary' : 'bg-secondary'; ?> ms-1 align-middle" id="empFilterBadge"><?php echo (int)$filterActive; ?></span>
+          <i class="bi bi-chevron-down emp-filter-chevron" aria-hidden="true"></i><span class="ms-1">Filters<span id="empFilterActiveLabel" class="<?php echo $filterActive > 0 ? 'text-primary fw-semibold' : 'd-none'; ?>"> (Active)</span></span>
         </button>
         <div class="btn-group btn-group-sm filters-presets flex-wrap" role="group" aria-label="Quick filters">
           <span class="input-group-text bg-light border-0 text-muted py-0 px-1 small d-none d-sm-inline">Presets</span>
@@ -103,7 +102,7 @@ $stCur = (string)($status ?? '');
         <a href="<?php echo htmlspecialchars($payrollUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary" title="Salary report"><i class="bi bi-clipboard-data me-1" aria-hidden="true"></i><span class="d-none d-xl-inline">Salary report</span></a>
       </div>
     </div>
-    <div id="empFiltersBody" class="card-body collapse show py-1 px-2 border-top border-light">
+    <div id="empFiltersBody" class="card-body collapse py-1 px-2 border-top border-light">
       <form id="empFilterForm" method="get" action="<?php echo htmlspecialchars(Helpers::baseUrl('index.php'), ENT_QUOTES, 'UTF-8'); ?>">
         <input type="hidden" name="page" value="employees">
 
