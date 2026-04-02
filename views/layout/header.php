@@ -60,7 +60,9 @@ $user = Auth::user();
     </div>
     <?php if ($user): ?>
     <ul class="nav nav-pills flex-column p-2 small" role="list">
+      <?php if ($currentPage !== 'cashbook'): ?>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='dashboard'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>"<?php echo $navCurrent($currentPage==='dashboard'); ?>><i class="bi bi-speedometer2" aria-hidden="true"></i><span>Dashboard</span></a></li>
+      <?php endif; ?>
       <?php if (($user['role'] ?? '') === 'admin'): ?>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='users'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>"<?php echo $navCurrent($currentPage==='users'); ?>><i class="bi bi-people" aria-hidden="true"></i><span>Users</span></a></li>
       <?php endif; ?>

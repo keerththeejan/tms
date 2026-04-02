@@ -1174,7 +1174,13 @@
     accounts.forEach(function (a, idx) {
       var canDel = !isCustomerLinkedAcc(a) && !isSystemAccount(a);
       var sel = state.mgmtSelectedId && parseInt(a.id, 10) === state.mgmtSelectedId;
-      var customerHtml = a.customer_name ? '<span class="text-body">' + escapeHtml(String(a.customer_name)) + '</span>' : '<span class="text-muted">—</span>';
+      var customerHtml = a.customer_name
+        ? '<span class="text-body"><span class="cb-mgmt-cell-truncate" title="' +
+          escapeHtml(String(a.customer_name)) +
+          '">' +
+          escapeHtml(String(a.customer_name)) +
+          '</span></span>'
+        : '<span class="text-muted">—</span>';
       var typeBadge = accountTypeBadgeHTML(a.type);
       var kindBadge = accountKindBadgeHTML(a.account_kind);
       var statusBadge = accountStatusBadgeHTML(a.status);
@@ -1218,9 +1224,11 @@
         '<td class="text-muted col-num">' +
         (idx + 1) +
         '</td>' +
-        '<td class="fw-semibold">' +
+        '<td class="fw-semibold"><span class="cb-mgmt-cell-truncate" title="' +
         escapeHtml(String(a.name || '')) +
-        '</td>' +
+        '">' +
+        escapeHtml(String(a.name || '')) +
+        '</span></td>' +
         '<td class="small">' +
         customerHtml +
         '</td>' +
@@ -1353,6 +1361,8 @@
   function loadMgmtAccountsList() {
     var loading = $('cbMgmtListLoading');
     if (loading) loading.classList.remove('d-none');
+    var empty = $('cbMgmtEmpty');
+    var wrap = document.querySelector('.cb-mgmt-table-wrap');
     var q = ($('cbMgmtFilterQ') && $('cbMgmtFilterQ').value.trim()) || '';
     var typeF = ($('cbMgmtFilterType') && $('cbMgmtFilterType').value) || '';
     var statusF = ($('cbMgmtFilterStatus') && $('cbMgmtFilterStatus').value) || '';
@@ -1380,7 +1390,23 @@
         return refreshMgmtTotals();
       })
       .catch(function (e) {
-        toast(String(e.message || e), true);
+        var msg = String((e && e.message) || e || 'Load failed');
+        toast(msg, true);
+        // Ensure the user sees a visible error state instead of a blank table.
+        try {
+          var tb = $('cbMgmtTableBody');
+          if (tb) tb.innerHTML = '';
+          if (wrap) wrap.classList.add('d-none');
+          if (empty) {
+            empty.classList.remove('d-none');
+            empty.innerHTML =
+              '<i class="bi bi-exclamation-triangle fs-1 d-block mb-2 opacity-50"></i>' +
+              '<div class="fw-semibold">Could not load accounts</div>' +
+              '<div class="small"> ' +
+              escapeHtml(msg).slice(0, 220) +
+              '</div>';
+          }
+        } catch (err) {}
       })
       .finally(function () {
         if (loading) loading.classList.add('d-none');

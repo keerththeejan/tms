@@ -5,8 +5,18 @@ $cashbookCustomers = $cashbookCustomers ?? [];
 $reportsLegacyUrl = Helpers::baseUrl('index.php?page=reports');
 $dashboardUrl = Helpers::baseUrl('index.php?page=dashboard');
 $base = Helpers::baseUrl('');
+$cbCssVer = '1';
+$cbJsVer = '1';
+try {
+  $cbCssPath = __DIR__ . '/../../public/assets/css/cashbook.css';
+  $cbJsPath = __DIR__ . '/../../public/assets/js/cashbook.js';
+  if (is_file($cbCssPath)) { $cbCssVer = (string) @filemtime($cbCssPath); }
+  if (is_file($cbJsPath)) { $cbJsVer = (string) @filemtime($cbJsPath); }
+} catch (Throwable $e) {
+  // ignore
+}
 ?>
-<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/cashbook.css'); ?>">
+<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/cashbook.css?v=' . rawurlencode($cbCssVer)); ?>">
 
 <div class="cashbook-app container-fluid px-0 pb-5">
   <div class="row g-0">
@@ -589,4 +599,4 @@ window.TMS_CASHBOOK = <?php echo json_encode([
     }, $cashbookCustomers),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 </script>
-<script src="<?php echo Helpers::baseUrl('assets/js/cashbook.js'); ?>"></script>
+<script src="<?php echo Helpers::baseUrl('assets/js/cashbook.js?v=' . rawurlencode($cbJsVer)); ?>"></script>

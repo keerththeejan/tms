@@ -33,6 +33,19 @@
   }
 }
 
+.cashbook-app.cashbook-mode-accounts .cashbook-main {
+  /* Match the “soft dashboard” look from your screenshot */
+  background:
+    radial-gradient(1200px 500px at 70% 0%, rgba(13, 110, 253, 0.10), transparent 55%),
+    radial-gradient(900px 400px at 20% 20%, rgba(25, 135, 84, 0.08), transparent 55%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 45%, #f8fafc 100%);
+}
+
+.cashbook-app.cashbook-mode-accounts .cashbook-topbar {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+}
+
 .cashbook-app {
   --cb-green: #198754;
   --cb-red: #dc3545;
@@ -424,15 +437,19 @@
   box-shadow: 0 8px 24px rgba(13, 110, 253, 0.35);
 }
 
-@media (max-width: 991.98px) {
-  .cashbook-app.cashbook-mode-accounts .cb-mgmt-fab {
-    display: flex;
-  }
+/* Screenshot target UI does not use the floating "+" button. Keep New button in header only. */
+.cashbook-app.cashbook-mode-accounts .cb-mgmt-fab {
+  display: none !important;
+}
+
+#cbRangeHint {
+  display: none !important;
 }
 
 .cb-mgmt-table-wrap {
-  max-height: min(440px, 52vh);
-  overflow-y: auto;
+  /* No internal scrollbars; page should scroll naturally */
+  max-height: none;
+  overflow: visible;
 }
 
 .cashbook-mgmt-table thead th {
@@ -441,6 +458,55 @@
   z-index: 2;
   background-color: var(--bs-tertiary-bg) !important;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.cashbook-mgmt-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.cashbook-mgmt-table tbody td,
+.cashbook-mgmt-table thead th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.cashbook-mgmt-table .col-num {
+  width: 36px;
+}
+
+/* Truncate long cell contents cleanly */
+.cb-mgmt-cell-truncate {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Make header sticky only when table grows tall on desktop */
+@media (min-width: 768px) {
+  .cashbook-mgmt-table thead th {
+    position: sticky;
+    top: 0;
+  }
+}
+
+.cb-mgmt-col-list .card,
+.cb-mgmt-form-card {
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+
+.cb-mgmt-col-list .card-header,
+.cb-mgmt-form-card .card-header {
+  padding-bottom: .25rem !important;
+}
+
+.cb-mgmt-col-list .card-body,
+.cb-mgmt-form-card .card-body {
+  padding-top: .85rem !important;
 }
 
 @media (max-width: 380px) {

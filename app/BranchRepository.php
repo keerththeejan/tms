@@ -147,18 +147,48 @@ final class BranchRepository
     public static function invoiceHeaderBranchesThree(\PDO $pdo): array
     {
         self::ensureSchema($pdo);
+        // 1) Prefer Settings slots (0..2) because this is the most reliable way to define
+        //    "Colombo / Kilinochchi / Mullaitivu" header columns on hosted servers.
+        $result = [null, null, null];
+        $usedIds = [];
+        try {
+            $stSlots = $pdo->query(
+                'SELECT id, name, address_tamil, address_english, phones, settings_slot
+                 FROM branches
+                 WHERE is_active = 1 AND settings_slot BETWEEN 0 AND 2
+                 ORDER BY settings_slot ASC'
+            );
+            $slotRows = $stSlots ? $stSlots->fetchAll(\PDO::FETCH_ASSOC) : [];
+            foreach ($slotRows as $r) {
+                $slot = isset($r['settings_slot']) ? (int)$r['settings_slot'] : -1;
+                $id = (int)($r['id'] ?? 0);
+                if ($slot < 0 || $slot > 2 || $id <= 0) {
+                    continue;
+                }
+                $shape = self::rowToCompanyBranchShape($r);
+                $shape['id'] = $id;
+                $result[$slot] = $shape;
+                $usedIds[$id] = true;
+            }
+        } catch (\Throwable $e) {
+            // ignore and fall back
+        }
+
+        // 2) Load remaining active branches (used for keyword matching / fill).
         $stmt = $pdo->query(
             'SELECT id, name, address_tamil, address_english, phones FROM branches WHERE is_active = 1 ORDER BY id ASC'
         );
         $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-        $usedIds = [];
         $keywordsByColumn = [
             ['colombo', 'kolumbu', 'கொழும்பு', 'col'],
             ['kilinochchi', 'kilinochi', 'kilino', 'கிளிநொச்சி', 'kili'],
             ['mullaitivu', 'mullaithivu', 'mullativu', 'mulllaitivu', 'முல்லைத்தீவு', 'mullai', 'mlt'],
         ];
-        $result = [null, null, null];
+        // Only match keywords for columns still empty after settings_slot mapping.
         foreach ($keywordsByColumn as $colIdx => $keywords) {
+            if (is_array($result[$colIdx])) {
+                continue;
+            }
             foreach ($rows as $r) {
                 $id = (int)($r['id'] ?? 0);
                 if ($id <= 0 || isset($usedIds[$id])) {
