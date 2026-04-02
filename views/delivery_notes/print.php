@@ -2,14 +2,24 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Delivery Note #<?php echo (int)$dn['id']; ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
+    /* Minimal Bootstrap fallbacks for embedded print.
+       Some hosts block external CSS; these ensure alignment and typography stay correct. */
+    .text-end { text-align: right !important; }
+    .text-muted { color: #6c757d !important; }
+    .fw-bold { font-weight: 700 !important; }
+    .small { font-size: 0.875em !important; }
+
     @media print { .no-print { display: none !important; } }
-    body { padding: <?php echo $isEmbed ? '8px' : '20px'; ?>; }
+    body { padding: <?php echo $isEmbed ? '8px' : '20px'; ?>; font-family: 'Noto Sans Tamil', Arial, sans-serif; }
     .doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .75rem; }
     .doc-title { font-weight: 700; font-size: 1.25rem; }
     .muted { color: #6c757d; }

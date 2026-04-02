@@ -3283,6 +3283,8 @@ switch ($page) {
 
     case 'parcel_print':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        // UTF-8 output for the invoice preview iframe (Tamil rendering issues on cPanel)
+        header('Content-Type: text/html; charset=utf-8');
         $pdo = Database::pdo();
         try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
@@ -3304,6 +3306,8 @@ switch ($page) {
     case 'delivery_notes':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         if (!Auth::hasAnyRole(['admin','parcel_user','staff'])) { http_response_code(403); echo 'Forbidden'; break; }
+        // UTF-8 output for print pages
+        header('Content-Type: text/html; charset=utf-8');
         $pdo = Database::pdo();
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }

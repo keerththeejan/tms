@@ -1,3 +1,7 @@
+# Ensure consistent UTF-8 rendering on cPanel (fixes Tamil/encoding)
+AddDefaultCharset UTF-8
+AddCharset UTF-8 .php .html .htm .css .js .json .xml .svg
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /TMS/public/
