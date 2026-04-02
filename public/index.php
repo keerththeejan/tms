@@ -19,6 +19,21 @@ function _merge_delivery_location_options(PDO $pdo) {
     return $opts;
 }
 
+/** Link cash book account to new customer; failures do not block customer save. */
+function _cashbook_ensure_customer_account(PDO $pdo, int $customerId, string $name): void
+{
+    CashbookRepository::ensureCustomerAccount($pdo, $customerId, trim($name));
+}
+
+function _cashbook_sync_customer_account_name(PDO $pdo, int $customerId, string $name): void
+{
+    try {
+        CashbookRepository::syncCustomerAccountName($pdo, $customerId, trim($name));
+    } catch (Throwable $e) {
+        /* non-fatal */
+    }
+}
+
 action_router:
 
 // Public routes
@@ -409,8 +424,19 @@ switch ($page) {
             CashbookApi::dispatch(Database::pdo());
             break;
         }
+        $pdoCb = Database::pdo();
+        $cashbookCustomers = [];
+        try {
+            $stCb = $pdoCb->query('SELECT id, name FROM customers ORDER BY name ASC LIMIT 2000');
+            if ($stCb) {
+                $cashbookCustomers = $stCb->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch (Throwable $e) {
+            $cashbookCustomers = [];
+        }
         Helpers::view('cashbook/index', [
             'csrf' => Helpers::csrfToken(),
+            'cashbookCustomers' => $cashbookCustomers,
         ]);
         break;
 
@@ -1122,10 +1148,19 @@ switch ($page) {
                 }
 
                 try {
+                    $pdo->beginTransaction();
                     $stmt = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?,?)');
                     $stmt->execute([$nameV, $phoneDb, $emailDb, $addressV, $dlV, null, null, null, $typeDb]);
+                    $newCid = (int) $pdo->lastInsertId();
+                    if ($newCid > 0) {
+                        CashbookRepository::ensureCustomerAccount($pdo, $newCid, $nameV);
+                    }
+                    $pdo->commit();
                     $imported++;
                 } catch (Throwable $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
                     $failed++;
                     $msg = 'Failed to import row.';
                     if ($e instanceof PDOException) {
@@ -1243,14 +1278,30 @@ switch ($page) {
                 $deliveryLocationOptions = _merge_delivery_location_options($pdo);
                 $error = 'Name is required.'; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error','deliveryLocationOptions')); break;
             }
+            $cashbookAccountId = null;
+            $customerCreated = false;
             try {
                 if ($id > 0) {
                     $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, email=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
                     $stmt->execute([$name,$phoneDb,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
+                    _cashbook_sync_customer_account_name($pdo, $id, $name);
                 } else {
-                    $stmt = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?,?)');
-                    $stmt->execute([$name,$phoneDb,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
-                    $id = (int)$pdo->lastInsertId();
+                    $pdo->beginTransaction();
+                    try {
+                        $stmt = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, place_id, lat, lng, customer_type) VALUES (?,?,?,?,?,?,?,?,?)');
+                        $stmt->execute([$name,$phoneDb,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type]);
+                        $id = (int)$pdo->lastInsertId();
+                        if ($id > 0) {
+                            $cashbookAccountId = CashbookRepository::ensureCustomerAccount($pdo, $id, $name);
+                        }
+                        $customerCreated = true;
+                        $pdo->commit();
+                    } catch (Throwable $e) {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                        throw $e;
+                    }
                 }
             } catch (Throwable $e) {
                 $msg = 'Failed to save customer.';
@@ -1270,7 +1321,27 @@ switch ($page) {
                 $deliveryLocationOptions = _merge_delivery_location_options($pdo);
                 $error = $msg; $customer = compact('id','name','phone','email','address','delivery_location','place_id','lat','lng','customer_type'); Helpers::view('customers/form', compact('customer','error','deliveryLocationOptions')); break;
             }
-            if ($wantsJson) { header('Content-Type: application/json'); echo json_encode(['id'=>$id,'name'=>$name,'phone'=>$phone,'email'=>$email,'delivery_location'=>$delivery_location]); return; }
+            if ($cashbookAccountId === null && $id > 0) {
+                $stCa = $pdo->prepare('SELECT id FROM cashbook_accounts WHERE customer_id = ? LIMIT 1');
+                $stCa->execute([$id]);
+                $cidRow = $stCa->fetchColumn();
+                if ($cidRow) {
+                    $cashbookAccountId = (int)$cidRow;
+                }
+            }
+            if ($wantsJson) {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'id' => $id,
+                    'name' => $name,
+                    'phone' => $phone,
+                    'email' => $email,
+                    'delivery_location' => $delivery_location,
+                    'cashbook_account_id' => $cashbookAccountId,
+                    'customer_created' => $customerCreated,
+                ]);
+                return;
+            }
             Helpers::redirect('index.php?page=customers');
             break;
         }
@@ -1307,6 +1378,8 @@ switch ($page) {
                        . '</div></body></html>';
                     break;
                 }
+
+                CashbookRepository::detachCashbookAccountForDeletedCustomer($pdo, $id);
 
                 // Safe to delete
                 try {
@@ -5709,10 +5782,18 @@ switch ($page) {
         if ($cid === 0) {
             try { $pdo->exec("ALTER TABLE customers MODIFY phone VARCHAR(20) NULL"); } catch (Throwable $e) { /* ignore */ }
             try {
+                $pdo->beginTransaction();
                 $ins = $pdo->prepare('INSERT INTO customers (name, phone, email, address, delivery_location, customer_type) VALUES (?,?,?,?,?,?)');
                 $ins->execute([$name, $phoneDb, ($email !== '' ? $email : null), $address, $delivery_location, $customer_type]);
                 $cid = (int)$pdo->lastInsertId();
+                if ($cid > 0) {
+                    CashbookRepository::ensureCustomerAccount($pdo, $cid, $name);
+                }
+                $pdo->commit();
             } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 if ($wantsJson) {
                     header('Content-Type: application/json; charset=utf-8');
                     echo json_encode(['error' => 'Failed to save customer. ' . $e->getMessage()]);
@@ -5722,8 +5803,25 @@ switch ($page) {
             }
         }
         if ($wantsJson) {
+            $cashbookAccountId = null;
+            if ($cid > 0) {
+                $stCb = $pdo->prepare('SELECT id FROM cashbook_accounts WHERE customer_id = ? LIMIT 1');
+                $stCb->execute([$cid]);
+                $rCb = $stCb->fetchColumn();
+                if ($rCb) {
+                    $cashbookAccountId = (int)$rCb;
+                }
+            }
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['id' => $cid, 'name' => $name, 'phone' => $phone, 'email' => $email, 'address' => $address, 'delivery_location' => $delivery_location]);
+            echo json_encode([
+                'id' => $cid,
+                'name' => $name,
+                'phone' => $phone,
+                'email' => $email,
+                'address' => $address,
+                'delivery_location' => $delivery_location,
+                'cashbook_account_id' => $cashbookAccountId,
+            ]);
             return;
         }
         Helpers::redirect('index.php?page=parcels&action=new&customer_id=' . $cid);

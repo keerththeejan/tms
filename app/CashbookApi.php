@@ -32,8 +32,101 @@ class CashbookApi
 
         try {
             switch ($action) {
+                case 'get_accounts':
                 case 'accounts':
-                    self::json(['ok' => true, 'accounts' => CashbookRepository::listAccounts($pdo)]);
+                    /* Pagination must use cb_page — plain "page" is the app route (e.g. page=cashbook) and would be overwritten by URLSearchParams in the client. */
+                    $page = (int) ($_GET['cb_page'] ?? 0);
+                    $forOps = ($_GET['for_ops'] ?? '') === '1' || ($_GET['for_ops'] ?? '') === 'true';
+                    $mapAccountsShape = static function (array $acc): array {
+                        // Keep legacy keys (`name`, `type`, `account_kind`, etc.) but also expose
+                        // the requested API shape for the UI.
+                        $type = (string) ($acc['type'] ?? '');
+                        if ($type === 'customer') {
+                            $acc['account_type'] = 'Customer';
+                        } elseif ($type === 'bank') {
+                            $acc['account_type'] = 'Bank';
+                        } else {
+                            $acc['account_type'] = 'Main';
+                        }
+
+                        $acc['account_name'] = (string) ($acc['name'] ?? '');
+                        $acc['customer_name'] = isset($acc['customer_name']) && $acc['customer_name'] !== '' ? (string) $acc['customer_name'] : null;
+                        return $acc;
+                    };
+                    if ($forOps) {
+                        $accs = CashbookRepository::listAccounts($pdo, true);
+                        $accs = array_map($mapAccountsShape, $accs);
+                        self::json(['ok' => true, 'accounts' => $accs]);
+
+                        return;
+                    }
+                    if ($page > 0) {
+                        $perPage = (int) ($_GET['per_page'] ?? 15);
+                        $q = trim((string) ($_GET['q'] ?? ''));
+                        $typeF = trim((string) ($_GET['type'] ?? ''));
+                        $statusF = trim((string) ($_GET['status'] ?? ''));
+                        $typeFilter = $typeF !== '' ? $typeF : null;
+                        $statusFilter = $statusF !== '' ? $statusF : null;
+                        $sort = trim((string) ($_GET['sort'] ?? 'default'));
+                        if (!in_array($sort, ['default', 'name_asc', 'name_desc', 'balance_asc', 'balance_desc'], true)) {
+                            $sort = 'default';
+                        }
+                        $paged = CashbookRepository::listAccountsPaged($pdo, $q, $typeFilter, $statusFilter, $page, $perPage, $sort);
+                        $items = $paged['items'] ?? [];
+                        $items = array_map($mapAccountsShape, $items);
+                        self::json([
+                            'ok' => true,
+                            'accounts' => $items,
+                            'total' => $paged['total'],
+                            'page' => $paged['page'],
+                            'per_page' => $paged['per_page'],
+                        ]);
+
+                        return;
+                    }
+                    $accs = CashbookRepository::listAccounts($pdo);
+                    $accs = array_map($mapAccountsShape, $accs);
+                    self::json(['ok' => true, 'accounts' => $accs]);
+
+                    return;
+                case 'mgmt_dashboard':
+                    $anchor = trim((string) ($_GET['anchor'] ?? date('Y-m-d')));
+                    if ($anchor === '') {
+                        $anchor = date('Y-m-d');
+                    }
+                    $d = CashbookRepository::managementDashboardTotals($pdo, $anchor);
+                    self::json(['ok' => true] + $d);
+
+                    return;
+                case 'customer_accounts_sync':
+                    if (!$isPost) {
+                        self::json(['ok' => false, 'error' => 'POST required'], 405);
+
+                        return;
+                    }
+                    if (!Auth::hasAnyRole(['admin', 'accountant'])) {
+                        self::json(['ok' => false, 'error' => 'Forbidden'], 403);
+
+                        return;
+                    }
+                    $n = CashbookRepository::syncMissingCustomerAccounts($pdo);
+                    self::json(['ok' => true, 'linked' => $n]);
+
+                    return;
+                case 'account_get':
+                    $id = (int) ($_GET['id'] ?? 0);
+                    if ($id <= 0) {
+                        self::json(['ok' => false, 'error' => 'id required'], 400);
+
+                        return;
+                    }
+                    $acc = CashbookRepository::getAccount($pdo, $id);
+                    if (!$acc) {
+                        self::json(['ok' => false, 'error' => 'Account not found'], 404);
+
+                        return;
+                    }
+                    self::json(['ok' => true, 'account' => $acc]);
 
                     return;
                 case 'account_save':
@@ -45,8 +138,12 @@ class CashbookApi
                     $id = (int) ($_POST['id'] ?? 0);
                     $name = trim((string) ($_POST['name'] ?? ''));
                     $type = (string) ($_POST['type'] ?? 'cash');
-                    if (!in_array($type, ['cash', 'bank', 'branch'], true)) {
+                    if (!in_array($type, ['cash', 'bank', 'branch', 'customer'], true)) {
                         $type = 'cash';
+                    }
+                    $status = (string) ($_POST['status'] ?? 'active');
+                    if (!in_array($status, ['active', 'inactive'], true)) {
+                        $status = 'active';
                     }
                     $branchId = ($_POST['branch_id'] ?? '') !== '' ? (int) $_POST['branch_id'] : null;
                     if ($name === '') {
@@ -54,12 +151,45 @@ class CashbookApi
 
                         return;
                     }
-                    if ($id > 0) {
-                        CashbookRepository::updateAccount($pdo, $id, $name, $type, $branchId);
-                    } else {
-                        $id = CashbookRepository::createAccount($pdo, $name, $type, $branchId);
+                    if (CashbookRepository::accountNameExists($pdo, $name, $id)) {
+                        self::json(['ok' => false, 'error' => 'An account with this name already exists.'], 400);
+
+                        return;
                     }
-                    self::json(['ok' => true, 'id' => $id, 'accounts' => CashbookRepository::listAccounts($pdo)]);
+                    if ($id > 0) {
+                        $existing = CashbookRepository::getAccount($pdo, $id);
+                        if ($existing && !empty($existing['customer_id'])) {
+                            $type = 'customer';
+                        }
+                        CashbookRepository::updateAccount($pdo, $id, $name, $type, $branchId, $status);
+                    } else {
+                        $customerId = null;
+                        if ($type === 'customer') {
+                            $rawCid = $_POST['customer_id'] ?? '';
+                            $cid = $rawCid !== '' ? (int) $rawCid : 0;
+                            if ($cid <= 0) {
+                                self::json(['ok' => false, 'error' => 'Select a customer for customer accounts.'], 400);
+
+                                return;
+                            }
+                            $dup = $pdo->prepare('SELECT id FROM cashbook_accounts WHERE customer_id = ? LIMIT 1');
+                            $dup->execute([$cid]);
+                            if ($dup->fetchColumn()) {
+                                self::json(['ok' => false, 'error' => 'This customer already has a Cash Book account.'], 400);
+
+                                return;
+                            }
+                            $customerId = $cid;
+                        }
+                        $id = CashbookAccountService::createAccount($pdo, $name, $type, $branchId, $customerId, $status);
+                    }
+                    $accounts = [];
+                    try {
+                        $accounts = CashbookRepository::listAccounts($pdo);
+                    } catch (\Throwable $e) {
+                        /* Account saved; listing is optional for the client */
+                    }
+                    self::json(['ok' => true, 'id' => $id, 'accounts' => $accounts]);
 
                     return;
                 case 'account_delete':
@@ -74,12 +204,38 @@ class CashbookApi
 
                         return;
                     }
+                    $acc = CashbookRepository::getAccount($pdo, $id);
+                    if (!$acc) {
+                        self::json(['ok' => false, 'error' => 'Account not found'], 404);
+
+                        return;
+                    }
+                    if ((int) ($acc['is_system'] ?? 0) === 1) {
+                        self::json(['ok' => false, 'error' => 'System accounts cannot be deleted.'], 400);
+
+                        return;
+                    }
+                    if (!empty($acc['customer_id'])) {
+                        self::json(['ok' => false, 'error' => 'Customer-linked accounts cannot be deleted from here.'], 400);
+
+                        return;
+                    }
+                    if (abs((float) ($acc['balance'] ?? 0)) > 0.00001) {
+                        self::json(['ok' => false, 'error' => 'Balance must be zero before this account can be removed.'], 400);
+
+                        return;
+                    }
                     if (!CashbookRepository::deleteAccount($pdo, $id)) {
                         self::json(['ok' => false, 'error' => 'Account has transactions or transfers; cannot delete.'], 400);
 
                         return;
                     }
-                    self::json(['ok' => true, 'accounts' => CashbookRepository::listAccounts($pdo)]);
+                    $accounts = [];
+                    try {
+                        $accounts = CashbookRepository::listAccounts($pdo);
+                    } catch (\Throwable $e) {
+                    }
+                    self::json(['ok' => true, 'accounts' => $accounts]);
 
                     return;
                 case 'totals':
@@ -96,6 +252,7 @@ class CashbookApi
                     self::json(['ok' => true, 'from' => $from, 'to' => $to, 'totals' => $t]);
 
                     return;
+                case 'get_transactions':
                 case 'entries':
                     $accountId = (int) ($_GET['account_id'] ?? 0);
                     $period = (string) ($_GET['period'] ?? 'monthly');
@@ -200,7 +357,17 @@ class CashbookApi
 
                         return;
                     }
-                    CashbookRepository::addTransfer($pdo, $fromId, $toId, $amount, $occurredAt, $notes);
+                    /* Default: block overdrafts unless client explicitly sends prevent_negative=false */
+                    $preventNeg = !(
+                        (string) ($_POST['prevent_negative'] ?? '') === '0'
+                        || strtolower((string) ($_POST['prevent_negative'] ?? '')) === 'false'
+                    );
+                    $u = Auth::user();
+                    $createdBy = ($u && isset($u['id'])) ? (int) $u['id'] : null;
+                    if ($createdBy <= 0) {
+                        $createdBy = null;
+                    }
+                    CashbookRepository::addTransfer($pdo, $fromId, $toId, $amount, $occurredAt, $notes, $preventNeg, $createdBy);
                     self::json(['ok' => true]);
 
                     return;
@@ -218,6 +385,27 @@ class CashbookApi
                     }
                     CashbookRepository::deleteTransfer($pdo, $tid);
                     self::json(['ok' => true]);
+
+                    return;
+                case 'parcel_customer_account':
+                    $pid = (int) ($_GET['parcel_id'] ?? 0);
+                    if ($pid <= 0) {
+                        self::json(['ok' => false, 'error' => 'parcel_id required'], 400);
+
+                        return;
+                    }
+                    $row = CashbookRepository::parcelCustomerCashbookAccount($pdo, $pid);
+                    if ($row === null) {
+                        self::json(['ok' => false, 'error' => 'Parcel not found'], 404);
+
+                        return;
+                    }
+                    self::json([
+                        'ok' => true,
+                        'customer_id' => $row['customer_id'],
+                        'customer_name' => $row['customer_name'],
+                        'cashbook_account_id' => $row['cashbook_account_id'],
+                    ]);
 
                     return;
                 case 'parcel_search':

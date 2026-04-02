@@ -27,6 +27,7 @@ require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/Sms.php';
 require_once __DIR__ . '/DataReset.php';
 require_once __DIR__ . '/CashbookRepository.php';
+require_once __DIR__ . '/CashbookAccountService.php';
 require_once __DIR__ . '/CashbookApi.php';
 
 // Load config and initialize DB
