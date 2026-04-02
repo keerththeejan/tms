@@ -23,17 +23,21 @@ class CashbookRepository
 CREATE TABLE IF NOT EXISTS cashbook_accounts (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   name VARCHAR(120) NOT NULL,
+  description TEXT NULL,
   branch_id INT UNSIGNED NULL DEFAULT NULL,
-  type ENUM('cash','bank','branch','customer') NOT NULL DEFAULT 'cash',
-  account_kind ENUM('cash','bank','digital','receivable') NULL DEFAULT NULL,
+  type ENUM('cash','bank','branch','customer','supplier') NOT NULL DEFAULT 'cash',
+  account_kind ENUM('cash','bank','digital','receivable','payable') NULL DEFAULT NULL,
+  opening_balance DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   balance DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   sort_order INT NOT NULL DEFAULT 0,
   customer_id INT UNSIGNED NULL DEFAULT NULL,
+  supplier_id INT UNSIGNED NULL DEFAULT NULL,
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   is_system TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_cashbook_acc_customer (customer_id),
+  UNIQUE KEY uq_cashbook_acc_supplier (supplier_id),
   KEY idx_cashbook_acc_branch (branch_id),
   KEY idx_cashbook_acc_sort (sort_order),
   KEY idx_cashbook_acc_status (status)
@@ -48,9 +52,11 @@ CREATE TABLE IF NOT EXISTS cashbook_transactions (
   amount DECIMAL(14,2) NOT NULL,
   occurred_at DATETIME NOT NULL,
   notes TEXT NULL,
+  reference_no VARCHAR(80) NULL DEFAULT NULL,
   parcel_id INT UNSIGNED NULL DEFAULT NULL,
   items_json TEXT NULL,
   attachment_path VARCHAR(255) NULL DEFAULT NULL,
+  created_by INT UNSIGNED NULL DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_cashbook_txn_account_time (account_id, occurred_at),
@@ -85,6 +91,8 @@ SQL
         self::migrateCashbookAccountsExtras($pdo);
         self::$cacheAccountsIsSystemColumn = null;
         self::migrateCashbookTransfersExtras($pdo);
+        self::migrateCashbookTransactionsExtras($pdo);
+        self::ensureAuditSchema($pdo);
         try {
             $n = (int) $pdo->query('SELECT COUNT(*) FROM cashbook_accounts')->fetchColumn();
             if ($n === 0) {
@@ -103,6 +111,75 @@ SQL
         }
         self::ensureMinimumMainAccounts($pdo);
         self::syncMissingCustomerAccounts($pdo);
+    }
+
+    private static function migrateCashbookTransactionsExtras(\PDO $pdo): void
+    {
+        try {
+            $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn();
+            $dbName = $dbName !== false ? (string) $dbName : '';
+            if ($dbName === '') {
+                return;
+            }
+            $chk = $pdo->prepare(
+                'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $has = static function (string $col) use ($chk, $dbName): bool {
+                $chk->execute([$dbName, 'cashbook_transactions', $col]);
+                return (int) $chk->fetchColumn() > 0;
+            };
+            if (!$has('reference_no')) {
+                $pdo->exec('ALTER TABLE cashbook_transactions ADD COLUMN reference_no VARCHAR(80) NULL DEFAULT NULL AFTER notes');
+            }
+            if (!$has('created_by')) {
+                $pdo->exec('ALTER TABLE cashbook_transactions ADD COLUMN created_by INT UNSIGNED NULL DEFAULT NULL AFTER attachment_path');
+            }
+        } catch (\Throwable $e) {
+            /* ignore */
+        }
+    }
+
+    private static function ensureAuditSchema(\PDO $pdo): void
+    {
+        try {
+            $pdo->exec(
+                <<<'SQL'
+CREATE TABLE IF NOT EXISTS cashbook_audit_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  entity VARCHAR(40) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL,
+  action VARCHAR(20) NOT NULL,
+  user_id INT UNSIGNED NULL DEFAULT NULL,
+  ip VARCHAR(64) NULL DEFAULT NULL,
+  meta_json TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_cashbook_audit_entity (entity, entity_id),
+  KEY idx_cashbook_audit_created (created_at),
+  KEY idx_cashbook_audit_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+SQL
+            );
+        } catch (\Throwable $e) {
+            /* ignore */
+        }
+    }
+
+    public static function audit(\PDO $pdo, string $entity, string $entityId, string $action, ?int $userId, array $meta = []): void
+    {
+        try {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            if (is_string($ip)) {
+                $ip = trim($ip) !== '' ? trim($ip) : null;
+            } else {
+                $ip = null;
+            }
+            $mj = $meta ? json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+            $st = $pdo->prepare('INSERT INTO cashbook_audit_logs (entity, entity_id, action, user_id, ip, meta_json) VALUES (?,?,?,?,?,?)');
+            $st->execute([$entity, $entityId, $action, $userId, $ip, $mj]);
+        } catch (\Throwable $e) {
+            /* non-fatal */
+        }
     }
 
     /** If only customer (or empty-type) accounts exist, add one main cash account for income/expense/transfers. */
@@ -254,7 +331,7 @@ SQL
             }
 
             try {
-                $pdo->exec("ALTER TABLE cashbook_accounts MODIFY COLUMN type ENUM('cash','bank','branch','customer') NOT NULL DEFAULT 'cash'");
+                $pdo->exec("ALTER TABLE cashbook_accounts MODIFY COLUMN type ENUM('cash','bank','branch','customer','supplier') NOT NULL DEFAULT 'cash'");
             } catch (\Throwable $e) {
                 /* already applied */
             }
@@ -271,22 +348,48 @@ SQL
             if (!$hasCol('account_kind')) {
                 try {
                     if ($hasCol('type')) {
-                        $pdo->exec("ALTER TABLE cashbook_accounts ADD COLUMN account_kind ENUM('cash','bank','digital','receivable') NULL DEFAULT NULL AFTER type");
+                        $pdo->exec("ALTER TABLE cashbook_accounts ADD COLUMN account_kind ENUM('cash','bank','digital','receivable','payable') NULL DEFAULT NULL AFTER type");
                     } else {
-                        $pdo->exec("ALTER TABLE cashbook_accounts ADD COLUMN account_kind ENUM('cash','bank','digital','receivable') NULL DEFAULT NULL");
+                        $pdo->exec("ALTER TABLE cashbook_accounts ADD COLUMN account_kind ENUM('cash','bank','digital','receivable','payable') NULL DEFAULT NULL");
                     }
                 } catch (\Throwable $e) {
                     try {
-                        $pdo->exec("ALTER TABLE cashbook_accounts ADD COLUMN account_kind ENUM('cash','bank','digital','receivable') NULL DEFAULT NULL");
+                        $pdo->exec("ALTER TABLE cashbook_accounts ADD COLUMN account_kind ENUM('cash','bank','digital','receivable','payable') NULL DEFAULT NULL");
                     } catch (\Throwable $e2) {
                         /* duplicate column, denied, or non-MySQL */
                     }
                 }
             }
             try {
-                $pdo->exec("UPDATE cashbook_accounts SET account_kind = CASE type WHEN 'cash' THEN 'cash' WHEN 'bank' THEN 'bank' WHEN 'branch' THEN 'digital' WHEN 'customer' THEN 'receivable' END WHERE account_kind IS NULL");
+                $pdo->exec("UPDATE cashbook_accounts SET account_kind = CASE type WHEN 'cash' THEN 'cash' WHEN 'bank' THEN 'bank' WHEN 'branch' THEN 'digital' WHEN 'customer' THEN 'receivable' WHEN 'supplier' THEN 'payable' END WHERE account_kind IS NULL");
             } catch (\Throwable $e) {
                 /* ignore */
+            }
+            if (!$hasCol('description')) {
+                try {
+                    $pdo->exec('ALTER TABLE cashbook_accounts ADD COLUMN description TEXT NULL AFTER name');
+                } catch (\Throwable $e) {
+                    /* ignore */
+                }
+            }
+            if (!$hasCol('opening_balance')) {
+                try {
+                    $pdo->exec('ALTER TABLE cashbook_accounts ADD COLUMN opening_balance DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER account_kind');
+                } catch (\Throwable $e) {
+                    /* ignore */
+                }
+            }
+            if (!$hasCol('supplier_id')) {
+                try {
+                    $after = $hasCol('customer_id') ? 'customer_id' : ($hasCol('sort_order') ? 'sort_order' : null);
+                    $sql = 'ALTER TABLE cashbook_accounts ADD COLUMN supplier_id INT UNSIGNED NULL DEFAULT NULL';
+                    if ($after !== null) {
+                        $sql .= ' AFTER ' . $after;
+                    }
+                    $pdo->exec($sql);
+                } catch (\Throwable $e) {
+                    /* ignore */
+                }
             }
             if (!$hasCol('is_system')) {
                 try {
@@ -294,6 +397,11 @@ SQL
                 } catch (\Throwable $e) {
                     /* ignore */
                 }
+            }
+            try {
+                $pdo->exec('ALTER TABLE cashbook_accounts ADD UNIQUE KEY uq_cashbook_acc_supplier (supplier_id)');
+            } catch (\Throwable $e) {
+                /* exists/denied */
             }
             try {
                 $pdo->exec("UPDATE cashbook_accounts SET is_system=1 WHERE name IN ('Cash Book','Main Cash','T.S') AND type IN ('cash','bank','branch')");
@@ -344,7 +452,16 @@ SQL
         $st->execute([$accountId]);
         $in = (float) $st->fetchColumn();
 
-        $bal = $tx - $out + $in;
+        $opening = 0.0;
+        try {
+            $st = $pdo->prepare('SELECT opening_balance FROM cashbook_accounts WHERE id=?');
+            $st->execute([$accountId]);
+            $opening = (float) ($st->fetchColumn() ?: 0);
+        } catch (\Throwable $e) {
+            $opening = 0.0;
+        }
+
+        $bal = $opening + $tx - $out + $in;
         $up = $pdo->prepare('UPDATE cashbook_accounts SET balance=? WHERE id=?');
         $up->execute([$bal, $accountId]);
 
@@ -365,6 +482,9 @@ SQL
         if ($type === 'customer') {
             return 'receivable';
         }
+        if ($type === 'supplier') {
+            return 'payable';
+        }
 
         return null;
     }
@@ -376,7 +496,7 @@ SQL
     {
         $isSystemExpr = self::cashbookAccountsHasIsSystemColumn($pdo) ? 'ca.is_system' : '0 AS is_system';
 
-        return 'ca.id, ca.name, ca.branch_id, ca.type, ca.account_kind, ca.balance, ca.sort_order, ca.created_at, ca.customer_id, ca.status, ' . $isSystemExpr . ', c.name AS customer_name';
+        return 'ca.id, ca.name, ca.description, ca.branch_id, ca.type, ca.account_kind, ca.opening_balance, ca.balance, ca.sort_order, ca.created_at, ca.customer_id, ca.supplier_id, ca.status, ' . $isSystemExpr . ', c.name AS customer_name';
     }
 
     private static function cashbookAccountsHasIsSystemColumn(\PDO $pdo): bool
@@ -436,7 +556,7 @@ SQL
             if ($typeFilter === 'main') {
                 // "Main" = Cash + Digital (branch)
                 $where[] = "ca.type IN ('cash','branch')";
-            } elseif (in_array($typeFilter, ['cash', 'bank', 'branch', 'customer'], true)) {
+            } elseif (in_array($typeFilter, ['cash', 'bank', 'branch', 'customer', 'supplier'], true)) {
                 $where[] = 'ca.type = ?';
                 $params[] = $typeFilter;
             }
@@ -555,34 +675,57 @@ SQL
         return $r ?: null;
     }
 
-    public static function createAccount(\PDO $pdo, string $name, string $type, ?int $branchId, ?int $customerId = null, string $status = 'active'): int
+    public static function createAccount(\PDO $pdo, string $name, string $type, ?int $branchId, ?int $customerId = null, string $status = 'active', float $openingBalance = 0.0, ?int $supplierId = null, ?string $description = null): int
     {
         if (!in_array($status, ['active', 'inactive'], true)) {
             $status = 'active';
         }
         $max = (int) $pdo->query('SELECT COALESCE(MAX(sort_order),0) FROM cashbook_accounts')->fetchColumn();
         $kind = self::defaultAccountKindForType($type);
-        $st = $pdo->prepare('INSERT INTO cashbook_accounts (name, branch_id, type, account_kind, balance, sort_order, customer_id, status) VALUES (?,?,?,?,0,?,?,?)');
-        $st->execute([$name, $branchId, $type, $kind, $max + 1, $customerId, $status]);
+        $openingBalance = is_finite($openingBalance) ? $openingBalance : 0.0;
+        $desc = $description !== null ? trim($description) : null;
+        if ($desc === '') {
+            $desc = null;
+        }
+        $st = $pdo->prepare('INSERT INTO cashbook_accounts (name, description, branch_id, type, account_kind, opening_balance, balance, sort_order, customer_id, supplier_id, status) VALUES (?,?,?,?,?,?,0,?,?,?,?)');
+        $st->execute([$name, $desc, $branchId, $type, $kind, $openingBalance, $max + 1, $customerId, $supplierId, $status]);
 
         return (int) $pdo->lastInsertId();
     }
 
-    public static function updateAccount(\PDO $pdo, int $id, string $name, string $type, ?int $branchId, string $status = 'active'): void
+    public static function updateAccount(\PDO $pdo, int $id, string $name, string $type, ?int $branchId, string $status = 'active', ?float $openingBalance = null, ?string $description = null): void
     {
         if (!in_array($status, ['active', 'inactive'], true)) {
             $status = 'active';
         }
         $existing = self::getAccount($pdo, $id);
         if ($existing && (int) ($existing['is_system'] ?? 0) === 1) {
-            $st = $pdo->prepare('UPDATE cashbook_accounts SET name=?, branch_id=?, status=? WHERE id=?');
-            $st->execute([$name, $branchId, $status, $id]);
+            $desc = $description !== null ? trim($description) : null;
+            if ($desc === '') {
+                $desc = null;
+            }
+            $st = $pdo->prepare('UPDATE cashbook_accounts SET name=?, description=?, branch_id=?, status=? WHERE id=?');
+            $st->execute([$name, $desc, $branchId, $status, $id]);
 
             return;
         }
+        if ($existing && !empty($existing['customer_id'])) {
+            $type = 'customer';
+        }
         $kind = self::defaultAccountKindForType($type);
-        $st = $pdo->prepare('UPDATE cashbook_accounts SET name=?, branch_id=?, type=?, account_kind=?, status=? WHERE id=?');
-        $st->execute([$name, $branchId, $type, $kind, $status, $id]);
+        $desc = $description !== null ? trim($description) : null;
+        if ($desc === '') {
+            $desc = null;
+        }
+        if ($openingBalance !== null && $type !== 'customer') {
+            $openingBalance = is_finite($openingBalance) ? $openingBalance : 0.0;
+            $st = $pdo->prepare('UPDATE cashbook_accounts SET name=?, description=?, branch_id=?, type=?, account_kind=?, opening_balance=?, status=? WHERE id=?');
+            $st->execute([$name, $desc, $branchId, $type, $kind, $openingBalance, $status, $id]);
+        } else {
+            $st = $pdo->prepare('UPDATE cashbook_accounts SET name=?, description=?, branch_id=?, type=?, account_kind=?, status=? WHERE id=?');
+            $st->execute([$name, $desc, $branchId, $type, $kind, $status, $id]);
+        }
+        self::recalcBalance($pdo, $id);
     }
 
     public static function deleteAccount(\PDO $pdo, int $id): bool
@@ -687,7 +830,7 @@ SQL
     public static function listMergedEntries(\PDO $pdo, int $accountId, string $fromDt, string $toDt, string $q = ''): array
     {
         $rows = [];
-        $st = $pdo->prepare('SELECT t.id, t.account_id, t.txn_type AS kind, t.amount, t.occurred_at, t.notes, t.parcel_id, t.items_json, t.attachment_path, '
+        $st = $pdo->prepare('SELECT t.id, t.account_id, t.txn_type AS kind, t.amount, t.occurred_at, t.notes, t.reference_no, t.created_by, t.parcel_id, t.items_json, t.attachment_path, '
             . 'NULL AS transfer_id, NULL AS peer_account_id, NULL AS peer_name '
             . 'FROM cashbook_transactions t WHERE t.account_id=? AND t.occurred_at BETWEEN ? AND ?');
         $st->execute([$accountId, $fromDt, $toDt]);
@@ -789,8 +932,8 @@ SQL
         }
         $pdo->beginTransaction();
         try {
-            $st = $pdo->prepare('INSERT INTO cashbook_transactions (account_id, txn_type, amount, occurred_at, notes, parcel_id, items_json, attachment_path) VALUES (?,?,?,?,?,?,?,?)');
-            $st->execute([$accountId, $txnType, $amount, $occurredAt, $notes, $parcelId, $itemsJson, $attachmentPath]);
+            $st = $pdo->prepare('INSERT INTO cashbook_transactions (account_id, txn_type, amount, occurred_at, notes, reference_no, parcel_id, items_json, attachment_path, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            $st->execute([$accountId, $txnType, $amount, $occurredAt, $notes, null, $parcelId, $itemsJson, $attachmentPath, null]);
             $id = (int) $pdo->lastInsertId();
             self::recalcBalance($pdo, $accountId);
             $pdo->commit();
@@ -804,7 +947,29 @@ SQL
         }
     }
 
-    public static function updateTransaction(\PDO $pdo, int $id, int $accountId, string $txnType, float $amount, string $occurredAt, ?string $notes, ?int $parcelId, ?string $itemsJson, ?string $attachmentPath): void
+    public static function addTransactionV2(\PDO $pdo, int $accountId, string $txnType, float $amount, string $occurredAt, ?string $notes, ?int $parcelId, ?string $itemsJson, ?string $attachmentPath, ?int $createdBy = null, ?string $referenceNo = null): int
+    {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Amount must be positive.');
+        }
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('INSERT INTO cashbook_transactions (account_id, txn_type, amount, occurred_at, notes, reference_no, parcel_id, items_json, attachment_path, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            $st->execute([$accountId, $txnType, $amount, $occurredAt, $notes, $referenceNo, $parcelId, $itemsJson, $attachmentPath, $createdBy]);
+            $id = (int) $pdo->lastInsertId();
+            self::recalcBalance($pdo, $accountId);
+            $pdo->commit();
+
+            return $id;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public static function updateTransaction(\PDO $pdo, int $id, int $accountId, string $txnType, float $amount, string $occurredAt, ?string $notes, ?int $parcelId, ?string $itemsJson, ?string $attachmentPath, ?string $referenceNo = null): void
     {
         $pdo->beginTransaction();
         try {
@@ -816,8 +981,8 @@ SQL
                 throw new \RuntimeException('Transaction not found.');
             }
             $oldAid = (int) $old;
-            $st = $pdo->prepare('UPDATE cashbook_transactions SET account_id=?, txn_type=?, amount=?, occurred_at=?, notes=?, parcel_id=?, items_json=?, attachment_path=? WHERE id=?');
-            $st->execute([$accountId, $txnType, $amount, $occurredAt, $notes, $parcelId, $itemsJson, $attachmentPath, $id]);
+            $st = $pdo->prepare('UPDATE cashbook_transactions SET account_id=?, txn_type=?, amount=?, occurred_at=?, notes=?, reference_no=?, parcel_id=?, items_json=?, attachment_path=? WHERE id=?');
+            $st->execute([$accountId, $txnType, $amount, $occurredAt, $notes, $referenceNo, $parcelId, $itemsJson, $attachmentPath, $id]);
             self::recalcBalance($pdo, $oldAid);
             if ($oldAid !== $accountId) {
                 self::recalcBalance($pdo, $accountId);
@@ -829,6 +994,28 @@ SQL
             }
             throw $e;
         }
+    }
+
+    public static function getTransaction(\PDO $pdo, int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        $st = $pdo->prepare('SELECT id, account_id, txn_type, amount, occurred_at, notes, reference_no, parcel_id, items_json, attachment_path, created_by, created_at FROM cashbook_transactions WHERE id=? LIMIT 1');
+        $st->execute([$id]);
+        $r = $st->fetch(\PDO::FETCH_ASSOC);
+        return $r ?: null;
+    }
+
+    public static function getTransfer(\PDO $pdo, int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        $st = $pdo->prepare('SELECT tr.*, fa.name AS from_name, ta.name AS to_name FROM cashbook_transfers tr LEFT JOIN cashbook_accounts fa ON fa.id=tr.from_account_id LEFT JOIN cashbook_accounts ta ON ta.id=tr.to_account_id WHERE tr.id=? LIMIT 1');
+        $st->execute([$id]);
+        $r = $st->fetch(\PDO::FETCH_ASSOC);
+        return $r ?: null;
     }
 
     public static function deleteTransaction(\PDO $pdo, int $id): void

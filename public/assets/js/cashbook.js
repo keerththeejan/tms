@@ -25,6 +25,14 @@
     return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function parseMoney(s) {
+    if (s == null) return 0;
+    var raw = String(s).replace(/,/g, '').trim();
+    if (raw === '') return 0;
+    var n = Number(raw);
+    return isNaN(n) ? NaN : n;
+  }
+
   function accountLabel(a) {
     if (!a) return '';
     var st = (a.status || 'active') === 'inactive' ? ' (Inactive)' : '';
@@ -139,6 +147,7 @@
     var mainWrap = $('cbMgmtMainSubtypeWrap');
     var custWrap = $('cbMgmtCustomerWrap');
     var branchEl = $('cbMgmtBranch');
+    var openingEl = $('cbMgmtOpening');
     var isNew = !acc || !acc.id;
     var linked = isCustomerLinkedAcc(acc);
     var sys = isSystemAccount(acc);
@@ -150,9 +159,10 @@
       cust.disabled = !!linked;
       cust.classList.remove('is-invalid');
     }
-    if (mainWrap) mainWrap.classList.toggle('d-none', cat && cat.value === 'customer');
+    if (mainWrap) mainWrap.classList.toggle('d-none', !cat || cat.value !== 'main');
     if (custWrap) custWrap.classList.toggle('d-none', !cat || cat.value !== 'customer');
-    if (branchEl) branchEl.disabled = (cat && cat.value === 'customer') || false;
+    if (branchEl) branchEl.disabled = (cat && cat.value !== 'main') || false;
+    if (openingEl) openingEl.disabled = !!linked || sys || (cat && cat.value === 'customer');
     if (delBtn) {
       delBtn.disabled = isNew || linked || sys;
       delBtn.title = sys
@@ -427,6 +437,14 @@
       var idStr = String(row.id);
       var tid = row.transfer_id != null && row.transfer_id !== '' ? String(row.transfer_id) : '';
       var canEdit = /^\d+$/.test(idStr);
+      var viewKind = tid ? 'transfer' : 'transaction';
+      var viewId = tid ? tid : idStr;
+      var viewBtn =
+        '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill cb-view-entry" data-kind="' +
+        viewKind +
+        '" data-id="' +
+        viewId +
+        '"><i class="bi bi-eye"></i></button>';
       var editBtn = canEdit
         ? '<button type="button" class="btn btn-sm btn-outline-primary rounded-pill cb-edit-txn" data-id="' +
           idStr +
@@ -465,6 +483,8 @@
         runBal +
         '</td>' +
         '<td class="text-end text-nowrap">' +
+        viewBtn +
+        ' ' +
         editBtn +
         ' ' +
         delBtn +
@@ -491,6 +511,14 @@
         var idStr = String(row.id);
         var tid = row.transfer_id != null && row.transfer_id !== '' ? String(row.transfer_id) : '';
         var canEdit = /^\d+$/.test(idStr);
+        var viewKind = tid ? 'transfer' : 'transaction';
+        var viewId = tid ? tid : idStr;
+        var viewBtn =
+          '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill cb-view-entry" data-kind="' +
+          viewKind +
+          '" data-id="' +
+          viewId +
+          '">View</button>';
         var editBtn = canEdit
           ? '<button type="button" class="btn btn-sm btn-outline-primary rounded-pill cb-edit-txn" data-id="' +
             idStr +
@@ -529,12 +557,62 @@
           entryAmountHtml(row) +
           '</div>' +
           '<div class="btn-group btn-group-sm">' +
+          viewBtn +
           editBtn +
           delBtn +
           '</div></div></div></div>';
       });
       host.innerHTML = html;
     }
+  }
+
+  function showEntryDetails(kind, idStr) {
+    var modalEl = $('cbEntryDetailsModal');
+    var body = $('cbEntryDetailsBody');
+    if (!modalEl || !body || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
+    body.textContent = 'Loading…';
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    get('entry_get', { kind: kind, id: idStr })
+      .then(function (j) {
+        if (!j.ok || !j.entry) throw new Error(j.error || 'Load failed');
+        var e = j.entry;
+        var html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">';
+        function row(k, v) {
+          html +=
+            '<tr><th class="text-muted small" style="width: 180px;">' +
+            escapeHtml(k) +
+            '</th><td class="small">' +
+            escapeHtml(v == null ? '' : String(v)) +
+            '</td></tr>';
+        }
+        if (kind === 'transfer') {
+          row('Transfer ID', e.id);
+          row('Occurred at', e.occurred_at);
+          row('From', e.from_name || e.from_account_id);
+          row('To', e.to_name || e.to_account_id);
+          row('Amount', money(e.amount));
+          row('Notes', e.notes || '');
+          row('Created by', e.created_by || '');
+        } else {
+          row('Transaction ID', e.id);
+          row('Occurred at', e.occurred_at);
+          row('Type', e.txn_type);
+          row('Amount', money(e.amount));
+          row('Reference No', e.reference_no || '');
+          row('Notes', e.notes || '');
+          row('Parcel ID', e.parcel_id || '');
+          row('Created by', e.created_by || '');
+          row('Attachment', e.attachment_path || '');
+        }
+        html += '</table></div>';
+        body.innerHTML = html;
+      })
+      .catch(function (e) {
+        body.innerHTML =
+          '<div class="alert alert-danger py-2 px-3 small mb-0">Could not load details: ' +
+          escapeHtml(String(e.message || e)) +
+          '</div>';
+      });
   }
 
   function escapeHtml(s) {
@@ -665,6 +743,7 @@
       $('cbTxnTime').value = new Date().toTimeString().slice(0, 5);
     }
     $('cbTxnNotes').value = txn && txn.notes ? txn.notes : '';
+    if ($('cbTxnRefNo')) $('cbTxnRefNo').value = txn && txn.reference_no ? txn.reference_no : '';
     $('cbTxnParcel').value = txn && txn.parcel_id ? String(txn.parcel_id) : '';
     $('cbTxnItems').value = txn && txn.items_json ? txn.items_json : '';
     var aidRaw = accountIdOverride != null && accountIdOverride !== '' ? accountIdOverride : null;
@@ -711,6 +790,7 @@
     var t = $('cbTxnTime').value || '12:00';
     fd.append('occurred_at', d + ' ' + t + ':00');
     fd.append('notes', $('cbTxnNotes').value);
+    fd.append('reference_no', $('cbTxnRefNo') ? $('cbTxnRefNo').value : '');
     var pid = $('cbTxnParcel').value.trim();
     fd.append('parcel_id', pid);
     fd.append('items_json', $('cbTxnItems').value.trim());
@@ -740,6 +820,7 @@
           $('cbTxnId').value = '';
           $('cbTxnAmount').value = '';
           $('cbTxnNotes').value = '';
+          if ($('cbTxnRefNo')) $('cbTxnRefNo').value = '';
           $('cbTxnParcel').value = '';
           $('cbTxnItems').value = '';
           if (att) att.value = '';
@@ -825,7 +906,7 @@
 
   function accountKindBadgeHTML(kind) {
     var k = (kind || '').toString();
-    var map = { cash: 'Cash', bank: 'Bank', digital: 'Digital', receivable: 'Receivable' };
+    var map = { cash: 'Cash', bank: 'Bank', digital: 'Digital', receivable: 'Receivable', payable: 'Payable' };
     var label = map[k] || (k ? String(k) : '—');
     return '<span class="badge rounded-pill text-bg-light border">' + escapeHtml(label) + '</span>';
   }
@@ -996,6 +1077,9 @@
     if (t === 'customer') {
       if ($('cbMgmtCategory')) $('cbMgmtCategory').value = 'customer';
       if ($('cbMgmtCustomerId') && acc.customer_id) $('cbMgmtCustomerId').value = String(acc.customer_id);
+    } else if (t === 'supplier') {
+      if ($('cbMgmtCategory')) $('cbMgmtCategory').value = 'supplier';
+      if ($('cbMgmtCustomerId')) $('cbMgmtCustomerId').value = '';
     } else {
       if ($('cbMgmtCategory')) $('cbMgmtCategory').value = 'main';
       if ($('cbMgmtMainSubtype')) $('cbMgmtMainSubtype').value = t;
@@ -1003,6 +1087,7 @@
     }
     if ($('cbMgmtStatus')) $('cbMgmtStatus').checked = (acc && acc.status) !== 'inactive';
     if ($('cbMgmtBranch')) $('cbMgmtBranch').value = acc && acc.branch_id != null ? String(acc.branch_id) : '';
+    if ($('cbMgmtOpening')) $('cbMgmtOpening').value = money(acc && acc.opening_balance != null ? acc.opening_balance : 0);
     if ($('cbMgmtBalance')) $('cbMgmtBalance').value = money(acc && acc.balance != null ? acc.balance : 0);
     state.mgmtSelectedId = acc && acc.id ? parseInt(acc.id, 10) : null;
     applyMgmtFormState(acc);
@@ -1019,6 +1104,7 @@
     if ($('cbMgmtCustomerId')) $('cbMgmtCustomerId').value = '';
     if ($('cbMgmtStatus')) $('cbMgmtStatus').checked = true;
     if ($('cbMgmtBranch')) $('cbMgmtBranch').value = '';
+    if ($('cbMgmtOpening')) $('cbMgmtOpening').value = money(0);
     if ($('cbMgmtBalance')) $('cbMgmtBalance').value = money(0);
     state.mgmtSelectedId = null;
     clearMgmtFieldErrors();
@@ -1033,17 +1119,21 @@
     var type = 'cash';
     if (cat === 'customer') {
       type = 'customer';
+    } else if (cat === 'supplier') {
+      type = 'supplier';
     } else {
       type = ($('cbMgmtMainSubtype') && $('cbMgmtMainSubtype').value) || 'cash';
     }
     var status = $('cbMgmtStatus') && $('cbMgmtStatus').checked ? 'active' : 'inactive';
     var branchRaw = $('cbMgmtBranch') ? $('cbMgmtBranch').value.trim() : '';
     var branchId = branchRaw !== '' ? branchRaw : '';
+    var openingRaw = $('cbMgmtOpening') ? $('cbMgmtOpening').value : '';
+    var opening = parseMoney(openingRaw);
     var customerId = '';
     if (cat === 'customer' && id === 0) {
       customerId = ($('cbMgmtCustomerId') && $('cbMgmtCustomerId').value) || '';
     }
-    return { id: id, name: name, type: type, status: status, branch_id: branchId, customer_id: customerId };
+    return { id: id, name: name, type: type, status: status, branch_id: branchId, opening_balance: opening, customer_id: customerId };
   }
 
   function validateMgmtForm(payload) {
@@ -1061,6 +1151,12 @@
         var c = $('cbMgmtCustomerId');
         if (c) c.classList.add('is-invalid');
         setMgmtFormError('Select a customer for customer accounts.');
+        ok = false;
+      }
+    }
+    if (payload.type !== 'customer') {
+      if (isNaN(payload.opening_balance)) {
+        setMgmtFormError('Opening balance must be a number.');
         ok = false;
       }
     }
@@ -1579,6 +1675,21 @@
       });
 
     document.body.addEventListener('click', function (e) {
+      var vw = e.target.closest('.cb-view-entry');
+      if (vw) {
+        var kind = vw.getAttribute('data-kind') || 'transaction';
+        var idStr = vw.getAttribute('data-id') || '';
+        if (kind !== 'transaction' && kind !== 'transfer') {
+          toast('Invalid entry type.', true);
+          return;
+        }
+        if (!/^\d+$/.test(idStr)) {
+          toast('Invalid entry id.', true);
+          return;
+        }
+        showEntryDetails(kind, idStr);
+        return;
+      }
       var ed = e.target.closest('.cb-edit-txn');
       if (ed) {
         var id = ed.getAttribute('data-id');
@@ -1729,6 +1840,7 @@
           type: payload.type,
           status: payload.status,
           branch_id: payload.branch_id,
+          opening_balance: isNaN(payload.opening_balance) ? '' : String(payload.opening_balance),
         };
         if (payload.id === 0 && payload.type === 'customer') {
           fields.customer_id = String(payload.customer_id);
@@ -1845,6 +1957,18 @@
             toast(String(e.message || e), true);
           });
       });
+
+    $('cbBtnExport') &&
+      $('cbBtnExport').addEventListener('click', function () {
+        if (!state.accountId) return;
+        var u = apiUrl('export_csv', {
+          account_id: state.accountId,
+          period: state.period,
+          anchor: state.anchor,
+          q: state.q,
+        });
+        window.location.href = u;
+      });
   }
 
   function loadAccountSummary() {
@@ -1931,6 +2055,11 @@
 
   function boot() {
     if (!$('cbEntryList') && !$('cbEntryTableBody')) return;
+    // Optional deep-linking from Accounts module:
+    // ?cb_account_id=123&cb_open=txn|transfer
+    var qs = new URLSearchParams(window.location.search || '');
+    var deeplinkAcc = parseInt(qs.get('cb_account_id') || '0', 10) || 0;
+    var deeplinkOpen = (qs.get('cb_open') || '').toString();
     var ad = $('cbAnchorDate');
     if (ad) ad.value = state.anchor;
     var rf = $('cbReportFrom');
@@ -1953,7 +2082,19 @@
     loadAccounts()
       .then(function () {
         fillTransferSelects();
+        if (deeplinkAcc > 0) {
+          state.accountId = deeplinkAcc;
+          setAccountSelectOptions();
+          if ($('cbAccountSelect')) $('cbAccountSelect').value = String(deeplinkAcc);
+        }
         return refresh();
+      })
+      .then(function () {
+        if (deeplinkOpen === 'transfer') {
+          openTransferFromAccount(state.accountId);
+        } else if (deeplinkOpen === 'txn') {
+          openTxnModal('income', null);
+        }
       })
       .catch(function (e) {
         toast(String(e.message || e), true);

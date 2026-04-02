@@ -64,6 +64,7 @@ try {
             <button type="button" class="btn btn-success btn-sm rounded-pill px-3" id="cbBtnIncomeDesk"><i class="bi bi-plus-circle me-1"></i><span class="d-none d-sm-inline">Income</span></button>
             <button type="button" class="btn btn-danger btn-sm rounded-pill px-3" id="cbBtnExpenseDesk"><i class="bi bi-dash-circle me-1"></i><span class="d-none d-sm-inline">Expense</span></button>
             <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 text-dark" data-bs-toggle="modal" data-bs-target="#cashbookTransferModal"><i class="bi bi-shuffle me-1"></i><span class="d-none d-sm-inline">Transfer</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="cbBtnExport"><i class="bi bi-download me-1"></i><span class="d-none d-sm-inline">Export</span></button>
             <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#cashbookCustomerModal"><i class="bi bi-person-plus me-1"></i><span class="d-none d-sm-inline">Customer</span></button>
           </div>
         </div>
@@ -222,6 +223,7 @@ try {
                         <option value="main">Main (Cash + Digital)</option>
                         <option value="customer">Customer</option>
                         <option value="bank">Bank</option>
+                        <option value="supplier">Supplier</option>
                       </select>
                     </div>
                     <div class="col-6 col-md-4 col-lg-3">
@@ -293,6 +295,7 @@ try {
                       <select class="form-select rounded-3" id="cbMgmtCategory" data-enhance="false">
                         <option value="main">Main</option>
                         <option value="customer">Customer</option>
+                        <option value="supplier">Supplier</option>
                       </select>
                     </div>
                     <div class="mb-3" id="cbMgmtMainSubtypeWrap">
@@ -312,6 +315,11 @@ try {
                         <?php endforeach; ?>
                       </select>
                       <div class="invalid-feedback" id="cbMgmtCustomerErr">Select a customer.</div>
+                    </div>
+                    <div class="mb-3" id="cbMgmtOpeningWrap">
+                      <label class="form-label small fw-semibold" for="cbMgmtOpening">Opening balance</label>
+                      <input type="text" class="form-control rounded-3" id="cbMgmtOpening" placeholder="0.00" inputmode="decimal" autocomplete="off">
+                      <div class="form-text">Starting balance for this account. Customer-linked and system accounts cannot change opening balance here.</div>
                     </div>
                     <div class="mb-3">
                       <label class="form-label small fw-semibold" for="cbMgmtBalance">Balance</label>
@@ -501,6 +509,10 @@ try {
             <label for="cbTxnNotes">Notes</label>
           </div>
           <div class="form-floating mb-3">
+            <input type="text" class="form-control" id="cbTxnRefNo" placeholder="Reference">
+            <label for="cbTxnRefNo">Reference No (optional)</label>
+          </div>
+          <div class="form-floating mb-3">
             <input type="text" class="form-control" id="cbTxnParcel" placeholder="Parcel" inputmode="numeric">
             <label for="cbTxnParcel">Parcel ID (optional)</label>
           </div>
@@ -583,6 +595,24 @@ try {
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body p-0 px-3 pb-3" id="cbMgmtFormModalBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry details -->
+  <div class="modal fade" id="cbEntryDetailsModal" tabindex="-1" aria-hidden="true" aria-labelledby="cbEntryDetailsModalLabel">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title" id="cbEntryDetailsModalLabel">Transaction details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body pt-2">
+          <div id="cbEntryDetailsBody" class="small text-muted">Loading…</div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Close</button>
+        </div>
       </div>
     </div>
   </div>

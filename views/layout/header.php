@@ -89,7 +89,36 @@ $user = Auth::user();
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='advances'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>"<?php echo $navCurrent($currentPage==='advances'); ?>><i class="bi bi-cash-stack" aria-hidden="true"></i><span>Advances</span></a></li>
         <li class="nav-item nav-section">Accounts</li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='cashbook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=cashbook'); ?>"<?php echo $navCurrent($currentPage==='cashbook'); ?>><i class="bi bi-cash-stack" aria-hidden="true"></i><span>Cash Book</span></a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='accounts'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts'); ?>"<?php echo $navCurrent($currentPage==='accounts'); ?>><i class="bi bi-journal-richtext" aria-hidden="true"></i><span>Accounts</span></a></li>
+        <?php
+          $accTab = $_GET['tab'] ?? 'all';
+          $accActive = ($currentPage === 'accounts');
+          $accOpen = $accActive ? ' show' : '';
+        ?>
+        <li class="nav-item">
+          <button class="nav-link text-white w-100 text-start d-flex align-items-center justify-content-between <?php echo $accActive?'active':''; ?>" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarAccountsSub" aria-expanded="<?php echo $accActive ? 'true' : 'false'; ?>" aria-controls="sidebarAccountsSub"<?php echo $navCurrent($accActive); ?>>
+            <span class="d-inline-flex align-items-center gap-2"><i class="bi bi-journal-richtext" aria-hidden="true"></i><span>Accounts</span></span>
+            <i class="bi bi-chevron-down small opacity-75" aria-hidden="true"></i>
+          </button>
+          <div class="collapse<?php echo $accOpen; ?>" id="sidebarAccountsSub">
+            <ul class="nav nav-pills flex-column ms-4 my-1 gap-1" role="list">
+              <li class="nav-item">
+                <a class="nav-link text-white py-1 <?php echo $accActive && ($accTab==='all' || $accTab==='') ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts&tab=all'); ?>">
+                  <span>All Accounts</span>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white py-1 <?php echo $accActive && $accTab==='add' ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts&tab=add'); ?>">
+                  <span>Add Account</span>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white py-1 <?php echo $accActive && $accTab==='statement' ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts&tab=statement'); ?>">
+                  <span>Account Statement</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='daybook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=daybook'); ?>"<?php echo $navCurrent($currentPage==='daybook'); ?>><i class="bi bi-journal-text" aria-hidden="true"></i><span>Daybook</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='ledger'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=ledger'); ?>"<?php echo $navCurrent($currentPage==='ledger'); ?>><i class="bi bi-journal-check" aria-hidden="true"></i><span>Account Ledger</span></a></li>
       <?php endif; ?>

@@ -138,7 +138,7 @@ class CashbookApi
                     $id = (int) ($_POST['id'] ?? 0);
                     $name = trim((string) ($_POST['name'] ?? ''));
                     $type = (string) ($_POST['type'] ?? 'cash');
-                    if (!in_array($type, ['cash', 'bank', 'branch', 'customer'], true)) {
+                    if (!in_array($type, ['cash', 'bank', 'branch', 'customer', 'supplier'], true)) {
                         $type = 'cash';
                     }
                     $status = (string) ($_POST['status'] ?? 'active');
@@ -146,6 +146,19 @@ class CashbookApi
                         $status = 'active';
                     }
                     $branchId = ($_POST['branch_id'] ?? '') !== '' ? (int) $_POST['branch_id'] : null;
+                    $opening = null;
+                    if (isset($_POST['opening_balance']) && trim((string) $_POST['opening_balance']) !== '') {
+                        $opening = (float) str_replace(',', '', (string) $_POST['opening_balance']);
+                    }
+                    $desc = trim((string) ($_POST['description'] ?? ''));
+                    if ($desc === '') {
+                        $desc = null;
+                    }
+                    $u = Auth::user();
+                    $uid = ($u && isset($u['id'])) ? (int) $u['id'] : null;
+                    if ($uid <= 0) {
+                        $uid = null;
+                    }
                     if ($name === '') {
                         self::json(['ok' => false, 'error' => 'Name is required'], 400);
 
@@ -161,7 +174,8 @@ class CashbookApi
                         if ($existing && !empty($existing['customer_id'])) {
                             $type = 'customer';
                         }
-                        CashbookRepository::updateAccount($pdo, $id, $name, $type, $branchId, $status);
+                        CashbookRepository::updateAccount($pdo, $id, $name, $type, $branchId, $status, $opening, $desc);
+                        CashbookRepository::audit($pdo, 'account', (string) $id, 'update', $uid, ['name' => $name, 'type' => $type, 'branch_id' => $branchId, 'status' => $status]);
                     } else {
                         $customerId = null;
                         if ($type === 'customer') {
@@ -181,7 +195,8 @@ class CashbookApi
                             }
                             $customerId = $cid;
                         }
-                        $id = CashbookAccountService::createAccount($pdo, $name, $type, $branchId, $customerId, $status);
+                        $id = CashbookAccountService::createAccount($pdo, $name, $type, $branchId, $customerId, $status, (float) ($opening ?? 0.0), null, $desc);
+                        CashbookRepository::audit($pdo, 'account', (string) $id, 'create', $uid, ['name' => $name, 'type' => $type, 'branch_id' => $branchId, 'status' => $status, 'customer_id' => $customerId]);
                     }
                     $accounts = [];
                     try {
@@ -203,6 +218,11 @@ class CashbookApi
                         self::json(['ok' => false, 'error' => 'Invalid id'], 400);
 
                         return;
+                    }
+                    $u = Auth::user();
+                    $uid = ($u && isset($u['id'])) ? (int) $u['id'] : null;
+                    if ($uid <= 0) {
+                        $uid = null;
                     }
                     $acc = CashbookRepository::getAccount($pdo, $id);
                     if (!$acc) {
@@ -230,6 +250,7 @@ class CashbookApi
 
                         return;
                     }
+                    CashbookRepository::audit($pdo, 'account', (string) $id, 'delete', $uid, ['name' => (string) ($acc['name'] ?? ''), 'type' => (string) ($acc['type'] ?? '')]);
                     $accounts = [];
                     try {
                         $accounts = CashbookRepository::listAccounts($pdo);
@@ -252,6 +273,19 @@ class CashbookApi
                     self::json(['ok' => true, 'from' => $from, 'to' => $to, 'totals' => $t]);
 
                     return;
+                case 'totals_range':
+                    $accountId = (int) ($_GET['account_id'] ?? 0);
+                    $from = trim((string) ($_GET['from'] ?? ''));
+                    $to = trim((string) ($_GET['to'] ?? ''));
+                    if ($accountId <= 0 || $from === '' || $to === '') {
+                        self::json(['ok' => false, 'error' => 'account_id, from, to required'], 400);
+                        return;
+                    }
+                    $fromDt = $from . ' 00:00:00';
+                    $toDt = $to . ' 23:59:59';
+                    $t = CashbookRepository::totalsForAccount($pdo, $accountId, $fromDt, $toDt);
+                    self::json(['ok' => true, 'from' => $fromDt, 'to' => $toDt, 'totals' => $t]);
+                    return;
                 case 'get_transactions':
                 case 'entries':
                     $accountId = (int) ($_GET['account_id'] ?? 0);
@@ -267,6 +301,20 @@ class CashbookApi
                     $entries = CashbookRepository::listMergedEntries($pdo, $accountId, $from, $to, $q);
                     self::json(['ok' => true, 'from' => $from, 'to' => $to, 'entries' => $entries]);
 
+                    return;
+                case 'entries_range':
+                    $accountId = (int) ($_GET['account_id'] ?? 0);
+                    $from = trim((string) ($_GET['from'] ?? ''));
+                    $to = trim((string) ($_GET['to'] ?? ''));
+                    $q = trim((string) ($_GET['q'] ?? ''));
+                    if ($accountId <= 0 || $from === '' || $to === '') {
+                        self::json(['ok' => false, 'error' => 'account_id, from, to required'], 400);
+                        return;
+                    }
+                    $fromDt = $from . ' 00:00:00';
+                    $toDt = $to . ' 23:59:59';
+                    $entries = CashbookRepository::listMergedEntries($pdo, $accountId, $fromDt, $toDt, $q);
+                    self::json(['ok' => true, 'from' => $fromDt, 'to' => $toDt, 'entries' => $entries]);
                     return;
                 case 'transaction_save':
                     if (!$isPost) {
@@ -290,6 +338,7 @@ class CashbookApi
                         $occurredAt .= ' 12:00:00';
                     }
                     $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
+                    $refNo = trim((string) ($_POST['reference_no'] ?? '')) ?: null;
                     $parcelId = ($_POST['parcel_id'] ?? '') !== '' ? (int) $_POST['parcel_id'] : null;
                     if ($parcelId !== null && $parcelId <= 0) {
                         $parcelId = null;
@@ -312,10 +361,17 @@ class CashbookApi
 
                         return;
                     }
+                    $u = Auth::user();
+                    $uid = ($u && isset($u['id'])) ? (int) $u['id'] : null;
+                    if ($uid <= 0) {
+                        $uid = null;
+                    }
                     if ($id > 0) {
-                        CashbookRepository::updateTransaction($pdo, $id, $accountId, $txnType, $amount, $occurredAt, $notes, $parcelId, $itemsJson, $attachmentPath);
+                        CashbookRepository::updateTransaction($pdo, $id, $accountId, $txnType, $amount, $occurredAt, $notes, $parcelId, $itemsJson, $attachmentPath, $refNo);
+                        CashbookRepository::audit($pdo, 'transaction', (string) $id, 'update', $uid, ['account_id' => $accountId, 'txn_type' => $txnType, 'amount' => $amount, 'reference_no' => $refNo]);
                     } else {
-                        CashbookRepository::addTransaction($pdo, $accountId, $txnType, $amount, $occurredAt, $notes, $parcelId, $itemsJson, $attachmentPath);
+                        $newId = CashbookRepository::addTransactionV2($pdo, $accountId, $txnType, $amount, $occurredAt, $notes, $parcelId, $itemsJson, $attachmentPath, $uid, $refNo);
+                        CashbookRepository::audit($pdo, 'transaction', (string) $newId, 'create', $uid, ['account_id' => $accountId, 'txn_type' => $txnType, 'amount' => $amount, 'reference_no' => $refNo]);
                     }
                     self::json(['ok' => true]);
 
@@ -332,7 +388,13 @@ class CashbookApi
 
                         return;
                     }
+                    $u = Auth::user();
+                    $uid = ($u && isset($u['id'])) ? (int) $u['id'] : null;
+                    if ($uid <= 0) {
+                        $uid = null;
+                    }
                     CashbookRepository::deleteTransaction($pdo, $id);
+                    CashbookRepository::audit($pdo, 'transaction', (string) $id, 'delete', $uid);
                     self::json(['ok' => true]);
 
                     return;
@@ -367,7 +429,8 @@ class CashbookApi
                     if ($createdBy <= 0) {
                         $createdBy = null;
                     }
-                    CashbookRepository::addTransfer($pdo, $fromId, $toId, $amount, $occurredAt, $notes, $preventNeg, $createdBy);
+                    $tid = CashbookRepository::addTransfer($pdo, $fromId, $toId, $amount, $occurredAt, $notes, $preventNeg, $createdBy);
+                    CashbookRepository::audit($pdo, 'transfer', (string) $tid, 'create', $createdBy, ['from_account_id' => $fromId, 'to_account_id' => $toId, 'amount' => $amount]);
                     self::json(['ok' => true]);
 
                     return;
@@ -383,7 +446,13 @@ class CashbookApi
 
                         return;
                     }
+                    $u = Auth::user();
+                    $uid = ($u && isset($u['id'])) ? (int) $u['id'] : null;
+                    if ($uid <= 0) {
+                        $uid = null;
+                    }
                     CashbookRepository::deleteTransfer($pdo, $tid);
+                    CashbookRepository::audit($pdo, 'transfer', (string) $tid, 'delete', $uid);
                     self::json(['ok' => true]);
 
                     return;
@@ -425,6 +494,69 @@ class CashbookApi
                     $rows = CashbookRepository::reportByMonth($pdo, $accountId, $from, $to);
                     self::json(['ok' => true, 'rows' => $rows]);
 
+                    return;
+                case 'entry_get':
+                    $kind = (string) ($_GET['kind'] ?? '');
+                    $idRaw = (string) ($_GET['id'] ?? '');
+                    if ($kind === 'transaction') {
+                        $id = (int) $idRaw;
+                        if ($id <= 0) {
+                            self::json(['ok' => false, 'error' => 'Invalid id'], 400);
+                            return;
+                        }
+                        $row = CashbookRepository::getTransaction($pdo, $id);
+                        if (!$row) {
+                            self::json(['ok' => false, 'error' => 'Not found'], 404);
+                            return;
+                        }
+                        self::json(['ok' => true, 'entry' => $row]);
+                        return;
+                    }
+                    if ($kind === 'transfer') {
+                        $id = (int) $idRaw;
+                        if ($id <= 0) {
+                            self::json(['ok' => false, 'error' => 'Invalid id'], 400);
+                            return;
+                        }
+                        $row = CashbookRepository::getTransfer($pdo, $id);
+                        if (!$row) {
+                            self::json(['ok' => false, 'error' => 'Not found'], 404);
+                            return;
+                        }
+                        self::json(['ok' => true, 'entry' => $row]);
+                        return;
+                    }
+                    self::json(['ok' => false, 'error' => 'Invalid kind'], 400);
+                    return;
+                case 'export_csv':
+                    $accountId = (int) ($_GET['account_id'] ?? 0);
+                    $period = (string) ($_GET['period'] ?? 'monthly');
+                    $anchor = (string) ($_GET['anchor'] ?? date('Y-m-d'));
+                    $q = trim((string) ($_GET['q'] ?? ''));
+                    if ($accountId <= 0) {
+                        self::json(['ok' => false, 'error' => 'account_id required'], 400);
+                        return;
+                    }
+                    [$from, $to] = CashbookRepository::periodBounds($period, $anchor);
+                    $entries = CashbookRepository::listMergedEntries($pdo, $accountId, $from, $to, $q);
+                    header('Content-Type: text/csv; charset=utf-8');
+                    header('Content-Disposition: attachment; filename="cashbook_' . $accountId . '_' . date('Ymd_His') . '.csv"');
+                    $out = fopen('php://output', 'w');
+                    fputcsv($out, ['Date', 'Type', 'Description', 'Amount', 'Running Balance', 'Reference No']);
+                    foreach ($entries as $e) {
+                        $kind = (string) ($e['kind'] ?? '');
+                        $dt = (string) ($e['occurred_at'] ?? '');
+                        $desc = (string) (($e['notes'] ?? '') ?: ($e['peer_name'] ?? ''));
+                        $amt = (float) ($e['amount'] ?? 0);
+                        $signed = $amt;
+                        if (in_array($kind, ['expense', 'transfer_out'], true)) {
+                            $signed = -$amt;
+                        }
+                        $run = $e['running_balance'] ?? '';
+                        $ref = (string) ($e['reference_no'] ?? '');
+                        fputcsv($out, [$dt, $kind, $desc, $signed, $run, $ref]);
+                    }
+                    fclose($out);
                     return;
                 default:
                     self::json(['ok' => false, 'error' => 'Unknown action'], 400);

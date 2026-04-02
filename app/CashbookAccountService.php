@@ -8,14 +8,14 @@ declare(strict_types=1);
  */
 final class CashbookAccountService
 {
-    public static function createAccount(\PDO $pdo, string $name, string $type, ?int $branchId, ?int $customerId = null, string $status = 'active'): int
+    public static function createAccount(\PDO $pdo, string $name, string $type, ?int $branchId, ?int $customerId = null, string $status = 'active', float $openingBalance = 0.0, ?int $supplierId = null, ?string $description = null): int
     {
-        return CashbookRepository::createAccount($pdo, $name, $type, $branchId, $customerId, $status);
+        return CashbookRepository::createAccount($pdo, $name, $type, $branchId, $customerId, $status, $openingBalance, $supplierId, $description);
     }
 
-    public static function updateAccount(\PDO $pdo, int $id, string $name, string $type, ?int $branchId, string $status = 'active'): void
+    public static function updateAccount(\PDO $pdo, int $id, string $name, string $type, ?int $branchId, string $status = 'active', ?float $openingBalance = null, ?string $description = null): void
     {
-        CashbookRepository::updateAccount($pdo, $id, $name, $type, $branchId, $status);
+        CashbookRepository::updateAccount($pdo, $id, $name, $type, $branchId, $status, $openingBalance, $description);
     }
 
     public static function deleteAccount(\PDO $pdo, int $id): bool
