@@ -153,9 +153,9 @@ final class BranchRepository
         $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
         $usedIds = [];
         $keywordsByColumn = [
-            ['colombo'],
-            ['kilinochchi', 'kilinochi'],
-            ['mullaitivu', 'mullaithivu', 'mullativu', 'mulllaitivu'],
+            ['colombo', 'kolumbu', 'கொழும்பு', 'col'],
+            ['kilinochchi', 'kilinochi', 'kilino', 'கிளிநொச்சி', 'kili'],
+            ['mullaitivu', 'mullaithivu', 'mullativu', 'mulllaitivu', 'முல்லைத்தீவு', 'mullai', 'mlt'],
         ];
         $result = [null, null, null];
         foreach ($keywordsByColumn as $colIdx => $keywords) {
@@ -178,6 +178,95 @@ final class BranchRepository
                         $result[$colIdx] = $shape;
                         $usedIds[$id] = true;
                         break 2;
+                    }
+                }
+            }
+        }
+
+        // Fill still-empty slots with remaining active branches by order.
+        foreach ($result as $colIdx => $colVal) {
+            if (is_array($colVal)) {
+                continue;
+            }
+            foreach ($rows as $r) {
+                $id = (int)($r['id'] ?? 0);
+                if ($id <= 0 || isset($usedIds[$id])) {
+                    continue;
+                }
+                $shape = self::rowToCompanyBranchShape($r);
+                $shape['id'] = $id;
+                $result[$colIdx] = $shape;
+                $usedIds[$id] = true;
+                break;
+            }
+        }
+
+        // Final fallback: enrich missing fields from config/company.json legacy slots.
+        // This is important on hosted environments where branch addresses may be incomplete in DB.
+        $legacyBranches = [];
+        try {
+            if (class_exists('Helpers')) {
+                $company = Helpers::company();
+                $legacy = $company['branches'] ?? [];
+                if (is_array($legacy)) {
+                    $legacyBranches = $legacy;
+                }
+            }
+        } catch (\Throwable $e) {
+            $legacyBranches = [];
+        }
+        if ($legacyBranches !== []) {
+            $matchLegacyByKeywords = static function (array $branches, array $keywords): ?array {
+                foreach ($branches as $b) {
+                    if (!is_array($b)) {
+                        continue;
+                    }
+                    $name = trim((string)($b['name'] ?? ''));
+                    $nameNorm = function_exists('mb_strtolower')
+                        ? mb_strtolower($name, 'UTF-8')
+                        : strtolower($name);
+                    foreach ($keywords as $kw) {
+                        if ($kw === '') {
+                            continue;
+                        }
+                        if (str_contains($nameNorm, $kw)) {
+                            return [
+                                'id' => 0,
+                                'name' => $name,
+                                'address_ta' => (string)($b['address_ta'] ?? ''),
+                                'address_en' => (string)($b['address_en'] ?? ''),
+                                'phones' => (string)($b['phones'] ?? ''),
+                            ];
+                        }
+                    }
+                }
+                return null;
+            };
+            foreach ($keywordsByColumn as $colIdx => $keywords) {
+                $legacyShape = $matchLegacyByKeywords($legacyBranches, $keywords);
+                if (!is_array($legacyShape)) {
+                    $legacyRaw = $legacyBranches[$colIdx] ?? null;
+                    if (is_array($legacyRaw)) {
+                        $legacyShape = [
+                            'id' => 0,
+                            'name' => (string)($legacyRaw['name'] ?? ''),
+                            'address_ta' => (string)($legacyRaw['address_ta'] ?? ''),
+                            'address_en' => (string)($legacyRaw['address_en'] ?? ''),
+                            'phones' => (string)($legacyRaw['phones'] ?? ''),
+                        ];
+                    }
+                }
+                if (!is_array($legacyShape)) {
+                    continue;
+                }
+                if (!is_array($result[$colIdx])) {
+                    $result[$colIdx] = $legacyShape;
+                    continue;
+                }
+                // Merge only missing fields so DB values remain authoritative.
+                foreach (['name', 'address_ta', 'address_en', 'phones'] as $k) {
+                    if (trim((string)($result[$colIdx][$k] ?? '')) === '' && trim((string)($legacyShape[$k] ?? '')) !== '') {
+                        $result[$colIdx][$k] = $legacyShape[$k];
                     }
                 }
             }
