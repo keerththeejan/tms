@@ -1001,7 +1001,15 @@ SQL
         if ($id <= 0) {
             return null;
         }
-        $st = $pdo->prepare('SELECT id, account_id, txn_type, amount, occurred_at, notes, reference_no, parcel_id, items_json, attachment_path, created_by, created_at FROM cashbook_transactions WHERE id=? LIMIT 1');
+        $st = $pdo->prepare(
+            'SELECT t.id, t.account_id, a.name AS account_name, a.type AS account_type, '
+            . 't.txn_type, t.amount, t.occurred_at, t.notes, t.reference_no, t.parcel_id, t.items_json, '
+            . 't.attachment_path, t.created_by, u.full_name AS created_by_name, t.created_at '
+            . 'FROM cashbook_transactions t '
+            . 'LEFT JOIN cashbook_accounts a ON a.id = t.account_id '
+            . 'LEFT JOIN users u ON u.id = t.created_by '
+            . 'WHERE t.id=? LIMIT 1'
+        );
         $st->execute([$id]);
         $r = $st->fetch(\PDO::FETCH_ASSOC);
         return $r ?: null;

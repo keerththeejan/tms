@@ -592,16 +592,18 @@
           row('To', e.to_name || e.to_account_id);
           row('Amount', money(e.amount));
           row('Notes', e.notes || '');
-          row('Created by', e.created_by || '');
+          row('Created by', e.created_by_name || e.created_by || '');
         } else {
           row('Transaction ID', e.id);
+          row('Account', e.account_name || e.account_id);
+          row('Account type', e.account_type || '');
           row('Occurred at', e.occurred_at);
           row('Type', e.txn_type);
           row('Amount', money(e.amount));
           row('Reference No', e.reference_no || '');
           row('Notes', e.notes || '');
           row('Parcel ID', e.parcel_id || '');
-          row('Created by', e.created_by || '');
+          row('Created by', e.created_by_name || e.created_by || '');
           row('Attachment', e.attachment_path || '');
         }
         html += '</table></div>';

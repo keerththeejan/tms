@@ -159,7 +159,7 @@ $user = Auth::user();
             <button class="btn btn-outline-secondary icon-btn d-lg-none flex-shrink-0" type="button" title="Open menu" data-role="sidebar-open" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false"><i class="bi bi-list" aria-hidden="true"></i></button>
             <div class="min-w-0 flex-grow-1">
               <p class="page-title text-truncate mb-0"><?php echo htmlspecialchars($pageTitle); ?></p>
-              <?php if (!empty($uiHeaderAddr)): ?>
+              <?php if (!empty($uiHeaderAddr) && $currentPage !== 'accounts'): ?>
                 <?php $addrLine = implode(' | ', $uiHeaderAddr); ?>
                 <p class="page-subtitle mb-0 d-none d-md-block text-truncate" title="<?php echo htmlspecialchars($addrLine); ?>"><?php echo htmlspecialchars($addrLine); ?></p>
               <?php endif; ?>
