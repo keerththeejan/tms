@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../app/bootstrap.php';
+date_default_timezone_set('Asia/Colombo');
 
 $page = $_GET['page'] ?? 'dashboard';
 
@@ -2573,8 +2574,13 @@ switch ($page) {
             // Last bill (most recent parcel) for "Open last bill" / "Add more parcel" options
             $lastParcel = null;
             try {
-                $lastStmt = $pdo->query('SELECT id, customer_id, vehicle_no, from_branch_id, to_branch_id, created_at FROM parcels ORDER BY created_at DESC, id DESC LIMIT 1');
-                $lastParcel = $lastStmt->fetch();
+                $lastStmt = $pdo->prepare('SELECT id, customer_id, vehicle_no, from_branch_id, to_branch_id, created_at
+                                           FROM parcels
+                                           WHERE DATE(created_at) = ?
+                                           ORDER BY created_at DESC, id DESC
+                                           LIMIT 1');
+                $lastStmt->execute([date('Y-m-d')]);
+                $lastParcel = $lastStmt->fetch() ?: null;
             } catch (Throwable $e) { /* ignore */ }
 
             // Determine lock/priceOnly flags for UI
