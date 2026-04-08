@@ -406,11 +406,20 @@ $logoInitials = $logoInitials ?: 'TS';
         margin: 0;
         font-family: "Courier New", monospace;
         font-size: 12px;
+        font-weight: 700;
         line-height: 1.4;
         color: #000 !important;
         background: #fff !important;
+        zoom: 1;
         -webkit-font-smoothing: auto;
         -moz-osx-font-smoothing: auto;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      table {
+        font-family: "Courier New", monospace !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
       }
       * {
         color: #000 !important;
@@ -418,6 +427,10 @@ $logoInitials = $logoInitials ?: 'TS';
         box-shadow: none !important;
         text-shadow: none !important;
         background-image: none !important;
+        opacity: 1 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        transform: none !important;
       }
       .inv-company {
         color: #000 !important;
@@ -536,6 +549,11 @@ $logoInitials = $logoInitials ?: 'TS';
       .logo-unit .bar-small {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+      }
+      .inv-logo-img {
+        height: 50px !important;
+        width: auto !important;
+        image-rendering: crisp-edges;
       }
       .a4-root {
         width: 100%;
