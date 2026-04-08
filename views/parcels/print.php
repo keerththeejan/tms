@@ -119,6 +119,7 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     .small { font-size: 0.875em !important; }
 
     * { box-sizing: border-box; line-height: 1.2; }
+    .matrix-sheet hr { margin: 3px 0; border: 0; border-top: 1px solid #000; }
     html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body.parcel-print-embed { padding: 0; }
     body {
@@ -139,14 +140,17 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     .no-print.matrix-logo-strip {
       display: flex;
       align-items: flex-start;
-      gap: 6px;
-      margin: 0 0 2px;
-      padding: 0;
+      gap: 4px;
+      margin: 0;
+      padding: 2px 0;
+      line-height: 1.1;
     }
     .no-print.matrix-logo-strip img {
       display: block;
       margin: 0;
       padding: 0;
+      height: 40px;
+      width: auto;
     }
     .no-print.matrix-logo-strip .logo-wrap {
       border: 1px solid #000;
@@ -177,10 +181,11 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       padding: 0;
     }
     .matrix-co-name {
-      margin: 0;
-      padding: 5px 0 0;
+      margin: 2px 0;
+      padding: 0;
       text-align: center;
       font-size: 16px;
+      line-height: 1.2;
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -188,19 +193,19 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     .matrix-reg-row {
       text-align: right;
       font-size: 11px;
-      margin: 0;
-      padding: 0 0 5px;
-      line-height: 1.2;
+      margin: 1px 0;
+      padding: 0 0 2px;
+      line-height: 1.1;
     }
     .matrix-route {
       text-align: center;
       font-size: 11px;
-      margin: 0 0 2px;
-      padding: 0 0 3px;
-      line-height: 1.2;
+      margin: 0 0 1px;
+      padding: 0 0 2px;
+      line-height: 1.1;
       border-bottom: 1px solid #000;
     }
-    .matrix-route .sep { margin: 0 3px; }
+    .matrix-route .sep { margin: 0 2px; }
     .matrix-branches {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -323,6 +328,21 @@ $addrSlots = array_slice($addrSlots, 0, 3);
         border-radius: 0 !important;
         padding: 3px !important;
         margin: 0 auto !important;
+      }
+      .matrix-co-name {
+        margin: 2px 0 !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+      }
+      .matrix-reg-row {
+        margin: 1px 0 !important;
+        padding: 0 0 2px !important;
+        line-height: 1.1 !important;
+      }
+      .matrix-route {
+        margin: 0 0 1px !important;
+        padding: 0 0 2px !important;
+        line-height: 1.1 !important;
       }
       .matrix-branches { grid-template-columns: 1fr 1fr 1fr !important; }
       .matrix-bc-col1 { text-align: left !important; }
