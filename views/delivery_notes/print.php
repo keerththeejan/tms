@@ -1,8 +1,6 @@
 <?php
 /** @var array $dn */ /** @var array $items */
 $isEmbed = (($_GET['embed'] ?? '') === '1');
-$paperParam = isset($_GET['paper']) ? strtolower(trim((string)$_GET['paper'])) : '80';
-$receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
 ?>
 <!doctype html>
 <html lang="en">
@@ -16,7 +14,6 @@ $receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    :root { --receipt-width: <?php echo (int)$receiptWidthPx; ?>px; }
     .text-end { text-align: right !important; }
     .text-muted { color: #6c757d !important; }
     .fw-bold { font-weight: 700 !important; }
@@ -35,8 +32,11 @@ $receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
     }
     .receipt.thermal-receipt.dn-print-root {
       width: 100%;
-      max-width: min(var(--receipt-width), 100%);
+      max-width: 100%;
       margin: 0 auto;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
     .print-header-card {
       border: 1px solid #000;
@@ -61,7 +61,17 @@ $receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
     }
     .dn-deliv strong { display: block; margin-bottom: 4px; }
     .amount { text-align: right; }
-    .table-sm th, .table-sm td { padding-top: .35rem; padding-bottom: .35rem; vertical-align: top; }
+    .dn-print-root table.table {
+      width: 100%;
+      table-layout: auto;
+    }
+    .table-sm th, .table-sm td {
+      padding: 2px;
+      vertical-align: top;
+      font-size: 12px;
+      word-wrap: break-word;
+      white-space: normal;
+    }
     .table-bordered th, .table-bordered td { border: 1px solid #000 !important; }
     .table thead th {
       background: #fff !important;
@@ -85,10 +95,16 @@ $receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
         print-color-adjust: exact !important;
       }
       body.dn-print-body {
+        width: 100%;
         padding: 0 !important;
-        font-family: "Noto Sans Tamil", "Courier New", Courier, monospace !important;
-        font-size: 11px;
+        margin: 0 !important;
+        font-family: "Courier New", "Noto Sans Tamil", Courier, monospace !important;
+        font-size: 12px;
         color: #000 !important;
+      }
+      .receipt.thermal-receipt.dn-print-root {
+        width: 100% !important;
+        max-width: 100% !important;
       }
       .print-header-card {
         border: 0 !important;
@@ -97,11 +113,13 @@ $receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
       }
       .print-header-card .text-muted { color: #000 !important; }
       .muted { color: #000 !important; }
-      .table { font-size: 9px; }
-      .table thead th { font-size: 8px; }
-      .receipt.thermal-receipt.dn-print-root {
-        max-width: var(--receipt-width) !important;
+      .dn-print-root table.table {
+        width: 100% !important;
+        table-layout: auto !important;
       }
+      .table { font-size: 12px; }
+      .table thead th { font-size: 12px; }
+      .table th, .table td { padding: 2px !important; }
       .doc-header { page-break-inside: avoid; }
       .table-responsive { overflow: visible !important; }
     }
@@ -113,7 +131,7 @@ $receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
     <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
       <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
       <button id="toggleAddrEditor" class="btn btn-outline-secondary" type="button"><i class="bi bi-pencil-square"></i> Edit Header Addresses</button>
-      <span class="small text-muted">Print: scale 100%, margins None. Add <code>&amp;paper=58</code> for 58mm.</span>
+      <span class="small text-muted">Print: scale 100%, margins None — uses full roll width.</span>
     </div>
     <div id="addrEditor" style="display:none">
       <div class="card card-body p-2">

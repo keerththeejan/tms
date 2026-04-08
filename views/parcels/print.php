@@ -112,9 +112,6 @@ if (function_exists('mb_substr')) {
 }
 $logoInitials = $logoInitials ?: 'TS';
 
-$paperParam = isset($_GET['paper']) ? strtolower(trim((string)$_GET['paper'])) : '80';
-$receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
-
 $custNameDisp = trim((string)($parcel['customer_name'] ?? ''));
 $custPhoneDisp = trim((string)($parcel['customer_phone'] ?? ''));
 $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
@@ -144,7 +141,6 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
       --logo-bar-color: <?php echo $logoBarColor; ?>;
       --inv-pad: 6px;
       --inv-gap: 4px;
-      --receipt-width: <?php echo (int)$receiptWidthPx; ?>px;
     }
     * { box-sizing: border-box; }
     html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -160,16 +156,23 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
       color: #000;
       background: #fff;
     }
-    .receipt.thermal-receipt {
+    .receipt.thermal-receipt,
+    .a4-root.receipt {
       width: 100%;
-      max-width: var(--receipt-width);
+      max-width: 100%;
       margin: 0 auto;
     }
     .a4-root {
       width: 100%;
-      max-width: var(--receipt-width);
+      max-width: 100%;
       margin: 0 auto;
       padding: 0 2px;
+    }
+    .receipt,
+    .receipt .invoice-sheet {
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
     .invoice-sheet {
       border: 1px solid #000;
@@ -177,6 +180,7 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
       margin-bottom: 12px;
       page-break-inside: avoid;
       break-inside: avoid;
+      box-shadow: none;
     }
     .inv-header {
       display: grid;
@@ -308,14 +312,16 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
     table.inv-tbl {
       width: 100%;
       border-collapse: collapse;
-      font-size: 10px;
+      font-size: 12px;
       line-height: 1.25;
-      table-layout: fixed;
+      table-layout: auto;
     }
     table.inv-tbl th, table.inv-tbl td {
       border: 1px solid #000;
-      padding: 3px 4px;
+      padding: 2px;
       vertical-align: top;
+      word-wrap: break-word;
+      white-space: normal;
     }
     table.inv-tbl th {
       background: #fff;
@@ -329,11 +335,6 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
       word-break: break-word;
       overflow-wrap: anywhere;
     }
-    table.inv-tbl col.inv-col-no { width: 7%; }
-    table.inv-tbl col.qty { width: 11%; }
-    table.inv-tbl col.desc { width: auto; }
-    table.inv-tbl col.rate { width: 13%; }
-    table.inv-tbl col.amt { width: 14%; }
     .inv-total-row {
       display: flex;
       justify-content: flex-end;
@@ -427,16 +428,24 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      /* Thermal / matrix: Tamil + Latin alignment; sharp black */
+      /* Continuous roll: full printable width, matrix-friendly monospace */
       body {
+        width: 100%;
         padding: 0;
         margin: 0;
-        font-family: "Noto Sans Tamil", "Courier New", Courier, "Liberation Mono", monospace, "Latha", Tahoma, sans-serif !important;
+        font-family: "Courier New", "Noto Sans Tamil", Courier, monospace !important;
         font-size: 12px;
         line-height: 1.4;
         color: #000 !important;
         -webkit-font-smoothing: auto;
         -moz-osx-font-smoothing: auto;
+      }
+      .receipt.thermal-receipt,
+      .a4-root {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto;
+        padding: 0;
       }
       .inv-company {
         color: #000 !important;
@@ -483,19 +492,22 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
         font-size: 11px !important;
       }
       table.inv-tbl {
-        font-size: 11px;
+        width: 100% !important;
+        table-layout: auto !important;
+        font-size: 12px;
       }
       table.inv-tbl th,
       table.inv-tbl td {
+        border: 1px solid #000 !important;
         border-color: #000 !important;
-        padding: 4px 6px !important;
+        padding: 2px !important;
       }
       table.inv-tbl th {
         background: #fff !important;
         color: #000 !important;
-        font-size: 10px !important;
-        font-weight: 800 !important;
-        border-bottom-width: 2px !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        border-bottom-width: 1px !important;
         text-transform: uppercase;
       }
       .inv-total-row {
@@ -520,14 +532,6 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
       .logo-unit .bar-small {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-      }
-      .receipt.thermal-receipt,
-      .a4-root {
-        width: var(--receipt-width) !important;
-        max-width: var(--receipt-width) !important;
-        margin: 0 auto;
-        padding: 0;
-        display: block;
       }
       .invoice-sheet {
         margin-bottom: 0;
@@ -559,10 +563,10 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
   <?php if (!$hasInvoiceCols): ?>
   <button type="button" id="toggleAddrEditor" class="btn btn-outline-secondary btn-sm">Edit header addresses</button>
   <?php endif; ?>
-  <span class="small text-muted">Print: scale 100%, margins None. Narrow paper: add <code>&amp;paper=58</code> to URL.</span>
+  <span class="small text-muted">Print: scale 100%, margins None — layout uses full paper width.</span>
 </div>
 <?php if (!$hasInvoiceCols): ?>
-<div id="addrEditor" class="no-print card card-body p-2 mb-2" style="display:none; max-width:210mm; margin:0 auto;">
+<div id="addrEditor" class="no-print card card-body p-2 mb-2" style="display:none; max-width:100%; margin:0 auto;">
   <div class="small text-muted mb-1">One address per line. Applies to this invoice only.</div>
   <textarea id="addrTextarea" class="form-control form-control-sm" rows="4"></textarea>
   <div class="mt-2 d-flex gap-2">
@@ -652,9 +656,6 @@ $delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
 
     <div class="inv-body">
       <table class="inv-tbl">
-        <colgroup>
-          <col class="inv-col-no"><col class="qty"><col class="desc"><col class="rate"><col class="amt">
-        </colgroup>
         <thead>
           <tr>
             <th class="text-end">#</th>
