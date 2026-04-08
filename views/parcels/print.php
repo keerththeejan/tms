@@ -113,12 +113,8 @@ $addrSlots = array_slice($addrSlots, 0, 3);
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Invoice #<?php echo (int)$parcel['id']; ?></title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    .text-end { text-align: right !important; }
     .text-muted { color: #6c757d !important; }
     .small { font-size: 0.875em !important; }
 
@@ -128,153 +124,120 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     body {
       margin: 0;
       padding: 5px;
-      font-family: "Courier New", "Noto Sans Tamil", Courier, monospace;
+      font-family: "Courier New", monospace;
       font-size: 12px;
       line-height: 1.2;
       color: #000;
       background: #fff;
     }
-    .matrix-sheet > p:not(.matrix-footer-note) { margin: 2px 0; }
-    .matrix-section { margin-bottom: 5px; }
-    .matrix-root {
-      width: 100%;
-      max-width: 100%;
-      margin: 0 auto;
+    .matrix-root { width: 100%; max-width: 100%; margin: 0 auto; }
+    .no-print.matrix-logo-strip {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .no-print.matrix-logo-strip .logo-wrap {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      font-weight: bold;
+      font-size: 12px;
+      background: #fff;
+    }
+    .no-print.matrix-logo-strip .bar-small {
+      border: 1px solid #000;
+      padding: 1px 4px;
+      font-size: 8px;
+      font-weight: bold;
+      background: #fff;
     }
     .matrix-sheet {
       border: 1px solid #000;
-      padding: 5px;
-      margin: 0 auto 8px;
+      padding: 4px;
+      margin: 0 auto 6px;
       page-break-inside: avoid;
-      box-shadow: none;
       border-radius: 0;
-    }
-    .matrix-logo-strip {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-    .matrix-logo-strip .logo-unit .logo-wrap {
-      width: 40px;
-      min-height: 0;
-      display: flex; align-items: center; justify-content: center;
-      padding: 4px 2px;
-      background: #ccc;
-      font-weight: 800; font-size: 12px;
-      color: #000;
-      border: 1px solid #000;
-      border-radius: 0;
-    }
-    .matrix-logo-strip .bar-small {
-      background: #000;
-      color: #fff;
-      padding: 1px 4px;
-      font-size: 7px;
-      font-weight: 700;
-      max-width: 48px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .matrix-co-name {
-      margin: 0 0 2px;
+      margin: 0;
       text-align: center;
       font-size: 16px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
+      font-weight: bold;
       text-transform: uppercase;
-      color: #000;
+      letter-spacing: 0.04em;
+    }
+    .matrix-reg-row {
+      text-align: right;
+      font-size: 11px;
+      margin: 0 0 2px;
+      line-height: 1.2;
     }
     .matrix-route {
       text-align: center;
       font-size: 11px;
-      margin: 0 0 4px;
+      margin: 0 0 3px;
       padding-bottom: 3px;
       line-height: 1.2;
       border-bottom: 1px solid #000;
     }
-    .matrix-route .sep { margin: 0 4px; }
-    .matrix-reg {
-      text-align: center;
-      margin: 0 0 2px;
-      font-size: 11px;
-      line-height: 1.2;
-    }
+    .matrix-route .sep { margin: 0 3px; }
     .matrix-branches {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 6px 10px;
+      gap: 4px 8px;
       font-size: 11px;
       line-height: 1.2;
-      margin-bottom: 4px;
-      padding-bottom: 4px;
+      margin: 0 0 3px;
+      padding-bottom: 3px;
       border-bottom: 1px solid #000;
       page-break-inside: avoid;
     }
-    .matrix-bc {
-      min-width: 0;
-      text-align: left;
-      word-wrap: break-word;
-      overflow-wrap: anywhere;
-      white-space: normal;
-    }
-    .matrix-bc .bc-name { font-weight: 700; margin-bottom: 1px; }
+    .matrix-bc { min-width: 0; word-wrap: break-word; white-space: normal; }
+    .matrix-bc-col1 { text-align: left; }
+    .matrix-bc-col2 { text-align: center; }
+    .matrix-bc-col3 { text-align: right; }
+    .matrix-bc .bc-name { font-weight: bold; margin-bottom: 1px; }
     .matrix-bc .bc-line { margin: 0; padding: 0; font-size: 10px; line-height: 1.2; }
+    .matrix-inv-wrap {
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      padding: 2px 0;
+      margin: 3px 0 4px;
+    }
     .matrix-inv-meta {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      gap: 10px;
-      margin: 4px 0 5px;
-      font-weight: 700;
+      margin: 0;
+      font-weight: bold;
       line-height: 1.2;
     }
-    .matrix-inv-meta .matrix-date { font-weight: 700; white-space: nowrap; }
-    .customer-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 6px 10px;
-      align-items: start;
-      margin: 4px 0 5px;
-      padding: 4px 0;
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
+    .matrix-inv-meta .matrix-date { white-space: nowrap; }
+    .matrix-customer-plain {
+      text-align: left;
+      margin: 0 0 4px;
       font-size: 12px;
       line-height: 1.2;
     }
-    .customer-row .customer-col {
-      min-width: 0;
-      text-align: left;
-      word-wrap: break-word;
-      overflow-wrap: anywhere;
-    }
-    .customer-row .customer-col strong {
-      display: block;
-      font-weight: 800;
-      margin-bottom: 1px;
-    }
-    .customer-row .customer-val {
-      margin: 0;
-      white-space: pre-wrap;
-    }
+    .matrix-customer-plain > div { margin: 0 0 2px; }
+    .matrix-customer-plain .matrix-del-block { margin-top: 2px; }
     table.matrix-tbl {
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
+      font-family: "Courier New", monospace;
       font-size: 12px;
     }
     table.matrix-tbl th,
     table.matrix-tbl td {
       border: 1px solid #000;
-      padding: 2px 4px;
+      padding: 1px 2px;
       vertical-align: top;
       word-wrap: break-word;
       white-space: normal;
     }
     table.matrix-tbl thead th {
-      font-weight: 700;
-      text-transform: uppercase;
+      font-weight: bold;
       background: #fff;
       color: #000;
     }
@@ -283,74 +246,54 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     .matrix-th-rate, .matrix-td-rate { text-align: right; width: 18%; }
     .matrix-th-amt, .matrix-td-amt { text-align: right; width: 22%; }
     .matrix-total {
-      margin-top: 5px;
+      margin-top: 3px;
       text-align: right;
-      font-weight: 800;
+      font-weight: bold;
       font-size: 12px;
       line-height: 1.2;
     }
     .matrix-footer-note {
-      margin: 5px 0 4px;
+      margin: 4px 0 2px;
       text-align: center;
       font-size: 11px;
-      line-height: 1.25;
+      line-height: 1.2;
       word-wrap: break-word;
     }
-    .matrix-dash {
-      border: 0;
+    .matrix-sig-row {
       border-top: 1px solid #000;
-      margin: 4px 0;
-    }
-    .matrix-sigs {
+      padding-top: 3px;
+      margin-top: 3px;
       display: flex;
       justify-content: space-between;
-      gap: 16px;
-      margin-top: 2px;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: bold;
       line-height: 1.2;
     }
-    .matrix-sigs span {
-      flex: 1;
-      text-align: center;
-      padding-top: 4px;
-      border-top: 1px solid #000;
-    }
+    .matrix-sig-l { text-align: left; }
+    .matrix-sig-r { text-align: right; }
     @media screen and (max-width: 720px) {
       .matrix-branches { grid-template-columns: 1fr; }
-      .customer-row { grid-template-columns: 1fr; }
+      .matrix-bc-col1, .matrix-bc-col2, .matrix-bc-col3 { text-align: left; }
     }
     @media print {
       .no-print { display: none !important; }
       @page { size: A5 landscape; margin: 5mm; }
-      * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
       body {
-        width: 100%;
         margin: 0;
         padding: 5px;
-        line-height: 1.2;
-        font-family: "Courier New", "Noto Sans Tamil", Courier, monospace !important;
+        font-family: "Courier New", monospace !important;
         font-size: 12px !important;
+        line-height: 1.2;
         color: #000 !important;
       }
-      .matrix-root { width: 100% !important; max-width: 100% !important; }
-      .matrix-sheet {
-        border: 1px solid #000 !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-      }
-      .matrix-branches {
-        grid-template-columns: 1fr 1fr 1fr !important;
-      }
-      .matrix-bc { text-align: left !important; }
-      .customer-row { grid-template-columns: 1fr 1fr 1fr !important; }
-      table.matrix-tbl { font-size: 12px !important; }
+      .matrix-sheet { border: 1px solid #000 !important; border-radius: 0 !important; }
+      .matrix-branches { grid-template-columns: 1fr 1fr 1fr !important; }
+      .matrix-bc-col1 { text-align: left !important; }
+      .matrix-bc-col2 { text-align: center !important; }
+      .matrix-bc-col3 { text-align: right !important; }
       table.matrix-tbl th, table.matrix-tbl td {
         border: 1px solid #000 !important;
-        padding: 2px 4px !important;
+        padding: 1px 2px !important;
       }
     }
   </style>
@@ -397,7 +340,7 @@ $addrSlots = array_slice($addrSlots, 0, 3);
 
     <h1 class="matrix-co-name"><?php echo htmlspecialchars($brand['name'] ?? 'TS TRANSPORT'); ?></h1>
     <?php if ($regNo !== ''): ?>
-      <p class="matrix-reg">Reg: <?php echo htmlspecialchars($regNo); ?></p>
+      <div class="matrix-reg-row">Reg: <?php echo htmlspecialchars($regNo); ?></div>
     <?php endif; ?>
 
     <div class="matrix-route">
@@ -409,8 +352,11 @@ $addrSlots = array_slice($addrSlots, 0, 3);
 
     <div class="matrix-branches<?php echo !$hasInvoiceCols ? ' js-addr-container' : ''; ?>" aria-label="Branch addresses">
       <?php if ($hasInvoiceCols): ?>
-        <?php foreach ($invoiceHeaderBranches as $bi => $b): ?>
-          <div class="matrix-bc">
+        <?php
+          $bcAlign = ['matrix-bc-col1', 'matrix-bc-col2', 'matrix-bc-col3'];
+          foreach ($invoiceHeaderBranches as $bi => $b):
+        ?>
+          <div class="matrix-bc <?php echo $bcAlign[$bi] ?? 'matrix-bc-col1'; ?>">
             <?php if (is_array($b)): ?>
               <?php
                 $bn = trim((string)($b['name'] ?? ''));
@@ -426,52 +372,47 @@ $addrSlots = array_slice($addrSlots, 0, 3);
           </div>
         <?php endforeach; ?>
       <?php else: ?>
-        <div class="matrix-bc">
+        <div class="matrix-bc matrix-bc-col1">
           <div class="addr-line"><?php echo $addrSlots[0] !== '' ? nl2br(htmlspecialchars($addrSlots[0])) : '&nbsp;'; ?></div>
         </div>
-        <div class="matrix-bc">
+        <div class="matrix-bc matrix-bc-col2">
           <div class="addr-line"><?php echo $addrSlots[1] !== '' ? nl2br(htmlspecialchars($addrSlots[1])) : '&nbsp;'; ?></div>
         </div>
-        <div class="matrix-bc">
+        <div class="matrix-bc matrix-bc-col3">
           <div class="addr-line"><?php echo $addrSlots[2] !== '' ? nl2br(htmlspecialchars($addrSlots[2])) : '&nbsp;'; ?></div>
         </div>
       <?php endif; ?>
     </div>
 
-    <div class="matrix-inv-meta">
-      <span>Invoice No: #<?php echo (int)$invoiceNo; ?></span>
-      <span class="matrix-date">Date: <?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></span>
+    <div class="matrix-inv-wrap">
+      <div class="matrix-inv-meta">
+        <span>Invoice No: #<?php echo (int)$invoiceNo; ?></span>
+        <span class="matrix-date">Date: <?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></span>
+      </div>
     </div>
 
     <?php if ($custNameDisp !== '' || $custPhoneDisp !== '' || $delLocDisp !== ''): ?>
-    <section class="matrix-section" aria-label="Customer details">
-      <div class="customer-row">
-        <div class="customer-col">
-          <strong>Customer</strong>
-          <div class="customer-val"><?php echo $custNameDisp !== '' ? htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
-        </div>
-        <div class="customer-col">
-          <strong>Phone</strong>
-          <div class="customer-val"><?php echo $custPhoneDisp !== '' ? htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
-        </div>
-        <div class="customer-col">
-          <strong>Delivery</strong>
-          <div class="customer-val"><?php echo $delLocDisp !== '' ? nl2br(htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8')) : '—'; ?></div>
-        </div>
-      </div>
-    </section>
+    <div class="matrix-customer-plain" aria-label="Customer details">
+      <?php if ($custNameDisp !== ''): ?>
+        <div>Customer: <?php echo htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8'); ?></div>
+      <?php endif; ?>
+      <?php if ($custPhoneDisp !== ''): ?>
+        <div>Phone: <?php echo htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8'); ?></div>
+      <?php endif; ?>
+      <?php if ($delLocDisp !== ''): ?>
+        <div class="matrix-del-block">Delivery Location:</div>
+        <div><?php echo nl2br(htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8')); ?></div>
+      <?php endif; ?>
+    </div>
     <?php endif; ?>
 
     <table class="matrix-tbl">
-      <colgroup>
-        <col class="matrix-col-qty"><col class="matrix-col-desc"><col class="matrix-col-rate"><col class="matrix-col-amt">
-      </colgroup>
       <thead>
         <tr>
-          <th class="matrix-th-qty">Qty</th>
-          <th class="matrix-th-desc">Description</th>
-          <th class="matrix-th-rate">Rate</th>
-          <th class="matrix-th-amt">Amount</th>
+          <th class="matrix-th-qty">QTY</th>
+          <th class="matrix-th-desc">DESCRIPTION</th>
+          <th class="matrix-th-rate">RATE</th>
+          <th class="matrix-th-amt">AMOUNT</th>
         </tr>
       </thead>
       <tbody><?php echo $tableBodyHtml; ?></tbody>
@@ -482,10 +423,9 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     <?php if ($footerNoteDisplay !== ''): ?>
       <p class="matrix-footer-note"><?php echo htmlspecialchars($footerNoteDisplay, ENT_QUOTES, 'UTF-8'); ?></p>
     <?php endif; ?>
-    <hr class="matrix-dash">
-    <div class="matrix-sigs">
-      <span>Handed Over</span>
-      <span>Receiver</span>
+    <div class="matrix-sig-row">
+      <span class="matrix-sig-l">Handed Over</span>
+      <span class="matrix-sig-r">Receiver</span>
     </div>
   </article>
 </div>
