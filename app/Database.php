@@ -25,11 +25,6 @@ class Database
         ];
 
         self::$pdo = new PDO($dsn, $db['username'], $db['password'], $options);
-        try {
-            self::$pdo->exec("SET time_zone = '+05:30'");
-        } catch (Throwable $e) {
-            /* non-fatal if server disallows SET time_zone */
-        }
         return self::$pdo;
     }
 }

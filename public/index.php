@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../app/bootstrap.php';
+date_default_timezone_set('Asia/Colombo');
 
 $page = $_GET['page'] ?? 'dashboard';
 
@@ -1213,18 +1214,17 @@ switch ($page) {
             $due = max(0, $total_amount - $total_paid);
 
             // Find today's delivery note for this customer at current branch (if any)
-            $todayStr = date('Y-m-d');
             $todayDnId = null;
             if ($branchId > 0) {
-                $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
-                $stmt->execute([$id, $branchId, $todayStr]);
+                $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=CURDATE() LIMIT 1');
+                $stmt->execute([$id, $branchId]);
                 $row = $stmt->fetch();
                 if ($row) { $todayDnId = (int)$row['id']; }
             }
-            // Last delivery note for this customer created today only (no older bills)
+            // Find the last delivery note id for this customer (any branch/date)
             $lastDnId = null;
-            $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND delivery_date=? ORDER BY id DESC LIMIT 1');
-            $stmt->execute([$id, $todayStr]);
+            $stmt = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? ORDER BY delivery_date DESC, id DESC LIMIT 1');
+            $stmt->execute([$id]);
             $row = $stmt->fetch();
             if ($row) { $lastDnId = (int)$row['id']; }
             echo json_encode([
@@ -2571,16 +2571,15 @@ switch ($page) {
                     $parcel['from_branch_id'] = $defFrom;
                 }
             }
-            // Last bill (most recent parcel today only) for "Open last bill" / "Add more parcel" options
+            // Last bill (most recent parcel) for "Open last bill" / "Add more parcel" options
             $lastParcel = null;
-            $todayParcels = date('Y-m-d');
             try {
                 $lastStmt = $pdo->prepare('SELECT id, customer_id, vehicle_no, from_branch_id, to_branch_id, created_at
                                            FROM parcels
                                            WHERE DATE(created_at) = ?
-                                           ORDER BY id DESC
+                                           ORDER BY created_at DESC, id DESC
                                            LIMIT 1');
-                $lastStmt->execute([$todayParcels]);
+                $lastStmt->execute([date('Y-m-d')]);
                 $lastParcel = $lastStmt->fetch() ?: null;
             } catch (Throwable $e) { /* ignore */ }
 
@@ -2897,8 +2896,8 @@ switch ($page) {
             $customer_id = (int)($_GET['customer_id'] ?? 0);
             if ($customer_id <= 0) { echo json_encode(['ok'=>false,'error'=>'customer_id required']); break; }
             try {
-                $st = $pdo->prepare('SELECT id, delivery_date FROM delivery_notes WHERE customer_id=? AND delivery_date=? ORDER BY id DESC LIMIT 1');
-                $st->execute([$customer_id, date('Y-m-d')]);
+                $st = $pdo->prepare('SELECT id, delivery_date FROM delivery_notes WHERE customer_id=? ORDER BY delivery_date DESC, id DESC LIMIT 1');
+                $st->execute([$customer_id]);
                 $row = $st->fetch();
                 $dnId = $row ? (int)($row['id'] ?? 0) : 0;
                 echo json_encode(['ok'=>true,'data'=>[
@@ -4081,7 +4080,7 @@ switch ($page) {
 
         if ($action === 'print') {
             $id = (int)($_GET['id'] ?? 0);
-            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS customer_delivery_location, b.name AS branch_name FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id LEFT JOIN branches b ON b.id=dn.branch_id WHERE dn.id=?');
+            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, b.name AS branch_name FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id LEFT JOIN branches b ON b.id=dn.branch_id WHERE dn.id=?');
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }

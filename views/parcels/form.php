@@ -1359,8 +1359,7 @@
     . '&to_branch_id='.(int)($parcel['to_branch_id'] ?? 0)
     . '&date='.urlencode($sameDayDateNew)) : '';
 ?>
-<?php if (empty($parcel['id'])): ?>
-<?php if ($isNewPrefilled || !empty($lastParcel)): ?>
+<?php if (empty($parcel['id']) && ($isNewPrefilled || !empty($lastParcel))): ?>
 <div class="card mb-2 pf-aux-banner shadow-sm">
   <div class="card-body py-2 px-3">
     <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center gap-2 pf-lastbill-actions">
@@ -1377,13 +1376,6 @@
     </div>
   </div>
 </div>
-<?php elseif (!$isNewPrefilled): ?>
-<div class="card mb-2 pf-aux-banner shadow-sm">
-  <div class="card-body py-2 px-3">
-    <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>No bill created today.</span>
-  </div>
-</div>
-<?php endif; ?>
 <?php endif; ?>
 
 <?php if ($isEdit && !empty($parcel['id']) && !$statusOnlyEdit): ?>

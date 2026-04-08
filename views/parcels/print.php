@@ -23,6 +23,15 @@ foreach ($invoiceHeaderBranches as $col) {
     break;
   }
 }
+$logoArch = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_arch_color'] ?? 'c00') ?: 'c00');
+$logoBarBg = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_bar_bg'] ?? '000') ?: '000');
+$logoBarColor = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_bar_color'] ?? 'fff') ?: 'fff');
+$logoTitleColor = '#' . (preg_replace('/[^0-9a-fA-F]/', '', $brand['logo_title_color'] ?? 'c00') ?: 'c00');
+if (strlen($logoArch) === 4) { $c = $logoArch[1].$logoArch[1].$logoArch[2].$logoArch[2].$logoArch[3].$logoArch[3]; $logoArch = '#'.$c; }
+if (strlen($logoBarBg) === 4) { $c = $logoBarBg[1].$logoBarBg[1].$logoBarBg[2].$logoBarBg[2].$logoBarBg[3].$logoBarBg[3]; $logoBarBg = '#'.$c; }
+if (strlen($logoBarColor) === 4) { $c = $logoBarColor[1].$logoBarColor[1].$logoBarColor[2].$logoBarColor[2].$logoBarColor[3].$logoBarColor[3]; $logoBarColor = '#'.$c; }
+if (strlen($logoTitleColor) === 4) { $c = $logoTitleColor[1].$logoTitleColor[1].$logoTitleColor[2].$logoTitleColor[2].$logoTitleColor[3].$logoTitleColor[3]; $logoTitleColor = '#'.$c; }
+
 $regNo = $brand['reg_no'] ?? '';
 $routeTamilParts = $brand['route_tamil_parts'] ?? ['கொழும்பு', 'கிளிநொச்சி', 'முல்லைத்தீவு'];
 $addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 12, 'all');
@@ -65,20 +74,20 @@ if ($items && count($items) > 0) {
     $total += $amt;
     $rs = floor($amt);
     $tableBodyHtml .= '<tr>'
-      . '<td class="matrix-td-qty">' . ($qty > 0 ? htmlspecialchars(number_format($qty, 2)) : '') . '</td>'
-      . '<td class="matrix-td-desc">' . htmlspecialchars((string)$i['description']) . '</td>'
-      . '<td class="matrix-td-rate">' . ($rate > 0 ? htmlspecialchars(number_format($rate, 2)) : '') . '</td>'
-      . '<td class="matrix-td-amt">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
+      . '<td class="text-end">' . ($qty > 0 ? htmlspecialchars(number_format($qty, 2)) : '') . '</td>'
+      . '<td>' . htmlspecialchars((string)$i['description']) . '</td>'
+      . '<td class="text-end">' . ($rate > 0 ? htmlspecialchars(number_format($rate, 2)) : '') . '</td>'
+      . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
       . '</tr>';
   }
 } else {
   $amt = (float)($parcel['price'] ?? 0);
   $rs = floor($amt);
   $tableBodyHtml = '<tr>'
-    . '<td class="matrix-td-qty">' . htmlspecialchars(number_format((float)($parcel['weight'] ?? 0), 2)) . '</td>'
-    . '<td class="matrix-td-desc">' . htmlspecialchars((string)($parcel['tracking_number'] ?? '')) . '</td>'
-    . '<td class="matrix-td-rate">' . ($amt > 0 ? htmlspecialchars(number_format($amt, 2)) : '') . '</td>'
-    . '<td class="matrix-td-amt">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
+    . '<td class="text-end">' . htmlspecialchars(number_format((float)($parcel['weight'] ?? 0), 2)) . '</td>'
+    . '<td>' . htmlspecialchars((string)($parcel['tracking_number'] ?? '')) . '</td>'
+    . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($amt, 2)) : '') . '</td>'
+    . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
     . '</tr>';
   $total = $amt;
 }
@@ -97,15 +106,6 @@ if (function_exists('mb_substr')) {
   $logoInitials = substr($logoInitials, 0, 6);
 }
 $logoInitials = $logoInitials ?: 'TS';
-
-$custNameDisp = trim((string)($parcel['customer_name'] ?? ''));
-$custPhoneDisp = trim((string)($parcel['customer_phone'] ?? ''));
-$delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
-$addrSlots = array_values($addresses);
-while (count($addrSlots) < 3) {
-  $addrSlots[] = '';
-}
-$addrSlots = array_slice($addrSlots, 0, 3);
 ?>
 <!doctype html>
 <html lang="en">
@@ -113,260 +113,469 @@ $addrSlots = array_slice($addrSlots, 0, 3);
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Invoice #<?php echo (int)$parcel['id']; ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    /* Minimal Bootstrap fallbacks for iframe previews.
+       If external CSS (Bootstrap) is blocked on cPanel, these keep alignment consistent. */
+    .text-end { text-align: right !important; }
     .text-muted { color: #6c757d !important; }
+    .fw-bold { font-weight: 700 !important; }
     .small { font-size: 0.875em !important; }
 
-    * { box-sizing: border-box; line-height: 1.2; }
-    .matrix-sheet hr { margin: 3px 0; border: 0; border-top: 1px solid #000; }
+    :root {
+      --brand: <?php echo $logoTitleColor; ?>;
+      --logo-arch: <?php echo $logoArch; ?>;
+      --logo-bar-bg: <?php echo $logoBarBg; ?>;
+      --logo-bar-color: <?php echo $logoBarColor; ?>;
+      --inv-pad: 6px;
+      --inv-gap: 4px;
+    }
+    * { box-sizing: border-box; }
     html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body.parcel-print-embed { padding: 0; }
+    body.parcel-print-embed {
+      padding: 4px;
+    }
     body {
       margin: 0;
-      padding: 0;
-      font-family: "Courier New", monospace;
-      font-size: 12px;
-      line-height: 1.2;
-      color: #000;
+      padding: 8px;
+      font-family: system-ui, "Segoe UI", Roboto, "Noto Sans Tamil", "Noto Sans", "Latha", Tahoma, sans-serif;
+      font-size: 11px;
+      line-height: 1.25;
+      color: #111;
       background: #fff;
     }
-    .matrix-root {
+    .a4-root {
       width: 100%;
-      max-width: 100%;
-      margin: 0;
-      padding: 5px;
-    }
-    .no-print.matrix-logo-strip {
-      display: flex;
-      align-items: flex-start;
-      gap: 4px;
-      margin: 0;
-      padding: 2px 0;
-      line-height: 1.1;
-    }
-    .no-print.matrix-logo-strip img {
-      display: block;
-      margin: 0;
-      padding: 0;
-      height: 40px;
-      width: auto;
-    }
-    .no-print.matrix-logo-strip .logo-wrap {
-      border: 1px solid #000;
-      padding: 4px 6px;
-      font-weight: bold;
-      font-size: 12px;
-      background: #fff;
-    }
-    .no-print.matrix-logo-strip .bar-small {
-      border: 1px solid #000;
-      padding: 1px 4px;
-      font-size: 8px;
-      font-weight: bold;
-      background: #fff;
-    }
-    .matrix-sheet {
-      border: 1px solid #000;
-      padding: 3px;
+      max-width: min(210mm, 100%);
       margin: 0 auto;
+      padding: 0 4px;
+    }
+    .invoice-sheet {
+      border: 1px solid #000;
+      padding: var(--inv-pad);
+      margin-bottom: 12px;
       page-break-inside: avoid;
-      border-radius: 0;
+      break-inside: avoid;
     }
-    .matrix-sheet h1,
-    .matrix-sheet h2,
-    .matrix-sheet h3,
-    .matrix-sheet p {
-      margin: 2px 0;
-      padding: 0;
+    .inv-header {
+      display: grid;
+      grid-template-columns: 44px 1fr auto;
+      align-items: center;
+      gap: 6px 8px;
+      padding-bottom: var(--inv-gap);
+      border-bottom: 1px solid #000;
     }
-    .matrix-co-name {
-      margin: 2px 0;
-      padding: 0;
+    .inv-logo-img { max-height: 36px; width: auto; display: block; }
+    .logo-unit { display: flex; flex-direction: column; align-items: flex-start; }
+    .logo-unit .logo-wrap {
+      width: 40px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--logo-arch);
+      border-radius: 50% 50% 0 0;
+      font-weight: 800; font-size: 13px;
+      color: var(--logo-bar-color);
+      border: 1px solid #000;
+    }
+    .logo-unit .bar-small {
+      background: var(--logo-bar-bg);
+      color: var(--logo-bar-color);
+      padding: 1px 5px;
+      font-size: 7px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-top: 1px;
+      max-width: 44px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .inv-company {
       text-align: center;
-      font-size: 16px;
-      line-height: 1.2;
-      font-weight: bold;
+      font-weight: 800;
+      font-size: 15px;
+      line-height: 1.15;
+      color: var(--brand);
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-    .matrix-reg-row {
+    .inv-regdate {
       text-align: right;
-      font-size: 11px;
-      margin: 1px 0;
-      padding: 0 0 2px;
-      line-height: 1.1;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
     }
-    .matrix-route {
+    .inv-print-header-block {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .inv-route {
       text-align: center;
       font-size: 11px;
-      margin: 0 0 1px;
-      padding: 0 0 2px;
-      line-height: 1.1;
-      border-bottom: 1px solid #000;
+      line-height: 1.2;
+      padding: 2px 0;
+      border-bottom: 1px solid #ccc;
     }
-    .matrix-route .sep { margin: 0 2px; }
-    .matrix-branches {
+    .inv-route span.sep { color: #555; margin: 0 3px; }
+    .inv-branches-3 {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 4px 8px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      column-gap: 8px;
+      row-gap: 0;
+      padding: 3px 0 4px;
+      border-bottom: 1px solid #ccc;
+      font-size: 10.5px;
+      line-height: 1.2;
+      align-items: start;
+    }
+    .inv-branch-col {
+      min-width: 0;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .inv-branches-3 .bc-name {
+      font-weight: 700;
       font-size: 11px;
       line-height: 1.2;
-      margin: 0 0 3px;
-      padding-bottom: 3px;
-      border-bottom: 1px solid #000;
-      page-break-inside: avoid;
+      margin-bottom: 1px;
     }
-    .matrix-bc { min-width: 0; word-wrap: break-word; white-space: normal; }
-    .matrix-bc-col1 { text-align: left; }
-    .matrix-bc-col2 { text-align: center; }
-    .matrix-bc-col3 { text-align: right; }
-    .matrix-bc .bc-name { font-weight: bold; margin-bottom: 1px; }
-    .matrix-bc .bc-line { margin: 0; padding: 0; font-size: 10px; line-height: 1.2; }
-    .matrix-inv-wrap {
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
-      padding: 2px 0;
-      margin: 3px 0 4px;
-    }
-    .matrix-inv-meta {
+    .inv-branches-3 .bc-line { font-size: 10px; line-height: 1.2; margin: 0; padding: 0; }
+    .inv-invoice-row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin: 0;
-      font-weight: bold;
+      gap: 8px;
+      padding: 2px 0 3px;
       line-height: 1.2;
     }
-    .matrix-inv-meta .matrix-date { white-space: nowrap; }
+    .inv-customer-row,
     .customer-row {
-      display: flex;
-      justify-content: space-between;
-      margin: 3px 0;
-      font-size: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: center;
+      column-gap: 8px;
+      padding: 2px 0 3px;
+      border-bottom: 1px solid #ccc;
+      font-size: 11px;
       line-height: 1.2;
     }
+    .inv-customer-row > div,
     .customer-row > div {
-      width: 33.33%;
       min-width: 0;
-      font-family: "Courier New", monospace;
-      font-size: 12px;
-      line-height: 1.2;
-      word-wrap: break-word;
-      overflow-wrap: anywhere;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .customer-row .col-left { text-align: left; }
-    .customer-row .col-center { text-align: center; }
-    .customer-row .col-right { text-align: right; }
-    table.matrix-tbl {
+    .inv-customer-left { text-align: left; }
+    .inv-customer-center { text-align: center; }
+    .inv-customer-right { text-align: right; }
+    .inv-invoice-title {
+      margin: 0;
+      text-align: left;
+      font-weight: 700;
+      font-size: 13px;
+      color: #b00;
+    }
+    .inv-invoice-date {
+      text-align: right;
+      font-size: 10px;
+      font-weight: 600;
+      color: #111;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .inv-body { display: block; }
+    table.inv-tbl {
       width: 100%;
       border-collapse: collapse;
+      font-size: 10px;
+      line-height: 1.2;
       table-layout: fixed;
-      font-family: "Courier New", monospace;
-      font-size: 12px;
     }
-    table.matrix-tbl th,
-    table.matrix-tbl td {
+    table.inv-tbl th, table.inv-tbl td {
       border: 1px solid #000;
-      padding: 1px 2px;
+      padding: 3px 5px;
       vertical-align: top;
-      word-wrap: break-word;
-      white-space: normal;
     }
-    table.matrix-tbl thead th {
-      font-weight: bold;
-      background: #fff;
-      color: #000;
+    table.inv-tbl th {
+      background: #eee;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 9px;
+      letter-spacing: 0.02em;
     }
-    .matrix-th-qty, .matrix-td-qty { text-align: center; width: 12%; }
-    .matrix-th-desc, .matrix-td-desc { text-align: left; width: 48%; }
-    .matrix-th-rate, .matrix-td-rate { text-align: right; width: 18%; }
-    .matrix-th-amt, .matrix-td-amt { text-align: right; width: 22%; }
-    .matrix-total {
-      margin-top: 3px;
-      text-align: right;
-      font-weight: bold;
-      font-size: 12px;
-      line-height: 1.2;
-    }
-    .matrix-footer-note {
-      margin: 4px 0 2px;
-      text-align: center;
-      font-size: 11px;
-      line-height: 1.2;
-      word-wrap: break-word;
-    }
-    .matrix-sig-row {
-      border-top: 1px solid #000;
-      padding-top: 3px;
-      margin-top: 3px;
+    table.inv-tbl col.qty { width: 11%; }
+    table.inv-tbl col.desc { width: auto; }
+    table.inv-tbl col.rate { width: 14%; }
+    table.inv-tbl col.amt { width: 14%; }
+    .inv-total-row {
       display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      font-weight: bold;
+      justify-content: flex-end;
+      align-items: baseline;
+      gap: 8px;
+      padding-top: 6px;
+      padding-bottom: 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .inv-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: stretch;
+      margin-top: 6px;
+      padding-top: 8px;
+      padding-bottom: 6px;
+      font-size: 9px;
       line-height: 1.2;
     }
-    .matrix-sig-l { text-align: left; }
-    .matrix-sig-r { text-align: right; }
-    @media screen and (max-width: 720px) {
-      .matrix-branches { grid-template-columns: 1fr; }
-      .matrix-bc-col1, .matrix-bc-col2, .matrix-bc-col3 { text-align: left; }
+    .inv-footer .note {
+      color: #444;
+      font-size: 10px;
+      line-height: 1.45;
+      max-width: 100%;
+      margin: 0;
+      padding-bottom: 4px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .inv-sigs {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 100%;
+      column-gap: 20px;
+      padding: 4px 4px 2px;
+      margin-top: 0;
+    }
+    .inv-footer .sig {
+      flex: 0 1 38%;
+      min-width: 7.5rem;
+      max-width: 42%;
+      border-top: 1px dashed #333;
+      padding-top: 3px;
+      padding-bottom: 2px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 9px;
+    }
+    @media screen and (max-width: 640px) {
+      body { padding: 6px; }
+      .a4-root { padding: 0 2px; }
+      .inv-header {
+        grid-template-columns: 36px 1fr;
+        grid-template-rows: auto auto;
+      }
+      .inv-logo-cell { grid-column: 1; grid-row: 1; }
+      .inv-company { grid-column: 2; grid-row: 1; font-size: 13px; }
+      .inv-regdate { grid-column: 1 / -1; grid-row: 2; text-align: right; }
+      .inv-branches-3 {
+        grid-template-columns: 1fr;
+        row-gap: 10px;
+        column-gap: 0;
+        padding-bottom: 8px;
+      }
+      .inv-branch-col {
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e5e5;
+      }
+      .inv-branch-col:last-child { border-bottom: none; padding-bottom: 0; }
+      .inv-invoice-row { flex-wrap: wrap; gap: 4px; }
+      .inv-sigs {
+        column-gap: 12px;
+        padding: 0;
+      }
+      .inv-footer .sig {
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: none;
+        font-size: 8.5px;
+        padding-top: 3px;
+      }
     }
     @media print {
       .no-print { display: none !important; }
-      @page { size: A5 landscape; margin: 0; }
+      @page { size: A4; margin: 8mm; }
+      /* Dot matrix / impact: monospace, black ink, no faint grays or screen-only red */
       body {
-        margin: 0 !important;
-        padding: 0 !important;
-        font-family: "Courier New", monospace !important;
-        font-size: 12px !important;
-        line-height: 1.2;
+        padding: 0;
+        margin: 0;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #000 !important;
+        background: #fff !important;
+        -webkit-font-smoothing: auto;
+        -moz-osx-font-smoothing: auto;
+      }
+      * {
+        color: #000 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        background-image: none !important;
+      }
+      .inv-company {
         color: #000 !important;
       }
-      .matrix-root { padding: 0 !important; margin: 0 !important; }
-      .matrix-sheet {
+      .inv-route {
+        border-bottom: 1px solid #000 !important;
+      }
+      .inv-route .sep {
+        color: #000 !important;
+      }
+      .inv-branches-3 {
+        border-bottom: 1px solid #000 !important;
+        font-size: 11px;
+        column-gap: 6px;
+      }
+      .inv-customer-row,
+      .customer-row {
+        border-bottom: 1px solid #000 !important;
+        font-size: 11px;
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+      }
+      .inv-customer-row > div,
+      .customer-row > div {
+        display: table-cell !important;
+        width: 33.33% !important;
+        white-space: nowrap !important;
+        vertical-align: middle !important;
+      }
+      .inv-branches-3 .bc-name { font-size: 12px; }
+      .inv-branches-3 .bc-line { font-size: 11px; }
+      .inv-invoice-title {
+        color: #000 !important;
+        font-size: 14px !important;
+      }
+      .inv-invoice-date {
+        color: #000 !important;
+        font-size: 11px !important;
+      }
+      .inv-invoice-row {
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+      }
+      .inv-invoice-row > div {
+        display: table-cell !important;
+        width: 50% !important;
+        white-space: nowrap !important;
+        vertical-align: baseline !important;
+      }
+      .inv-invoice-row > div:last-child {
+        text-align: right !important;
+      }
+      .inv-regdate {
+        color: #000 !important;
+        font-size: 11px !important;
+      }
+      table.inv-tbl {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        font-size: 11px;
+      }
+      table.inv-tbl,
+      table.inv-tbl th,
+      table.inv-tbl td {
         border: 1px solid #000 !important;
-        border-radius: 0 !important;
-        padding: 3px !important;
-        margin: 0 auto !important;
       }
-      .matrix-co-name {
-        margin: 2px 0 !important;
-        padding: 0 !important;
-        line-height: 1.2 !important;
+      table.inv-tbl th,
+      table.inv-tbl td {
+        padding: 4px 6px !important;
       }
-      .matrix-reg-row {
-        margin: 1px 0 !important;
-        padding: 0 0 2px !important;
-        line-height: 1.1 !important;
+      table.inv-tbl th {
+        background: #fff !important;
+        color: #000 !important;
+        font-size: 10px !important;
+        font-weight: 800 !important;
+        border-bottom: 1px solid #000 !important;
+        text-transform: uppercase;
       }
-      .matrix-route {
-        margin: 0 0 1px !important;
-        padding: 0 0 2px !important;
-        line-height: 1.1 !important;
+      .inv-total-row {
+        font-size: 13px !important;
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
       }
-      .matrix-branches { grid-template-columns: 1fr 1fr 1fr !important; }
-      .matrix-bc-col1 { text-align: left !important; }
-      .matrix-bc-col2 { text-align: center !important; }
-      .matrix-bc-col3 { text-align: right !important; }
-      table.matrix-tbl th, table.matrix-tbl td {
-        border: 1px solid #000 !important;
-        padding: 1px 2px !important;
+      .inv-total-row > span {
+        display: table-cell !important;
+        width: 50% !important;
       }
+      .inv-total-row > span:last-child {
+        text-align: right !important;
+      }
+      .inv-footer .note {
+        color: #000 !important;
+        font-size: 11px !important;
+      }
+      .invoice-sheet,
+      .inv-header,
+      .inv-footer,
+      .inv-sigs,
+      .inv-footer .sig {
+        border-color: #000 !important;
+      }
+      .inv-footer .sig {
+        border-top: 1px solid #000 !important;
+        border-top-style: solid !important;
+        font-size: 10px !important;
+        font-weight: 700 !important;
+      }
+      .logo-unit .logo-wrap {
+        border-color: #000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .logo-unit .bar-small {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .a4-root {
+        width: 100%;
+        max-width: 210mm;
+        margin: 0 auto;
+        padding: 0;
+        display: block;
+      }
+      .invoice-sheet {
+        margin-bottom: 0;
+        overflow: visible;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        box-shadow: none !important;
+        border-color: #000 !important;
+      }
+      .inv-header {
+        border-bottom: 1px solid #000 !important;
+      }
+      .inv-print-header-block {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .inv-footer { gap: 12px; padding-top: 6px; padding-bottom: 6px; }
+      .inv-sigs { padding-top: 2px; }
+      .inv-footer .sig { padding-top: 4px; }
     }
   </style>
 </head>
 <body<?php echo $printEmbed ? ' class="parcel-print-embed"' : ''; ?>>
 <?php if (!$printEmbed): ?>
-<div class="no-print mb-2 d-flex flex-wrap gap-2 align-items-center">
+<div class="no-print mb-2 d-flex flex-wrap gap-2">
   <a class="btn btn-secondary btn-sm" href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=parcels')); ?>">Back</a>
   <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
   <?php if (!$hasInvoiceCols): ?>
   <button type="button" id="toggleAddrEditor" class="btn btn-outline-secondary btn-sm">Edit header addresses</button>
   <?php endif; ?>
-  <span class="small text-muted">Print: A5 landscape recommended — matrix-style invoice.</span>
 </div>
 <?php if (!$hasInvoiceCols): ?>
-<div id="addrEditor" class="no-print card card-body p-2 mb-2" style="display:none; max-width:100%; margin:0 auto;">
+<div id="addrEditor" class="no-print card card-body p-2 mb-2" style="display:none; max-width:210mm; margin:0 auto;">
   <div class="small text-muted mb-1">One address per line. Applies to this invoice only.</div>
   <textarea id="addrTextarea" class="form-control form-control-sm" rows="4"></textarea>
   <div class="mt-2 d-flex gap-2">
@@ -377,43 +586,40 @@ $addrSlots = array_slice($addrSlots, 0, 3);
 <?php endif; ?>
 <?php endif; ?>
 
-<div class="matrix-root a4-root receipt thermal-receipt">
-  <article class="matrix-sheet invoice-sheet">
-    <div class="no-print matrix-logo-strip">
-      <?php if ($useLogoImage): ?>
-        <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
-        <div><img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="" style="height:40px;max-width:120px"></div>
-      <?php else: ?>
-        <div class="logo-unit">
-          <div class="logo-wrap"><?php echo htmlspecialchars(strtoupper($logoInitials)); ?></div>
-          <?php
-            $__bn = strtoupper((string)($brand['name'] ?? 'TS'));
-            $__bn = function_exists('mb_substr') ? mb_substr($__bn, 0, 8) : substr($__bn, 0, 8);
-          ?>
-          <span class="bar-small"><?php echo htmlspecialchars($__bn); ?></span>
-        </div>
-      <?php endif; ?>
-    </div>
-
-    <h1 class="matrix-co-name"><?php echo htmlspecialchars($brand['name'] ?? 'TS TRANSPORT'); ?></h1>
-    <?php if ($regNo !== ''): ?>
-      <div class="matrix-reg-row">Reg: <?php echo htmlspecialchars($regNo); ?></div>
-    <?php endif; ?>
-
-    <div class="matrix-route">
+<div class="a4-root">
+  <article class="invoice-sheet">
+    <div class="inv-print-header-block">
+    <header class="inv-header">
+      <div class="inv-logo-cell">
+        <?php if ($useLogoImage): ?>
+          <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
+          <img class="inv-logo-img" src="<?php echo htmlspecialchars($logoUrl); ?>" alt="">
+        <?php else: ?>
+          <div class="logo-unit">
+            <div class="logo-wrap"><?php echo htmlspecialchars(strtoupper($logoInitials)); ?></div>
+            <?php
+              $__bn = strtoupper((string)($brand['name'] ?? 'TS'));
+              $__bn = function_exists('mb_substr') ? mb_substr($__bn, 0, 8) : substr($__bn, 0, 8);
+            ?>
+            <span class="bar-small"><?php echo htmlspecialchars($__bn); ?></span>
+          </div>
+        <?php endif; ?>
+      </div>
+      <div class="inv-company"><?php echo htmlspecialchars($brand['name'] ?? 'TS Transport'); ?></div>
+      <div class="inv-regdate">
+        <?php if ($regNo !== ''): ?><div>Reg: <?php echo htmlspecialchars($regNo); ?></div><?php endif; ?>
+      </div>
+    </header>
+    <div class="inv-route">
       <?php foreach ($routeTamilParts as $i => $part): ?>
-        <?php if ($i > 0): ?><span class="sep">|</span><?php endif; ?>
+        <?php if ($i > 0): ?><span class="sep">⟷</span><?php endif; ?>
         <span><?php echo htmlspecialchars($part); ?></span>
       <?php endforeach; ?>
     </div>
-
-    <div class="matrix-branches<?php echo !$hasInvoiceCols ? ' js-addr-container' : ''; ?>" aria-label="Branch addresses">
-      <?php if ($hasInvoiceCols): ?>
-        <?php
-          $bcAlign = ['matrix-bc-col1', 'matrix-bc-col2', 'matrix-bc-col3'];
-          foreach ($invoiceHeaderBranches as $bi => $b):
-        ?>
-          <div class="matrix-bc <?php echo $bcAlign[$bi] ?? 'matrix-bc-col1'; ?>">
+    <?php if ($hasInvoiceCols): ?>
+      <div class="inv-branches-3" aria-label="Branch addresses">
+        <?php foreach ($invoiceHeaderBranches as $b): ?>
+          <div class="inv-branch-col">
             <?php if (is_array($b)): ?>
               <?php
                 $bn = trim((string)($b['name'] ?? ''));
@@ -428,54 +634,53 @@ $addrSlots = array_slice($addrSlots, 0, 3);
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
-      <?php else: ?>
-        <div class="matrix-bc matrix-bc-col1">
-          <div class="addr-line"><?php echo $addrSlots[0] !== '' ? nl2br(htmlspecialchars($addrSlots[0])) : '&nbsp;'; ?></div>
-        </div>
-        <div class="matrix-bc matrix-bc-col2">
-          <div class="addr-line"><?php echo $addrSlots[1] !== '' ? nl2br(htmlspecialchars($addrSlots[1])) : '&nbsp;'; ?></div>
-        </div>
-        <div class="matrix-bc matrix-bc-col3">
-          <div class="addr-line"><?php echo $addrSlots[2] !== '' ? nl2br(htmlspecialchars($addrSlots[2])) : '&nbsp;'; ?></div>
-        </div>
-      <?php endif; ?>
-    </div>
-
-    <div class="matrix-inv-wrap">
-      <div class="matrix-inv-meta">
-        <span>Invoice No: #<?php echo (int)$invoiceNo; ?></span>
-        <span class="matrix-date">Date: <?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></span>
       </div>
+    <?php else: ?>
+      <div class="inv-branches-3 js-addr-container">
+        <?php foreach ($addresses as $addr): ?>
+          <div class="addr-line"><?php echo nl2br(htmlspecialchars($addr)); ?></div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+    </div>
+    <div class="inv-customer-row customer-row" aria-label="Customer details">
+      <div class="inv-customer-left left">Customer: <?php echo htmlspecialchars(trim((string)($parcel['customer_name'] ?? ''))); ?></div>
+      <div class="inv-customer-center center">Phone: <?php echo htmlspecialchars(trim((string)($parcel['customer_phone'] ?? ''))); ?></div>
+      <div class="inv-customer-right right">Delivery: <?php echo htmlspecialchars(trim((string)($parcel['delivery_location'] ?? ''))); ?></div>
+    </div>
+    <div class="inv-invoice-row">
+      <div class="inv-invoice-title">Invoice No. #<?php echo (int)$invoiceNo; ?></div>
+      <div class="inv-invoice-date">Date: <?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></div>
     </div>
 
-    <?php if ($custNameDisp !== '' || $custPhoneDisp !== '' || $delLocDisp !== ''): ?>
-    <div class="customer-row" aria-label="Customer details">
-      <div class="col-left">Customer: <?php echo $custNameDisp !== '' ? htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8') : ''; ?></div>
-      <div class="col-center">Phone: <?php echo $custPhoneDisp !== '' ? htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8') : ''; ?></div>
-      <div class="col-right">Delivery Location:<?php if ($delLocDisp !== ''): ?><br><?php echo nl2br(htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8')); ?><?php endif; ?></div>
-    </div>
-    <?php endif; ?>
-
-    <table class="matrix-tbl">
-      <thead>
-        <tr>
-          <th class="matrix-th-qty">QTY</th>
-          <th class="matrix-th-desc">DESCRIPTION</th>
-          <th class="matrix-th-rate">RATE</th>
-          <th class="matrix-th-amt">AMOUNT</th>
-        </tr>
-      </thead>
-      <tbody><?php echo $tableBodyHtml; ?></tbody>
-    </table>
-
-    <div class="matrix-total">Total (Rs): <?php echo htmlspecialchars(number_format($grs)); ?></div>
-
-    <?php if ($footerNoteDisplay !== ''): ?>
-      <p class="matrix-footer-note"><?php echo htmlspecialchars($footerNoteDisplay, ENT_QUOTES, 'UTF-8'); ?></p>
-    <?php endif; ?>
-    <div class="matrix-sig-row">
-      <span class="matrix-sig-l">Handed Over</span>
-      <span class="matrix-sig-r">Receiver</span>
+    <div class="inv-body">
+      <table class="inv-tbl">
+        <colgroup>
+          <col class="qty"><col class="desc"><col class="rate"><col class="amt">
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="text-end">Qty</th>
+            <th>Description</th>
+            <th class="text-end">Rate</th>
+            <th class="text-end">Amount</th>
+          </tr>
+        </thead>
+        <tbody><?php echo $tableBodyHtml; ?></tbody>
+      </table>
+      <div class="inv-total-row">
+        <span>Total (Rs)</span>
+        <span><?php echo htmlspecialchars(number_format($grs)); ?></span>
+      </div>
+      <div class="inv-footer">
+        <?php if ($footerNoteDisplay !== ''): ?>
+        <p class="note"><?php echo htmlspecialchars($footerNoteDisplay, ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php endif; ?>
+        <div class="inv-sigs">
+          <div class="sig">Handed Over</div>
+          <div class="sig">Receiver</div>
+        </div>
+      </div>
     </div>
   </article>
 </div>
@@ -487,29 +692,31 @@ $addrSlots = array_slice($addrSlots, 0, 3);
   var ta = document.getElementById('addrTextarea');
   if (t && ed && ta) {
     function getLines() {
-      var cont = document.querySelector('.js-addr-container');
-      if (!cont) return [];
-      var nodes = cont.querySelectorAll('.matrix-bc .addr-line');
+      var first = document.querySelector('.js-addr-container');
+      if (!first) return [];
+      var nodes = first.querySelectorAll('.addr-line');
       var arr = [];
       for (var i = 0; i < nodes.length; i++) {
-        arr.push(nodes[i].textContent.replace(/\r/g, '').trim());
+        var s = nodes[i].textContent.replace(/\s+/g, ' ').trim();
+        if (s) arr.push(s);
       }
-      while (arr.length < 3) arr.push('');
-      return arr.slice(0, 3);
+      return arr;
     }
     ta.value = getLines().join('\n');
     t.addEventListener('click', function () {
       ed.style.display = ed.style.display === 'none' || ed.style.display === '' ? 'block' : 'none';
     });
     function apply() {
-      var raw = ta.value.replace(/\r/g, '').split('\n');
-      var parts = [0, 1, 2].map(function (i) { return (raw[i] !== undefined ? raw[i] : '').trim(); });
-      var cont = document.querySelector('.js-addr-container');
-      if (!cont) return;
-      var cols = cont.querySelectorAll('.matrix-bc .addr-line');
-      for (var j = 0; j < cols.length; j++) {
-        cols[j].innerHTML = parts[j] !== '' ? parts[j].replace(/\n/g, '<br>') : '&nbsp;';
-      }
+      var parts = ta.value.replace(/\r/g, '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+      document.querySelectorAll('.js-addr-container').forEach(function (cont) {
+        cont.innerHTML = '';
+        parts.forEach(function (line) {
+          var d = document.createElement('div');
+          d.className = 'addr-line';
+          d.textContent = line;
+          cont.appendChild(d);
+        });
+      });
     }
     var a = document.getElementById('applyAddr');
     var ap = document.getElementById('applyAndPrint');
@@ -518,10 +725,5 @@ $addrSlots = array_slice($addrSlots, 0, 3);
   }
 })();
 </script>
-<!--
-  Optional ESC/POS (raw thermal): generate fixed-width text or ESC/POS bytes server-side
-  and send to a receipt printer via OS print agent, USB, or network socket — not via HTML.
-  Typical flow: build lines with str_pad() for columns; GS v 0 for bitmap logo; LF line feeds.
--->
 </body>
 </html>
