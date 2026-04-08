@@ -134,8 +134,7 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       color: #000;
       background: #fff;
     }
-    body.matrix-print-page p,
-    body.matrix-print-page div { margin: 2px 0; }
+    .matrix-sheet > p:not(.matrix-footer-note) { margin: 2px 0; }
     .matrix-section { margin-bottom: 5px; }
     .matrix-root {
       width: 100%;
@@ -158,10 +157,11 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     }
     .matrix-logo-strip .logo-unit .logo-wrap {
       width: 40px;
+      min-height: 0;
       display: flex; align-items: center; justify-content: center;
       padding: 4px 2px;
       background: #ccc;
-      font-weight: 800; font-size: 13px;
+      font-weight: 800; font-size: 12px;
       color: #000;
       border: 1px solid #000;
       border-radius: 0;
@@ -177,12 +177,6 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .matrix-reg {
-      text-align: center;
-      margin: 0 0 2px;
-      font-size: 11px;
-      line-height: 1.2;
-    }
     .matrix-co-name {
       margin: 0 0 2px;
       text-align: center;
@@ -197,26 +191,36 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       font-size: 11px;
       margin: 0 0 4px;
       padding-bottom: 3px;
+      line-height: 1.2;
       border-bottom: 1px solid #000;
+    }
+    .matrix-route .sep { margin: 0 4px; }
+    .matrix-reg {
+      text-align: center;
+      margin: 0 0 2px;
+      font-size: 11px;
       line-height: 1.2;
     }
-    .matrix-route .sep { margin: 0 3px; }
-    /* 3 equal columns — same alignment as branch header (left, tight) */
     .matrix-branches {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 4px 10px;
-      font-size: 12px;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px 10px;
+      font-size: 11px;
       line-height: 1.2;
-      margin-bottom: 5px;
+      margin-bottom: 4px;
       padding-bottom: 4px;
       border-bottom: 1px solid #000;
       page-break-inside: avoid;
     }
-    .matrix-bc { min-width: 0; word-wrap: break-word; overflow-wrap: anywhere; white-space: normal; text-align: left; }
-    .matrix-bc-left, .matrix-bc-center, .matrix-bc-right { text-align: left; }
-    .matrix-bc .bc-name { font-weight: 700; margin: 0 0 1px; }
-    .matrix-bc .bc-line { margin: 0; padding: 0; font-size: 11px; line-height: 1.2; }
+    .matrix-bc {
+      min-width: 0;
+      text-align: left;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+    .matrix-bc .bc-name { font-weight: 700; margin-bottom: 1px; }
+    .matrix-bc .bc-line { margin: 0; padding: 0; font-size: 10px; line-height: 1.2; }
     .matrix-inv-meta {
       display: flex;
       justify-content: space-between;
@@ -227,30 +231,33 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       line-height: 1.2;
     }
     .matrix-inv-meta .matrix-date { font-weight: 700; white-space: nowrap; }
-    .matrix-customer-row {
+    .customer-row {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 4px 10px;
-      margin: 5px 0;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px 10px;
+      align-items: start;
+      margin: 4px 0 5px;
       padding: 4px 0;
       border-top: 1px solid #000;
       border-bottom: 1px solid #000;
       font-size: 12px;
       line-height: 1.2;
-      page-break-inside: avoid;
     }
-    .matrix-customer-row > div {
+    .customer-row .customer-col {
       min-width: 0;
       text-align: left;
       word-wrap: break-word;
       overflow-wrap: anywhere;
     }
-    .matrix-customer-row strong {
+    .customer-row .customer-col strong {
       display: block;
-      font-weight: 700;
-      margin: 0 0 1px;
+      font-weight: 800;
+      margin-bottom: 1px;
     }
-    .matrix-customer-val { white-space: pre-wrap; margin: 0; padding: 0; }
+    .customer-row .customer-val {
+      margin: 0;
+      white-space: pre-wrap;
+    }
     table.matrix-tbl {
       width: 100%;
       border-collapse: collapse;
@@ -283,7 +290,7 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       line-height: 1.2;
     }
     .matrix-footer-note {
-      margin: 6px 0 4px;
+      margin: 5px 0 4px;
       text-align: center;
       font-size: 11px;
       line-height: 1.25;
@@ -310,8 +317,8 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       border-top: 1px solid #000;
     }
     @media screen and (max-width: 720px) {
-      .matrix-branches,
-      .matrix-customer-row { grid-template-columns: 1fr; }
+      .matrix-branches { grid-template-columns: 1fr; }
+      .customer-row { grid-template-columns: 1fr; }
     }
     @media print {
       .no-print { display: none !important; }
@@ -323,8 +330,8 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       body {
         width: 100%;
         margin: 0;
-        padding: 0;
-        line-height: 1.2 !important;
+        padding: 5px;
+        line-height: 1.2;
         font-family: "Courier New", "Noto Sans Tamil", Courier, monospace !important;
         font-size: 12px !important;
         color: #000 !important;
@@ -338,7 +345,8 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       .matrix-branches {
         grid-template-columns: 1fr 1fr 1fr !important;
       }
-      .matrix-bc-left, .matrix-bc-center, .matrix-bc-right { text-align: left !important; }
+      .matrix-bc { text-align: left !important; }
+      .customer-row { grid-template-columns: 1fr 1fr 1fr !important; }
       table.matrix-tbl { font-size: 12px !important; }
       table.matrix-tbl th, table.matrix-tbl td {
         border: 1px solid #000 !important;
@@ -347,7 +355,7 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     }
   </style>
 </head>
-<body class="matrix-print-page<?php echo $printEmbed ? ' parcel-print-embed' : ''; ?>">
+<body<?php echo $printEmbed ? ' class="parcel-print-embed"' : ''; ?>>
 <?php if (!$printEmbed): ?>
 <div class="no-print mb-2 d-flex flex-wrap gap-2 align-items-center">
   <a class="btn btn-secondary btn-sm" href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=parcels')); ?>">Back</a>
@@ -389,7 +397,7 @@ $addrSlots = array_slice($addrSlots, 0, 3);
 
     <h1 class="matrix-co-name"><?php echo htmlspecialchars($brand['name'] ?? 'TS TRANSPORT'); ?></h1>
     <?php if ($regNo !== ''): ?>
-      <p class="matrix-reg matrix-section">Reg: <?php echo htmlspecialchars($regNo); ?></p>
+      <p class="matrix-reg">Reg: <?php echo htmlspecialchars($regNo); ?></p>
     <?php endif; ?>
 
     <div class="matrix-route">
@@ -401,11 +409,8 @@ $addrSlots = array_slice($addrSlots, 0, 3);
 
     <div class="matrix-branches<?php echo !$hasInvoiceCols ? ' js-addr-container' : ''; ?>" aria-label="Branch addresses">
       <?php if ($hasInvoiceCols): ?>
-        <?php
-          $aligns = ['matrix-bc-left', 'matrix-bc-center', 'matrix-bc-right'];
-          foreach ($invoiceHeaderBranches as $bi => $b):
-        ?>
-          <div class="matrix-bc <?php echo $aligns[$bi] ?? 'matrix-bc-left'; ?>">
+        <?php foreach ($invoiceHeaderBranches as $bi => $b): ?>
+          <div class="matrix-bc">
             <?php if (is_array($b)): ?>
               <?php
                 $bn = trim((string)($b['name'] ?? ''));
@@ -421,13 +426,13 @@ $addrSlots = array_slice($addrSlots, 0, 3);
           </div>
         <?php endforeach; ?>
       <?php else: ?>
-        <div class="matrix-bc matrix-bc-left">
+        <div class="matrix-bc">
           <div class="addr-line"><?php echo $addrSlots[0] !== '' ? nl2br(htmlspecialchars($addrSlots[0])) : '&nbsp;'; ?></div>
         </div>
-        <div class="matrix-bc matrix-bc-center">
+        <div class="matrix-bc">
           <div class="addr-line"><?php echo $addrSlots[1] !== '' ? nl2br(htmlspecialchars($addrSlots[1])) : '&nbsp;'; ?></div>
         </div>
-        <div class="matrix-bc matrix-bc-right">
+        <div class="matrix-bc">
           <div class="addr-line"><?php echo $addrSlots[2] !== '' ? nl2br(htmlspecialchars($addrSlots[2])) : '&nbsp;'; ?></div>
         </div>
       <?php endif; ?>
@@ -439,18 +444,20 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     </div>
 
     <?php if ($custNameDisp !== '' || $custPhoneDisp !== '' || $delLocDisp !== ''): ?>
-    <section class="matrix-customer-row matrix-section" aria-label="Customer details">
-      <div>
-        <strong>Customer</strong>
-        <div class="matrix-customer-val"><?php echo $custNameDisp !== '' ? htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
-      </div>
-      <div>
-        <strong>Phone</strong>
-        <div class="matrix-customer-val"><?php echo $custPhoneDisp !== '' ? htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
-      </div>
-      <div>
-        <strong>Delivery</strong>
-        <div class="matrix-customer-val"><?php echo $delLocDisp !== '' ? htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
+    <section class="matrix-section" aria-label="Customer details">
+      <div class="customer-row">
+        <div class="customer-col">
+          <strong>Customer</strong>
+          <div class="customer-val"><?php echo $custNameDisp !== '' ? htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
+        </div>
+        <div class="customer-col">
+          <strong>Phone</strong>
+          <div class="customer-val"><?php echo $custPhoneDisp !== '' ? htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></div>
+        </div>
+        <div class="customer-col">
+          <strong>Delivery</strong>
+          <div class="customer-val"><?php echo $delLocDisp !== '' ? nl2br(htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8')) : '—'; ?></div>
+        </div>
       </div>
     </section>
     <?php endif; ?>
