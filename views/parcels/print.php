@@ -60,8 +60,10 @@ if ($items && count($items) > 0) {
 $useParcelPriceOnFirstRow = ($items && count($items) > 0 && !$hasAnyItemRate && $parcelPrice > 0);
 $firstRowDone = false;
 $tableBodyHtml = '';
+$rowNo = 0;
 if ($items && count($items) > 0) {
   foreach ($items as $i) {
+    $rowNo++;
     $qty = (float)$i['qty'];
     $rate = (float)($i['rate'] ?? 0);
     $addAmt = (float)($i['additional_amount'] ?? 0);
@@ -74,18 +76,21 @@ if ($items && count($items) > 0) {
     $total += $amt;
     $rs = floor($amt);
     $tableBodyHtml .= '<tr>'
+      . '<td class="text-end inv-col-no">' . (int)$rowNo . '</td>'
       . '<td class="text-end">' . ($qty > 0 ? htmlspecialchars(number_format($qty, 2)) : '') . '</td>'
-      . '<td>' . htmlspecialchars((string)$i['description']) . '</td>'
+      . '<td class="inv-desc">' . htmlspecialchars((string)$i['description']) . '</td>'
       . '<td class="text-end">' . ($rate > 0 ? htmlspecialchars(number_format($rate, 2)) : '') . '</td>'
       . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
       . '</tr>';
   }
 } else {
+  $rowNo = 1;
   $amt = (float)($parcel['price'] ?? 0);
   $rs = floor($amt);
   $tableBodyHtml = '<tr>'
+    . '<td class="text-end inv-col-no">' . (int)$rowNo . '</td>'
     . '<td class="text-end">' . htmlspecialchars(number_format((float)($parcel['weight'] ?? 0), 2)) . '</td>'
-    . '<td>' . htmlspecialchars((string)($parcel['tracking_number'] ?? '')) . '</td>'
+    . '<td class="inv-desc">' . htmlspecialchars((string)($parcel['tracking_number'] ?? '')) . '</td>'
     . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($amt, 2)) : '') . '</td>'
     . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
     . '</tr>';
@@ -106,6 +111,13 @@ if (function_exists('mb_substr')) {
   $logoInitials = substr($logoInitials, 0, 6);
 }
 $logoInitials = $logoInitials ?: 'TS';
+
+$paperParam = isset($_GET['paper']) ? strtolower(trim((string)$_GET['paper'])) : '80';
+$receiptWidthPx = (in_array($paperParam, ['58', '58mm'], true)) ? 220 : 280;
+
+$custNameDisp = trim((string)($parcel['customer_name'] ?? ''));
+$custPhoneDisp = trim((string)($parcel['customer_phone'] ?? ''));
+$delLocDisp = trim((string)($parcel['delivery_location'] ?? ''));
 ?>
 <!doctype html>
 <html lang="en">
@@ -132,6 +144,7 @@ $logoInitials = $logoInitials ?: 'TS';
       --logo-bar-color: <?php echo $logoBarColor; ?>;
       --inv-pad: 6px;
       --inv-gap: 4px;
+      --receipt-width: <?php echo (int)$receiptWidthPx; ?>px;
     }
     * { box-sizing: border-box; }
     html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -141,17 +154,22 @@ $logoInitials = $logoInitials ?: 'TS';
     body {
       margin: 0;
       padding: 8px;
-      font-family: system-ui, "Segoe UI", Roboto, "Noto Sans Tamil", "Noto Sans", "Latha", Tahoma, sans-serif;
+      font-family: "Noto Sans Tamil", "Courier New", Courier, "Liberation Mono", monospace, "Latha", Tahoma, sans-serif;
       font-size: 11px;
-      line-height: 1.25;
-      color: #111;
+      line-height: 1.35;
+      color: #000;
       background: #fff;
+    }
+    .receipt.thermal-receipt {
+      width: 100%;
+      max-width: var(--receipt-width);
+      margin: 0 auto;
     }
     .a4-root {
       width: 100%;
-      max-width: min(210mm, 100%);
+      max-width: var(--receipt-width);
       margin: 0 auto;
-      padding: 0 4px;
+      padding: 0 2px;
     }
     .invoice-sheet {
       border: 1px solid #000;
@@ -217,16 +235,16 @@ $logoInitials = $logoInitials ?: 'TS';
       font-size: 11px;
       line-height: 1.2;
       padding: 2px 0;
-      border-bottom: 1px solid #ccc;
+      border-bottom: 1px solid #000;
     }
-    .inv-route span.sep { color: #555; margin: 0 3px; }
+    .inv-route span.sep { color: #000; margin: 0 3px; }
     .inv-branches-3 {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       column-gap: 8px;
       row-gap: 0;
       padding: 3px 0 4px;
-      border-bottom: 1px solid #ccc;
+      border-bottom: 1px solid #000;
       font-size: 10.5px;
       line-height: 1.2;
       align-items: start;
@@ -256,7 +274,7 @@ $logoInitials = $logoInitials ?: 'TS';
       text-align: left;
       font-weight: 700;
       font-size: 13px;
-      color: #b00;
+      color: #000;
     }
     .inv-invoice-date {
       text-align: right;
@@ -267,28 +285,54 @@ $logoInitials = $logoInitials ?: 'TS';
       flex-shrink: 0;
     }
     .inv-body { display: block; }
+    .inv-customer {
+      margin: 6px 0 8px;
+      padding: 6px 0;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      font-size: 10.5px;
+      line-height: 1.5;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      color: #000;
+    }
+    .inv-customer .inv-cust-line { margin: 0 0 4px; }
+    .inv-customer .inv-cust-line:last-child { margin-bottom: 0; }
+    .inv-customer .lbl { font-weight: 800; }
+    .inv-customer .inv-del-label { font-weight: 800; margin: 6px 0 2px; display: block; }
+    .inv-customer .inv-del-text {
+      margin: 0;
+      padding: 0;
+      white-space: pre-wrap;
+    }
     table.inv-tbl {
       width: 100%;
       border-collapse: collapse;
       font-size: 10px;
-      line-height: 1.2;
+      line-height: 1.25;
       table-layout: fixed;
     }
     table.inv-tbl th, table.inv-tbl td {
       border: 1px solid #000;
-      padding: 3px 5px;
+      padding: 3px 4px;
       vertical-align: top;
     }
     table.inv-tbl th {
-      background: #eee;
+      background: #fff;
       font-weight: 700;
       text-transform: uppercase;
       font-size: 9px;
       letter-spacing: 0.02em;
+      color: #000;
     }
+    table.inv-tbl td.inv-desc {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    table.inv-tbl col.inv-col-no { width: 7%; }
     table.inv-tbl col.qty { width: 11%; }
     table.inv-tbl col.desc { width: auto; }
-    table.inv-tbl col.rate { width: 14%; }
+    table.inv-tbl col.rate { width: 13%; }
     table.inv-tbl col.amt { width: 14%; }
     .inv-total-row {
       display: flex;
@@ -312,7 +356,7 @@ $logoInitials = $logoInitials ?: 'TS';
       line-height: 1.2;
     }
     .inv-footer .note {
-      color: #444;
+      color: #000;
       font-size: 10px;
       line-height: 1.45;
       max-width: 100%;
@@ -335,7 +379,7 @@ $logoInitials = $logoInitials ?: 'TS';
       flex: 0 1 38%;
       min-width: 7.5rem;
       max-width: 42%;
-      border-top: 1px dashed #333;
+      border-top: 1px solid #000;
       padding-top: 3px;
       padding-bottom: 2px;
       text-align: center;
@@ -378,14 +422,18 @@ $logoInitials = $logoInitials ?: 'TS';
     }
     @media print {
       .no-print { display: none !important; }
-      @page { size: A4; margin: 8mm; }
-      /* Dot matrix / impact: monospace, black ink, no faint grays or screen-only red */
+      @page { size: auto; margin: 0; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      /* Thermal / matrix: Tamil + Latin alignment; sharp black */
       body {
         padding: 0;
         margin: 0;
-        font-family: "Courier New", Courier, "Liberation Mono", monospace, "Noto Sans Tamil", "Latha", Tahoma, sans-serif;
+        font-family: "Noto Sans Tamil", "Courier New", Courier, "Liberation Mono", monospace, "Latha", Tahoma, sans-serif !important;
         font-size: 12px;
-        line-height: 1.35;
+        line-height: 1.4;
         color: #000 !important;
         -webkit-font-smoothing: auto;
         -moz-osx-font-smoothing: auto;
@@ -400,9 +448,25 @@ $logoInitials = $logoInitials ?: 'TS';
         color: #000 !important;
       }
       .inv-branches-3 {
+        display: block !important;
         border-bottom-color: #000 !important;
         font-size: 11px;
-        column-gap: 6px;
+        column-gap: 0;
+        padding-bottom: 6px;
+      }
+      .inv-branches-3 .inv-branch-col,
+      .inv-branches-3 .addr-line {
+        display: block;
+        width: 100% !important;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #000;
+      }
+      .inv-branches-3 .inv-branch-col:last-child,
+      .inv-branches-3 .addr-line:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
       }
       .inv-branches-3 .bc-name { font-size: 12px; }
       .inv-branches-3 .bc-line { font-size: 11px; }
@@ -448,6 +512,7 @@ $logoInitials = $logoInitials ?: 'TS';
         font-weight: 700 !important;
       }
       .logo-unit .logo-wrap {
+        border-radius: 0 !important;
         border-color: #000 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
@@ -456,9 +521,10 @@ $logoInitials = $logoInitials ?: 'TS';
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
+      .receipt.thermal-receipt,
       .a4-root {
-        width: 100%;
-        max-width: 210mm;
+        width: var(--receipt-width) !important;
+        max-width: var(--receipt-width) !important;
         margin: 0 auto;
         padding: 0;
         display: block;
@@ -468,7 +534,8 @@ $logoInitials = $logoInitials ?: 'TS';
         overflow: visible;
         page-break-inside: avoid;
         break-inside: avoid;
-        box-shadow: none;
+        box-shadow: none !important;
+        border-radius: 0 !important;
         border-color: #000 !important;
       }
       .inv-header {
@@ -486,12 +553,13 @@ $logoInitials = $logoInitials ?: 'TS';
 </head>
 <body<?php echo $printEmbed ? ' class="parcel-print-embed"' : ''; ?>>
 <?php if (!$printEmbed): ?>
-<div class="no-print mb-2 d-flex flex-wrap gap-2">
+<div class="no-print mb-2 d-flex flex-wrap gap-2 align-items-center">
   <a class="btn btn-secondary btn-sm" href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=parcels')); ?>">Back</a>
   <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
   <?php if (!$hasInvoiceCols): ?>
   <button type="button" id="toggleAddrEditor" class="btn btn-outline-secondary btn-sm">Edit header addresses</button>
   <?php endif; ?>
+  <span class="small text-muted">Print: scale 100%, margins None. Narrow paper: add <code>&amp;paper=58</code> to URL.</span>
 </div>
 <?php if (!$hasInvoiceCols): ?>
 <div id="addrEditor" class="no-print card card-body p-2 mb-2" style="display:none; max-width:210mm; margin:0 auto;">
@@ -505,7 +573,7 @@ $logoInitials = $logoInitials ?: 'TS';
 <?php endif; ?>
 <?php endif; ?>
 
-<div class="a4-root">
+<div class="a4-root receipt thermal-receipt">
   <article class="invoice-sheet">
     <div class="inv-print-header-block">
     <header class="inv-header">
@@ -567,17 +635,33 @@ $logoInitials = $logoInitials ?: 'TS';
       <div class="inv-invoice-date">Date: <?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></div>
     </div>
 
+    <?php if ($custNameDisp !== '' || $custPhoneDisp !== '' || $delLocDisp !== ''): ?>
+    <section class="inv-customer" aria-label="Customer details">
+      <?php if ($custNameDisp !== ''): ?>
+        <div class="inv-cust-line"><span class="lbl">Customer:</span> <?php echo htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8'); ?></div>
+      <?php endif; ?>
+      <?php if ($custPhoneDisp !== ''): ?>
+        <div class="inv-cust-line"><span class="lbl">Phone:</span> <?php echo htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8'); ?></div>
+      <?php endif; ?>
+      <?php if ($delLocDisp !== ''): ?>
+        <div class="inv-cust-line"><span class="inv-del-label">Delivery Location:</span><p class="inv-del-text"><?php echo htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8'); ?></p></div>
+      <?php endif; ?>
+      <div class="inv-cust-line" style="margin-top:6px; letter-spacing:0.15em;">-------------------</div>
+    </section>
+    <?php endif; ?>
+
     <div class="inv-body">
       <table class="inv-tbl">
         <colgroup>
-          <col class="qty"><col class="desc"><col class="rate"><col class="amt">
+          <col class="inv-col-no"><col class="qty"><col class="desc"><col class="rate"><col class="amt">
         </colgroup>
         <thead>
           <tr>
+            <th class="text-end">#</th>
             <th class="text-end">Qty</th>
             <th>Description</th>
             <th class="text-end">Rate</th>
-            <th class="text-end">Amount</th>
+            <th class="text-end">Amt</th>
           </tr>
         </thead>
         <tbody><?php echo $tableBodyHtml; ?></tbody>
@@ -639,5 +723,10 @@ $logoInitials = $logoInitials ?: 'TS';
   }
 })();
 </script>
+<!--
+  Optional ESC/POS (raw thermal): generate fixed-width text or ESC/POS bytes server-side
+  and send to a receipt printer via OS print agent, USB, or network socket — not via HTML.
+  Typical flow: build lines with str_pad() for columns; GS v 0 for bitmap logo; LF line feeds.
+-->
 </body>
 </html>

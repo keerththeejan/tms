@@ -4081,7 +4081,7 @@ switch ($page) {
 
         if ($action === 'print') {
             $id = (int)($_GET['id'] ?? 0);
-            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, b.name AS branch_name FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id LEFT JOIN branches b ON b.id=dn.branch_id WHERE dn.id=?');
+            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, c.delivery_location AS customer_delivery_location, b.name AS branch_name FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id LEFT JOIN branches b ON b.id=dn.branch_id WHERE dn.id=?');
             $stmt->execute([$id]);
             $dn = $stmt->fetch();
             if (!$dn) { http_response_code(404); echo 'Not found'; break; }
