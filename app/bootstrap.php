@@ -4,6 +4,8 @@
 // Strict types and error reporting for development
 declare(strict_types=1);
 
+date_default_timezone_set('Asia/Colombo');
+
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
