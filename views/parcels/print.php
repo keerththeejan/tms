@@ -118,24 +118,35 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     .text-muted { color: #6c757d !important; }
     .small { font-size: 0.875em !important; }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; line-height: 1.2; }
     html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body.parcel-print-embed { padding: 5px; }
+    body.parcel-print-embed { padding: 0; }
     body {
       margin: 0;
-      padding: 5px;
+      padding: 0;
       font-family: "Courier New", monospace;
       font-size: 12px;
       line-height: 1.2;
       color: #000;
       background: #fff;
     }
-    .matrix-root { width: 100%; max-width: 100%; margin: 0 auto; }
+    .matrix-root {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 5px;
+    }
     .no-print.matrix-logo-strip {
       display: flex;
       align-items: flex-start;
       gap: 6px;
-      margin-bottom: 4px;
+      margin: 0 0 2px;
+      padding: 0;
+    }
+    .no-print.matrix-logo-strip img {
+      display: block;
+      margin: 0;
+      padding: 0;
     }
     .no-print.matrix-logo-strip .logo-wrap {
       border: 1px solid #000;
@@ -153,13 +164,21 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     }
     .matrix-sheet {
       border: 1px solid #000;
-      padding: 4px;
-      margin: 0 auto 6px;
+      padding: 3px;
+      margin: 0 auto;
       page-break-inside: avoid;
       border-radius: 0;
     }
+    .matrix-sheet h1,
+    .matrix-sheet h2,
+    .matrix-sheet h3,
+    .matrix-sheet p {
+      margin: 2px 0;
+      padding: 0;
+    }
     .matrix-co-name {
       margin: 0;
+      padding: 5px 0 0;
       text-align: center;
       font-size: 16px;
       font-weight: bold;
@@ -169,14 +188,15 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     .matrix-reg-row {
       text-align: right;
       font-size: 11px;
-      margin: 0 0 2px;
+      margin: 0;
+      padding: 0 0 5px;
       line-height: 1.2;
     }
     .matrix-route {
       text-align: center;
       font-size: 11px;
-      margin: 0 0 3px;
-      padding-bottom: 3px;
+      margin: 0 0 2px;
+      padding: 0 0 3px;
       line-height: 1.2;
       border-bottom: 1px solid #000;
     }
@@ -216,7 +236,7 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     .customer-row {
       display: flex;
       justify-content: space-between;
-      margin: 5px 0;
+      margin: 3px 0;
       font-size: 12px;
       line-height: 1.2;
     }
@@ -288,16 +308,22 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     }
     @media print {
       .no-print { display: none !important; }
-      @page { size: A5 landscape; margin: 5mm; }
+      @page { size: A5 landscape; margin: 0; }
       body {
-        margin: 0;
-        padding: 5px;
+        margin: 0 !important;
+        padding: 0 !important;
         font-family: "Courier New", monospace !important;
         font-size: 12px !important;
         line-height: 1.2;
         color: #000 !important;
       }
-      .matrix-sheet { border: 1px solid #000 !important; border-radius: 0 !important; }
+      .matrix-root { padding: 0 !important; margin: 0 !important; }
+      .matrix-sheet {
+        border: 1px solid #000 !important;
+        border-radius: 0 !important;
+        padding: 3px !important;
+        margin: 0 auto !important;
+      }
       .matrix-branches { grid-template-columns: 1fr 1fr 1fr !important; }
       .matrix-bc-col1 { text-align: left !important; }
       .matrix-bc-col2 { text-align: center !important; }
