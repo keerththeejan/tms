@@ -221,28 +221,20 @@ $logoInitials = $logoInitials ?: 'TS';
     }
     .inv-route span.sep { color: #555; margin: 0 3px; }
     .inv-branches-3 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      column-gap: 8px;
-      row-gap: 0;
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
       padding: 3px 0 4px;
       border-bottom: 1px solid #ccc;
-      font-size: 10.5px;
-      line-height: 1.2;
-      align-items: start;
-    }
-    .inv-branch-col {
-      min-width: 0;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
-    .inv-branches-3 .bc-name {
+      font-size: 13px;
       font-weight: 700;
-      font-size: 11px;
-      line-height: 1.2;
-      margin-bottom: 1px;
+      line-height: 1.4;
     }
-    .inv-branches-3 .bc-line { font-size: 10px; line-height: 1.2; margin: 0; padding: 0; }
+    .inv-branches-3 td {
+      vertical-align: top;
+      text-align: left;
+      padding: 0;
+    }
     .inv-invoice-row {
       display: flex;
       justify-content: space-between;
@@ -259,7 +251,8 @@ $logoInitials = $logoInitials ?: 'TS';
       column-gap: 8px;
       padding: 2px 0 3px;
       border-bottom: 1px solid #ccc;
-      font-size: 11px;
+      font-size: 14px;
+      font-weight: 700;
       line-height: 1.2;
     }
     .inv-customer-row > div,
@@ -373,17 +366,8 @@ $logoInitials = $logoInitials ?: 'TS';
       .inv-logo-cell { grid-column: 1; grid-row: 1; }
       .inv-company { grid-column: 2; grid-row: 1; font-size: 13px; }
       .inv-regdate { grid-column: 1 / -1; grid-row: 2; text-align: right; }
-      .inv-branches-3 {
-        grid-template-columns: 1fr;
-        row-gap: 10px;
-        column-gap: 0;
-        padding-bottom: 8px;
-      }
-      .inv-branch-col {
-        padding-bottom: 6px;
-        border-bottom: 1px solid #e5e5e5;
-      }
-      .inv-branch-col:last-child { border-bottom: none; padding-bottom: 0; }
+      .inv-branches-3 td { display: block; width: 100% !important; padding-bottom: 6px; }
+      .inv-branches-3 td:last-child { padding-bottom: 0; }
       .inv-invoice-row { flex-wrap: wrap; gap: 4px; }
       .inv-sigs {
         column-gap: 12px;
@@ -443,13 +427,15 @@ $logoInitials = $logoInitials ?: 'TS';
       }
       .inv-branches-3 {
         border-bottom: 1px solid #000 !important;
-        font-size: 11px;
-        column-gap: 6px;
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+        font-weight: 700 !important;
       }
       .inv-customer-row,
       .customer-row {
         border-bottom: 1px solid #000 !important;
-        font-size: 11px;
+        font-size: 14px;
+        font-weight: 700;
         display: table !important;
         width: 100% !important;
         table-layout: fixed !important;
@@ -461,8 +447,6 @@ $logoInitials = $logoInitials ?: 'TS';
         white-space: nowrap !important;
         vertical-align: middle !important;
       }
-      .inv-branches-3 .bc-name { font-size: 12px; }
-      .inv-branches-3 .bc-line { font-size: 11px; }
       .inv-invoice-title {
         color: #000 !important;
         font-size: 14px !important;
@@ -628,38 +612,35 @@ $logoInitials = $logoInitials ?: 'TS';
         <?php if ($regNo !== ''): ?><div>Reg: <?php echo htmlspecialchars($regNo); ?></div><?php endif; ?>
       </div>
     </header>
-    <div class="inv-route">
-      <?php foreach ($routeTamilParts as $i => $part): ?>
-        <?php if ($i > 0): ?><span class="sep">⟷</span><?php endif; ?>
-        <span><?php echo htmlspecialchars($part); ?></span>
-      <?php endforeach; ?>
-    </div>
-    <?php if ($hasInvoiceCols): ?>
-      <div class="inv-branches-3" aria-label="Branch addresses">
-        <?php foreach ($invoiceHeaderBranches as $b): ?>
-          <div class="inv-branch-col">
-            <?php if (is_array($b)): ?>
-              <?php
-                $bn = trim((string)($b['name'] ?? ''));
-                $bta = trim((string)($b['address_ta'] ?? ''));
-                $ben = trim((string)($b['address_en'] ?? ''));
-                $bph = trim((string)($b['phones'] ?? ''));
-              ?>
-              <?php if ($bn !== ''): ?><div class="bc-name"><?php echo htmlspecialchars($bn); ?></div><?php endif; ?>
-              <?php if ($bta !== ''): ?><div class="bc-line"><?php echo htmlspecialchars($bta); ?></div><?php endif; ?>
-              <?php if ($ben !== ''): ?><div class="bc-line"><?php echo htmlspecialchars($ben); ?></div><?php endif; ?>
-              <?php if ($bph !== ''): ?><div class="bc-line"><?php echo htmlspecialchars(Helpers::formatPhonesDisplay($bph)); ?></div><?php endif; ?>
-            <?php endif; ?>
-          </div>
-        <?php endforeach; ?>
-      </div>
-    <?php else: ?>
-      <div class="inv-branches-3 js-addr-container">
-        <?php foreach ($addresses as $addr): ?>
-          <div class="addr-line"><?php echo nl2br(htmlspecialchars($addr)); ?></div>
-        <?php endforeach; ?>
-      </div>
-    <?php endif; ?>
+    <table class="inv-route" style="width:100%; border-collapse:collapse; margin:0;">
+      <tr>
+        <td colspan="3" align="center" style="font-size:13px; font-weight:bold; padding:3px; border-top:1px solid #000; border-bottom:1px solid #000;">
+          கொழும்பு ⟷ கிளிநொச்சி ⟷ முல்லைத்தீவு
+        </td>
+      </tr>
+    </table>
+    <table class="inv-branches-3" aria-label="Branch addresses">
+      <tr style="font-size:13px; line-height:1.4; font-weight:bold;">
+        <td width="33%" align="left" valign="top">
+          <strong>Colombo</strong><br>
+          இல. 71 A, ஆட்டுப்பட்டித்தெரு, கொழும்பு -13.<br>
+          No. 71A, Wolfendhal Street, Colombo-13.<br>
+          077 2474 905 | 077 2474 177
+        </td>
+        <td width="33%" align="left" valign="top">
+          <strong>Main Branch (KILI)</strong><br>
+          பரவிப்பாஞ்சான், கிளிநொச்சி.<br>
+          Paravippanchan, Kilinochchi.<br>
+          021 720 1757 | 077 2474 605
+        </td>
+        <td width="34%" align="left" valign="top">
+          <strong>MULLAITIVU</strong><br>
+          பரவிப்பாஞ்சான், கிளிநொச்சி.<br>
+          Paravippanchan, Kilinochchi.<br>
+          021 720 1757 | 077 2474 605
+        </td>
+      </tr>
+    </table>
     </div>
     <div class="inv-customer-row customer-row" aria-label="Customer details">
       <div class="inv-customer-left left">Customer: <?php echo htmlspecialchars(trim((string)($parcel['customer_name'] ?? ''))); ?></div>
@@ -685,11 +666,13 @@ $logoInitials = $logoInitials ?: 'TS';
           </tr>
         </thead>
         <tbody><?php echo $tableBodyHtml; ?></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3"></td>
+            <td class="text-end fw-bold" style="font-size:13px;">Total (Rs): <?php echo htmlspecialchars(number_format($grs)); ?></td>
+          </tr>
+        </tfoot>
       </table>
-      <div class="inv-total-row">
-        <span>Total (Rs)</span>
-        <span><?php echo htmlspecialchars(number_format($grs)); ?></span>
-      </div>
       <div class="inv-footer">
         <?php if ($footerNoteDisplay !== ''): ?>
         <p class="note"><?php echo htmlspecialchars($footerNoteDisplay, ENT_QUOTES, 'UTF-8'); ?></p>
