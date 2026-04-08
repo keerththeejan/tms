@@ -213,14 +213,25 @@ $addrSlots = array_slice($addrSlots, 0, 3);
       line-height: 1.2;
     }
     .matrix-inv-meta .matrix-date { white-space: nowrap; }
-    .matrix-customer-plain {
-      text-align: left;
-      margin: 0 0 4px;
+    .customer-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
       font-size: 12px;
       line-height: 1.2;
     }
-    .matrix-customer-plain > div { margin: 0 0 2px; }
-    .matrix-customer-plain .matrix-del-block { margin-top: 2px; }
+    .customer-row > div {
+      width: 33.33%;
+      min-width: 0;
+      font-family: "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.2;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+    }
+    .customer-row .col-left { text-align: left; }
+    .customer-row .col-center { text-align: center; }
+    .customer-row .col-right { text-align: right; }
     table.matrix-tbl {
       width: 100%;
       border-collapse: collapse;
@@ -392,17 +403,10 @@ $addrSlots = array_slice($addrSlots, 0, 3);
     </div>
 
     <?php if ($custNameDisp !== '' || $custPhoneDisp !== '' || $delLocDisp !== ''): ?>
-    <div class="matrix-customer-plain" aria-label="Customer details">
-      <?php if ($custNameDisp !== ''): ?>
-        <div>Customer: <?php echo htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8'); ?></div>
-      <?php endif; ?>
-      <?php if ($custPhoneDisp !== ''): ?>
-        <div>Phone: <?php echo htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8'); ?></div>
-      <?php endif; ?>
-      <?php if ($delLocDisp !== ''): ?>
-        <div class="matrix-del-block">Delivery Location:</div>
-        <div><?php echo nl2br(htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8')); ?></div>
-      <?php endif; ?>
+    <div class="customer-row" aria-label="Customer details">
+      <div class="col-left">Customer: <?php echo $custNameDisp !== '' ? htmlspecialchars($custNameDisp, ENT_QUOTES, 'UTF-8') : ''; ?></div>
+      <div class="col-center">Phone: <?php echo $custPhoneDisp !== '' ? htmlspecialchars($custPhoneDisp, ENT_QUOTES, 'UTF-8') : ''; ?></div>
+      <div class="col-right">Delivery Location:<?php if ($delLocDisp !== ''): ?><br><?php echo nl2br(htmlspecialchars($delLocDisp, ENT_QUOTES, 'UTF-8')); ?><?php endif; ?></div>
     </div>
     <?php endif; ?>
 
