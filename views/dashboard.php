@@ -1,7 +1,12 @@
 <style>
   /* Dashboard — responsive shell + SaaS polish (frontend only) */
   main.content-wrapper > .container-fluid:has(.dashboard-page) {
-    max-width: min(100%, 1560px);
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 12px;
+    padding-right: 12px;
   }
   .dashboard-page {
     --dash-space-1: 8px;
@@ -260,6 +265,12 @@
     main.content-wrapper > .container-fluid:has(.dashboard-page) {
       padding-left: max(12px, env(safe-area-inset-left, 0px));
       padding-right: max(12px, env(safe-area-inset-right, 0px));
+    }
+  }
+  @media (min-width: 768px) {
+    main.content-wrapper > .container-fluid:has(.dashboard-page) {
+      padding-left: 16px;
+      padding-right: 16px;
     }
   }
   @media (max-width: 767.98px) {

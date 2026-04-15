@@ -42,18 +42,18 @@
 <script>
   (function(){
     var body = document.body;
-    var openBtn = document.querySelector('[data-role="sidebar-open"]');
+    var openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-role="sidebar-open"]'));
     var overlay = document.querySelector('[data-role="sidebar-overlay"]');
     var sidebar = document.getElementById('sidebar');
 
     function openSidebar(){
       body.classList.add('sidebar-open');
-      if (openBtn) openBtn.setAttribute('aria-expanded', 'true');
+      openBtns.forEach(function(btn){ btn.setAttribute('aria-expanded', 'true'); });
       if (overlay) overlay.setAttribute('aria-hidden', 'false');
     }
     function closeSidebar(){
       body.classList.remove('sidebar-open');
-      if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
+      openBtns.forEach(function(btn){ btn.setAttribute('aria-expanded', 'false'); });
       if (overlay) overlay.setAttribute('aria-hidden', 'true');
     }
 
@@ -63,15 +63,20 @@
       try { localStorage.setItem('tms_sidebar_collapsed', on ? '1' : '0'); } catch(e) {}
     }
 
-    // Restore collapsed state (desktop only)
+    // Start expanded by default to keep labels visible.
+    body.classList.remove('sidebar-collapsed');
+    // Optional persisted collapse: desktop only.
     (function(){
       try {
+        if (window.innerWidth < 992) return;
         var v = localStorage.getItem('tms_sidebar_collapsed');
         if (v === '1') { body.classList.add('sidebar-collapsed'); }
       } catch(e) {}
     })();
 
-    if (openBtn) openBtn.addEventListener('click', function(e){ e.preventDefault(); openSidebar(); });
+    openBtns.forEach(function(btn){
+      btn.addEventListener('click', function(e){ e.preventDefault(); openSidebar(); });
+    });
     if (overlay) overlay.addEventListener('click', function(){ closeSidebar(); });
     var closeBtn = document.querySelector('[data-role="sidebar-close"]');
     if (closeBtn) closeBtn.addEventListener('click', function(e){ e.preventDefault(); closeSidebar(); });
@@ -100,6 +105,7 @@
     // Auto-close when switching to large screens
     function handleResize(){
       if (window.innerWidth >= 992) { body.classList.remove('sidebar-open'); }
+      if (window.innerWidth < 992) { body.classList.remove('sidebar-collapsed'); }
     }
     window.addEventListener('resize', handleResize);
   })();

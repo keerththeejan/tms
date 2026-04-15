@@ -13,6 +13,7 @@ $user = Auth::user();
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/css/dataTables.bootstrap5.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/tms-design-system.css'); ?>">
+  <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/app-layout-rebuild.css'); ?>">
   <?php if (in_array($_GET['page'] ?? '', ['employees', 'salaries', 'advances'], true)): ?>
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/hr-responsive.css'); ?>">
   <?php endif; ?>
@@ -48,9 +49,9 @@ $user = Auth::user();
 ?>
 <?php if ($user): ?>
 <a href="#main-content" class="skip-link visually-hidden-focusable">Skip to main content</a>
-<div class="d-flex app-shell">
+<div class="app app-layout">
   <!-- Sidebar -->
-  <nav id="sidebar" class="tms-sidebar bg-dark text-white" aria-label="Primary navigation">
+  <nav id="sidebar" class="tms-sidebar app-sidebar bg-dark text-white" aria-label="Primary navigation">
     <div class="p-3 border-bottom border-secondary d-flex align-items-center justify-content-between gap-2">
       <a class="navbar-brand text-white text-decoration-none fw-semibold" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>">TMS</a>
       <div class="d-flex align-items-center gap-2">
@@ -141,7 +142,10 @@ $user = Auth::user();
   </nav>
 
   <!-- Main content -->
-  <main id="main-content" class="content-wrapper flex-grow-1" role="main" tabindex="-1">
+  <main id="main-content" class="content-wrapper app-content flex-grow-1" role="main" tabindex="-1">
+    <button class="btn btn-outline-secondary sidebar-toggle-floating" type="button" data-role="sidebar-open" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">
+      <i class="bi bi-list" aria-hidden="true"></i>
+    </button>
     <div class="sidebar-overlay" data-role="sidebar-overlay" role="presentation" aria-hidden="true"></div>
     <?php
       $uiCompany = Helpers::company();

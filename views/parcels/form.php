@@ -1106,7 +1106,8 @@
     .parcel-form-page .section-card .section-body { padding: 0.65rem; }
     .parcel-form-page .receipt-header { flex-direction: column; align-items: stretch; }
     .parcel-form-page .receipt-header .serial-badge { width: 100%; justify-content: space-between; }
-    .parcel-form-page #serialInput { max-width: 100% !important; width: 100%; }
+    .parcel-form-page #serialInput,
+    .parcel-form-page #serialInputHeader { max-width: 100% !important; width: 100%; }
     .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { padding: 0.35rem 0.4rem; font-size: 0.85rem; }
     .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 1.85rem; font-size: 0.9rem; }
   }
@@ -1533,8 +1534,319 @@
       display: inline-flex;
     }
   }
+  /* ---- Modern responsive refactor overrides ---- */
+  .parcel-form-page.pf-modern-refactor {
+    --pf-space-1: 8px;
+    --pf-space-2: 16px;
+    --pf-space-3: 24px;
+    --pf-card-radius: 10px;
+    --pf-card-pad: 16px;
+    --pf-input-h: 40px;
+    --pf-soft-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    background: #f7f8fb;
+    overflow-x: hidden;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-page-wrap {
+    width: 100%;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 12px !important;
+    box-sizing: border-box;
+  }
+  @media (min-width: 768px) {
+    .parcel-form-page.pf-modern-refactor .pf-page-wrap {
+      padding-left: 0 !important;
+      padding-right: 16px !important;
+    }
+  }
+  .parcel-form-page.pf-modern-refactor .pf-page-wrap,
+  .parcel-form-page.pf-modern-refactor .container-fluid,
+  .parcel-form-page.pf-modern-refactor .section-card,
+  .parcel-form-page.pf-modern-refactor .receipt-box,
+  .parcel-form-page.pf-modern-refactor .pf-items-scroll,
+  .parcel-form-page.pf-modern-refactor .pf-receipt-summary-wrap {
+    max-width: 100%;
+  }
+  .parcel-form-page.pf-modern-refactor .page-header,
+  .parcel-form-page.pf-modern-refactor .section-card,
+  .parcel-form-page.pf-modern-refactor .receipt-box {
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid #e5e7eb;
+    box-shadow: var(--pf-soft-shadow);
+  }
+  .parcel-form-page.pf-modern-refactor .section-card .section-title {
+    background: #fff;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    border-bottom: 1px solid #eef2f7;
+  }
+  .parcel-form-page.pf-modern-refactor .section-card .section-body {
+    padding: 16px !important;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-form-sections {
+    gap: 16px !important;
+  }
+  .parcel-form-page.pf-modern-refactor .form-control,
+  .parcel-form-page.pf-modern-refactor .form-select,
+  .parcel-form-page.pf-modern-refactor .choices__inner {
+    min-height: 40px;
+    border-radius: 10px;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-header-tools {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-serial-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #f8fafc;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #334155;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-serial-pill .pf-serial-input {
+    max-width: 110px;
+    min-height: 30px;
+    font-size: 0.75rem;
+    border-radius: 8px;
+  }
+  .parcel-form-page.pf-modern-refactor .receipt-header {
+    padding: 10px 16px;
+    background: #fff;
+    border-bottom: 1px solid #eef2f7;
+  }
+  .parcel-form-page.pf-modern-refactor .receipt-total {
+    position: static;
+    box-shadow: none;
+    border-top: 1px solid #e5e7eb;
+    padding: 10px 16px !important;
+    background: #f8fafc;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-total-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .parcel-form-page.pf-modern-refactor #itemsTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f8fafc;
+  }
+  .parcel-form-page.pf-modern-refactor #itemsTable {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    table-layout: auto;
+  }
+  .parcel-form-page.pf-modern-refactor #itemsTable th,
+  .parcel-form-page.pf-modern-refactor #itemsTable td {
+    white-space: nowrap;
+    word-break: normal;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-status-row {
+    align-items: end;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-status-row .col-status {
+    max-width: 220px;
+    margin-left: auto;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-btn-save {
+    min-height: 40px !important;
+    padding: 0.45rem 1rem !important;
+    border-radius: 10px !important;
+  }
+  @media (min-width: 768px) {
+    .parcel-form-page.pf-modern-refactor .row.pf-main-columns {
+      display: grid !important;
+      grid-template-columns: minmax(0, 68%) minmax(0, 32%);
+      gap: 12px;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+    .parcel-form-page.pf-modern-refactor .row.pf-main-columns > [class*="col-"] {
+      width: 100% !important;
+      max-width: none !important;
+      flex: none !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-status-row .col-lg-auto {
+      margin-left: 8px;
+    }
+  }
+  @media (min-width: 1200px) {
+    .parcel-form-page.pf-modern-refactor .row.pf-main-columns {
+      grid-template-columns: minmax(0, 70%) minmax(0, 30%);
+      gap: 16px;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-col-items .pf-items-section {
+      position: sticky;
+      top: 72px;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-col-items .pf-items-section .pf-items-scroll {
+      max-height: min(52vh, 480px);
+      overflow: auto;
+    }
+  }
+  @media (min-width: 768px) and (max-width: 1199.98px) {
+    .parcel-form-page.pf-modern-refactor .pf-col-items .pf-items-section {
+      position: static;
+    }
+    .parcel-form-page.pf-modern-refactor .section-card .section-body {
+      padding: 12px !important;
+    }
+  }
+  @media (max-width: 991.98px) {
+    .parcel-form-page.pf-modern-refactor .page-header #pfSaveBtnTop {
+      display: none !important;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-header-tools {
+      width: 100%;
+      justify-content: space-between;
+    }
+  }
+  @media (max-width: 767.98px) {
+    .parcel-form-page.pf-modern-refactor .row.pf-main-columns {
+      display: grid !important;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+    .parcel-form-page.pf-modern-refactor .section-card .section-body {
+      padding: 12px !important;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-form-sections {
+      gap: 12px !important;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-label,
+    .parcel-form-page.pf-modern-refactor .form-label {
+      margin-bottom: 8px;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-items-scroll {
+      max-height: none;
+      overflow: visible;
+      border: 0;
+      background: transparent;
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable {
+      min-width: 0 !important;
+      border: 0;
+      table-layout: auto;
+      background: transparent;
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable thead {
+      display: none;
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable tbody {
+      display: grid;
+      gap: 10px;
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable tbody tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable tbody td {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 0;
+      border: 0;
+      white-space: normal;
+      min-width: 0;
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable tbody td::before {
+      content: attr(data-label);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-no-cell,
+    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-remove-cell {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-no-cell::before {
+      content: 'Line';
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-remove-cell::before {
+      content: 'Actions';
+    }
+    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-remove-cell .btn {
+      margin-left: auto;
+    }
+    .parcel-form-page.pf-modern-refactor .pf-sticky-actions {
+      padding: 8px 12px;
+      border-top: 1px solid #e2e8f0;
+      background: rgba(255, 255, 255, 0.96);
+    }
+    .parcel-form-page.pf-modern-refactor .pf-sticky-actions-inner {
+      display: block;
+    }
+    .parcel-form-page.pf-modern-refactor #pfResetBtnMobile {
+      display: none !important;
+    }
+    .parcel-form-page.pf-modern-refactor #pfSaveBtnMobile {
+      width: 100%;
+      min-height: 44px;
+    }
+  }
+  .parcel-form-page.pf-modern-refactor .pf-search-results {
+    display: none;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-loc-results {
+    max-height: 140px;
+    overflow: auto;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-bill-preview {
+    display: none;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-bill-preview-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.07);
+  }
+  .parcel-form-page.pf-modern-refactor .pf-bill-preview-body {
+    height: 700px;
+    max-height: 75vh;
+    padding: 0;
+  }
+  .parcel-form-page.pf-modern-refactor .pf-bill-preview-frame {
+    border: 0;
+    width: 100%;
+    height: 100%;
+  }
 </style>
-<div class="parcel-form-page pf-saas pf-layout-optimized pf-one-screen">
+<div class="parcel-form-page pf-saas pf-layout-optimized pf-modern-refactor">
 <div class="container-fluid px-1 px-sm-2 px-lg-2 pf-page-wrap pf-form-inner-fluid">
 
 <?php 
@@ -1564,7 +1876,11 @@
     <h1 class="h4 mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
     <div class="text-muted small d-none d-sm-block mt-1">Fast entry • consistent billing • logistics workflow</div>
   </div>
-  <div class="d-flex flex-wrap gap-2">
+  <div class="pf-header-tools">
+    <span class="pf-serial-pill">
+      <label for="serialInputHeader" class="mb-0">Serial</label>
+      <input type="text" id="serialInputHeader" name="tracking_number" form="parcelForm" class="form-control form-control-sm pf-serial-input" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" aria-label="Parcel serial or tracking number" autocomplete="off" />
+    </span>
     <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm rounded-3"><i class="bi bi-arrow-left" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Back to Parcels</span></a>
     <button type="submit" form="parcelForm" class="btn btn-primary btn-sm pf-btn-save" id="pfSaveBtnTop"><i class="bi bi-save" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Save Parcel</span></button>
   </div>
@@ -1701,7 +2017,7 @@
   <div class="pf-form-sections d-flex flex-column gap-2 gap-lg-3 mb-2 mb-lg-0 pf-dense pf-floating">
     <!-- Customer -->
     <section class="section-card pf-customer-stack" role="region" aria-labelledby="pf-h-customer">
-      <div class="section-title" id="pf-h-customer"><i class="bi bi-person-badge me-2 text-primary" aria-hidden="true"></i>Customer</div>
+      <div class="section-title" id="pf-h-customer"><i class="bi bi-person-badge me-2 text-primary" aria-hidden="true"></i>Customer Info</div>
       <div class="section-body pt-2 pt-lg-3">
           <div class="row g-2 align-items-start pf-customer-row">
             <div class="col-12 col-lg-4">
@@ -1729,7 +2045,7 @@
                   <input type="text" id="customerSearch" class="form-control form-control-sm border-start-0" placeholder="Type to search…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Search customer by name or phone" aria-describedby="customerSummary customerInvalidFeedback">
                   <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddCustomer" title="Quick add customer" aria-label="Quick add customer"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
                 </div>
-                <div id="customerSearchResults" class="list-group list-group-flush shadow-sm rounded mt-1 border" style="display:none"></div>
+                <div id="customerSearchResults" class="list-group list-group-flush shadow-sm rounded mt-1 border pf-search-results"></div>
               </div>
             </div>
           </div>
@@ -1739,7 +2055,7 @@
           <div class="mb-1">
             <input type="text" id="locQuery" class="form-control form-control-sm" placeholder="Type delivery location area (e.g., Kilinochchi)">
           </div>
-          <div id="locResults" class="small" style="max-height: 140px; overflow:auto"></div>
+          <div id="locResults" class="small pf-loc-results"></div>
         </div>
       </div>
       <div id="customerSummary" class="mt-1 small pf-form-text" role="status" aria-live="polite"></div>
@@ -1794,7 +2110,7 @@
       <!-- Invoice & date (first on mobile: parcel date next to customer flow) -->
       <div class="col-12 col-lg-4 order-1 order-lg-3">
         <section class="section-card h-100" role="region" aria-labelledby="pf-h-invoice">
-          <div class="section-title" id="pf-h-invoice"><i class="bi bi-file-earmark-text me-2 text-primary" aria-hidden="true"></i>Invoice &amp; date</div>
+          <div class="section-title" id="pf-h-invoice"><i class="bi bi-file-earmark-text me-2 text-primary" aria-hidden="true"></i>Shipment Details</div>
           <div class="section-body pt-2 pt-lg-3">
           <div class="row g-2 pf-invoice-date-row">
             <div class="col-12 col-sm-6">
@@ -1871,7 +2187,7 @@
       <!-- Vehicle -->
       <div class="col-12 col-md-6">
         <section class="section-card h-100" role="region" aria-labelledby="pf-h-vehicle">
-          <div class="section-title" id="pf-h-vehicle"><i class="bi bi-truck me-2 text-primary" aria-hidden="true"></i>Vehicle</div>
+          <div class="section-title" id="pf-h-vehicle"><i class="bi bi-truck me-2 text-primary" aria-hidden="true"></i>Transport Info</div>
           <div class="section-body pt-2 pt-lg-3">
       <?php if (!empty($vehiclesAll)): ?>
         <label class="pf-label" for="vehicleSelect">Vehicle</label>
@@ -1944,14 +2260,14 @@
       <div class="col-12 col-lg-6 col-xl-6 pf-animate pf-animate-in pf-animate-delay-2 pf-col-items">
 
   <!-- Full-width Previous Bill Preview (moved outside left column) -->
-  <div id="billPreview" class="mb-3 pf-bill-preview" style="display:none;">
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background: rgba(255,255,255,0.9); backdrop-filter: blur(12px);">
+  <div id="billPreview" class="mb-3 pf-bill-preview">
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden pf-bill-preview-card">
       <div class="card-header d-flex justify-content-between align-items-center py-2">
         <span class="fw-semibold">Previous Bill</span>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="billPreviewClose">Close</button>
       </div>
-      <div class="card-body p-0" style="height:700px; max-height:75vh;">
-        <iframe id="billPreviewFrame" src="about:blank" style="border:0; width:100%; height:100%;"></iframe>
+      <div class="card-body p-0 pf-bill-preview-body">
+        <iframe id="billPreviewFrame" src="about:blank" class="pf-bill-preview-frame"></iframe>
       </div>
     </div>
   </div>
@@ -1963,10 +2279,7 @@
   <div class="receipt-box">
     <div class="receipt-header d-flex justify-content-between align-items-center">
       <div class="fw-semibold small">TS Transport</div>
-      <div class="serial-badge d-flex align-items-center gap-1 flex-wrap justify-content-end">
-        <label for="serialInput" class="mb-0 small">Serial:</label>
-        <input type="text" id="serialInput" name="tracking_number" class="form-control form-control-sm pf-serial-input" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" aria-label="Parcel serial or tracking number" autocomplete="off" />
-      </div>
+      <div class="text-muted small">Line items</div>
     </div>
     <div class="px-2 py-2 border-bottom bg-body-secondary bg-opacity-25 pf-receipt-summary-wrap">
       <div class="pf-receipt-summary small">
@@ -2133,7 +2446,10 @@
             </div>
           <?php endif; ?>
           <div class="col-12 col-lg-auto text-lg-end">
-            <span class="fs-5 fw-bold" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
+            <div class="pf-total-inline">
+              <span>Total</span>
+              <span class="fs-5 fw-bold" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
+            </div>
           </div>
         </div>
       </div>
@@ -2174,7 +2490,6 @@
   <div class="pf-sticky-actions d-lg-none">
     <div class="pf-sticky-actions-inner">
       <button type="submit" class="btn btn-primary pf-btn-save" id="pfSaveBtnMobile"><i class="bi bi-save me-1" aria-hidden="true"></i> Save</button>
-      <button type="reset" class="btn btn-outline-secondary rounded-3" id="pfResetBtnMobile"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Reset</button>
     </div>
   </div>
 </form>
@@ -2677,7 +2992,7 @@
                 recalc();
               }
               // clear tracking/serial input
-              const serial = document.getElementById('serialInput');
+              const serial = document.getElementById('serialInputHeader') || document.getElementById('serialInput');
               if (serial) serial.value = '';
               // update URL quietly
               try { window.history.replaceState({}, '', u.pathname + '?' + u.searchParams.toString()); } catch(_) {}

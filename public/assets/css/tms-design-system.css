@@ -10,13 +10,17 @@ html {
 html,
 body {
   height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
   padding-top: 0;
   margin: 0;
+  padding: 0;
   background: #f8f9fb;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 :root {
@@ -37,7 +41,7 @@ body {
   --shell-radius: 14px;
   --shell-border: rgba(17, 24, 39, 0.1);
   --shell-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --sidebar-w: 252px;
+  --sidebar-w: 250px;
   --sidebar-w-collapsed: 72px;
   --touch-min: 44px;
   --sidebar-transition: 0.25s ease;
@@ -106,21 +110,23 @@ a:hover {
 }
 
 .container-fluid {
-  max-width: 1560px;
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
 }
 /* Parcels list + New/Edit parcel form: full width (classes added in views/parcels/*.php) */
 main.content-wrapper .container-fluid.parcels-main-fluid {
   max-width: none !important;
   width: 100%;
-  /* Tighter side gutters on parcel list / new / edit */
-  padding-left: clamp(0.35rem, 1vw, 0.65rem);
-  padding-right: clamp(0.35rem, 1vw, 0.65rem);
+  padding-left: 0;
+  padding-right: 12px;
 }
 main.content-wrapper .topbar .container-fluid.parcels-topbar-fluid {
   max-width: none !important;
   width: 100%;
-  padding-left: clamp(0.35rem, 1vw, 0.65rem);
-  padding-right: clamp(0.35rem, 1vw, 0.65rem);
+  padding-left: 0;
+  padding-right: 12px;
 }
 
 /* Glass-style surfaces */
@@ -234,16 +240,18 @@ main.content-wrapper .topbar .container-fluid.parcels-topbar-fluid {
   max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: clip;
+  overflow-x: hidden;
+  align-items: stretch;
 }
 
 #sidebar {
-  position: fixed;
+  position: sticky;
   top: 0;
   left: 0;
-  bottom: 0;
+  bottom: auto;
+  flex: 0 0 var(--sidebar-w);
   width: var(--sidebar-w) !important;
-  max-width: min(100vw, 280px);
+  max-width: var(--sidebar-w);
   height: 100vh;
   height: 100dvh;
   overflow-x: hidden;
@@ -259,13 +267,14 @@ main.content-wrapper .topbar .container-fluid.parcels-topbar-fluid {
 }
 .content-wrapper {
   flex: 1 1 auto;
+  flex-grow: 1;
   min-width: 0;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   transition:
-    margin-left 0.2s ease,
+    padding-left 0.2s ease,
     width 0.2s ease;
 }
 body.sidebar-open {
@@ -311,18 +320,29 @@ body.sidebar-open {
 }
 
 .content-wrapper {
-  margin-left: var(--sidebar-w) !important;
-  width: calc(100% - var(--sidebar-w)) !important;
+  margin-left: 0 !important;
+  width: auto !important;
+}
+main.content-wrapper > .container-fluid {
+  --bs-gutter-x: 0;
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 12px;
 }
 
 /* Desktop only: icon rail + narrower sidebar */
 @media (min-width: 993px) {
   body.sidebar-collapsed #sidebar {
+    flex-basis: var(--sidebar-w-collapsed);
     width: var(--sidebar-w-collapsed) !important;
+    max-width: var(--sidebar-w-collapsed);
   }
   body.sidebar-collapsed .content-wrapper {
-    margin-left: var(--sidebar-w-collapsed) !important;
-    width: calc(100% - var(--sidebar-w-collapsed)) !important;
+    margin-left: 0 !important;
+    width: auto !important;
   }
   body.sidebar-collapsed #sidebar .nav-link {
     justify-content: center;
@@ -410,8 +430,11 @@ body.sidebar-open {
 /* Tablet / mobile: off-canvas drawer (full labels when open; does not shrink content width) */
 @media (max-width: 992px) {
   #sidebar {
+    position: fixed;
     width: min(88vw, 280px) !important;
     max-width: 280px;
+    flex: none;
+    bottom: 0;
     transform: translateX(calc(-100% - 16px));
     box-shadow: none;
   }
@@ -426,6 +449,7 @@ body.sidebar-open {
     margin-left: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+    overflow-x: hidden;
   }
 
   body.sidebar-open #sidebar [data-role="sidebar-collapse"] {
@@ -449,6 +473,15 @@ body.sidebar-open {
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
     cursor: pointer;
+  }
+}
+
+@media (max-width: 991.98px) {
+  #sidebar {
+    transform: translateX(-100%);
+  }
+  body.sidebar-open #sidebar {
+    transform: translateX(0);
   }
 }
 
@@ -518,8 +551,8 @@ body.sidebar-open .sidebar-toggle-floating {
 
 @media (max-width: 576px) {
   .container-fluid {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
+    padding-left: 12px;
+    padding-right: 12px;
   }
   .navbar .navbar-brand {
     font-size: 0.95rem;
@@ -551,6 +584,12 @@ body.sidebar-open .sidebar-toggle-floating {
   .form-control,
   .form-select {
     min-width: 0;
+  }
+}
+@media (min-width: 768px) {
+  main.content-wrapper > .container-fluid {
+    padding-left: 0;
+    padding-right: 16px;
   }
 }
 
