@@ -403,6 +403,34 @@ SQL
             } catch (\Throwable $e) {
                 /* exists/denied */
             }
+
+            /* Employee-linked ledger accounts (HR / payroll payable) */
+            $chk->execute([$dbName, 'cashbook_accounts', 'employee_id']);
+            if ((int) $chk->fetchColumn() === 0) {
+                try {
+                    if ($hasCol('supplier_id')) {
+                        $pdo->exec('ALTER TABLE cashbook_accounts ADD COLUMN employee_id INT UNSIGNED NULL DEFAULT NULL AFTER supplier_id');
+                    } else {
+                        $pdo->exec('ALTER TABLE cashbook_accounts ADD COLUMN employee_id INT UNSIGNED NULL DEFAULT NULL');
+                    }
+                } catch (\Throwable $e) {
+                    try {
+                        $pdo->exec('ALTER TABLE cashbook_accounts ADD COLUMN employee_id INT UNSIGNED NULL DEFAULT NULL');
+                    } catch (\Throwable $e2) {
+                        /* duplicate / denied */
+                    }
+                }
+            }
+            try {
+                $pdo->exec("ALTER TABLE cashbook_accounts MODIFY COLUMN type ENUM('cash','bank','branch','customer','supplier','employee') NOT NULL DEFAULT 'cash'");
+            } catch (\Throwable $e) {
+                /* already applied or denied */
+            }
+            try {
+                $pdo->exec('ALTER TABLE cashbook_accounts ADD UNIQUE KEY uq_cashbook_acc_employee (employee_id)');
+            } catch (\Throwable $e) {
+                /* exists */
+            }
             try {
                 $pdo->exec("UPDATE cashbook_accounts SET is_system=1 WHERE name IN ('Cash Book','Main Cash','T.S') AND type IN ('cash','bank','branch')");
             } catch (\Throwable $e) {
@@ -485,6 +513,9 @@ SQL
         if ($type === 'supplier') {
             return 'payable';
         }
+        if ($type === 'employee') {
+            return 'payable';
+        }
 
         return null;
     }
@@ -496,7 +527,7 @@ SQL
     {
         $isSystemExpr = self::cashbookAccountsHasIsSystemColumn($pdo) ? 'ca.is_system' : '0 AS is_system';
 
-        return 'ca.id, ca.name, ca.description, ca.branch_id, ca.type, ca.account_kind, ca.opening_balance, ca.balance, ca.sort_order, ca.created_at, ca.customer_id, ca.supplier_id, ca.status, ' . $isSystemExpr . ', c.name AS customer_name';
+        return 'ca.id, ca.name, ca.description, ca.branch_id, ca.type, ca.account_kind, ca.opening_balance, ca.balance, ca.sort_order, ca.created_at, ca.customer_id, ca.supplier_id, ca.employee_id, ca.status, ' . $isSystemExpr . ', c.name AS customer_name, e.name AS employee_name';
     }
 
     private static function cashbookAccountsHasIsSystemColumn(\PDO $pdo): bool
@@ -527,7 +558,7 @@ SQL
     public static function listAccounts(\PDO $pdo, bool $activeOnly = false): array
     {
         $sql = 'SELECT ' . self::sqlAccountsSelectFields($pdo) . ' '
-            . 'FROM cashbook_accounts ca LEFT JOIN customers c ON c.id = ca.customer_id';
+            . 'FROM cashbook_accounts ca LEFT JOIN customers c ON c.id = ca.customer_id LEFT JOIN employees e ON e.id = ca.employee_id';
         if ($activeOnly) {
             $sql .= " WHERE ca.status = 'active'";
         }
@@ -556,7 +587,7 @@ SQL
             if ($typeFilter === 'main') {
                 // "Main" = Cash + Digital (branch)
                 $where[] = "ca.type IN ('cash','branch')";
-            } elseif (in_array($typeFilter, ['cash', 'bank', 'branch', 'customer', 'supplier'], true)) {
+            } elseif (in_array($typeFilter, ['cash', 'bank', 'branch', 'customer', 'supplier', 'employee'], true)) {
                 $where[] = 'ca.type = ?';
                 $params[] = $typeFilter;
             }
@@ -576,7 +607,7 @@ SQL
             $orderBy = 'ca.balance DESC, ca.id DESC';
         }
         $w = implode(' AND ', $where);
-        $from = 'cashbook_accounts ca LEFT JOIN customers c ON c.id = ca.customer_id';
+        $from = 'cashbook_accounts ca LEFT JOIN customers c ON c.id = ca.customer_id LEFT JOIN employees e ON e.id = ca.employee_id';
         $st = $pdo->prepare("SELECT COUNT(*) FROM $from WHERE $w");
         $st->execute($params);
         $total = (int) $st->fetchColumn();
@@ -653,6 +684,45 @@ SQL
         return (int) $pdo->lastInsertId();
     }
 
+    /**
+     * Ensure a cash book account exists for an employee (one per employee_id). Idempotent.
+     *
+     * @return array{id: int, created: bool}
+     */
+    public static function ensureEmployeeAccount(\PDO $pdo, int $employeeId, string $displayName, string $empStatus = 'active'): array
+    {
+        self::ensureSchema($pdo);
+        if ($employeeId <= 0) {
+            throw new \InvalidArgumentException('Invalid employee id.');
+        }
+        $name = trim($displayName);
+        if ($name === '') {
+            $st = $pdo->prepare('SELECT COALESCE(NULLIF(TRIM(name), ""), TRIM(CONCAT(COALESCE(first_name, ""), " ", COALESCE(last_name, "")))) AS dn FROM employees WHERE id = ? LIMIT 1');
+            $st->execute([$employeeId]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            $name = trim((string) ($row['dn'] ?? ''));
+        }
+        if ($name === '') {
+            $name = 'Employee #' . $employeeId;
+        }
+        $accountStatus = ($empStatus === 'inactive' || $empStatus === 'suspended') ? 'inactive' : 'active';
+
+        $st = $pdo->prepare('SELECT id FROM cashbook_accounts WHERE employee_id = ? LIMIT 1');
+        $st->execute([$employeeId]);
+        $existing = $st->fetchColumn();
+        if ($existing) {
+            $id = (int) $existing;
+            $pdo->prepare('UPDATE cashbook_accounts SET name = ?, type = ?, account_kind = ?, status = ? WHERE id = ?')->execute([$name, 'employee', 'payable', $accountStatus, $id]);
+
+            return ['id' => $id, 'created' => false];
+        }
+        $max = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM cashbook_accounts')->fetchColumn();
+        $st = $pdo->prepare('INSERT INTO cashbook_accounts (name, branch_id, type, account_kind, balance, sort_order, employee_id, status) VALUES (?,?,?,?,?,?,?,?)');
+        $st->execute([$name, null, 'employee', 'payable', 0.0, $max + 1, $employeeId, $accountStatus]);
+
+        return ['id' => (int) $pdo->lastInsertId(), 'created' => true];
+    }
+
     public static function syncCustomerAccountName(\PDO $pdo, int $customerId, string $customerName): void
     {
         $name = trim($customerName);
@@ -667,7 +737,7 @@ SQL
     {
         $st = $pdo->prepare(
             'SELECT ' . self::sqlAccountsSelectFields($pdo) . ' '
-            . 'FROM cashbook_accounts ca LEFT JOIN customers c ON c.id = ca.customer_id WHERE ca.id=? LIMIT 1'
+            . 'FROM cashbook_accounts ca LEFT JOIN customers c ON c.id = ca.customer_id LEFT JOIN employees e ON e.id = ca.employee_id WHERE ca.id=? LIMIT 1'
         );
         $st->execute([$id]);
         $r = $st->fetch(\PDO::FETCH_ASSOC);
@@ -712,12 +782,15 @@ SQL
         if ($existing && !empty($existing['customer_id'])) {
             $type = 'customer';
         }
+        if ($existing && !empty($existing['employee_id'])) {
+            $type = 'employee';
+        }
         $kind = self::defaultAccountKindForType($type);
         $desc = $description !== null ? trim($description) : null;
         if ($desc === '') {
             $desc = null;
         }
-        if ($openingBalance !== null && $type !== 'customer') {
+        if ($openingBalance !== null && $type !== 'customer' && $type !== 'employee') {
             $openingBalance = is_finite($openingBalance) ? $openingBalance : 0.0;
             $st = $pdo->prepare('UPDATE cashbook_accounts SET name=?, description=?, branch_id=?, type=?, account_kind=?, opening_balance=?, status=? WHERE id=?');
             $st->execute([$name, $desc, $branchId, $type, $kind, $openingBalance, $status, $id]);
@@ -738,6 +811,9 @@ SQL
             return false;
         }
         if (!empty($acc['customer_id'])) {
+            return false;
+        }
+        if (!empty($acc['employee_id'])) {
             return false;
         }
         $bal = (float) ($acc['balance'] ?? 0);

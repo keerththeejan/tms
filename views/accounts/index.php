@@ -53,6 +53,7 @@ $csrf = Helpers::csrfToken();
               <option value="bank">Bank</option>
               <option value="customer">Customer</option>
               <option value="supplier">Supplier</option>
+              <option value="employee">Employee</option>
               <option value="main">Main (Cash + Digital)</option>
             </select>
           </div>

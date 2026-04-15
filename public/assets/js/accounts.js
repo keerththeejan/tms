@@ -75,6 +75,7 @@
       branch: ['Digital', 'text-bg-info'],
       customer: ['Customer', 'text-bg-primary'],
       supplier: ['Supplier', 'text-bg-secondary'],
+      employee: ['Employee', 'text-bg-dark'],
     };
     var v = map[t] || [t || '—', 'text-bg-light'];
     return '<span class="badge rounded-pill acc-type-badge ' + v[1] + '">' + escapeHtml(v[0]) + '</span>';

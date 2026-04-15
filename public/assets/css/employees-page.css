@@ -1,44 +1,171 @@
-/* Employees index — aligned with Parcels list: dense filters, bordered table, viewport-fit scroll */
+/**
+ * Employees module — SaaS-style responsive layout (index + add/edit form)
+ * Index: full data table with horizontal scroll on narrow viewports (desktop layout preserved).
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Shared tokens */
+/* -------------------------------------------------------------------------- */
+
+.hr-page.emp-page,
+.hr-page.emp-form {
+  --emp-space-1: 8px;
+  --emp-space-2: 12px;
+  --emp-space-3: 16px;
+  --emp-space-4: 24px;
+  --emp-radius: 12px;
+  --emp-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --emp-border: rgba(17, 24, 39, 0.1);
+  --emp-table-min: 900px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Employees list (emp-page) */
+/* -------------------------------------------------------------------------- */
 
 .emp-page {
-  --emp-gap: 6px;
   max-width: none !important;
   width: 100%;
   margin: 0;
-  padding-bottom: 0.35rem;
+  padding-bottom: var(--emp-space-2);
+  min-width: 0;
 }
 
 main.content-wrapper > .container-fluid .emp-page {
   margin-top: -0.35rem;
 }
 
-.emp-page .table-wrap {
-  border: 1px solid rgba(17, 24, 39, 0.1);
-  border-radius: 12px;
+/* Filters — card */
+.emp-page .emp-filters-card {
+  border-radius: var(--emp-radius) !important;
+  box-shadow: var(--emp-shadow);
+  border: 1px solid var(--emp-border) !important;
   background: #fff;
+  overflow: hidden;
+}
+
+.emp-page .emp-filters-header {
+  background: linear-gradient(180deg, #fafbfc 0%, #f4f6f9 100%) !important;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.06) !important;
+}
+
+.emp-page .emp-filters-body .form-label {
+  font-size: clamp(0.75rem, 0.7rem + 0.15vw, 0.8125rem);
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: var(--emp-space-1);
+}
+
+.emp-page .filters-card .form-control,
+.emp-page .filters-card .form-select,
+.emp-page .emp-filters-body .form-control,
+.emp-page .emp-filters-body .form-select {
+  width: 100%;
+  border-radius: 10px;
+  font-size: clamp(0.875rem, 0.82rem + 0.1vw, 0.9375rem);
+}
+
+.emp-page .filters-card .input-group-text {
+  border-radius: 10px 0 0 10px;
+}
+
+.emp-page .filters-card .input-group .form-control {
+  border-radius: 0 10px 10px 0;
+}
+
+.emp-page .filters-presets .btn,
+.emp-page .filters-tools .btn {
+  border-radius: 10px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.emp-page .filters-presets {
+  gap: 6px;
+}
+
+.emp-page .filters-tools .btn {
+  font-weight: 600;
+}
+
+.emp-page .filters-actions-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: var(--emp-space-2);
+  padding-top: var(--emp-space-3) !important;
+}
+
+.emp-page .emp-filter-action-btn {
+  min-height: 40px;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  border-radius: 10px;
+}
+
+/* Filters toggle chevron */
+.emp-page .filters-card .emp-filter-chevron {
+  transition: transform 0.25s ease;
+  display: inline-block;
+}
+
+.emp-page .filters-card [data-bs-toggle="collapse"].collapsed .emp-filter-chevron,
+.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .emp-filter-chevron {
+  transform: rotate(0deg);
+}
+
+.emp-page .filters-card [data-bs-toggle="collapse"]:not(.collapsed) .emp-filter-chevron,
+.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="true"] .emp-filter-chevron {
+  transform: rotate(180deg);
+}
+
+.emp-page .filters-card .filters-toggle-btn:not(.collapsed) {
+  color: var(--bs-primary) !important;
+}
+
+.emp-page .filters-presets .btn {
+  white-space: nowrap;
+}
+
+/* Table shell — horizontal scroll on small screens; desktop unchanged */
+.emp-page .emp-table-shell {
+  border: 1px solid var(--emp-border);
+  border-radius: var(--emp-radius);
+  background: #fff;
+  box-shadow: var(--emp-shadow);
+  overflow: hidden;
+  min-width: 0;
 }
 
 .emp-page .emp-table-scroll {
-  max-height: min(640px, calc(100vh - 260px));
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
-@media (max-width: 991.98px) {
+@media (min-width: 768px) {
   .emp-page .emp-table-scroll {
-    max-height: none;
+    max-height: min(640px, calc(100vh - 260px));
+    overflow-y: auto;
+  }
+
+  .emp-page .emp-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8f9fa;
   }
 }
 
+/* Desktop / large: natural table width */
 .emp-page .emp-table {
   table-layout: fixed;
   font-size: 12.5px;
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .emp-page .emp-table th,
 .emp-page .emp-table td {
-  padding: 4px 6px !important;
+  padding: 6px 8px !important;
   vertical-align: middle;
 }
 
@@ -51,12 +178,26 @@ main.content-wrapper > .container-fluid .emp-page {
   background: rgba(2, 6, 23, 0.035);
 }
 
-@media (min-width: 768px) {
-  .emp-page .emp-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: #f8f9fa;
+/* Mobile / tablet: enforce min width + nowrap for horizontal pan */
+@media (max-width: 991.98px) {
+  .emp-page .emp-table-scroll {
+    max-height: none;
+  }
+
+  .emp-page .emp-table {
+    min-width: var(--emp-table-min);
+    width: max-content;
+    table-layout: auto;
+  }
+
+  .emp-page .emp-table th,
+  .emp-page .emp-table td {
+    white-space: nowrap;
+  }
+
+  .emp-page .emp-name-cell .emp-name-main,
+  .emp-page .emp-name-cell .emp-code-sub {
+    white-space: nowrap;
   }
 }
 
@@ -91,83 +232,27 @@ main.content-wrapper > .container-fluid .emp-page {
   border-radius: 8px;
 }
 
-/* Filters card — match Parcels density */
-.emp-page .page-title-row {
-  margin-bottom: 0.5rem !important;
+/* DataTables inside shell */
+.emp-page .emp-table-shell .dataTables_wrapper {
+  padding: var(--emp-space-2) var(--emp-space-3) var(--emp-space-3);
 }
 
-.emp-page .filters-card {
-  margin-bottom: 0.5rem !important;
-  border-radius: 12px;
+.emp-page .emp-table-shell .dataTables_filter input {
+  border-radius: 10px;
+  min-height: 40px;
 }
 
-.emp-page .filters-card .card-header {
-  padding: 0.35rem 0.65rem !important;
-}
-
-.emp-page .filters-card .card-body {
-  padding: 0.5rem 0.65rem !important;
-}
-
-.emp-page .filters-card .form-label {
-  margin-bottom: 0.1rem !important;
-  font-size: 0.72rem;
-  font-weight: 600;
+.emp-page .emp-empty {
+  padding: var(--emp-space-4) var(--emp-space-3);
+  text-align: center;
   color: #64748b;
+  font-size: 0.9375rem;
+  border-radius: var(--emp-radius);
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px dashed var(--emp-border);
 }
 
-.emp-page .filters-card .form-control,
-.emp-page .filters-card .form-select {
-  padding-top: 0.15rem;
-  padding-bottom: 0.15rem;
-  font-size: 0.8rem;
-  min-height: calc(1.45em + 0.35rem + 2px);
-}
-
-.emp-page .filters-card .btn {
-  border-radius: 8px;
-}
-
-/* Filters toggle: ▼ collapsed / ▲ expanded (smooth) */
-.emp-page .filters-card .emp-filter-chevron {
-  transition: transform 0.25s ease;
-  display: inline-block;
-}
-
-.emp-page .filters-card [data-bs-toggle="collapse"].collapsed .emp-filter-chevron,
-.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="false"] .emp-filter-chevron {
-  transform: rotate(0deg);
-}
-
-.emp-page .filters-card [data-bs-toggle="collapse"]:not(.collapsed) .emp-filter-chevron,
-.emp-page .filters-card [data-bs-toggle="collapse"][aria-expanded="true"] .emp-filter-chevron {
-  transform: rotate(180deg);
-}
-
-.emp-page .filters-card .filters-toggle-btn:not(.collapsed) {
-  color: var(--bs-primary) !important;
-}
-
-.emp-page .filters-presets .btn {
-  white-space: nowrap;
-}
-
-.emp-page .filters-tools .btn {
-  padding: 0.2rem 0.45rem;
-  font-size: 0.75rem;
-}
-
-.emp-page .filters-actions-row {
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  margin-top: 0.25rem;
-  padding-top: 0.35rem !important;
-}
-
-.emp-page .emp-toolbar {
-  margin-bottom: 0.35rem !important;
-}
-
-/* Soft status badges (Parcels-style) */
+/* Soft status badges */
 .emp-page .badge.badge-soft {
   font-weight: 700;
   border: 1px solid rgba(17, 24, 39, 0.1);
@@ -188,28 +273,159 @@ main.content-wrapper > .container-fluid .emp-page {
   color: #495057;
 }
 
-/* Mobile cards */
-.emp-page .cards-wrap .card {
-  border: 1px solid rgba(17, 24, 39, 0.1);
-  border-radius: 12px;
+/* -------------------------------------------------------------------------- */
+/* Mobile: filters + table — touch targets, full-width actions */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .emp-page .emp-filters-body .form-control-sm,
+  .emp-page .emp-filters-body .form-select-sm {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 1rem;
+  }
+
+  .emp-page .emp-filters-actions {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .emp-page .emp-filters-actions-btns {
+    width: 100%;
+    flex-direction: column;
+    margin-left: 0 !important;
+  }
+
+  .emp-page .emp-filter-action-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .emp-page .filters-tools {
+    width: 100%;
+  }
+
+  .emp-page .filters-tools .btn-group {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .emp-page .filters-tools .btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
 }
 
-.emp-page .cards-wrap .card .card-body {
-  padding: 0.7rem 0.85rem;
+/* -------------------------------------------------------------------------- */
+/* Add / Edit employee form */
+/* -------------------------------------------------------------------------- */
+
+.hr-page.emp-form {
+  max-width: none;
+  width: 100%;
+  min-width: 0;
 }
 
-.emp-page .cards-wrap .meta {
-  color: #64748b;
-  font-size: 0.85rem;
+.hr-page.emp-form .emp-toast-wrap .toast {
+  min-width: min(100vw - 2rem, 340px);
 }
 
-.emp-page .cards-wrap .emp-card-title {
-  font-weight: 800;
+.hr-page.emp-form .emp-acct-badge {
+  font-weight: 600;
+  font-size: 0.75rem;
 }
 
-.emp-page .emp-empty {
-  padding: 1.25rem 1rem;
-  text-align: center;
-  color: #64748b;
-  font-size: 0.9rem;
+.hr-page.emp-form .emp-form-toolbar h3 {
+  font-size: clamp(1.125rem, 1rem + 0.4vw, 1.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.hr-page.emp-form .emp-form-card {
+  border-radius: var(--emp-radius) !important;
+  box-shadow: var(--emp-shadow);
+  border: 1px solid var(--emp-border) !important;
+  overflow: hidden;
+}
+
+.hr-page.emp-form .emp-form-card .card-body {
+  padding: var(--emp-space-3) var(--emp-space-3);
+}
+
+.hr-page.emp-form .form-label {
+  font-size: clamp(0.8125rem, 0.78rem + 0.1vw, 0.875rem);
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.85);
+  margin-bottom: var(--emp-space-1);
+}
+
+.hr-page.emp-form .form-control,
+.hr-page.emp-form .form-select,
+.hr-page.emp-form textarea.form-control {
+  width: 100%;
+  border-radius: 10px;
+  font-size: clamp(0.9375rem, 0.88rem + 0.12vw, 1rem);
+}
+
+.hr-page.emp-form .form-control:not(textarea),
+.hr-page.emp-form .form-select {
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.hr-page.emp-form textarea.form-control {
+  min-height: 88px;
+  padding: 10px 12px;
+}
+
+.hr-page.emp-form .card-footer {
+  padding: var(--emp-space-3);
+  background: #fafbfc;
+  border-top: 1px solid rgba(17, 24, 39, 0.06) !important;
+}
+
+.hr-page.emp-form .card-footer .btn {
+  border-radius: 11px;
+  min-height: 44px;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+}
+
+@media (max-width: 767.98px) {
+  .hr-page.emp-form .emp-form-toolbar {
+    gap: var(--emp-space-2) !important;
+  }
+
+  .hr-page.emp-form .emp-form-toolbar .btn {
+    width: 100%;
+  }
+
+  .hr-page.emp-form .card-footer {
+    text-align: stretch !important;
+  }
+
+  .hr-page.emp-form .card-footer .btn {
+    width: 100%;
+  }
+
+  .hr-page.emp-form label .btn-sm {
+    width: 100%;
+    margin-top: var(--emp-space-1);
+  }
+
+  .hr-page.emp-form label.d-flex {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: var(--emp-space-1);
+  }
+}
+
+@media (min-width: 768px) {
+  .hr-page.emp-form .emp-form-card .card-body {
+    padding: var(--emp-space-4);
+  }
 }

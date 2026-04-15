@@ -97,4 +97,10 @@ final class CashbookAccountService
     {
         return CashbookRepository::ensureCustomerAccount($pdo, $customerId, $customerName);
     }
+
+    /** @return array{id: int, created: bool} */
+    public static function ensureEmployeeAccount(\PDO $pdo, int $employeeId, string $displayName, string $empStatus = 'active'): array
+    {
+        return CashbookRepository::ensureEmployeeAccount($pdo, $employeeId, $displayName, $empStatus);
+    }
 }

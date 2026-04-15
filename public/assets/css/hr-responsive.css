@@ -29,10 +29,10 @@
   margin-bottom: 0;
 }
 
-/* Slightly lower minimum widths on small tablets */
+/* Employees table min-width lives in employees-page.css (900px); payroll kept here */
 @media (max-width: 991.98px) {
   .hr-page #employeesTable {
-    min-width: 560px !important;
+    min-width: 900px;
   }
   .hr-page #employeesPayrollTable {
     min-width: 640px !important;

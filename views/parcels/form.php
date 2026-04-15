@@ -52,6 +52,15 @@
   .parcel-form-page { --pf-radius: 0.5rem; --pf-border: 1px solid var(--bs-border-color-translucent); }
   /* Full width inside main content (matches parcels list — no side gutters) */
   .parcel-form-page.pf-saas .pf-page-wrap { max-width: none; width: 100%; margin-left: 0; margin-right: 0; }
+  /* Nested .container-fluid inherits design-system max-width:1560px — force parcel form to true full width of parent */
+  .parcel-form-page .pf-page-wrap.pf-form-inner-fluid,
+  .parcel-form-page #parcelForm > .container-fluid.pf-form-inner-fluid {
+    max-width: none !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+  }
   .parcel-form-page.pf-saas .page-header {
     margin-bottom: 0.65rem;
     padding: 0.75rem 0.9rem;
@@ -127,7 +136,42 @@
     justify-content: space-between;
     gap: 0.5rem;
   }
+  .parcel-form-page .pf-serial-input {
+    width: 100%;
+    max-width: min(100%, 12rem);
+    min-width: 0;
+    min-height: 44px;
+  }
+  @media (min-width: 768px) {
+    .parcel-form-page .pf-serial-input {
+      max-width: 11rem;
+    }
+  }
   .parcel-form-page .receipt-grid { border-collapse: separate; border-spacing: 0; font-size: 0.8125rem; }
+  /* Receipt strip: responsive grid — stacked on phone, multi-column on tablet/desktop */
+  .parcel-form-page .pf-receipt-summary {
+    display: grid;
+    gap: 0.65rem 1rem;
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .parcel-form-page .pf-receipt-summary .pf-rs-block {
+    min-width: 0;
+  }
+  @media (min-width: 576px) and (max-width: 991.98px) {
+    .parcel-form-page .pf-receipt-summary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .parcel-form-page .pf-receipt-summary .pf-rs-customer {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (min-width: 992px) {
+    .parcel-form-page .pf-receipt-summary {
+      grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr));
+      gap: 0.5rem 0.75rem;
+    }
+  }
   .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { border: 1px solid rgba(15, 23, 42, 0.08); vertical-align: middle; padding: 0.45rem 0.55rem; }
   .parcel-form-page .receipt-grid thead th {
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
@@ -172,9 +216,7 @@
     max-width: 100%;
     overflow: visible;
   }
-  .parcel-form-page .pf-receipt-summary [class*="col-"] {
-    min-width: 0;
-  }
+  /* Line items: same table layout on all viewports — pan horizontally on narrow screens */
   .parcel-form-page .pf-items-scroll {
     width: 100%;
     max-width: 100%;
@@ -182,21 +224,24 @@
     display: block;
     box-sizing: border-box;
     max-height: min(380px, 48vh);
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: auto;
     overscroll-behavior: contain;
-    touch-action: pan-y;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
     border: 1px solid rgba(15, 23, 42, 0.1);
     border-radius: 10px;
     background: #fff;
     -webkit-overflow-scrolling: touch;
   }
   .parcel-form-page .pf-items-scroll .table { margin-bottom: 0; }
-  /* Items grid: fit viewport width — no horizontal scroll (Excel-style) */
+  /* Items grid: fixed min width — scroll container shows full desktop-style columns */
   .parcel-form-page #itemsTable {
     --pf-grid-line: #e5e7eb;
+    --pf-items-table-min: 880px;
     width: 100%;
-    max-width: 100%;
+    min-width: var(--pf-items-table-min);
+    max-width: none;
     table-layout: fixed;
     border-collapse: collapse;
     border: 1px solid var(--pf-grid-line);
@@ -208,8 +253,11 @@
     border: 1px solid var(--pf-grid-line);
     vertical-align: middle;
     padding: clamp(0.12rem, 0.35vw, 0.28rem) clamp(0.2rem, 0.45vw, 0.38rem);
-    word-wrap: break-word;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+  }
+  .parcel-form-page #itemsTable.receipt-grid td.item-amount-cell {
+    white-space: normal;
+    min-width: 12.5rem;
   }
   .parcel-form-page #itemsTable.receipt-grid thead th {
     background: #f9fafb;
@@ -269,7 +317,7 @@
     text-align: center;
   }
   .parcel-form-page #itemsTable .pf-item-amt-cell {
-    min-width: 0;
+    min-width: 5rem;
     vertical-align: middle;
   }
   .parcel-form-page #itemsTable .pf-item-amt-cell .item-amount.pf-amount-readout {
@@ -438,40 +486,38 @@
     text-align: center;
     vertical-align: middle;
   }
-  /* Desktop: column alignment (spreadsheet-style) */
-  @media (min-width: 992px) {
-    .parcel-form-page #itemsTable thead th:nth-child(1),
-    .parcel-form-page #itemsTable thead th:nth-child(3),
-    .parcel-form-page #itemsTable thead th:nth-child(4),
-    .parcel-form-page #itemsTable thead th:nth-child(5),
-    .parcel-form-page #itemsTable thead th:nth-child(6),
-    .parcel-form-page #itemsTable thead th:nth-child(7) {
-      text-align: center;
-    }
-    .parcel-form-page #itemsTable thead th:nth-child(2) {
-      text-align: left;
-    }
-    .parcel-form-page #itemsTable .item-desc {
-      text-align: left;
-    }
-    .parcel-form-page #itemsTable .item-qty,
-    .parcel-form-page #itemsTable .item-rate {
-      text-align: center;
-    }
-    .parcel-form-page #itemsTable .pf-item-amt-cell .pf-amount-readout,
-    .parcel-form-page #itemsTable .item-amount-cell .pf-amount-readout,
-    .parcel-form-page #itemsTable .item-amount-cell .item-add {
-      text-align: center;
-    }
-    .parcel-form-page .pf-items-scroll thead th {
-      position: sticky;
-      top: 0;
-      z-index: 6;
-      box-shadow: 0 1px 0 #e5e7eb;
-    }
-    .parcel-form-page .pf-items-scroll #itemsTable thead th {
-      background: #f3f4f6;
-    }
+  /* Column alignment — same as desktop at every breakpoint (table scrolls horizontally on small screens) */
+  .parcel-form-page #itemsTable thead th:nth-child(1),
+  .parcel-form-page #itemsTable thead th:nth-child(3),
+  .parcel-form-page #itemsTable thead th:nth-child(4),
+  .parcel-form-page #itemsTable thead th:nth-child(5),
+  .parcel-form-page #itemsTable thead th:nth-child(6),
+  .parcel-form-page #itemsTable thead th:nth-child(7) {
+    text-align: center;
+  }
+  .parcel-form-page #itemsTable thead th:nth-child(2) {
+    text-align: left;
+  }
+  .parcel-form-page #itemsTable .item-desc {
+    text-align: left;
+  }
+  .parcel-form-page #itemsTable .item-qty,
+  .parcel-form-page #itemsTable .item-rate {
+    text-align: center;
+  }
+  .parcel-form-page #itemsTable .pf-item-amt-cell .pf-amount-readout,
+  .parcel-form-page #itemsTable .item-amount-cell .pf-amount-readout,
+  .parcel-form-page #itemsTable .item-amount-cell .item-add {
+    text-align: center;
+  }
+  .parcel-form-page .pf-items-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    box-shadow: 0 1px 0 #e5e7eb;
+  }
+  .parcel-form-page .pf-items-scroll #itemsTable thead th {
+    background: #f3f4f6;
   }
   .parcel-form-page .pf-btn-icon-touch {
     display: inline-flex;
@@ -944,9 +990,31 @@
     border-top: 1px solid rgba(17,24,39,.08);
     box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.08);
     padding: .65rem .75rem;
+    padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
     transition: background 0.3s ease;
   }
-  .parcel-form-page .pf-sticky-actions .btn { border-radius: 12px; min-height: 2.65rem; }
+  .parcel-form-page .pf-sticky-actions-inner {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .parcel-form-page .pf-sticky-actions .btn {
+    border-radius: 12px;
+    min-height: 2.75rem;
+    width: 100%;
+  }
+  /* Sticky bar only renders below lg (d-lg-none); tablet can use side-by-side, phone stacked */
+  @media (min-width: 768px) and (max-width: 991.98px) {
+    .parcel-form-page .pf-sticky-actions-inner {
+      flex-direction: row;
+    }
+    .parcel-form-page .pf-sticky-actions .btn {
+      flex: 1 1 50%;
+    }
+  }
   .parcel-form-page .pf-toast-wrap { position: fixed; top: 1rem; right: 1rem; z-index: 1100; width: min(420px, calc(100vw - 2rem)); }
   /* Last-bill modal: full screen on phones, comfortable on desktop */
   .parcel-form-page .clb-modal .modal-content { border: 0; border-radius: 1rem; box-shadow: 0 18px 50px rgba(2,6,23,.12); overflow: hidden; }
@@ -978,7 +1046,8 @@
   .parcel-form-page.pf-compact-view .pf-items-scroll {
     max-height: min(220px, 32vh);
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     border: 1px solid var(--bs-border-color-translucent);
     border-radius: 0.25rem;
   }
@@ -986,102 +1055,44 @@
   @media (min-width: 1200px) {
     .parcel-form-page.pf-compact-view .pf-items-scroll { max-height: min(260px, 36vh); }
   }
-  /* Below lg: stack line items as full-width cards (no sideways page scroll) */
-  @media (max-width: 991.98px) {
-    .parcel-form-page .pf-items-scroll {
-      max-height: none;
-      overflow: visible !important;
-      touch-action: manipulation;
-      border: 0;
-      background: transparent;
-      -webkit-overflow-scrolling: auto;
+  /* Small screens: line items stay a real table — pan .pf-items-scroll horizontally (no card/stack transforms) */
+  @media (max-width: 767.98px) {
+    .parcel-form-page .row.pf-main-columns {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      --bs-gutter-x: 0.65rem;
     }
-    .parcel-form-page #itemsTable {
-      min-width: 0 !important;
+    .parcel-form-page .pf-col-items,
+    .parcel-form-page .pf-items-section,
+    .parcel-form-page .pf-items-section .receipt-box,
+    .parcel-form-page .pf-items-section .section-card {
       width: 100% !important;
       max-width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
     }
-    .parcel-form-page #itemsTable thead {
-      display: none !important;
+    .parcel-form-page .pf-page-wrap.pf-form-inner-fluid,
+    .parcel-form-page #parcelForm > .container-fluid.pf-form-inner-fluid {
+      padding-left: max(0.5rem, env(safe-area-inset-left)) !important;
+      padding-right: max(0.5rem, env(safe-area-inset-right)) !important;
     }
-    .parcel-form-page #itemsTable tbody tr {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      border: 1px solid rgba(15, 23, 42, 0.12) !important;
-      border-radius: 0.65rem;
-      margin-bottom: 0.75rem;
-      padding: 0.5rem 0.65rem !important;
-      background: rgba(255, 255, 255, 0.98);
-      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+    .parcel-form-page .pf-receipt-summary {
+      grid-template-columns: 1fr !important;
     }
-    .parcel-form-page #itemsTable tbody td {
-      display: block !important;
-      width: 100% !important;
-      max-width: 100%;
-      box-sizing: border-box;
-      border: none !important;
-      border-bottom: 1px solid rgba(15, 23, 42, 0.07) !important;
-      padding: 0.5rem 0 !important;
-      text-align: left !important;
-    }
-    .parcel-form-page #itemsTable tbody td:last-child {
-      border-bottom: none !important;
-    }
-    .parcel-form-page #itemsTable tbody td[data-label]:not(.pf-item-no-cell)::before {
-      content: attr(data-label);
-      display: block;
-      font-size: 0.62rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #64748b;
-      margin-bottom: 0.35rem;
-    }
-    .parcel-form-page #itemsTable tbody td.pf-item-no-cell {
+    .parcel-form-page .pf-items-section .text-end.mb-1 {
       text-align: center !important;
-      font-weight: 700;
-      font-size: 0.85rem;
-      padding-bottom: 0.25rem !important;
     }
-    .parcel-form-page #itemsTable tbody td.pf-item-no-cell::before {
-      display: none !important;
+    .parcel-form-page .pf-items-section #addRow {
+      width: 100% !important;
     }
-    .parcel-form-page #itemsTable tbody td.pf-item-remove-cell::before {
-      content: none !important;
-      display: none !important;
+    .parcel-form-page .pf-form-sections .form-control-sm,
+    .parcel-form-page .pf-form-sections .form-select-sm,
+    .parcel-form-page .pf-form-sections .pf-input-group .form-control,
+    .parcel-form-page .pf-form-sections .pf-input-group .form-select {
+      min-height: 44px;
     }
-    .parcel-form-page #itemsTable .pf-item-remove-cell .remove-row {
-      min-height: 2.65rem;
-      min-width: 2.65rem;
-      width: auto;
-      margin-left: auto;
-    }
-    .parcel-form-page #itemsTable tbody td.item-amount-cell .pf-item-add-excel-wrap {
-      max-width: 100%;
-      overflow-x: hidden;
-    }
-    .parcel-form-page #itemsTable tbody td.item-amount-cell .item-add-list .item-add-row {
-      flex-wrap: wrap;
-    }
-    .parcel-form-page #itemsTable tbody td.item-amount-cell .item-add-row input {
-      min-width: 0;
-      flex: 1 1 8rem;
-    }
-    .parcel-form-page #itemsTable tbody td .pf-amount-readout {
-      text-align: center;
-    }
-    .parcel-form-page #itemsTable .receipt-grid .form-control,
-    .parcel-form-page #itemsTable .receipt-grid .form-control-sm {
-      width: 100%;
-      max-width: 100%;
-    }
-    .parcel-form-page .pf-scroll-hint {
-      display: none !important;
-    }
-    .parcel-form-page .pf-page-wrap {
-      padding-left: max(0.35rem, env(safe-area-inset-left)) !important;
-      padding-right: max(0.35rem, env(safe-area-inset-right)) !important;
+    .parcel-form-page #parcelStatusSelect.form-select {
+      min-height: 44px;
     }
     .parcel-form-page .pf-form-sections .section-card .section-body {
       padding: 0.65rem !important;
@@ -1098,14 +1109,6 @@
     .parcel-form-page #serialInput { max-width: 100% !important; width: 100%; }
     .parcel-form-page .receipt-grid th, .parcel-form-page .receipt-grid td { padding: 0.35rem 0.4rem; font-size: 0.85rem; }
     .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 1.85rem; font-size: 0.9rem; }
-    /* Items table: stay compact on small screens (overrides generic receipt-grid sizing) */
-    .parcel-form-page #itemsTable .form-control,
-    .parcel-form-page #itemsTable .form-control-sm {
-      min-height: 1.38rem;
-      font-size: clamp(0.78rem, 2.8vw, 0.85rem);
-      padding: 0.12rem 0.3rem;
-    }
-    .parcel-form-page.pf-saas.pf-layout-optimized { padding-bottom: 76px; } /* space for sticky action bar */
   }
 
   /* —— Parcel form: dense dashboard layout (CSS only; no input/JS/PHP logic changes) —— */
@@ -1120,7 +1123,16 @@
   .parcel-form-page.pf-saas.pf-layout-optimized .pf-page-wrap {
     padding-left: max(0.35rem, env(safe-area-inset-left));
     padding-right: max(0.35rem, env(safe-area-inset-right));
-    padding-bottom: 0.25rem;
+  }
+  @media (max-width: 991.98px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-page-wrap {
+      padding-bottom: max(4.5rem, calc(0.5rem + env(safe-area-inset-bottom)));
+    }
+  }
+  @media (min-width: 992px) {
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-page-wrap {
+      padding-bottom: 0.25rem;
+    }
   }
   .parcel-form-page.pf-saas.pf-layout-optimized .pf-breadcrumb {
     margin-bottom: 0.3rem !important;
@@ -1236,7 +1248,7 @@
   .parcel-form-page.pf-saas.pf-layout-optimized .pf-receipt-summary .mt-1 {
     margin-top: 0.15rem !important;
   }
-  .parcel-form-page.pf-saas.pf-layout-optimized .receipt-box > .px-2.py-1.border-bottom {
+  .parcel-form-page.pf-saas.pf-layout-optimized .receipt-box > .pf-receipt-summary-wrap {
     padding: 0.35rem 0.5rem !important;
   }
   .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-section .p-2.pt-1 {
@@ -1311,9 +1323,219 @@
       padding: 0.5rem !important;
     }
   }
+
+  /* ---------------------------------------------------------------------------
+     Mobile one-screen: fill viewport below topbar; single scroll region; fixed Save/Reset
+     --------------------------------------------------------------------------- */
+  @media (max-width: 767.98px) {
+    :root {
+      --pf-one-topbar-h: 52px;
+      --pf-one-sticky-h: 112px;
+    }
+    html:has(.parcel-form-page.pf-one-screen) {
+      height: 100%;
+      overflow: hidden;
+    }
+    body:has(.parcel-form-page.pf-one-screen) {
+      overflow: hidden !important;
+      height: 100%;
+    }
+    .app-shell:has(.parcel-form-page.pf-one-screen) {
+      min-height: 100dvh;
+    }
+    main.content-wrapper:has(.parcel-form-page.pf-one-screen) {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    }
+    main.content-wrapper:has(.parcel-form-page.pf-one-screen) > .container-fluid.parcels-main-fluid {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      margin-top: 0 !important;
+      padding-top: 0.25rem !important;
+      padding-bottom: 0 !important;
+    }
+    .parcel-form-page.pf-one-screen {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: linear-gradient(165deg, #eef2f7 0%, #e8ecf4 40%, #f4f6fa 100%);
+      font-size: 13px;
+      --pf-card-radius: 10px;
+      --pf-space-1: 8px;
+      --pf-space-2: 10px;
+      --pf-input-h: 36px;
+    }
+    .parcel-form-page.pf-one-screen .pf-page-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding-bottom: 0 !important;
+    }
+    .parcel-form-page.pf-one-screen .pf-breadcrumb {
+      padding: 0.15rem 0;
+      margin-bottom: 0.25rem !important;
+      font-size: 0.75rem;
+    }
+    .parcel-form-page.pf-one-screen .page-header {
+      margin-bottom: 0.35rem !important;
+      padding: 0.45rem 0.55rem !important;
+      flex-shrink: 0;
+    }
+    .parcel-form-page.pf-one-screen .page-header .h4,
+    .parcel-form-page.pf-one-screen .page-header h1.h4 {
+      font-size: 1rem;
+    }
+    .parcel-form-page.pf-one-screen .pf-aux-banner {
+      margin-bottom: 0.35rem !important;
+    }
+    .parcel-form-page.pf-one-screen .pf-aux-banner .card-body {
+      padding: 0.35rem 0.5rem !important;
+    }
+    .parcel-form-page.pf-one-screen .alert {
+      padding: 0.35rem 0.5rem !important;
+      margin-bottom: 0.35rem !important;
+      font-size: 0.8rem;
+    }
+    .parcel-form-page.pf-one-screen .pf-one-screen-fill {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .parcel-form-page.pf-one-screen .pf-one-screen-form {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .parcel-form-page.pf-one-screen .pf-one-screen-form > .d-none {
+      min-height: 0;
+    }
+    .parcel-form-page.pf-one-screen .pf-form-scroll-region {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      padding-bottom: calc(var(--pf-one-sticky-h) + env(safe-area-inset-bottom, 0px));
+    }
+    .parcel-form-page.pf-one-screen .page-header #pfSaveBtnTop {
+      display: none;
+    }
+    .parcel-form-page.pf-one-screen .pf-sticky-actions {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1055;
+      padding-left: max(0.5rem, env(safe-area-inset-left));
+      padding-right: max(0.5rem, env(safe-area-inset-right));
+      padding-bottom: max(0.45rem, env(safe-area-inset-bottom));
+      box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.1);
+    }
+    .parcel-form-page.pf-one-screen .section-card {
+      margin-bottom: 0.4rem !important;
+    }
+    .parcel-form-page.pf-one-screen .section-card .section-title {
+      padding: 0.4rem 0.6rem !important;
+      font-size: 0.72rem !important;
+    }
+    .parcel-form-page.pf-one-screen .section-card .section-body {
+      padding: 0.45rem 0.55rem !important;
+    }
+    .parcel-form-page.pf-one-screen .pf-dense .form-control-sm,
+    .parcel-form-page.pf-one-screen .pf-dense .form-select-sm {
+      min-height: 36px !important;
+      padding: 0.25rem 0.45rem !important;
+      font-size: 13px !important;
+      border-radius: 8px !important;
+    }
+    .parcel-form-page.pf-one-screen .pf-label {
+      font-size: 0.65rem !important;
+      margin-bottom: 0.1rem !important;
+    }
+    .parcel-form-page.pf-one-screen .pf-form-sections.d-flex.flex-column {
+      gap: 0.4rem !important;
+    }
+    .parcel-form-page.pf-one-screen .row.g-2,
+    .parcel-form-page.pf-one-screen .row.g-2.g-lg-3 {
+      --bs-gutter-y: 0.4rem;
+      --bs-gutter-x: 0.45rem;
+    }
+    /* Items: cap height so Add Row + total stay reachable; inner scroll for table */
+    .parcel-form-page.pf-one-screen .pf-items-scroll {
+      max-height: min(28dvh, 200px) !important;
+      flex: 0 0 auto;
+      overflow-x: auto;
+      overflow-y: auto;
+    }
+    .parcel-form-page.pf-one-screen .pf-items-section .text-end.mb-1 {
+      flex-shrink: 0;
+    }
+    .parcel-form-page.pf-one-screen .receipt-total {
+      padding: 0.4rem 0.5rem !important;
+    }
+    .parcel-form-page.pf-one-screen .receipt-total .fs-5 {
+      font-size: 1rem !important;
+    }
+    .parcel-form-page.pf-one-screen #parcelStatusSelect.form-select {
+      min-height: 36px;
+      font-size: 13px;
+    }
+    .parcel-form-page.pf-one-screen.pf-saas.pf-layout-optimized .pf-page-wrap {
+      padding-bottom: 0 !important;
+    }
+  }
+  @media (min-width: 768px) {
+    .parcel-form-page .pf-form-scroll-region {
+      display: contents;
+    }
+    html:has(.parcel-form-page.pf-one-screen),
+    body:has(.parcel-form-page.pf-one-screen) {
+      height: auto !important;
+      overflow: auto !important;
+    }
+    main.content-wrapper:has(.parcel-form-page.pf-one-screen) {
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+    main.content-wrapper:has(.parcel-form-page.pf-one-screen) > .container-fluid.parcels-main-fluid {
+      overflow: visible !important;
+    }
+    .parcel-form-page.pf-one-screen {
+      flex: initial !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+    .parcel-form-page.pf-one-screen .pf-page-wrap,
+    .parcel-form-page.pf-one-screen .pf-one-screen-fill,
+    .parcel-form-page.pf-one-screen .pf-one-screen-form {
+      flex: initial !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+    .parcel-form-page.pf-one-screen .page-header #pfSaveBtnTop {
+      display: inline-flex;
+    }
+  }
 </style>
-<div class="parcel-form-page pf-saas pf-layout-optimized">
-<div class="container-fluid px-1 px-sm-2 px-lg-2 pf-page-wrap">
+<div class="parcel-form-page pf-saas pf-layout-optimized pf-one-screen">
+<div class="container-fluid px-1 px-sm-2 px-lg-2 pf-page-wrap pf-form-inner-fluid">
 
 <?php 
   $isEdit = (int)($parcel['id'] ?? 0) > 0; 
@@ -1464,14 +1686,16 @@
 
 <div class="pf-toast-wrap" id="pfToastWrap" aria-live="polite" aria-atomic="true"></div>
 
-<form method="post" id="parcelForm" class="needs-validation" novalidate action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>" autocomplete="off">
+<div class="pf-one-screen-fill">
+<form method="post" id="parcelForm" class="needs-validation pf-one-screen-form" novalidate action="<?php echo Helpers::baseUrl('index.php?page=parcels&action=save'); ?>" autocomplete="off">
   <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
   <input type="hidden" name="id" value="<?php echo (int)$parcel['id']; ?>">
   <?php if ($statusOnlyEdit): ?><input type="hidden" name="status_only_edit" value="1"><?php endif; ?>
   <input type="hidden" name="idempotency_key" value="<?php echo bin2hex(random_bytes(16)); ?>">
 
+  <div class="pf-form-scroll-region">
   <div class="<?php echo $statusOnlyEdit ? 'd-none' : ''; ?>">
-  <div class="container-fluid px-0">
+  <div class="container-fluid px-0 pf-form-inner-fluid">
     <div class="row g-2 g-lg-3 align-items-start pf-main-columns">
       <div class="col-12 col-lg-6 col-xl-6 pf-animate pf-animate-in">
   <div class="pf-form-sections d-flex flex-column gap-2 gap-lg-3 mb-2 mb-lg-0 pf-dense pf-floating">
@@ -1522,9 +1746,9 @@
       </div>
     </section>
 
-    <div class="row g-2 g-lg-3 align-items-stretch">
-      <!-- Location -->
-      <div class="col-12 col-lg-4">
+    <div class="row g-2 g-lg-3 align-items-stretch pf-loc-sup-inv-row">
+      <!-- Location (after invoice on narrow screens — see order-* classes) -->
+      <div class="col-12 col-lg-4 order-2 order-lg-1">
         <section class="section-card h-100" role="region" aria-labelledby="pf-h-location">
           <div class="section-title" id="pf-h-location"><i class="bi bi-geo-alt me-2 text-primary" aria-hidden="true"></i>Location</div>
           <div class="section-body pt-2 pt-lg-3">
@@ -1541,7 +1765,7 @@
         </section>
       </div>
       <!-- Supplier -->
-      <div class="col-12 col-lg-4">
+      <div class="col-12 col-lg-4 order-3 order-lg-2">
         <section class="section-card h-100" role="region" aria-labelledby="pf-h-supplier">
           <div class="section-title" id="pf-h-supplier"><i class="bi bi-people me-2 text-primary" aria-hidden="true"></i>Supplier</div>
           <div class="section-body pt-2 pt-lg-3">
@@ -1567,8 +1791,8 @@
           </div>
         </section>
       </div>
-      <!-- Invoice & date -->
-      <div class="col-12 col-lg-4">
+      <!-- Invoice & date (first on mobile: parcel date next to customer flow) -->
+      <div class="col-12 col-lg-4 order-1 order-lg-3">
         <section class="section-card h-100" role="region" aria-labelledby="pf-h-invoice">
           <div class="section-title" id="pf-h-invoice"><i class="bi bi-file-earmark-text me-2 text-primary" aria-hidden="true"></i>Invoice &amp; date</div>
           <div class="section-body pt-2 pt-lg-3">
@@ -1741,19 +1965,19 @@
       <div class="fw-semibold small">TS Transport</div>
       <div class="serial-badge d-flex align-items-center gap-1 flex-wrap justify-content-end">
         <label for="serialInput" class="mb-0 small">Serial:</label>
-        <input type="text" id="serialInput" name="tracking_number" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" aria-label="Parcel serial or tracking number" autocomplete="off" />
+        <input type="text" id="serialInput" name="tracking_number" class="form-control form-control-sm pf-serial-input" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" aria-label="Parcel serial or tracking number" autocomplete="off" />
       </div>
     </div>
-    <div class="px-2 py-1 border-bottom bg-body-secondary bg-opacity-25">
-      <div class="row g-2 align-items-start small pf-receipt-summary">
-        <div class="col-12 col-md-6 col-xl-5">
-          <div class="text-break"><strong>Cust:</strong> <span id="customerDisplay">—</span></div>
-          <div class="text-muted mt-1"><strong>Loc:</strong> <span id="customerLocDisplay">—</span></div>
+    <div class="px-2 py-2 border-bottom bg-body-secondary bg-opacity-25 pf-receipt-summary-wrap">
+      <div class="pf-receipt-summary small">
+        <div class="pf-rs-block pf-rs-customer text-break">
+          <strong>Customer:</strong> <span id="customerDisplay">—</span>
+          <div class="text-muted mt-1"><strong>Location:</strong> <span id="customerLocDisplay">—</span></div>
         </div>
-        <div class="col-12 col-sm-6 col-md-6 col-xl-2"><strong>Date:</strong> <span id="recDateSummary"><?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?></span></div>
-        <div class="col-12 col-sm-6 col-md-6 col-xl-2"><strong>From:</strong> <span id="fromBranchDisplay">—</span></div>
-        <div class="col-12 col-sm-6 col-md-6 col-xl-2"><strong>To:</strong> <span id="toBranchDisplay">—</span></div>
-        <div class="col-12 col-sm-6 col-md-6 col-xl-1"><strong>Veh:</strong> <span id="recVehicle">—</span></div>
+        <div class="pf-rs-block"><strong>Date:</strong> <span id="recDateSummary"><?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?></span></div>
+        <div class="pf-rs-block"><strong>From:</strong> <span id="fromBranchDisplay">—</span></div>
+        <div class="pf-rs-block"><strong>To:</strong> <span id="toBranchDisplay">—</span></div>
+        <div class="pf-rs-block"><strong>Vehicle:</strong> <span id="recVehicle">—</span></div>
       </div>
     </div>
 
@@ -1829,7 +2053,7 @@
               <td class="align-middle pf-item-amt-cell" data-label="Amount">
                 <span class="item-amount fw-semibold pf-amount-readout"><?php echo $amt > 0 ? number_format($amt, 2) : '—'; ?></span>
               </td>
-              <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+              <td class="align-middle item-amount-cell" data-label="Additional">
                 <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
                   <span class="item-add-sum fw-semibold pf-amount-readout"><?php echo $addSumPhp > 0 ? number_format($addSumPhp, 2) : '—'; ?></span>
                   <span class="visually-hidden">Additional line amounts</span>
@@ -1860,7 +2084,7 @@
               <td class="align-middle pf-item-amt-cell" data-label="Amount">
                 <span class="item-amount fw-semibold pf-amount-readout">—</span>
               </td>
-              <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+              <td class="align-middle item-amount-cell" data-label="Additional">
                 <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
                   <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
                   <span class="visually-hidden">Additional line amounts</span>
@@ -1923,7 +2147,7 @@
   </div><!-- /.statusOnly hide block -->
 
   <!-- Status and actions (native select: do not use Choices.js — keeps all 8 statuses visible) -->
-  <div class="container-fluid px-0">
+  <div class="container-fluid px-0 pf-form-inner-fluid">
   <div class="section-card mt-2">
     <div class="section-body py-2 px-2 px-sm-3">
       <div class="row g-2 align-items-end pf-status-row">
@@ -1944,14 +2168,17 @@
   </div>
   </div>
 
-  <!-- Mobile sticky action bar -->
+  </div><!-- /.pf-form-scroll-region -->
+
+  <!-- Mobile sticky action bar (stacked ≤767px; side-by-side tablet when bar visible) -->
   <div class="pf-sticky-actions d-lg-none">
-    <div class="d-flex gap-2">
-      <button type="reset" class="btn btn-outline-secondary w-50 rounded-3" id="pfResetBtnMobile"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Reset</button>
-      <button type="submit" class="btn btn-primary w-50 pf-btn-save" id="pfSaveBtnMobile"><i class="bi bi-save me-1" aria-hidden="true"></i> Save</button>
+    <div class="pf-sticky-actions-inner">
+      <button type="submit" class="btn btn-primary pf-btn-save" id="pfSaveBtnMobile"><i class="bi bi-save me-1" aria-hidden="true"></i> Save</button>
+      <button type="reset" class="btn btn-outline-secondary rounded-3" id="pfResetBtnMobile"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Reset</button>
     </div>
   </div>
 </form>
+</div><!-- /.pf-one-screen-fill -->
 
   <!-- Quick Add Customer: OUTSIDE #parcelForm (Enter must not submit parcel) -->
   <div class="modal fade" id="quickAddCustomer" tabindex="-1" aria-labelledby="quickAddCustomerTitle" aria-hidden="true">
@@ -2427,7 +2654,7 @@
                     <td class="align-middle pf-item-amt-cell" data-label="Amount">
                       <span class="item-amount fw-semibold pf-amount-readout">—</span>
                     </td>
-                    <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+                    <td class="align-middle item-amount-cell" data-label="Additional">
                       <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
                         <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
                         <span class="visually-hidden">Additional line amounts</span>
@@ -3059,7 +3286,7 @@
       <td class="align-middle pf-item-amt-cell" data-label="Amount">
         <span class="item-amount fw-semibold pf-amount-readout">—</span>
       </td>
-      <td class="align-middle item-amount-cell" data-label="Additional Amounts">
+      <td class="align-middle item-amount-cell" data-label="Additional">
         <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
           <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
           <span class="visually-hidden">Additional line amounts</span>
@@ -3076,7 +3303,7 @@
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button>
         </div>
       </td>
-      <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
+      <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
     `;
     tbody.appendChild(tr);
     syncAddRemoveButtons(tr);

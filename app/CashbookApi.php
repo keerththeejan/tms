@@ -45,12 +45,22 @@ class CashbookApi
                             $acc['account_type'] = 'Customer';
                         } elseif ($type === 'bank') {
                             $acc['account_type'] = 'Bank';
+                        } elseif ($type === 'supplier') {
+                            $acc['account_type'] = 'Supplier';
+                        } elseif ($type === 'employee') {
+                            $acc['account_type'] = 'Employee';
+                        } elseif ($type === 'branch') {
+                            $acc['account_type'] = 'Digital';
+                        } elseif ($type === 'cash') {
+                            $acc['account_type'] = 'Main';
                         } else {
                             $acc['account_type'] = 'Main';
                         }
 
                         $acc['account_name'] = (string) ($acc['name'] ?? '');
                         $acc['customer_name'] = isset($acc['customer_name']) && $acc['customer_name'] !== '' ? (string) $acc['customer_name'] : null;
+                        $acc['employee_name'] = isset($acc['employee_name']) && $acc['employee_name'] !== '' ? (string) $acc['employee_name'] : null;
+
                         return $acc;
                     };
                     if ($forOps) {
@@ -174,6 +184,9 @@ class CashbookApi
                         if ($existing && !empty($existing['customer_id'])) {
                             $type = 'customer';
                         }
+                        if ($existing && !empty($existing['employee_id'])) {
+                            $type = 'employee';
+                        }
                         CashbookRepository::updateAccount($pdo, $id, $name, $type, $branchId, $status, $opening, $desc);
                         CashbookRepository::audit($pdo, 'account', (string) $id, 'update', $uid, ['name' => $name, 'type' => $type, 'branch_id' => $branchId, 'status' => $status]);
                     } else {
@@ -237,6 +250,11 @@ class CashbookApi
                     }
                     if (!empty($acc['customer_id'])) {
                         self::json(['ok' => false, 'error' => 'Customer-linked accounts cannot be deleted from here.'], 400);
+
+                        return;
+                    }
+                    if (!empty($acc['employee_id'])) {
+                        self::json(['ok' => false, 'error' => 'Employee-linked accounts cannot be deleted from here.'], 400);
 
                         return;
                     }

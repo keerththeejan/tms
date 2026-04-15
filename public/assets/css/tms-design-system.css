@@ -16,6 +16,7 @@ body {
   padding-top: 0;
   margin: 0;
   background: #f8f9fb;
+  overflow-x: clip;
 }
 
 :root {
@@ -36,9 +37,10 @@ body {
   --shell-radius: 14px;
   --shell-border: rgba(17, 24, 39, 0.1);
   --shell-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --sidebar-w: 220px;
+  --sidebar-w: 252px;
   --sidebar-w-collapsed: 72px;
   --touch-min: 44px;
+  --sidebar-transition: 0.25s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -148,7 +150,13 @@ main.content-wrapper .topbar .container-fluid.parcels-topbar-fluid {
   transform: translateY(1px);
 }
 .btn-primary {
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 55%, #1d4ed8 100%);
+  border-color: rgba(37, 99, 235, 0.95);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 50%, #1d4ed8 100%);
+  border-color: #2563eb;
 }
 .btn-outline-secondary:hover {
   background: rgba(15, 23, 42, 0.04);
@@ -219,20 +227,46 @@ main.content-wrapper .topbar .container-fluid.parcels-topbar-fluid {
   display: none;
 }
 
-/* Shell layout */
+/* Shell layout — fixed sidebar + flex main (drawer on small screens) */
+.app-shell {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
 #sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
   width: var(--sidebar-w) !important;
+  max-width: min(100vw, 280px);
+  height: 100vh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: linear-gradient(180deg, #0a1628 0%, #0b1220 40%, #0b1220 100%) !important;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06);
   transition:
-    transform 0.22s ease,
-    width 0.18s ease;
+    transform var(--sidebar-transition),
+    width 0.2s ease,
+    box-shadow 0.2s ease;
   z-index: 1045;
 }
 .content-wrapper {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   transition:
-    margin-left 0.2s ease-in-out,
-    width 0.2s ease-in-out;
+    margin-left 0.2s ease,
+    width 0.2s ease;
 }
 body.sidebar-open {
   overflow: hidden;
@@ -281,25 +315,28 @@ body.sidebar-open {
   width: calc(100% - var(--sidebar-w)) !important;
 }
 
-body.sidebar-collapsed #sidebar {
-  width: var(--sidebar-w-collapsed) !important;
-}
-body.sidebar-collapsed .content-wrapper {
-  margin-left: var(--sidebar-w-collapsed) !important;
-  width: calc(100% - var(--sidebar-w-collapsed)) !important;
-}
-body.sidebar-collapsed #sidebar .nav-link {
-  justify-content: center;
-  padding: 0.55rem 0.5rem;
-}
-body.sidebar-collapsed #sidebar .nav-link span,
-body.sidebar-collapsed #sidebar .nav-section,
-body.sidebar-collapsed #sidebar .branch-meta,
-body.sidebar-collapsed #sidebar .btn-logout {
-  display: none !important;
-}
-body.sidebar-collapsed #sidebar .navbar-brand {
-  font-size: 1.05rem;
+/* Desktop only: icon rail + narrower sidebar */
+@media (min-width: 993px) {
+  body.sidebar-collapsed #sidebar {
+    width: var(--sidebar-w-collapsed) !important;
+  }
+  body.sidebar-collapsed .content-wrapper {
+    margin-left: var(--sidebar-w-collapsed) !important;
+    width: calc(100% - var(--sidebar-w-collapsed)) !important;
+  }
+  body.sidebar-collapsed #sidebar .nav-link {
+    justify-content: center;
+    padding: 0.55rem 0.5rem;
+  }
+  body.sidebar-collapsed #sidebar .nav-link span,
+  body.sidebar-collapsed #sidebar .nav-section,
+  body.sidebar-collapsed #sidebar .branch-meta,
+  body.sidebar-collapsed #sidebar .btn-logout span {
+    display: none !important;
+  }
+  body.sidebar-collapsed #sidebar .navbar-brand {
+    font-size: 1.05rem;
+  }
 }
 
 .topbar {
@@ -311,6 +348,7 @@ body.sidebar-collapsed #sidebar .navbar-brand {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--shell-border);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .topbar-inner {
   min-height: 48px;
@@ -331,7 +369,7 @@ body.sidebar-collapsed #sidebar .navbar-brand {
   min-width: 0;
 }
 .page-title {
-  font-size: 1rem;
+  font-size: clamp(1.05rem, 0.98rem + 0.25vw, 1.25rem);
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.02em;
@@ -369,57 +407,48 @@ body.sidebar-collapsed #sidebar .navbar-brand {
   box-shadow: var(--shell-shadow);
 }
 
-/* Mobile / tablet: drawer + icon rail when open */
+/* Tablet / mobile: off-canvas drawer (full labels when open; does not shrink content width) */
 @media (max-width: 992px) {
   #sidebar {
-    transform: translateX(calc(-1 * var(--sidebar-w) - 8px));
-    width: var(--sidebar-w) !important;
+    width: min(88vw, 280px) !important;
+    max-width: 280px;
+    transform: translateX(calc(-100% - 16px));
+    box-shadow: none;
   }
   body.sidebar-open #sidebar {
     transform: translateX(0);
-    width: var(--sidebar-w-collapsed) !important;
-  }
-  /* Icon rail: match desktop collapsed look */
-  body.sidebar-open #sidebar .nav-link span,
-  body.sidebar-open #sidebar .nav-section,
-  body.sidebar-open #sidebar .branch-meta,
-  body.sidebar-open #sidebar .btn-logout {
-    display: none !important;
-  }
-  body.sidebar-open #sidebar .nav-link {
-    justify-content: center;
-    padding: 0.55rem 0.5rem;
-  }
-  body.sidebar-open #sidebar .navbar-brand {
-    font-size: 1rem;
-    letter-spacing: 0;
-  }
-  body.sidebar-open #sidebar .p-3.border-bottom {
-    flex-direction: column;
-    gap: 0.35rem !important;
-    align-items: stretch !important;
-  }
-  body.sidebar-open #sidebar [data-role="sidebar-collapse"] {
-    display: none !important;
+    box-shadow:
+      8px 0 40px rgba(0, 0, 0, 0.18),
+      inset -1px 0 0 rgba(255, 255, 255, 0.06);
   }
 
   .content-wrapper {
     margin-left: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
   }
+
+  body.sidebar-open #sidebar [data-role="sidebar-collapse"] {
+    display: none !important;
+  }
+
   .sidebar-toggle-floating {
     display: inline-flex !important;
   }
   .sidebar-overlay {
     display: none;
+    pointer-events: none;
   }
   body.sidebar-open .sidebar-overlay {
     display: block;
+    pointer-events: auto;
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.42);
+    background: rgba(15, 23, 42, 0.45);
     z-index: 1030;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    cursor: pointer;
   }
 }
 

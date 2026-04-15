@@ -5153,7 +5153,16 @@ switch ($page) {
                 try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
                 $rolesDynamic = [];
                 try { $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM employees WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll(); } catch (Throwable $e) {}
-                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic','error'));
+                $cashbookAccountId = 0;
+                if ((int)($employee['id'] ?? 0) > 0) {
+                    try {
+                        $stCa = $pdo->prepare('SELECT id FROM cashbook_accounts WHERE employee_id = ? LIMIT 1');
+                        $stCa->execute([(int)$employee['id']]);
+                        $cashbookAccountId = (int)($stCa->fetchColumn() ?: 0);
+                    } catch (Throwable $e) {
+                    }
+                }
+                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic','error','cashbookAccountId'));
                 break;
             }
             
@@ -5190,15 +5199,25 @@ switch ($page) {
                 if ($id > 0) {
                     $stmt = $pdo->prepare("UPDATE employees SET emp_code=?, name=?, first_name=?, last_name=?, email=?, phone=?, address=?, position=?, role=?, license_number=?, license_expiry=?, vehicle_id = ?, branch_id=?, join_date=?, status=? WHERE id=?");
                     $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status,$id]);
+                    $savedEmployeeId = $id;
                 } else {
                     $stmt = $pdo->prepare("INSERT INTO employees (emp_code, name, first_name, last_name, email, phone, address, position, role, license_number, license_expiry, vehicle_id, branch_id, join_date, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                     $stmt->execute([$emp_code,$name,$first_name,$last_name,$email,$phone,$address,$position,$role,$license_number,($license_expiry?:null),$vehicle_id,$branch_id,($join_date?:null),$status]);
+                    $savedEmployeeId = (int)$pdo->lastInsertId();
+                }
+                $acctCreated = false;
+                try {
+                    $acct = CashbookRepository::ensureEmployeeAccount($pdo, $savedEmployeeId, $name, (string)$status);
+                    $acctCreated = !empty($acct['created']);
+                } catch (Throwable $acctEx) {
+                    /* non-fatal: employee save still succeeded */
                 }
                 $redir = trim($_POST['redirect_to'] ?? '');
                 if ($redir !== '') {
                     Helpers::redirect($redir);
                 } else {
-                    Helpers::redirect('index.php?page=employees');
+                    $acctParam = $acctCreated ? 'new' : 'exists';
+                    Helpers::redirect('index.php?page=employees&action=edit&id=' . $savedEmployeeId . '&emp_ok=1&acct=' . $acctParam);
                 }
                 break;
             } catch (PDOException $ex) {
@@ -5213,7 +5232,18 @@ switch ($page) {
                 $employee = compact('id','emp_code','name','first_name','last_name','email','phone','address','position','role','license_number','license_expiry','vehicle_id','branch_id','join_date','status');
                 $branchesAll = BranchRepository::forDropdowns($pdo);
                 try { $vehiclesAll = $pdo->query('SELECT id FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
-                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','error'));
+                $rolesDynamic = [];
+                try { $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM employees WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll(); } catch (Throwable $e) {}
+                $cashbookAccountId = 0;
+                if ((int)($employee['id'] ?? 0) > 0) {
+                    try {
+                        $stCa = $pdo->prepare('SELECT id FROM cashbook_accounts WHERE employee_id = ? LIMIT 1');
+                        $stCa->execute([(int)$employee['id']]);
+                        $cashbookAccountId = (int)($stCa->fetchColumn() ?: 0);
+                    } catch (Throwable $e) {
+                    }
+                }
+                Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic','error','cashbookAccountId'));
                 break;
             }
         }
@@ -5238,7 +5268,8 @@ switch ($page) {
             try { $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
             $rolesDynamic = [];
             try { $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM employees WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll(); } catch (Throwable $e) {}
-            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic'));
+            $cashbookAccountId = 0;
+            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic','cashbookAccountId'));
             break;
         }
 
@@ -5251,7 +5282,16 @@ switch ($page) {
             $branchesAll = BranchRepository::forDropdowns($pdo);
             // Load vehicles for dropdown (id + best-guess number)
             try { $vehiclesAll = $pdo->query('SELECT id, COALESCE(vehicle_no, reg_number, plate_no) AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); } catch (Throwable $e) { $vehiclesAll = []; }
-            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll'));
+            $rolesDynamic = [];
+            try { $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM employees WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll(); } catch (Throwable $e) {}
+            $cashbookAccountId = 0;
+            try {
+                $stCa = $pdo->prepare('SELECT id FROM cashbook_accounts WHERE employee_id = ? LIMIT 1');
+                $stCa->execute([$id]);
+                $cashbookAccountId = (int)($stCa->fetchColumn() ?: 0);
+            } catch (Throwable $e) {
+            }
+            Helpers::view('employees/form', compact('employee','branchesAll','vehiclesAll','rolesDynamic','cashbookAccountId'));
             break;
         }
 

@@ -1,13 +1,26 @@
-<?php /** @var array $employee */ ?>
-<div class="hr-page">
-<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-3">
-  <h3 class="mb-0"><?php echo $employee['id'] ? 'Edit Employee' : 'New Employee'; ?></h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>" class="btn btn-outline-secondary w-100 w-md-auto"><i class="bi bi-arrow-left"></i> Back</a>
+<?php
+/** @var array $employee */
+$cashbookAccountId = (int)($cashbookAccountId ?? 0);
+?>
+<div class="hr-page emp-form">
+<div class="hr-toolbar emp-form-toolbar d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 mb-3">
+  <div class="d-flex flex-wrap align-items-center gap-2 min-w-0">
+    <h3 class="mb-0"><?php echo $employee['id'] ? 'Edit Employee' : 'New Employee'; ?></h3>
+    <?php if ($cashbookAccountId > 0): ?>
+      <span class="badge rounded-pill text-bg-success emp-acct-badge"><i class="bi bi-check2-circle" aria-hidden="true"></i> Account linked</span>
+    <?php endif; ?>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-stretch justify-content-lg-end">
+    <?php if ($cashbookAccountId > 0): ?>
+      <a class="btn btn-outline-primary w-100 w-md-auto" href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=accounts&tab=statement&account_id=' . $cashbookAccountId), ENT_QUOTES, 'UTF-8'); ?>"><i class="bi bi-bank me-1"></i> View account</a>
+    <?php endif; ?>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>" class="btn btn-outline-secondary w-100 w-sm-auto"><i class="bi bi-arrow-left"></i> Back</a>
+  </div>
 </div>
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
-<form method="post" action="<?php echo Helpers::baseUrl('index.php?page=employees&action=save'); ?>" class="card shadow-sm">
+<form method="post" action="<?php echo Helpers::baseUrl('index.php?page=employees&action=save'); ?>" class="card emp-form-card">
   <div class="card-body">
     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
     <input type="hidden" name="id" value="<?php echo (int)$employee['id']; ?>">
@@ -147,6 +160,15 @@
     <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="bi bi-save"></i> Save</button>
   </div>
 </form>
+
+<div class="toast-container position-fixed top-0 end-0 p-3 emp-toast-wrap" style="z-index: 1085" aria-live="polite" aria-atomic="true">
+  <div id="empSaveToast" class="toast align-items-center border-0 shadow" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="empSaveToastBody"></div>
+      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
 </div><!-- /.hr-page -->
 <?php if (!empty($error)): ?>
 <script>
@@ -157,6 +179,35 @@
 </script>
 <?php endif; ?>
 
+<script>
+(function(){
+  document.addEventListener('DOMContentLoaded', function () {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('emp_ok') !== '1') return;
+      var acct = params.get('acct') || '';
+      var body = document.getElementById('empSaveToastBody');
+      var toastEl = document.getElementById('empSaveToast');
+      if (!body || !toastEl || typeof bootstrap === 'undefined' || !bootstrap.Toast) return;
+      toastEl.classList.remove('text-bg-success', 'text-bg-info');
+      if (acct === 'new') {
+        body.innerHTML = '<strong>Employee saved.</strong><br><span class="small">Cash Book account created automatically.</span>';
+        toastEl.classList.add('text-bg-success');
+      } else {
+        body.innerHTML = '<strong>Employee saved.</strong><br><span class="small">Account was already linked - no duplicate created.</span>';
+        toastEl.classList.add('text-bg-info');
+      }
+      var t = new bootstrap.Toast(toastEl, { delay: 7000 });
+      t.show();
+      params.delete('emp_ok');
+      params.delete('acct');
+      var q = params.toString();
+      var newUrl = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+    } catch (e) {}
+  });
+})();
+</script>
 <script>
 (function(){
   // Quick Add Role

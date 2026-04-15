@@ -44,14 +44,17 @@
     var body = document.body;
     var openBtn = document.querySelector('[data-role="sidebar-open"]');
     var overlay = document.querySelector('[data-role="sidebar-overlay"]');
+    var sidebar = document.getElementById('sidebar');
 
     function openSidebar(){
       body.classList.add('sidebar-open');
       if (openBtn) openBtn.setAttribute('aria-expanded', 'true');
+      if (overlay) overlay.setAttribute('aria-hidden', 'false');
     }
     function closeSidebar(){
       body.classList.remove('sidebar-open');
       if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
+      if (overlay) overlay.setAttribute('aria-hidden', 'true');
     }
 
     function setCollapsed(on){
@@ -72,6 +75,14 @@
     if (overlay) overlay.addEventListener('click', function(){ closeSidebar(); });
     var closeBtn = document.querySelector('[data-role="sidebar-close"]');
     if (closeBtn) closeBtn.addEventListener('click', function(e){ e.preventDefault(); closeSidebar(); });
+
+    if (sidebar) {
+      sidebar.addEventListener('click', function(e){
+        var a = e.target && e.target.closest ? e.target.closest('a.nav-link[href]') : null;
+        if (!a || window.innerWidth >= 992) return;
+        closeSidebar();
+      });
+    }
 
     // Desktop collapse button (event delegation so it always works)
     document.addEventListener('click', function(e){

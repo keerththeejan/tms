@@ -75,8 +75,8 @@ $stCur = (string)($status ?? '');
   data-delete-url="<?php echo htmlspecialchars($deleteUrl, ENT_QUOTES, 'UTF-8'); ?>"
   data-edit-base="<?php echo htmlspecialchars($editBase, ENT_QUOTES, 'UTF-8'); ?>"
 >
-  <div class="card border shadow-sm mb-1 filters-card">
-    <div class="card-header bg-light d-flex flex-wrap align-items-center justify-content-between gap-1 py-1 px-2">
+  <div class="card border-0 emp-filters-card filters-card mb-3">
+    <div class="card-header emp-filters-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2 px-3">
       <div class="d-flex flex-wrap align-items-center gap-2">
         <button
           class="btn btn-link btn-sm text-decoration-none text-dark p-0 fw-semibold small filters-toggle-btn collapsed"
@@ -102,7 +102,7 @@ $stCur = (string)($status ?? '');
         <a href="<?php echo htmlspecialchars($payrollUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary" title="Salary report"><i class="bi bi-clipboard-data me-1" aria-hidden="true"></i><span class="d-none d-xl-inline">Salary report</span></a>
       </div>
     </div>
-    <div id="empFiltersBody" class="card-body collapse py-1 px-2 border-top border-light">
+    <div id="empFiltersBody" class="card-body collapse emp-filters-body py-3 px-3 border-top border-light-subtle">
       <form id="empFilterForm" method="get" action="<?php echo htmlspecialchars(Helpers::baseUrl('index.php'), ENT_QUOTES, 'UTF-8'); ?>">
         <input type="hidden" name="page" value="employees">
 
@@ -224,14 +224,14 @@ $stCur = (string)($status ?? '');
             </div>
           </div>
 
-        <div class="filters-actions-row d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="filters-actions-row emp-filters-actions d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div class="form-check form-check-inline small mb-0">
             <input class="form-check-input" type="checkbox" id="empAutoApplyToggle" value="1">
             <label class="form-check-label text-muted" for="empAutoApplyToggle" title="Apply filters when any field changes">Auto-apply on change</label>
           </div>
-          <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 ms-auto">
-            <a href="<?php echo htmlspecialchars($clearUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary btn-sm py-1 px-2" title="Clear all filters"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear all</a>
-            <button type="submit" class="btn btn-primary btn-sm py-1 px-2" id="empFilterApply"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
+          <div class="d-flex flex-wrap justify-content-stretch justify-content-md-end align-items-center gap-2 ms-md-auto emp-filters-actions-btns">
+            <a href="<?php echo htmlspecialchars($clearUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-outline-secondary btn-sm emp-filter-action-btn" title="Clear all filters"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear all</a>
+            <button type="submit" class="btn btn-primary btn-sm emp-filter-action-btn" id="empFilterApply"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
           </div>
         </div>
       </form>
@@ -243,59 +243,8 @@ $stCur = (string)($status ?? '');
     No employees match your criteria.
   </div>
 
-  <div class="cards-wrap d-md-none mb-2">
-    <div class="d-flex flex-column gap-2 px-1" id="empCards">
-        <?php foreach ($employees as $e): ?>
-          <?php
-            $eid = (int)$e['id'];
-            $payload = rawurlencode(json_encode($e, JSON_UNESCAPED_UNICODE));
-            $dn = emp_index_display_name($e);
-            $code = trim((string)($e['emp_code'] ?? ''));
-          ?>
-          <div class="card shadow-sm emp-card" data-emp-payload="<?php echo htmlspecialchars($payload, ENT_QUOTES, 'UTF-8'); ?>">
-            <div class="card-body py-3 px-3">
-              <div class="d-flex justify-content-between align-items-start gap-2">
-                <div class="min-w-0">
-                  <div class="emp-card-title emp-truncate"><?php echo htmlspecialchars($dn, ENT_QUOTES, 'UTF-8'); ?></div>
-                  <?php if ($code !== ''): ?>
-                    <div class="meta"><?php echo htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?></div>
-                  <?php endif; ?>
-                  <div class="mt-2 small">
-                    <div><i class="bi bi-telephone me-1" aria-hidden="true"></i><?php echo htmlspecialchars((string)($e['phone'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                    <div><i class="bi bi-person-badge me-1" aria-hidden="true"></i><?php echo htmlspecialchars((string)($e['role'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                    <div><i class="bi bi-building me-1" aria-hidden="true"></i><?php echo htmlspecialchars((string)($e['branch_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                  </div>
-                </div>
-                <div class="flex-shrink-0 text-end">
-                  <?php echo emp_index_status_badge((string)($e['status'] ?? '')); ?>
-                  <div class="dropdown emp-actions-dd mt-2">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      <li>
-                        <button type="button" class="dropdown-item emp-act-view" data-id="<?php echo $eid; ?>"><i class="bi bi-eye me-2"></i>View</button>
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="<?php echo htmlspecialchars($editBase . $eid, ENT_QUOTES, 'UTF-8'); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a>
-                      </li>
-                      <li><hr class="dropdown-divider"></li>
-                      <li>
-                        <form method="post" action="<?php echo htmlspecialchars($deleteUrl, ENT_QUOTES, 'UTF-8'); ?>" onsubmit="return confirm('Delete this employee?');">
-                          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8'); ?>">
-                          <input type="hidden" name="id" value="<?php echo $eid; ?>">
-                          <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Delete</button>
-                        </form>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        <?php endforeach; ?>
-    </div>
-  </div>
-
-  <div class="table-responsive table-wrap emp-table-scroll d-none d-md-block mb-1">
+  <div class="emp-table-shell table-wrap mb-2">
+    <div class="table-responsive emp-table-scroll">
     <table class="table table-sm table-striped table-hover align-middle mb-0 emp-table" id="employeesTable">
       <thead class="table-light">
         <tr>
@@ -355,6 +304,7 @@ $stCur = (string)($status ?? '');
         <?php endforeach; ?>
       </tbody>
     </table>
+    </div>
   </div>
 
   <div class="modal fade" id="empViewModal" tabindex="-1" aria-labelledby="empViewModalLabel" aria-hidden="true">

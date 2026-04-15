@@ -325,7 +325,7 @@
     var searchInput = document.getElementById('empLiveSearch');
     var modalEl = document.getElementById('empViewModal');
 
-    if (!form || !tbody || !cardsEl) return;
+    if (!form || !tbody) return;
 
     updateFilterActiveLabel(form, activeLabel);
 
@@ -352,12 +352,12 @@
           var emps = data.employees;
           if (emps.length === 0) {
             tbody.innerHTML = '';
-            cardsEl.innerHTML = '';
+            if (cardsEl) cardsEl.innerHTML = '';
             if (emptyEl) emptyEl.classList.remove('d-none');
           } else {
             if (emptyEl) emptyEl.classList.add('d-none');
             tbody.innerHTML = buildRowsHtml(emps, cfg);
-            cardsEl.innerHTML = buildCardsHtml(emps, cfg);
+            if (cardsEl) cardsEl.innerHTML = buildCardsHtml(emps, cfg);
           }
           destroyDataTableIfAny();
           initDataTable();
