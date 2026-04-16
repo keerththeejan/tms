@@ -1,6 +1,11 @@
 <?php /** @var array $revenueByBranch */ /** @var array $parcelsBySupplier */ /** @var array $expenseSummary */ ?>
-<h3 class="mb-3">Reports</h3>
-<form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+<div class="container-fluid px-0">
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3 border-0">
+        <div class="card-body p-3">
+          <h3 class="h5 fw-bold mb-3">Reports</h3>
+<form class="row g-2 align-items-end" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="reports">
   <div class="col-md-3">
     <input type="date" class="form-control" name="from" value="<?php echo htmlspecialchars($from ?? ''); ?>">
@@ -25,14 +30,18 @@
     </select>
   </div>
   <div class="col-auto">
-    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+    <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1"><i class="bi bi-search" aria-hidden="true"></i><span>Filter</span></button>
   </div>
 </form>
+        </div>
+      </div>
+    </div>
+  </div>
 <div class="row g-3">
   <div class="col-md-6">
-    <div class="card shadow-sm h-100">
+    <div class="card shadow-sm rounded-3 border-0 h-100">
       <div class="card-body">
-        <h6>Revenue by Branch</h6>
+        <h6 class="card-title h6">Revenue by Branch</h6>
         <?php if (!$revenueByBranch): ?>
           <div class="text-muted">No data.</div>
         <?php else: ?>
@@ -46,9 +55,9 @@
     </div>
   </div>
   <div class="col-md-6">
-    <div class="card shadow-sm h-100">
+    <div class="card shadow-sm rounded-3 border-0 h-100">
       <div class="card-body">
-        <h6>Parcels by Supplier</h6>
+        <h6 class="card-title h6">Parcels by Supplier</h6>
         <?php if (!$parcelsBySupplier): ?>
           <div class="text-muted">No data.</div>
         <?php else: ?>
@@ -62,9 +71,9 @@
     </div>
   </div>
   <div class="col-12">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm rounded-3 border-0">
       <div class="card-body">
-        <h6>Expenses Summary</h6>
+        <h6 class="card-title h6">Expenses Summary</h6>
         <?php if (!$expenseSummary): ?>
           <div class="text-muted">No data.</div>
         <?php else: ?>
@@ -77,4 +86,5 @@
       </div>
     </div>
   </div>
+</div>
 </div>

@@ -1,11 +1,18 @@
 <?php /** @var array $files */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">Database Backups</h3>
-  <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=backup&action=create'); ?>">
-    <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-    <button type="submit" class="btn btn-primary"><i class="bi bi-hdd"></i> Create Backup</button>
-  </form>
-</div>
+<div class="container-fluid px-0">
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3 border-0">
+        <div class="card-body p-3 d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2">
+          <h3 class="h5 mb-0 fw-bold">Database backups</h3>
+          <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=backup&action=create'); ?>" class="d-inline">
+            <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+            <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-1"><i class="bi bi-hdd" aria-hidden="true"></i><span>Create backup</span></button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
@@ -14,8 +21,8 @@
   <div class="alert alert-success py-2"><?php echo htmlspecialchars($success); ?></div>
 <?php endif; ?>
 
-<div class="card">
-  <div class="card-header">Existing Backups</div>
+<div class="card shadow-sm rounded-3 border-0 overflow-hidden">
+  <div class="card-header bg-white py-2 px-3 fw-semibold">Existing backups</div>
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-sm mb-0">
@@ -35,7 +42,7 @@
             <td class="text-end"><?php echo number_format(($f['size'] ?? 0) / 1024, 1); ?> KB</td>
             <td><?php echo date('Y-m-d H:i:s', (int)$f['mtime']); ?></td>
             <td class="text-end">
-              <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=backup&action=download&file=' . urlencode($f['name'])); ?>"><i class="bi bi-download"></i> Download</a>
+              <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="<?php echo Helpers::baseUrl('index.php?page=backup&action=download&file=' . urlencode($f['name'])); ?>"><i class="bi bi-download" aria-hidden="true"></i><span>Download</span></a>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -61,4 +68,5 @@
       </div>
     </form>
   </div>
+</div>
 </div>

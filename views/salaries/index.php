@@ -1,6 +1,6 @@
 <?php /** @var array $rows */ /** @var int $year */ /** @var int $month_num */ ?>
-<div class="hr-page">
-<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-start gap-3 mb-3">
+<div class="hr-page container-fluid px-0">
+<div class="hr-toolbar card shadow-sm rounded-3 border-0 d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-start gap-3 mb-2 p-3">
   <h3 class="mb-0">Salaries</h3>
   <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=salaries&action=generate'); ?>" class="salaries-gen-form w-100" style="max-width: 22rem;">
     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">

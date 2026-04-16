@@ -115,26 +115,23 @@ a:hover {
   margin-left: 0;
   margin-right: 0;
 }
-/* Parcels list + New/Edit parcel form: full width (classes added in views/parcels/*.php) */
-main.content-wrapper .container-fluid.parcels-main-fluid {
-  max-width: none !important;
+/* Main content area — full width, Bootstrap-scale horizontal padding */
+main.content-wrapper > .container-fluid {
+  --bs-gutter-x: 0;
   width: 100%;
-  padding-left: 0;
-  padding-right: 12px;
-}
-main.content-wrapper .topbar .container-fluid.parcels-topbar-fluid {
-  max-width: none !important;
-  width: 100%;
-  padding-left: 0;
-  padding-right: 12px;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
 }
 
-/* Glass-style surfaces */
+/* Cards — Bootstrap 5 look: rounded-3 + shadow-sm */
 .card,
 .dropdown-menu {
   border-color: var(--tms-border) !important;
-  border-radius: var(--tms-radius) !important;
-  box-shadow: var(--tms-shadow-sm);
+  border-radius: var(--bs-border-radius-xl) !important;
+  box-shadow: var(--bs-box-shadow-sm);
   background: var(--tms-surface-solid);
   backdrop-filter: blur(8px);
 }
@@ -323,41 +320,6 @@ body.sidebar-open {
   margin-left: 0 !important;
   width: auto !important;
 }
-main.content-wrapper > .container-fluid {
-  --bs-gutter-x: 0;
-  width: 100%;
-  max-width: none;
-  margin-left: 0;
-  margin-right: 0;
-  padding-left: 0;
-  padding-right: 12px;
-}
-
-/* Desktop only: icon rail + narrower sidebar */
-@media (min-width: 993px) {
-  body.sidebar-collapsed #sidebar {
-    flex-basis: var(--sidebar-w-collapsed);
-    width: var(--sidebar-w-collapsed) !important;
-    max-width: var(--sidebar-w-collapsed);
-  }
-  body.sidebar-collapsed .content-wrapper {
-    margin-left: 0 !important;
-    width: auto !important;
-  }
-  body.sidebar-collapsed #sidebar .nav-link {
-    justify-content: center;
-    padding: 0.55rem 0.5rem;
-  }
-  body.sidebar-collapsed #sidebar .nav-link span,
-  body.sidebar-collapsed #sidebar .nav-section,
-  body.sidebar-collapsed #sidebar .branch-meta,
-  body.sidebar-collapsed #sidebar .btn-logout span {
-    display: none !important;
-  }
-  body.sidebar-collapsed #sidebar .navbar-brand {
-    font-size: 1.05rem;
-  }
-}
 
 .topbar {
   position: sticky;
@@ -450,10 +412,6 @@ main.content-wrapper > .container-fluid {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: hidden;
-  }
-
-  body.sidebar-open #sidebar [data-role="sidebar-collapse"] {
-    display: none !important;
   }
 
   .sidebar-toggle-floating {
@@ -588,8 +546,8 @@ body.sidebar-open .sidebar-toggle-floating {
 }
 @media (min-width: 768px) {
   main.content-wrapper > .container-fluid {
-    padding-left: 0;
-    padding-right: 16px;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
   }
 }
 

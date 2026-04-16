@@ -40,7 +40,7 @@
 <div class="login-page">
   <div class="row justify-content-center w-100 g-0">
     <div class="col-12 col-sm-11 col-md-8 col-lg-5 col-xl-4 px-2 px-sm-3">
-      <div class="card shadow-sm login-card border-0">
+      <div class="card shadow-sm rounded-3 login-card border-0">
         <div class="card-body">
           <h5 class="card-title mb-3 text-center">Login</h5>
           <?php if (!empty($error)): ?>

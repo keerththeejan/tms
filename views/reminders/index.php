@@ -1,9 +1,14 @@
 <?php /** @var array $reminders */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">Reminders</h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=reminders&action=new'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Reminder</a>
-</div>
-<form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+<div class="container-fluid px-0">
+  <div class="row g-2">
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3 border-0">
+        <div class="card-body p-3">
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3">
+            <h3 class="h5 mb-0 fw-bold">Reminders</h3>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=reminders&action=new'); ?>" class="btn btn-primary d-inline-flex align-items-center gap-1"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>New reminder</span></a>
+          </div>
+<form class="row g-2" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="reminders">
   <div class="col-md-3">
     <input type="date" class="form-control" name="from" value="<?php echo htmlspecialchars($from ?? ''); ?>">
@@ -29,12 +34,18 @@
     </select>
   </div>
   <div class="col-auto d-flex gap-2">
-    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+    <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1"><i class="bi bi-search" aria-hidden="true"></i><span>Filter</span></button>
     <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=reminders'); ?>">Clear</a>
   </div>
 </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3 border-0 overflow-hidden">
+        <div class="card-body p-0">
 <div class="table-responsive">
-  <table class="table table-sm table-striped align-middle">
+  <table class="table table-sm table-striped align-middle mb-0">
     <thead>
       <tr>
         <th>#</th>
@@ -66,23 +77,28 @@
           <td><?php echo (int)($r['notify_before_days'] ?? 7); ?> days</td>
           <td><?php echo ($r['status'] ?? 'open')==='done' ? '<span class="badge bg-success">Done</span>' : '<span class="badge bg-warning text-dark">Open</span>'; ?></td>
           <td><?php echo htmlspecialchars($r['notes'] ?? ''); ?></td>
-          <td class="text-end">
-            <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=reminders&action=edit&id='.(int)$r['id']); ?>"><i class="bi bi-pencil-square"></i> Edit</a>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="<?php echo Helpers::baseUrl('index.php?page=reminders&action=edit&id='.(int)$r['id']); ?>"><i class="bi bi-pencil-square" aria-hidden="true"></i><span>Edit</span></a>
             <?php if (($r['status'] ?? 'open')!=='done'): ?>
             <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=reminders&action=mark_done'); ?>" class="d-inline">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
               <input type="hidden" name="id" value="<?php echo (int)$r['id']; ?>">
-              <button class="btn btn-sm btn-outline-primary"><i class="bi bi-check2-circle"></i> Mark Done</button>
+              <button type="submit" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"><i class="bi bi-check2-circle" aria-hidden="true"></i><span>Mark done</span></button>
             </form>
             <?php endif; ?>
             <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=reminders&action=delete'); ?>" class="d-inline" onsubmit="return confirm('Delete this reminder?');">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
               <input type="hidden" name="id" value="<?php echo (int)$r['id']; ?>">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
+              <button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"><i class="bi bi-trash" aria-hidden="true"></i><span>Delete</span></button>
             </form>
           </td>
         </tr>
       <?php endforeach; ?>
     </tbody>
   </table>
+</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

@@ -4,8 +4,8 @@
   .customers-page .page-head { display:flex; align-items:flex-start; justify-content:space-between; gap: 12px; margin-bottom: 12px; }
   .customers-page .page-title { font-size: 1.25rem; font-weight: 800; margin: 0; letter-spacing: -.01em; }
   .customers-page .page-subtitle { font-size: .86rem; color:#6b7280; margin: 2px 0 0; }
-  .customers-page .card-soft { background:#fff; border: 1px solid var(--ui-border); border-radius: var(--ui-radius); box-shadow: var(--ui-shadow); }
-  .customers-page .filters { padding: 12px; }
+  .customers-page .card-soft { background:#fff; border: 1px solid var(--ui-border); border-radius: var(--bs-border-radius-xl); box-shadow: var(--bs-box-shadow-sm); }
+  .customers-page .filters { padding: 0.75rem; }
   .customers-page .filters .form-label { font-size: .78rem; font-weight: 700; color:#6b7280; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
   .customers-page .filters .form-control, .customers-page .filters .form-select { height: 38px; font-size: .92rem; border-radius: 12px; }
   .customers-page .table-wrap { border: 1px solid var(--ui-border); border-radius: var(--ui-radius); background:#fff; }
@@ -27,7 +27,7 @@
   }
 </style>
 
-<div class="customers-page">
+<div class="customers-page container-fluid px-0">
 
 <?php
   $importedCnt = isset($_GET['imported']) ? (int)$_GET['imported'] : null;
@@ -41,14 +41,22 @@
   }
 ?>
 
-<div class="page-head">
-  <div>
-    <h3 class="page-title">Customers</h3>
-    <div class="page-subtitle">Search, filter, and manage customer records. Import Excel-export CSV for bulk add.</div>
-  </div>
-  <div class="d-flex flex-wrap gap-2 justify-content-end">
-    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#customerImportModal"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Import</button>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Customer</a>
+<div class="row g-2 mb-2">
+  <div class="col-12">
+    <div class="card shadow-sm rounded-3 border-0 card-soft">
+      <div class="card-body p-3">
+        <div class="page-head">
+          <div>
+            <h3 class="page-title h5 mb-1">Customers</h3>
+            <div class="page-subtitle">Search, filter, and manage customer records. Import Excel-export CSV for bulk add.</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#customerImportModal"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i><span>Import</span></button>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>" class="btn btn-primary d-inline-flex align-items-center gap-1"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>New customer</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -97,7 +105,7 @@
   </div>
 </div>
 
-<div class="card-soft filters mb-3">
+<div class="card-soft filters card shadow-sm rounded-3 border-0 mb-2">
   <form class="row g-2 align-items-end" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
     <input type="hidden" name="page" value="customers">
     <div class="col-6 col-md-3 col-lg-2">
@@ -136,8 +144,10 @@
   </form>
 </div>
 
-<div class="table-responsive table-wrap">
-  <table class="table table-sm table-striped align-middle datatable customers-table">
+<div class="card shadow-sm rounded-3 border-0 overflow-hidden table-wrap">
+  <div class="card-body p-0">
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle datatable customers-table mb-0">
     <thead>
       <tr>
         <th class="col-num">#</th>
@@ -164,8 +174,8 @@
           <td><?php echo htmlspecialchars($c['customer_type'] ?? ''); ?></td>
           <td class="text-end">
             <div class="dropdown d-inline">
-              <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
-                <i class="bi bi-three-dots-vertical"></i>
+              <button class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Row actions">
+                <i class="bi bi-three-dots-vertical" aria-hidden="true"></i><span class="d-none d-sm-inline">Actions</span>
               </button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=edit&id='.(int)$c['id']); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a></li>
@@ -184,6 +194,8 @@
       <?php endforeach; ?>
     </tbody>
   </table>
+</div>
+  </div>
 </div>
 
 </div>

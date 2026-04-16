@@ -65,7 +65,7 @@ if (!in_array($settingsActiveTab, $allowedSettingsTabs, true)) {
   </div>
 </div>
 
-<div class="settings-page">
+<div class="settings-page container-fluid px-0">
   <ul class="nav nav-tabs settings-tabs-sticky mb-3" id="settingsMainTabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link <?php echo $settingsActiveTab === 'general' ? 'active' : ''; ?>" id="tab-general" data-bs-toggle="tab" data-bs-target="#pane-general" type="button" role="tab" aria-controls="pane-general" aria-selected="<?php echo $settingsActiveTab === 'general' ? 'true' : 'false'; ?>">General</button>

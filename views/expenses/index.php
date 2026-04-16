@@ -1,9 +1,14 @@
 <?php /** @var array $expenses */ /** @var array $byBranch */ /** @var float $overall */ /** @var bool $isAdmin */ ?>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">Expenses</h3>
-  <a href="<?php echo Helpers::baseUrl('index.php?page=expenses&action=new'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Expense</a>
-</div>
-<form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+<div class="container-fluid px-0">
+  <div class="row g-2">
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3 border-0">
+        <div class="card-body p-3">
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3">
+            <h3 class="h5 mb-0 fw-bold">Expenses</h3>
+            <a href="<?php echo Helpers::baseUrl('index.php?page=expenses&action=new'); ?>" class="btn btn-primary d-inline-flex align-items-center gap-1"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>New expense</span></a>
+          </div>
+<form class="row g-2" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="expenses">
   <div class="col-md-3">
     <input type="date" class="form-control" name="from" value="<?php echo htmlspecialchars($from ?? ''); ?>">
@@ -56,14 +61,18 @@
       <option value="overdue" <?php echo ($cs==='overdue')?'selected':''; ?>>Overdue</option>
     </select>
   </div>
-  <div class="col-auto d-flex gap-2">
-    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+  <div class="col-12 col-sm-auto d-flex flex-wrap gap-2">
+    <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1"><i class="bi bi-search" aria-hidden="true"></i><span>Filter</span></button>
     <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Clear</a>
   </div>
 </form>
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <h6 class="mb-2">Branch-wise Totals</h6>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+<div class="card shadow-sm rounded-3 border-0 mb-0">
+  <div class="card-body p-3">
+    <h6 class="card-title h6 mb-2">Branch-wise totals</h6>
     <?php if (!$byBranch): ?>
       <div class="text-muted">No expenses for selected period.</div>
     <?php else: ?>
@@ -76,20 +85,26 @@
     <?php endif; ?>
   </div>
 </div>
+    </div>
 <?php if (isset($cashTotal) && isset($creditTotal) && isset($settlementsTotal)): ?>
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <h6 class="mb-2">Totals (Selected Range)</h6>
+    <div class="col-12">
+<div class="card shadow-sm rounded-3 border-0 mb-0">
+  <div class="card-body p-3">
+    <h6 class="card-title h6 mb-2">Totals (selected range)</h6>
     <ul class="mb-0">
       <li>Cash Purchases: <strong><?php echo number_format((float)$cashTotal, 2); ?></strong></li>
       <li>Credit Purchases: <strong><?php echo number_format((float)$creditTotal, 2); ?></strong></li>
       <li>Settlements Paid: <strong><?php echo number_format((float)$settlementsTotal, 2); ?></strong></li>
     </ul>
   </div>
-  </div>
+</div>
+    </div>
 <?php endif; ?>
+    <div class="col-12">
+<div class="card shadow-sm rounded-3 border-0 overflow-hidden">
+  <div class="card-body p-0">
 <div class="table-responsive">
-  <table class="table table-sm table-striped align-middle">
+  <table class="table table-sm table-striped align-middle mb-0">
     <thead>
       <tr>
         <th>#</th>
@@ -178,4 +193,9 @@
       <?php endforeach; ?>
     </tbody>
   </table>
+</div>
+  </div>
+</div>
+    </div>
+  </div>
 </div>

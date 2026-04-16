@@ -1,10 +1,15 @@
 <?php /** @var array $dues */ /** @var array $payments */ ?>
+<div class="container-fluid px-0">
+  <div class="row g-2">
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3 border-0">
+        <div class="card-body p-3">
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">Payments</h3>
+  <h3 class="mb-0 h5 fw-bold">Payments</h3>
 </div>
 
 <!-- Tabs for switching between Due Collections and Payment History -->
-<ul class="nav nav-tabs mb-3" id="paymentTabs" role="tablist">
+<ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto gap-1" id="paymentTabs" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" id="dues-tab" data-bs-toggle="tab" data-bs-target="#dues" type="button" role="tab">Due Collections</button>
   </li>
@@ -40,12 +45,12 @@
       <option value="dn" <?php echo ($groupMode ?? 'customer')==='dn'?'selected':''; ?>>Show Each Bill</option>
     </select>
   </div>
-  <div class="col-auto">
-    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Filter</button>
+  <div class="col-auto d-flex flex-wrap gap-2">
+    <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1"><i class="bi bi-search" aria-hidden="true"></i><span>Filter</span></button>
   </div>
 </form>
 
-<div class="tab-content" id="paymentTabContent">
+<div class="tab-content pt-2" id="paymentTabContent">
   <!-- Due Collections Tab -->
   <div class="tab-pane fade show active" id="dues" role="tabpanel">
     <?php if (($groupMode ?? 'customer') === 'customer'): ?>
@@ -191,6 +196,11 @@
           <?php endforeach; ?>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

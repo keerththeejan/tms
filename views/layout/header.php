@@ -44,20 +44,15 @@ $user = Auth::user();
   $navCurrent = static function (bool $active): string {
     return $active ? ' aria-current="page"' : '';
   };
-  /** Full-width main + topbar (no max-width gutter) for Parcels list / new / edit, Cash Book, Employees list */
-  $parcelsFullWidth = ($currentPage === 'parcels' || $currentPage === 'cashbook' || ($currentPage === 'employees' && $action !== 'payroll'));
 ?>
 <?php if ($user): ?>
 <a href="#main-content" class="skip-link visually-hidden-focusable">Skip to main content</a>
 <div class="app app-layout">
   <!-- Sidebar -->
   <nav id="sidebar" class="tms-sidebar app-sidebar bg-dark text-white" aria-label="Primary navigation">
-    <div class="p-3 border-bottom border-secondary d-flex align-items-center justify-content-between gap-2">
-      <a class="navbar-brand text-white text-decoration-none fw-semibold" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>">TMS</a>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-light d-none d-lg-inline-flex" type="button" title="Collapse sidebar" data-role="sidebar-collapse" aria-label="Collapse sidebar"><i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i></button>
-        <button class="btn btn-sm btn-outline-light sidebar-close-btn" type="button" title="Close menu" data-role="sidebar-close" aria-label="Close menu"><i class="bi bi-x" aria-hidden="true"></i></button>
-      </div>
+    <div class="p-2 border-bottom border-secondary d-flex align-items-center justify-content-between gap-2">
+      <a class="navbar-brand text-white text-decoration-none fw-semibold mb-0" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>">TMS</a>
+      <button class="btn btn-sm btn-outline-light sidebar-close-btn" type="button" title="Close menu" data-role="sidebar-close" aria-label="Close navigation menu"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1 small">Close</span></button>
     </div>
     <?php if ($user): ?>
     <ul class="nav nav-pills flex-column p-2 small" role="list">
@@ -144,7 +139,7 @@ $user = Auth::user();
   <!-- Main content -->
   <main id="main-content" class="content-wrapper app-content flex-grow-1" role="main" tabindex="-1">
     <button class="btn btn-outline-secondary sidebar-toggle-floating" type="button" data-role="sidebar-open" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">
-      <i class="bi bi-list" aria-hidden="true"></i>
+      <i class="bi bi-list" aria-hidden="true"></i><span class="visually-hidden">Open menu</span>
     </button>
     <div class="sidebar-overlay" data-role="sidebar-overlay" role="presentation" aria-hidden="true"></div>
     <?php
@@ -156,21 +151,20 @@ $user = Auth::user();
       }
     ?>
     <div class="topbar" role="banner">
-      <div class="container-fluid <?php echo $parcelsFullWidth ? 'parcels-topbar-fluid' : ''; ?>">
+      <div class="container-fluid px-2">
         <div class="topbar-inner">
           <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1 topbar-title-block">
-            <button class="btn btn-outline-secondary icon-btn d-none d-lg-inline-flex flex-shrink-0" type="button" title="Toggle sidebar" data-role="sidebar-collapse" aria-label="Toggle sidebar"><i class="bi bi-layout-sidebar-inset"></i></button>
-            <button class="btn btn-outline-secondary icon-btn d-lg-none flex-shrink-0" type="button" title="Open menu" data-role="sidebar-open" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false"><i class="bi bi-list" aria-hidden="true"></i></button>
+            <button class="btn btn-outline-secondary d-flex align-items-center gap-1 flex-shrink-0" type="button" title="Open navigation menu" data-role="sidebar-open" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false"><i class="bi bi-list" aria-hidden="true"></i><span class="d-none d-sm-inline small">Menu</span></button>
             <div class="min-w-0 flex-grow-1">
               <p class="page-title text-truncate mb-0"><?php echo htmlspecialchars($pageTitle); ?></p>
               <?php /* subtitle hidden (address/phone) */ ?>
             </div>
           </div>
           <div class="d-flex align-items-center gap-2 flex-shrink-0 topbar-actions">
-            <button class="btn btn-outline-secondary icon-btn" type="button" title="Notifications" aria-label="Notifications"><i class="bi bi-bell" aria-hidden="true"></i></button>
+            <button class="btn btn-outline-secondary d-flex align-items-center gap-1" type="button" title="Notifications (coming soon)" aria-label="Notifications"><i class="bi bi-bell" aria-hidden="true"></i><span class="d-none d-md-inline small">Alerts</span></button>
             <div class="dropdown">
-              <button class="btn btn-outline-secondary icon-btn dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Profile" aria-label="User account menu">
-                <i class="bi bi-person-circle" aria-hidden="true"></i>
+              <button class="btn btn-outline-secondary d-flex align-items-center gap-1 dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Account menu" aria-label="Account menu">
+                <i class="bi bi-person-circle" aria-hidden="true"></i><span class="d-none d-lg-inline small text-truncate" style="max-width:8rem"><?php echo htmlspecialchars((string)($user['username'] ?? ($user['name'] ?? 'Account'))); ?></span>
               </button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li><h6 class="dropdown-header"><?php echo htmlspecialchars((string)($user['username'] ?? ($user['name'] ?? 'User'))); ?></h6></li>
@@ -185,9 +179,9 @@ $user = Auth::user();
       </div>
     </div>
 
-    <div class="container-fluid mt-3 py-1 <?php echo $parcelsFullWidth ? 'parcels-main-fluid' : ''; ?>">
+    <div class="container-fluid px-2 py-2 flex-grow-1 d-flex flex-column min-vh-0">
       
 <?php else: ?>
 <a href="#main-content" class="skip-link visually-hidden-focusable">Skip to main content</a>
-<main id="main-content" class="container-fluid mt-3" tabindex="-1" role="main">
+<main id="main-content" class="container-fluid px-2 py-3" tabindex="-1" role="main">
 <?php endif; ?>

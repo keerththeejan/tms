@@ -1,6 +1,6 @@
 <?php /** @var array $advances */ /** @var array $employeesAll */ ?>
-<div class="hr-page">
-<div class="hr-toolbar d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-3">
+<div class="hr-page container-fluid px-0">
+<div class="hr-toolbar card shadow-sm rounded-3 border-0 d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-2 p-3">
   <h3 class="mb-0">Employee Advances</h3>
   <a href="<?php echo Helpers::baseUrl('index.php?page=advances&action=new'); ?>" class="btn btn-primary w-100 w-md-auto"><i class="bi bi-plus-lg"></i> New Advance</a>
 </div>
@@ -25,8 +25,10 @@
     <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>">Clear</a>
   </div>
 </form>
-<div class="hr-table-wrap table-responsive">
-  <table class="table table-sm table-striped align-middle">
+<div class="hr-table-wrap card shadow-sm rounded-3 border-0 overflow-hidden">
+  <div class="card-body p-0">
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle mb-0">
     <thead>
       <tr>
         <th>#</th>
@@ -76,5 +78,7 @@
       <?php endforeach; ?>
     </tbody>
   </table>
+</div>
+  </div>
 </div>
 </div><!-- /.hr-page -->

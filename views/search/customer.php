@@ -1,6 +1,11 @@
 <?php /** @var string $phone */ /** @var string $name */ /** @var array|null $customer */ /** @var array $matches */ ?>
-<h3 class="mb-3">Customer Search</h3>
-<form class="row g-2 mb-3" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
+<div class="container-fluid px-0">
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3 border-0">
+        <div class="card-body p-3">
+          <h3 class="h5 fw-bold mb-3">Customer Search</h3>
+<form class="row g-2 align-items-end" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
   <input type="hidden" name="page" value="search">
   <div class="col-md-4">
     <input type="text" class="form-control" name="phone" placeholder="Phone number" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
@@ -9,12 +14,16 @@
     <input type="text" class="form-control" name="name" placeholder="Customer name" value="<?php echo htmlspecialchars($name ?? ''); ?>">
   </div>
   <div class="col-auto">
-    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
+    <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1"><i class="bi bi-search" aria-hidden="true"></i><span>Search</span></button>
   </div>
   <div class="col-12 small text-muted">Search by phone (exact) or by name (partial match). If both given, phone takes priority.</div>
 </form>
+        </div>
+      </div>
+    </div>
+  </div>
 <?php if (!empty($matches) && !$customer): ?>
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm rounded-3 border-0 mb-2">
   <div class="card-body">
     <h6 class="mb-2">Matching Customers</h6>
     <div class="list-group">
@@ -29,10 +38,10 @@
       <?php endforeach; ?>
     </div>
   </div>
-  </div>
+</div>
 <?php endif; ?>
 <?php if ($customer): ?>
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm rounded-3 border-0 mb-2">
   <div class="card-body">
     <div class="row g-2">
       <div class="col-md-3"><strong>Name:</strong> <?php echo htmlspecialchars((string)($customer['name'] ?? '')); ?></div>
@@ -43,7 +52,7 @@
   </div>
 </div>
 <?php if ($dueSummary): ?>
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm rounded-3 border-0 mb-2">
   <div class="card-body">
     <?php $due = max(0, (float)$dueSummary['total'] - (float)$dueSummary['paid']); ?>
     <div>Total Billed: <strong><?php echo number_format((float)$dueSummary['total'], 2); ?></strong></div>
@@ -52,9 +61,11 @@
   </div>
 </div>
 <?php endif; ?>
-<h5>Parcel History</h5>
-<div class="table-responsive mb-4">
-  <table class="table table-sm table-striped align-middle">
+<h5 class="h6 fw-bold mt-3">Parcel History</h5>
+<div class="card shadow-sm rounded-3 border-0 overflow-hidden mb-3">
+  <div class="card-body p-0">
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle mb-0">
     <thead>
       <tr>
         <th>#</th>
@@ -85,9 +96,13 @@
     </tbody>
   </table>
 </div>
-<h5>Delivery Notes</h5>
+  </div>
+</div>
+<h5 class="h6 fw-bold">Delivery Notes</h5>
+<div class="card shadow-sm rounded-3 border-0 overflow-hidden">
+  <div class="card-body p-0">
 <div class="table-responsive">
-  <table class="table table-sm table-striped align-middle">
+  <table class="table table-sm table-striped align-middle mb-0">
     <thead>
       <tr>
         <th>#</th>
@@ -112,6 +127,9 @@
     </tbody>
   </table>
 </div>
+  </div>
+</div>
 <?php elseif ($phone !== '' || $name !== ''): ?>
 <div class="alert alert-warning">No customer found<?php echo $phone !== '' ? ' with phone: ' . htmlspecialchars($phone) : ' for name: ' . htmlspecialchars($name); ?></div>
 <?php endif; ?>
+</div>

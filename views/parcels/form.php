@@ -1,5 +1,9 @@
 <?php /** @var array $parcel */ ?>
 <style>
+  body:has(.parcel-form-page) {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
   /* —— SaaS dashboard tokens (8px grid, 12–16px cards) —— */
   /* Mobile-first: fluid layout, no page-level horizontal scroll */
@@ -179,7 +183,7 @@
     border-bottom: 1px solid rgba(15, 23, 42, 0.1);
     white-space: nowrap;
   }
-  /* Sticky thead only on large screens (table layout); mobile uses stacked cards */
+  /* Sticky thead on md+ (line items table scrolls horizontally on small screens) */
   .parcel-form-page .receipt-grid tbody tr { transition: background-color 0.15s ease; }
   .parcel-form-page .receipt-grid tbody tr:hover { background: rgba(37, 99, 235, 0.04); }
   .parcel-form-page .receipt-grid .form-control, .parcel-form-page .receipt-grid .form-control-sm { min-height: 2rem; border-radius: 8px; }
@@ -192,6 +196,12 @@
     bottom: 0;
     z-index: 5;
     box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.05);
+  }
+  @media (max-width: 767.98px) {
+    .parcel-form-page .receipt-total {
+      position: static;
+      box-shadow: none;
+    }
   }
   .parcel-form-page .pf-items-section .receipt-total .row {
     align-items: center;
@@ -216,36 +226,49 @@
     max-width: 100%;
     overflow: visible;
   }
-  /* Line items: same table layout on all viewports — pan horizontally on narrow screens */
-  .parcel-form-page .pf-items-scroll {
+  /* Line items: same table at all breakpoints; horizontal scroll via .table-responsive */
+  .parcel-form-page .pf-items-table-wrap.table-responsive {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  .parcel-form-page .pf-items-table-wrap {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    display: block;
-    box-sizing: border-box;
-    max-height: min(380px, 48vh);
-    overflow-x: auto;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    overscroll-behavior-x: contain;
-    touch-action: pan-x pan-y;
-    border: 1px solid rgba(15, 23, 42, 0.1);
-    border-radius: 10px;
-    background: #fff;
-    -webkit-overflow-scrolling: touch;
   }
-  .parcel-form-page .pf-items-scroll .table { margin-bottom: 0; }
-  /* Items grid: fixed min width — scroll container shows full desktop-style columns */
+  @media (min-width: 768px) {
+    .parcel-form-page .pf-items-table-wrap.pf-items-scroll-desktop {
+      max-height: min(380px, 48vh);
+      overflow-x: auto;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 0.5rem;
+      background: #fff;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+  .parcel-form-page .pf-items-table-wrap .table { margin-bottom: 0; }
+  .parcel-form-page .container,
+  .parcel-form-page .container-fluid {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  @media (max-width: 768px) {
+    .parcel-form-page .btn-add-row {
+      width: 100%;
+    }
+  }
   .parcel-form-page #itemsTable {
     --pf-grid-line: #e5e7eb;
-    --pf-items-table-min: 880px;
-    width: 100%;
-    min-width: var(--pf-items-table-min);
+    width: max-content;
+    min-width: 100%;
     max-width: none;
-    table-layout: fixed;
+    table-layout: auto;
     border-collapse: collapse;
     border: 1px solid var(--pf-grid-line);
-    font-size: clamp(0.7rem, 0.12vw + 0.66rem, 0.8125rem);
+    font-size: clamp(0.75rem, 0.12vw + 0.7rem, 0.875rem);
     background: #fff;
   }
   .parcel-form-page #itemsTable.receipt-grid th,
@@ -257,7 +280,8 @@
   }
   .parcel-form-page #itemsTable.receipt-grid td.item-amount-cell {
     white-space: normal;
-    min-width: 12.5rem;
+    vertical-align: middle;
+    min-width: 180px;
   }
   .parcel-form-page #itemsTable.receipt-grid thead th {
     background: #f9fafb;
@@ -268,6 +292,41 @@
     color: #64748b;
     white-space: nowrap;
     border-bottom: 1px solid #d1d5db;
+  }
+  .parcel-form-page #itemsTable thead th.col-actions {
+    letter-spacing: normal;
+    text-transform: none;
+    font-weight: 700;
+    font-size: 0.7rem;
+  }
+  .parcel-form-page #itemsTable.table th,
+  .parcel-form-page #itemsTable.table td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .parcel-form-page #itemsTable.table td.item-amount-cell {
+    white-space: normal;
+  }
+  .parcel-form-page #itemsTable.table input {
+    min-width: 120px;
+  }
+  .parcel-form-page #itemsTable .col-no {
+    min-width: 3rem;
+  }
+  .parcel-form-page #itemsTable .col-description {
+    min-width: 220px;
+  }
+  .parcel-form-page #itemsTable .col-qty,
+  .parcel-form-page #itemsTable .col-rate,
+  .parcel-form-page #itemsTable .col-amount {
+    min-width: 100px;
+  }
+  .parcel-form-page #itemsTable .col-additional {
+    min-width: 180px;
+  }
+  .parcel-form-page #itemsTable .col-actions {
+    min-width: 80px;
+    text-align: center;
   }
   .parcel-form-page #itemsTable.receipt-grid tbody tr {
     transition: background-color 0.12s ease;
@@ -482,20 +541,20 @@
     background: rgba(254, 226, 226, 0.35);
   }
   .parcel-form-page #itemsTable .pf-item-remove-cell {
-    width: 2.5rem;
+    min-width: 80px;
     text-align: center;
     vertical-align: middle;
   }
-  /* Column alignment — same as desktop at every breakpoint (table scrolls horizontally on small screens) */
-  .parcel-form-page #itemsTable thead th:nth-child(1),
-  .parcel-form-page #itemsTable thead th:nth-child(3),
-  .parcel-form-page #itemsTable thead th:nth-child(4),
-  .parcel-form-page #itemsTable thead th:nth-child(5),
-  .parcel-form-page #itemsTable thead th:nth-child(6),
-  .parcel-form-page #itemsTable thead th:nth-child(7) {
+  /* Column alignment — same at every breakpoint (table scrolls horizontally on small screens) */
+  .parcel-form-page #itemsTable thead th.col-no,
+  .parcel-form-page #itemsTable thead th.col-qty,
+  .parcel-form-page #itemsTable thead th.col-rate,
+  .parcel-form-page #itemsTable thead th.col-amount,
+  .parcel-form-page #itemsTable thead th.col-additional,
+  .parcel-form-page #itemsTable thead th.col-actions {
     text-align: center;
   }
-  .parcel-form-page #itemsTable thead th:nth-child(2) {
+  .parcel-form-page #itemsTable thead th.col-description {
     text-align: left;
   }
   .parcel-form-page #itemsTable .item-desc {
@@ -510,14 +569,16 @@
   .parcel-form-page #itemsTable .item-amount-cell .item-add {
     text-align: center;
   }
-  .parcel-form-page .pf-items-scroll thead th {
-    position: sticky;
-    top: 0;
-    z-index: 6;
-    box-shadow: 0 1px 0 #e5e7eb;
-  }
-  .parcel-form-page .pf-items-scroll #itemsTable thead th {
-    background: #f3f4f6;
+  @media (min-width: 768px) {
+    .parcel-form-page .pf-items-table-wrap thead th {
+      position: sticky;
+      top: 0;
+      z-index: 6;
+      box-shadow: 0 1px 0 #e5e7eb;
+    }
+    .parcel-form-page .pf-items-table-wrap #itemsTable thead th {
+      background: #f3f4f6;
+    }
   }
   .parcel-form-page .pf-btn-icon-touch {
     display: inline-flex;
@@ -918,9 +979,9 @@
     letter-spacing: 0.01em;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(79, 70, 229, 0.2);
   }
-  .parcel-form-page.pf-saas .pf-items-section .pf-items-scroll + .text-end {
-    padding-left: 0.25rem;
-    padding-right: 0.25rem;
+  .parcel-form-page.pf-saas .pf-items-section .card-body .mt-3 {
+    padding-left: 0;
+    padding-right: 0;
   }
   .parcel-form-page.pf-saas .pf-btn-save:hover,
   .parcel-form-page.pf-saas .pf-btn-add-row:hover {
@@ -1043,7 +1104,7 @@
   .parcel-form-page.pf-compact-view .receipt-grid .form-control { min-height: 1.45rem; font-size: 0.78rem; padding: 0.15rem 0.35rem; }
   .parcel-form-page.pf-compact-view .receipt-total { padding: 0.4rem 0.55rem !important; }
   .parcel-form-page.pf-compact-view .receipt-total .fs-5 { font-size: 1rem !important; }
-  .parcel-form-page.pf-compact-view .pf-items-scroll {
+  .parcel-form-page.pf-compact-view .pf-items-table-wrap.pf-items-scroll-desktop {
     max-height: min(220px, 32vh);
     overflow-y: auto;
     overflow-x: auto;
@@ -1051,11 +1112,11 @@
     border: 1px solid var(--bs-border-color-translucent);
     border-radius: 0.25rem;
   }
-  .parcel-form-page.pf-compact-view .pf-items-scroll .table { margin-bottom: 0; }
+  .parcel-form-page.pf-compact-view .pf-items-table-wrap .table { margin-bottom: 0; }
   @media (min-width: 1200px) {
-    .parcel-form-page.pf-compact-view .pf-items-scroll { max-height: min(260px, 36vh); }
+    .parcel-form-page.pf-compact-view .pf-items-table-wrap.pf-items-scroll-desktop { max-height: min(260px, 36vh); }
   }
-  /* Small screens: line items stay a real table — pan .pf-items-scroll horizontally (no card/stack transforms) */
+  /* Small screens: line items table scrolls horizontally (same columns as desktop) */
   @media (max-width: 767.98px) {
     .parcel-form-page .row.pf-main-columns {
       margin-left: 0 !important;
@@ -1081,9 +1142,6 @@
     }
     .parcel-form-page .pf-items-section .text-end.mb-1 {
       text-align: center !important;
-    }
-    .parcel-form-page .pf-items-section #addRow {
-      width: 100% !important;
     }
     .parcel-form-page .pf-form-sections .form-control-sm,
     .parcel-form-page .pf-form-sections .form-select-sm,
@@ -1264,12 +1322,12 @@
   }
   /* Items table: use remaining viewport height on large screens */
   @media (min-width: 992px) {
-    .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-scroll {
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-table-wrap.pf-items-scroll-desktop {
       max-height: clamp(160px, calc(100vh - 300px), 480px);
     }
   }
   @media (min-width: 1200px) {
-    .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-scroll {
+    .parcel-form-page.pf-saas.pf-layout-optimized .pf-items-table-wrap.pf-items-scroll-desktop {
       max-height: clamp(180px, calc(100vh - 280px), 520px);
     }
   }
@@ -1478,13 +1536,13 @@
       --bs-gutter-x: 0.45rem;
     }
     /* Items: cap height so Add Row + total stay reachable; inner scroll for table */
-    .parcel-form-page.pf-one-screen .pf-items-scroll {
+    .parcel-form-page.pf-one-screen .pf-items-table-wrap.pf-items-scroll-desktop {
       max-height: min(28dvh, 200px) !important;
       flex: 0 0 auto;
       overflow-x: auto;
       overflow-y: auto;
     }
-    .parcel-form-page.pf-one-screen .pf-items-section .text-end.mb-1 {
+    .parcel-form-page.pf-one-screen .pf-items-section .mt-3 {
       flex-shrink: 0;
     }
     .parcel-form-page.pf-one-screen .receipt-total {
@@ -1565,7 +1623,7 @@
   .parcel-form-page.pf-modern-refactor .container-fluid,
   .parcel-form-page.pf-modern-refactor .section-card,
   .parcel-form-page.pf-modern-refactor .receipt-box,
-  .parcel-form-page.pf-modern-refactor .pf-items-scroll,
+  .parcel-form-page.pf-modern-refactor .pf-items-table-wrap,
   .parcel-form-page.pf-modern-refactor .pf-receipt-summary-wrap {
     max-width: 100%;
   }
@@ -1642,22 +1700,19 @@
     font-weight: 700;
     color: #0f172a;
   }
-  .parcel-form-page.pf-modern-refactor #itemsTable thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    background: #f8fafc;
-  }
   .parcel-form-page.pf-modern-refactor #itemsTable {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
     table-layout: auto;
   }
-  .parcel-form-page.pf-modern-refactor #itemsTable th,
-  .parcel-form-page.pf-modern-refactor #itemsTable td {
-    white-space: nowrap;
-    word-break: normal;
+  @media (min-width: 768px) {
+    .parcel-form-page.pf-modern-refactor #itemsTable thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f8fafc;
+    }
   }
   .parcel-form-page.pf-modern-refactor .pf-status-row {
     align-items: end;
@@ -1699,7 +1754,7 @@
       position: sticky;
       top: 72px;
     }
-    .parcel-form-page.pf-modern-refactor .pf-col-items .pf-items-section .pf-items-scroll {
+    .parcel-form-page.pf-modern-refactor .pf-col-items .pf-items-section .pf-items-table-wrap.pf-items-scroll-desktop {
       max-height: min(52vh, 480px);
       overflow: auto;
     }
@@ -1738,69 +1793,6 @@
     .parcel-form-page.pf-modern-refactor .pf-label,
     .parcel-form-page.pf-modern-refactor .form-label {
       margin-bottom: 8px;
-    }
-    .parcel-form-page.pf-modern-refactor .pf-items-scroll {
-      max-height: none;
-      overflow: visible;
-      border: 0;
-      background: transparent;
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable {
-      min-width: 0 !important;
-      border: 0;
-      table-layout: auto;
-      background: transparent;
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable thead {
-      display: none;
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable tbody {
-      display: grid;
-      gap: 10px;
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable tbody tr {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      padding: 10px;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      background: #fff;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable tbody td {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      padding: 0;
-      border: 0;
-      white-space: normal;
-      min-width: 0;
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable tbody td::before {
-      content: attr(data-label);
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      white-space: nowrap;
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-no-cell,
-    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-remove-cell {
-      grid-column: 1 / -1;
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-no-cell::before {
-      content: 'Line';
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-remove-cell::before {
-      content: 'Actions';
-    }
-    .parcel-form-page.pf-modern-refactor #itemsTable .pf-item-remove-cell .btn {
-      margin-left: auto;
     }
     .parcel-form-page.pf-modern-refactor .pf-sticky-actions {
       padding: 8px 12px;
@@ -2294,27 +2286,20 @@
       </div>
     </div>
 
-    <div class="p-2 pt-1">
-      <div class="pf-items-scroll mb-1">
-        <table class="table table-sm receipt-grid mb-0 align-middle" id="itemsTable" aria-describedby="pf-h-items-total">
-          <colgroup>
-            <col class="pf-col-no" style="width:4.5%" />
-            <col class="pf-col-desc" style="width:30%" />
-            <col class="pf-col-qty" style="width:8%" />
-            <col class="pf-col-rate" style="width:9%" />
-            <col class="pf-col-amt" style="width:10%" />
-            <col class="pf-col-addl" style="width:12%" />
-            <col class="pf-col-act" style="width:3.5rem" />
-          </colgroup>
+    <div class="container-fluid px-2 px-md-3">
+      <div class="card shadow-sm rounded-3 border-0">
+        <div class="card-body p-2 p-md-3">
+      <div class="table-responsive pf-items-table-wrap pf-items-scroll-desktop">
+        <table class="table table-sm table-bordered receipt-grid align-middle text-nowrap mb-0" id="itemsTable" aria-describedby="pf-h-items-total">
           <thead>
             <tr>
-              <th scope="col">No</th>
-              <th scope="col">Description</th>
-              <th scope="col">Qty</th>
-              <th scope="col">Rate</th>
-              <th scope="col">Amount</th>
-              <th scope="col" title="Additional amounts">Additional</th>
-              <th scope="col"><span class="visually-hidden">Remove row</span></th>
+              <th scope="col" class="col-no">No</th>
+              <th scope="col" class="col-description">Description</th>
+              <th scope="col" class="col-qty">Qty</th>
+              <th scope="col" class="col-rate">Rate</th>
+              <th scope="col" class="col-amount">Amount</th>
+              <th scope="col" class="col-additional" title="Additional amounts">Additional</th>
+              <th scope="col" class="col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -2348,10 +2333,10 @@
               }
             ?>
             <tr>
-              <td class="text-center align-middle pf-item-no-cell" data-label=""><?php echo $rowIndex; ?></td>
-              <td data-label="Description"><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td data-label="Qty"><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
+              <td class="text-center align-middle pf-item-no-cell col-no"><?php echo $rowIndex; ?></td>
+              <td class="col-description"><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td class="col-qty"><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
               <?php
                 $addAmounts = [];
                 if (!empty($it['additional_amounts'])) {
@@ -2363,10 +2348,10 @@
                 if (empty($addAmounts)) { $addAmounts = ['']; }
                 $addSumPhp = array_sum(array_map('floatval', $addAmounts));
               ?>
-              <td class="align-middle pf-item-amt-cell" data-label="Amount">
+              <td class="align-middle pf-item-amt-cell col-amount">
                 <span class="item-amount fw-semibold pf-amount-readout"><?php echo $amt > 0 ? number_format($amt, 2) : '—'; ?></span>
               </td>
-              <td class="align-middle item-amount-cell" data-label="Additional">
+              <td class="align-middle item-amount-cell col-additional">
                 <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
                   <span class="item-add-sum fw-semibold pf-amount-readout"><?php echo $addSumPhp > 0 ? number_format($addSumPhp, 2) : '—'; ?></span>
                   <span class="visually-hidden">Additional line amounts</span>
@@ -2385,19 +2370,19 @@
                   <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button><?php endif; ?>
                 </div>
               </td>
-              <td class="text-center pf-item-remove-cell"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button><?php endif; ?></td>
+              <td class="text-center pf-item-remove-cell col-actions"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button><?php endif; ?></td>
             </tr>
             <?php endforeach; ?>
             <?php if (empty($items)): ?>
             <tr>
-              <td class="text-center align-middle pf-item-no-cell" data-label="">1</td>
-              <td data-label="Description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td data-label="Qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
-              <td class="align-middle pf-item-amt-cell" data-label="Amount">
+              <td class="text-center align-middle pf-item-no-cell col-no">1</td>
+              <td class="col-description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td class="col-qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
+              <td class="align-middle pf-item-amt-cell col-amount">
                 <span class="item-amount fw-semibold pf-amount-readout">—</span>
               </td>
-              <td class="align-middle item-amount-cell" data-label="Additional">
+              <td class="align-middle item-amount-cell col-additional">
                 <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
                   <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
                   <span class="visually-hidden">Additional line amounts</span>
@@ -2414,20 +2399,23 @@
                   <?php if (!$lockAll && $canEnterItemAmounts): ?><button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button><?php endif; ?>
                 </div>
               </td>
-              <td class="text-center pf-item-remove-cell"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button><?php endif; ?></td>
+              <td class="text-center pf-item-remove-cell col-actions"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button><?php endif; ?></td>
             </tr>
             <?php endif; ?>
           </tbody>
         </table>
       </div>
-      <div class="text-end mb-1 px-2">
+      <div class="text-center text-md-end mt-3">
           <?php if (!$lockAll): ?>
-            <button type="button" class="btn btn-sm btn-primary pf-btn-add-row w-100 w-md-auto" id="addRow" aria-label="Add line item"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add Row</button>
+            <button type="button" class="btn btn-sm btn-primary pf-btn-add-row btn-add-row" id="addRow" aria-label="Add line item"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add Row</button>
           <?php endif; ?>
       </div>
+        </div>
+      </div>
+    </div>
 
       <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
-      <div class="receipt-total p-2 p-md-3">
+      <div class="receipt-total px-2 px-md-3 py-2 py-md-3">
         <div class="row g-2 g-md-3 align-items-center justify-content-lg-end">
           <div class="col-12 col-sm-6 col-lg-auto">
             <label class="col-form-label mb-0" for="totalPrice"><strong>Total</strong></label>
@@ -2962,14 +2950,14 @@
               if (tbody) {
                 tbody.innerHTML = `
                   <tr>
-                    <td class="text-center align-middle pf-item-no-cell" data-label="">1</td>
-                    <td data-label="Description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description"></td>
-                    <td data-label="Qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty"></td>
-                    <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
-                    <td class="align-middle pf-item-amt-cell" data-label="Amount">
+                    <td class="text-center align-middle pf-item-no-cell col-no">1</td>
+                    <td class="col-description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description"></td>
+                    <td class="col-qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty"></td>
+                    <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
+                    <td class="align-middle pf-item-amt-cell col-amount">
                       <span class="item-amount fw-semibold pf-amount-readout">—</span>
                     </td>
-                    <td class="align-middle item-amount-cell" data-label="Additional">
+                    <td class="align-middle item-amount-cell col-additional">
                       <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
                         <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
                         <span class="visually-hidden">Additional line amounts</span>
@@ -2986,7 +2974,7 @@
                         ${canEnterItemAmounts ? '<button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button>' : ''}
                       </div>
                     </td>
-                    <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
+                    <td class="text-center pf-item-remove-cell col-actions"><button type="button" class="btn btn-outline-danger btn-sm remove-row" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
                   </tr>`;
                 syncAddRemoveButtons(tbody);
                 recalc();
@@ -3594,14 +3582,14 @@
     const idx = tbody.querySelectorAll('tr').length + 1;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="text-center align-middle pf-item-no-cell" data-label="">${idx}</td>
-      <td data-label="Description"><input type="text" name="items[${idx}][description]" class="form-control item-desc" placeholder="Description"></td>
-      <td data-label="Qty"><input type="number" step="0.01" name="items[${idx}][qty]" class="form-control item-qty" placeholder="Qty"></td>
-      <td data-label="Rate"><input type="number" step="0.01" min="0" name="items[${idx}][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
-      <td class="align-middle pf-item-amt-cell" data-label="Amount">
+      <td class="text-center align-middle pf-item-no-cell col-no">${idx}</td>
+      <td class="col-description"><input type="text" name="items[${idx}][description]" class="form-control item-desc" placeholder="Description"></td>
+      <td class="col-qty"><input type="number" step="0.01" name="items[${idx}][qty]" class="form-control item-qty" placeholder="Qty"></td>
+      <td class="col-rate"><input type="number" step="0.01" min="0" name="items[${idx}][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
+      <td class="align-middle pf-item-amt-cell col-amount">
         <span class="item-amount fw-semibold pf-amount-readout">—</span>
       </td>
-      <td class="align-middle item-amount-cell" data-label="Additional">
+      <td class="align-middle item-amount-cell col-additional">
         <div class="d-flex flex-column gap-1 pf-item-add-block pf-item-add-excel">
           <span class="item-add-sum fw-semibold pf-amount-readout">—</span>
           <span class="visually-hidden">Additional line amounts</span>
@@ -3618,7 +3606,7 @@
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 add-amount-btn" title="Add another amount line"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Add amount</span></button>
         </div>
       </td>
-      <td class="text-center pf-item-remove-cell"><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
+      <td class="text-center pf-item-remove-cell col-actions"><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button></td>
     `;
     tbody.appendChild(tr);
     syncAddRemoveButtons(tr);
