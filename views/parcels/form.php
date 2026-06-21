@@ -964,6 +964,8 @@
   .parcel-form-page .pf-visually-hidden-select { position:absolute !important; left:-9999px !important; width:1px !important; height:1px !important; opacity:0 !important; }
   .parcel-form-page .customer-search-results { position: relative; }
   .parcel-form-page .customer-search-results .list-group { position:absolute; z-index: 1050; width:100%; max-height: 260px; overflow:auto; }
+  .parcel-form-page #customerInvalidFeedback { display: none; }
+  .parcel-form-page .customer-search-results:has(#customerSearch.is-invalid) #customerInvalidFeedback { display: block; }
   .parcel-form-page .pf-breadcrumb { font-size: 0.9rem; }
   /* Structured sections (left column) */
   .parcel-form-page .pf-form-sections { min-width: 0; }
@@ -2060,17 +2062,17 @@
       <div class="section-body">
         <div class="row g-3 align-items-start">
           <div class="col-lg-6">
-            <label class="pf-label" for="customerSearch">Search customer</label>
+            <label class="pf-label" for="customerSearch">Customer</label>
             <div class="customer-search-results mb-2">
               <div class="input-group input-group-sm pf-input-group">
                 <span class="input-group-text bg-white border-end-0 text-secondary"><i class="bi bi-search" aria-hidden="true"></i></span>
-                <input type="text" id="customerSearch" class="form-control form-control-sm border-start-0" placeholder="Name or phone…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Search customer by name or phone" aria-describedby="customerSummary customerInvalidFeedback">
+                <input type="text" id="customerSearch" class="form-control form-control-sm border-start-0" placeholder="Search by name or phone…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Search and select customer" aria-describedby="customerSummary customerInvalidFeedback" aria-required="true">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddCustomer" title="Quick add customer" aria-label="Quick add customer"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
               </div>
               <div id="customerSearchResults" class="list-group list-group-flush shadow-sm rounded mt-1 border pf-search-results"></div>
+              <div class="invalid-feedback" id="customerInvalidFeedback">Please choose a customer from the search results.</div>
             </div>
-            <label class="pf-label" for="customerSelectHidden">Customer</label>
-            <select name="customer_id" id="customerSelectHidden" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-invalid="false" aria-describedby="customerInvalidFeedback">
+            <select name="customer_id" id="customerSelectHidden" class="form-select form-select-sm pf-visually-hidden-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-hidden="true" tabindex="-1" aria-invalid="false">
         <option value="" disabled hidden <?php echo ((int)($parcel['customer_id'] ?? 0) <= 0) ? 'selected' : ''; ?>>-- Select Customer --</option>
         <?php foreach (($customersAll ?? []) as $c): ?>
           <?php 
@@ -2082,7 +2084,6 @@
           <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($parcel['customer_id'] ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
         <?php endforeach; ?>
       </select>
-            <div class="invalid-feedback" id="customerInvalidFeedback">Please choose a customer.</div>
           </div>
           <div class="col-lg-6">
             <?php if ($lockAll || $priceOnly): ?>
@@ -2874,14 +2875,31 @@
       if (toBranchEl && !toBranchEl.disabled) {
         toBranchEl.setCustomValidity(toBranchErr);
       }
+      const customerSelEl = document.getElementById('customerSelectHidden');
+      const customerSearchEl = document.getElementById('customerSearch');
+      if (customerSelEl && !customerSelEl.disabled) {
+        const cv = String(customerSelEl.value || '').trim();
+        if (!cv || cv === '0') {
+          customerSelEl.setCustomValidity('Please choose a customer from the search results.');
+          customerSearchEl?.classList.add('is-invalid');
+        } else {
+          customerSelEl.setCustomValidity('');
+          customerSearchEl?.classList.remove('is-invalid');
+        }
+      }
       // Scroll to first invalid field (HTML5 validation)
       if (!form.checkValidity()) {
         form.classList.add('was-validated');
         const firstInvalid = form.querySelector(':invalid');
         if (firstInvalid) {
-          const scrollTarget = firstInvalid.closest('.choices') || firstInvalid;
+          let scrollTarget = firstInvalid.closest('.choices') || firstInvalid;
+          let focusTarget = firstInvalid;
+          if (firstInvalid === customerSelEl && customerSearchEl) {
+            scrollTarget = customerSearchEl.closest('.customer-search-results') || customerSearchEl;
+            focusTarget = customerSearchEl;
+          }
           scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          try { firstInvalid.focus({ preventScroll: true }); } catch (_) { try { firstInvalid.focus(); } catch (_) {} }
+          try { focusTarget.focus({ preventScroll: true }); } catch (_) { try { focusTarget.focus(); } catch (_) {} }
         }
         return false;
       }
@@ -3170,7 +3188,25 @@
     customerSelectMain.value = String(id || '');
     customerSelectMain.dispatchEvent(new Event('change'));
     customerSelectMain.dispatchEvent(new Event('input'));
+    if (customerSearchInput) {
+      customerSearchInput.classList.remove('is-invalid');
+      customerSelectMain.classList.remove('is-invalid');
+      customerSelectMain.setCustomValidity('');
+    }
   }
+  function syncCustomerSearchFromSelect(){
+    if (!customerSelectMain || !customerSearchInput) return;
+    const id = parseInt(customerSelectMain.value || '0', 10);
+    if (id <= 0) return;
+    const c = customersSearchData.find(function(x){ return parseInt(x.id || '0', 10) === id; });
+    if (c) {
+      customerSearchInput.value = formatCustomerLabel(c);
+      return;
+    }
+    const opt = customerSelectMain.options[customerSelectMain.selectedIndex];
+    if (opt && opt.value) customerSearchInput.value = (opt.textContent || '').trim();
+  }
+  syncCustomerSearchFromSelect();
   function hideCustomerResults(){
     if (customerSearchResults) customerSearchResults.style.display = 'none';
     if (customerSearchResults) customerSearchResults.innerHTML = '';
@@ -4388,6 +4424,8 @@
     customerSelPf.addEventListener('change', function() {
       this.classList.remove('is-invalid');
       this.setAttribute('aria-invalid', 'false');
+      customerSearchInput?.classList.remove('is-invalid');
+      syncCustomerSearchFromSelect();
     });
   }
 })();
