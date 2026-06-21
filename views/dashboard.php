@@ -399,395 +399,9 @@
     $kpiExpTitle = !$isSingleDay
       ? 'Expenses (' . htmlspecialchars($df) . '–' . htmlspecialchars($dt) . ')'
       : ($isTodayRange ? "Today's Expenses" : 'Expenses (' . htmlspecialchars($df) . ')');
-    $kpiNetMovement = $kpiCollections - $kpiExpenses;
-    $dashLabels = [];
-    $dashPending = [];
-    $dashCollections = [];
-    $dashExpenses = [];
-    foreach (($branchesAll ?? []) as $b) {
-      $bid = (int)($b['id'] ?? 0);
-      $dashLabels[] = (string)($b['name'] ?? 'Branch');
-      $dashPending[] = (int)($pendingByBranch[$bid] ?? 0);
-      $dashCollections[] = (float)($collectionsTodayByBranch[$bid] ?? 0);
-      $dashExpenses[] = (float)($expensesTodayByBranch[$bid] ?? 0);
-    }
-    
-    // Transfer Voucher Statistics
-    $kpiTransfersToday = (int)($transfersToday ?? 0);
-    $kpiTransfersAmount = (float)($transfersAmount ?? 0);
-    $kpiTransfersPending = (int)($transfersPending ?? 0);
-    $kpiTransfersPosted = (int)($transfersPosted ?? 0);
   ?>
 
-  <section class="mb-3">
-    <p class="section-title">Overview</p>
-    <p class="section-subtitle">Key metrics for <?php echo $scopeAllBranches ? '<strong>all branches</strong>' : 'your branch filters'; ?> · <?php echo $isSingleDay ? 'Date: <strong>'.$rangeStr.'</strong>' : 'Range: <strong>'.$rangeStr.'</strong>'; ?>.</p>
-    <div class="row g-3">
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label">Pending Parcels</div>
-              <div class="kpi-value"><?php echo $kpiPending; ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true"><i class="bi bi-hourglass-split"></i></div>
-          </div>
-          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending'); ?>">View pending</a></div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label"><?php echo htmlspecialchars($kpiParcelsTitle); ?></div>
-              <div class="kpi-value"><?php echo $kpiTodayParcels; ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true" style="background: rgba(32,201,151,.12); color:#198754;"><i class="bi bi-box-seam"></i></div>
-          </div>
-          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&from=' . urlencode($df) . '&to=' . urlencode($dt)); ?>">View list</a></div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label"><?php echo htmlspecialchars($kpiCollTitle); ?></div>
-              <div class="kpi-value">Rs. <?php echo number_format($kpiCollections, 2); ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,110,253,.10); color:#0d6efd;"><i class="bi bi-cash-stack"></i></div>
-          </div>
-          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">Go to delivery notes</a></div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label"><?php echo htmlspecialchars($kpiExpTitle); ?></div>
-              <div class="kpi-value">Rs. <?php echo number_format($kpiExpenses, 2); ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#8a6d00;"><i class="bi bi-wallet2"></i></div>
-          </div>
-          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Go to expenses</a></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="mb-3">
-    <p class="section-title">Transfer Vouchers</p>
-    <p class="section-subtitle">Fund transfer statistics for the selected period.</p>
-    <div class="row g-3">
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label">Today's Transfers</div>
-              <div class="kpi-value"><?php echo $kpiTransfersToday; ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,202,240,.16); color:#0dcaf0;"><i class="bi bi-arrow-left-right"></i></div>
-          </div>
-          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>">Open voucher entry</a></div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label">Transfer Amount</div>
-              <div class="kpi-value">Rs. <?php echo number_format($kpiTransfersAmount, 2); ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true" style="background: rgba(102,16,242,.12); color:#6610f2;"><i class="bi bi-currency-rupee"></i></div>
-          </div>
-          <div class="mt-2"><small class="text-muted">Total transferred today</small></div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label">Pending Transfers</div>
-              <div class="kpi-value"><?php echo $kpiTransfersPending; ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#ffc107;"><i class="bi bi-clock-history"></i></div>
-          </div>
-          <div class="mt-2"><small class="text-muted">Awaiting posting</small></div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl-3">
-        <div class="kpi-card">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <div class="kpi-label">Posted Transfers</div>
-              <div class="kpi-value"><?php echo $kpiTransfersPosted; ?></div>
-            </div>
-            <div class="kpi-icon" aria-hidden="true" style="background: rgba(25,135,84,.12); color:#198754;"><i class="bi bi-check-circle"></i></div>
-          </div>
-          <div class="mt-2"><small class="text-muted">Completed transfers</small></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="mb-3">
-    <div class="row g-3">
-      <div class="col-12 col-xl-4">
-        <div class="finance-card h-100">
-          <div class="card-header-dash d-flex justify-content-between align-items-center">
-            <span>Financial Pulse</span>
-            <small class="text-muted fw-normal">Current view</small>
-          </div>
-          <div class="card-body">
-            <div class="row g-2">
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Collections</div>
-                  <div class="mini-value text-success">Rs. <?php echo number_format($kpiCollections, 2); ?></div>
-                  <div class="mini-sub">Received in the selected range</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Expenses</div>
-                  <div class="mini-value text-danger">Rs. <?php echo number_format($kpiExpenses, 2); ?></div>
-                  <div class="mini-sub">Posted in the selected range</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Net Movement</div>
-                  <div class="mini-value text-primary">Rs. <?php echo number_format($kpiNetMovement, 2); ?></div>
-                  <div class="mini-sub">Collections minus expenses</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Outstanding Due</div>
-                  <div class="mini-value text-warning">Rs. <?php echo number_format((float)($totalDue ?? 0), 2); ?></div>
-                  <div class="mini-sub">Unsettled delivery notes</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-xl-8">
-        <div class="chart-card h-100">
-          <div class="card-header-dash d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span>Branch Performance</span>
-            <small class="text-muted fw-normal">Pending, collections, and expenses by branch</small>
-          </div>
-          <div class="card-body">
-            <div class="chart-wrap">
-              <canvas id="dashboardBranchChart" aria-label="Branch performance chart" role="img"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="mb-3">
-    <div class="row g-3">
-      <div class="col-12 col-lg-4">
-        <div class="card card-dash h-100">
-          <div class="card-header-dash d-flex justify-content-between align-items-center">
-            <span>Transfer Voucher</span>
-            <small class="text-muted fw-normal">Account-to-account movement</small>
-          </div>
-          <div class="card-body">
-            <div class="row g-2">
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Total</div>
-                  <div class="mini-value text-primary"><?php echo (int)($tvSummary['total_vouchers'] ?? 0); ?></div>
-                  <div class="mini-sub">In the selected range</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Posted</div>
-                  <div class="mini-value text-success"><?php echo (int)($tvSummary['posted_count'] ?? 0); ?></div>
-                  <div class="mini-sub">Completed transfers</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Draft</div>
-                  <div class="mini-value text-warning"><?php echo (int)($tvSummary['draft_count'] ?? 0); ?></div>
-                  <div class="mini-sub">Waiting posting</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="mini-metric">
-                  <div class="mini-label">Amount</div>
-                  <div class="mini-value text-info">Rs. <?php echo number_format((float)($tvSummary['total_amount'] ?? 0), 2); ?></div>
-                  <div class="mini-sub">Movement total</div>
-                </div>
-              </div>
-            </div>
-            <div class="mt-3 d-grid">
-              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>"><i class="bi bi-receipt-cutoff me-1"></i> Open Voucher Entry</a>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-8">
-        <div class="card card-dash h-100">
-          <div class="card-header-dash d-flex justify-content-between align-items-center">
-            <span>Recent Transfer Voucher Activity</span>
-            <a class="small text-decoration-none fw-normal" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>">Open entry</a>
-          </div>
-          <div class="card-body p-0">
-            <?php if (empty($tvRecentAuditLogs ?? [])): ?>
-              <div class="p-3 text-muted small">No recent transfer voucher activity.</div>
-            <?php else: ?>
-              <div class="table-responsive dash-table-scroll-y dash-table-x">
-                <table class="table table-sm table-dash table-hover align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>Voucher</th>
-                      <th>User</th>
-                      <th>When</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($tvRecentAuditLogs as $log): ?>
-                    <tr>
-                      <td data-label="Action"><?php echo htmlspecialchars((string) ($log['action'] ?? '')); ?></td>
-                      <td data-label="Voucher"><?php echo htmlspecialchars((string) ($log['entity_id'] ?? '')); ?></td>
-                      <td data-label="User"><?php echo htmlspecialchars((string) ($log['user_name'] ?? $log['user_username'] ?? '')); ?></td>
-                      <td data-label="When"><small class="text-muted"><?php echo htmlspecialchars((string) ($log['created_at'] ?? '')); ?></small></td>
-                    </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
-              </div>
-            <?php endif; ?>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="quick-actions mb-3">
-    <p class="section-title">Quick Actions</p>
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>">
-          <div class="action-icon bg-primary bg-opacity-10 text-primary">
-            <i class="bi bi-search"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Search Customer</div>
-            <div class="action-desc">Find by phone</div>
-          </div>
-        </a>
-      </div>
-      <?php if (Auth::canCreateParcels()): ?>
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new'); ?>">
-          <div class="action-icon bg-success bg-opacity-10 text-success">
-            <i class="bi bi-box-seam"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Add Parcel</div>
-            <div class="action-desc">Record parcel</div>
-          </div>
-        </a>
-      </div>
-      <?php endif; ?>
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending'); ?>">
-          <div class="action-icon bg-secondary bg-opacity-10 text-secondary">
-            <i class="bi bi-hourglass-split"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Pending Parcels</div>
-            <div class="action-desc">Count: <strong><?php echo (int)($pendingParcels ?? 0); ?></strong></div>
-          </div>
-        </a>
-      </div>
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">
-          <div class="action-icon bg-warning bg-opacity-10 text-warning">
-            <i class="bi bi-receipt"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Delivery Note</div>
-            <div class="action-desc">Print / group</div>
-          </div>
-        </a>
-      </div>
-      <?php if (Auth::hasAnyRole(['admin','accountant'])): ?>
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>">
-          <div class="action-icon bg-info bg-opacity-10 text-info">
-            <i class="bi bi-receipt-cutoff"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Voucher Entry</div>
-            <div class="action-desc">Transfer and accounting vouchers</div>
-          </div>
-        </a>
-      </div>
-      <?php endif; ?>
-    </div>
-  </section>
-
-  <section class="mb-4">
-    <p class="section-title">Delivery</p>
-    <p class="section-subtitle">Register a customer first, then plan routes and assign vehicles. When adding a delivery route you can pick the customer and use their address.</p>
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>">
-          <div class="action-icon bg-info bg-opacity-10 text-info">
-            <i class="bi bi-person-plus"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Register Customer</div>
-            <div class="action-desc">Add customer &amp; address</div>
-          </div>
-        </a>
-      </div>
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>">
-          <div class="action-icon bg-primary bg-opacity-10 text-primary">
-            <i class="bi bi-signpost-split"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Plan Delivery Route</div>
-            <div class="action-desc">Pick customer, use address</div>
-          </div>
-        </a>
-      </div>
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>">
-          <div class="action-icon bg-secondary bg-opacity-10 text-secondary">
-            <i class="bi bi-truck-front"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Vehicle Routes</div>
-            <div class="action-desc">By vehicle &amp; date</div>
-          </div>
-        </a>
-      </div>
-      <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=parcels&filter_type=route_planning'); ?>">
-          <div class="action-icon bg-success bg-opacity-10 text-success">
-            <i class="bi bi-geo-alt"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="action-title">Parcels by Route</div>
-            <div class="action-desc">Today’s route planning</div>
-          </div>
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <div class="filters-card">
+  <div class="filters-card mb-3">
     <form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="row g-3 align-items-end">
       <input type="hidden" name="page" value="dashboard">
       <div class="col-6 col-md-3">
@@ -800,7 +414,7 @@
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">From Branch</label>
-        <select class="form-select form-select-sm" name="fb">
+        <select class="form-select form-select-sm" name="fb" data-enhance="false">
           <option value="0">All</option>
           <?php foreach (($branchesAll ?? []) as $b): ?>
             <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($fb ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
@@ -809,7 +423,7 @@
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">To Branch</label>
-        <select class="form-select form-select-sm" name="tb" aria-describedby="dashTbHint">
+        <select class="form-select form-select-sm" name="tb" data-enhance="false" aria-describedby="dashTbHint">
           <option value="0">All</option>
           <?php foreach (($branchesAll ?? []) as $b): ?>
             <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($tb ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
@@ -821,7 +435,7 @@
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">Customer</label>
-        <select class="form-select form-select-sm" name="cust">
+        <select class="form-select form-select-sm" name="cust" data-enhance="false">
           <option value="0">All</option>
           <?php foreach (($customersAll ?? []) as $c): ?>
             <?php
@@ -838,8 +452,124 @@
       </div>
     </form>
   </div>
+
+  <section class="mb-3">
+    <p class="section-title">Overview</p>
+    <p class="section-subtitle">Key metrics for <?php echo $scopeAllBranches ? '<strong>all branches</strong>' : 'your branch filters'; ?> · <?php echo $isSingleDay ? 'Date: <strong>'.$rangeStr.'</strong>' : 'Range: <strong>'.$rangeStr.'</strong>'; ?>.</p>
+    <div class="row g-3">
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Pending Parcels</div>
+              <div class="kpi-value"><?php echo $kpiPending; ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true"><i class="bi bi-hourglass-split"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending'); ?>">View pending</a></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label"><?php echo htmlspecialchars($kpiParcelsTitle); ?></div>
+              <div class="kpi-value"><?php echo $kpiTodayParcels; ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(32,201,151,.12); color:#198754;"><i class="bi bi-box-seam"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&from=' . urlencode($df) . '&to=' . urlencode($dt)); ?>">View list</a></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label"><?php echo htmlspecialchars($kpiCollTitle); ?></div>
+              <div class="kpi-value">Rs. <?php echo number_format($kpiCollections, 2); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,110,253,.10); color:#0d6efd;"><i class="bi bi-cash-stack"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">Delivery notes</a></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label"><?php echo htmlspecialchars($kpiExpTitle); ?></div>
+              <div class="kpi-value">Rs. <?php echo number_format($kpiExpenses, 2); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#8a6d00;"><i class="bi bi-wallet2"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Go to expenses</a></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Outstanding Due</div>
+              <div class="kpi-value">Rs. <?php echo number_format((float)($totalDue ?? 0), 2); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.12); color:#b45309;"><i class="bi bi-exclamation-circle"></i></div>
+          </div>
+          <div class="mt-2"><small class="text-muted">Unsettled delivery notes</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
 <?php if (isset($pendingParcels, $totalDue, $todayParcels)): ?>
-  <div class="row g-3 mb-4">
+  <?php if (!empty($isMain)): ?>
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card card-dash">
+        <div class="card-header-dash">All Branches (Today)</div>
+        <div class="card-body p-0">
+          <div class="table-responsive dash-table-x">
+            <table class="table table-sm table-dash table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Branch</th>
+                  <th class="text-end">Pending Parcels</th>
+                  <th class="text-end">Due (Total)</th>
+                  <th class="text-end">Parcels Today</th>
+                  <th class="text-end">Collections Today</th>
+                  <th class="text-end">Expenses Today</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
+                <tr>
+                  <td class="fw-medium" data-label="Branch"><?php echo htmlspecialchars($b['name']); ?></td>
+                  <td class="text-end" data-label="Pending">
+                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending&to_branch_id=' . $bid); ?>"><?php echo (int)($pendingByBranch[$bid] ?? 0); ?></a>
+                  </td>
+                  <td class="text-end" data-label="Due">
+                    <span>Rs. <?php echo number_format((float)($dueByBranch[$bid] ?? 0), 2); ?></span>
+                  </td>
+                  <td class="text-end" data-label="Parcels today">
+                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&to_branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>"><?php echo (int)($todayParcelsByBranch[$bid] ?? 0); ?></a>
+                  </td>
+                  <td class="text-end" data-label="Collections">
+                    <span>Rs. <?php echo number_format((float)($collectionsTodayByBranch[$bid] ?? 0), 2); ?></span>
+                  </td>
+                  <td class="text-end" data-label="Expenses">
+                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>">Rs. <?php echo number_format((float)($expensesTodayByBranch[$bid] ?? 0), 2); ?></a>
+                  </td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <div class="row g-3 mb-3">
     <div class="col-12">
       <div class="card card-dash w-100">
         <div class="card-header-dash d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -887,98 +617,9 @@
       </div>
     </div>
   </div>
-  <?php if (!empty($isMain)): ?>
-  <div class="row g-3 mb-4">
-    <div class="col-12">
-      <div class="card card-dash h-100">
-        <div class="card-header-dash">All Branches (Today)</div>
-        <div class="card-body p-0">
-          <div class="table-responsive dash-table-x">
-            <table class="table table-sm table-dash table-hover align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>Branch</th>
-                  <th class="text-end">Pending Parcels</th>
-                  <th class="text-end">Due (Total)</th>
-                  <th class="text-end">Parcels Today</th>
-                  <th class="text-end">Collections Today</th>
-                  <th class="text-end">Expenses Today</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach (($branchesAll ?? []) as $b): $bid=(int)$b['id']; ?>
-                <tr>
-                  <td class="fw-medium" data-label="Branch"><?php echo htmlspecialchars($b['name']); ?></td>
-                  <td class="text-end" data-label="Pending">
-                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending&to_branch_id=' . $bid); ?>"><?php echo (int)($pendingByBranch[$bid] ?? 0); ?></a>
-                  </td>
-                  <td class="text-end" data-label="Due">
-                    <span>Rs. <?php echo number_format((float)($dueByBranch[$bid] ?? 0), 2); ?></span>
-                  </td>
-                  <td class="text-end" data-label="Parcels today">
-                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&to_branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>"><?php echo (int)($todayParcelsByBranch[$bid] ?? 0); ?></a>
-                  </td>
-                  <td class="text-end" data-label="Collections">
-                    <span>Rs. <?php echo number_format((float)($collectionsTodayByBranch[$bid] ?? 0), 2); ?></span>
-                  </td>
-                  <td class="text-end" data-label="Expenses">
-                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>">Rs. <?php echo number_format((float)($expensesTodayByBranch[$bid] ?? 0), 2); ?></a>
-                  </td>
-                </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <?php endif; ?>
-  <div class="row g-3 mb-4">
-    <div class="col-12 d-flex align-items-stretch">
-      <div class="card card-dash w-100">
-        <div class="card-header-dash d-flex justify-content-between align-items-center">
-          <span>Recent Payments</span>
-        </div>
-        <div class="card-body">
-          <?php if (empty($recentPayments)): ?>
-            <p class="text-muted small mb-0">No recent payments.</p>
-          <?php else: ?>
-          <div class="table-responsive dash-table-scroll-y dash-table-x">
-            <table class="table table-sm table-dash table-hover align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Customer</th>
-                  <th>Amount</th>
-                  <th>Paid At</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($recentPayments as $p): ?>
-                <tr>
-                  <td data-label="#"><?php echo (int)$p['id']; ?></td>
-                  <td data-label="Customer"><?php
-                    $rpn = trim((string)($p['customer_name'] ?? ''));
-                    $rpp = trim((string)($p['customer_phone'] ?? ''));
-                    echo htmlspecialchars($rpn . ($rpp !== '' ? ' (' . $rpp . ')' : ''));
-                  ?></td>
-                  <td data-label="Amount">Rs. <?php echo number_format((float)$p['amount'], 2); ?></td>
-                  <td data-label="Paid at"><small class="text-muted"><?php echo htmlspecialchars($p['paid_at']); ?></small></td>
-                </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-          <?php endif; ?>
-        </div>
-      </div>
-    </div>
-  </div>
 <?php endif; ?>
 
 <?php
-  // Helper to safely fetch status counts
   $getCnt = function(array $arr, int $bid, string $status): int {
     return (int)(($arr[$bid] ?? [])[$status] ?? 0);
   };
@@ -987,7 +628,7 @@
   <div class="row g-3 mb-4">
     <div class="col-12">
       <div class="card card-dash">
-        <div class="card-header-dash">Branch Status Summary</div>
+        <div class="card-header-dash">Parcel Status by Branch</div>
         <div class="card-body">
           <ul class="nav nav-tabs nav-tabs-dash gap-1 mb-3" id="statusTabs" role="tablist">
             <li class="nav-item" role="presentation">
@@ -1079,13 +720,3 @@
     </div>
   </div>
 </div>
-
-<script>
-window.TMS_DASHBOARD_DATA = <?php echo json_encode([
-  'labels' => $dashLabels,
-  'pending' => $dashPending,
-  'collections' => $dashCollections,
-  'expenses' => $dashExpenses,
-], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-</script>
- 

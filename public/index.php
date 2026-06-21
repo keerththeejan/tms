@@ -148,6 +148,8 @@ switch ($page) {
         if (!is_dir($backupDir)) {
             @mkdir($backupDir, 0775, true);
         }
+        $error = null;
+        $success = null;
         if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $ts = date('Ymd_His');
@@ -211,7 +213,7 @@ switch ($page) {
                 }
                 usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
                 $error = 'Type DELETE (all caps) to confirm reset.';
-                Helpers::view('admin/backup', compact('files','error'));
+                Helpers::view('admin/backup', compact('files', 'error', 'success'));
                 break;
             }
             $pdo = Database::pdo();
@@ -227,7 +229,7 @@ switch ($page) {
             }
             usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
             $error = 'Reset failed: ' . implode('; ', $result['errors']);
-            Helpers::view('admin/backup', compact('files','error'));
+            Helpers::view('admin/backup', compact('files', 'error', 'success'));
             break;
         }
         // index: list existing backups
@@ -240,7 +242,7 @@ switch ($page) {
             ];
         }
         usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
-        Helpers::view('admin/backup', compact('files'));
+        Helpers::view('admin/backup', compact('files', 'error', 'success'));
         break;
     case 'dashboard':
         $pdo = Database::pdo();
