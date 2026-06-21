@@ -19,7 +19,11 @@ class Auth
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password_hash'])) {
+            if (isset($user['active']) && (int) $user['active'] !== 1) {
+                return false;
+            }
             unset($user['password_hash']);
+            session_regenerate_id(true);
             $_SESSION['user'] = $user;
             return true;
         }

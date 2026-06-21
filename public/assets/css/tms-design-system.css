@@ -47,6 +47,22 @@ body {
   --sidebar-transition: 0.25s ease;
 }
 
+body[data-theme="dark"] {
+  --tms-bg: #07111f;
+  --tms-surface: rgba(15, 23, 42, 0.78);
+  --tms-surface-solid: #0f172a;
+  --tms-text: #e5eef9;
+  --tms-muted: #94a3b8;
+  --tms-border: rgba(148, 163, 184, 0.18);
+  --tms-accent: #60a5fa;
+  --tms-accent-soft: rgba(96, 165, 250, 0.14);
+  --tms-shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.32);
+  --tms-shadow-md: 0 18px 36px rgba(2, 6, 23, 0.32);
+  --tms-banner-overlay: rgba(2, 6, 23, 0.32);
+  --shell-border: rgba(148, 163, 184, 0.14);
+  --shell-shadow: 0 1px 2px rgba(2, 6, 23, 0.28);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -77,6 +93,10 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body[data-theme="dark"] {
+  color: var(--tms-text);
 }
 
 a {
@@ -134,6 +154,45 @@ main.content-wrapper > .container-fluid {
   box-shadow: var(--bs-box-shadow-sm);
   background: var(--tms-surface-solid);
   backdrop-filter: blur(8px);
+}
+
+body[data-theme="dark"] .card,
+body[data-theme="dark"] .dropdown-menu {
+  background: rgba(15, 23, 42, 0.92);
+  color: var(--tms-text);
+}
+
+body[data-theme="dark"] .card-header,
+body[data-theme="dark"] .topbar,
+body[data-theme="dark"] .modal-content,
+body[data-theme="dark"] .offcanvas,
+body[data-theme="dark"] .table thead th {
+  background-color: rgba(15, 23, 42, 0.92);
+  color: var(--tms-text);
+}
+
+body[data-theme="dark"] .text-muted,
+body[data-theme="dark"] .small.text-muted,
+body[data-theme="dark"] .form-text {
+  color: var(--tms-muted) !important;
+}
+
+body[data-theme="dark"] .table {
+  --bs-table-striped-bg: rgba(148, 163, 184, 0.08);
+  --bs-table-bg: transparent;
+  color: var(--tms-text);
+}
+
+body[data-theme="dark"] .btn-outline-secondary,
+body[data-theme="dark"] .form-control,
+body[data-theme="dark"] .form-select {
+  border-color: rgba(148, 163, 184, 0.22);
+  background-color: rgba(15, 23, 42, 0.74);
+  color: var(--tms-text);
+}
+
+body[data-theme="dark"] .btn-outline-secondary:hover {
+  background: rgba(148, 163, 184, 0.12);
 }
 
 .card-header {

@@ -621,24 +621,25 @@ $logoInitials = $logoInitials ?: 'TS';
     </table>
     <table class="inv-branches-3" aria-label="Branch addresses">
       <tr style="font-size:13px; line-height:1.4; font-weight:bold;">
-        <td width="33%" align="left" valign="top">
-          <strong>Colombo</strong><br>
-          இல. 71 A, ஆட்டுப்பட்டித்தெரு, கொழும்பு -13.<br>
-          No. 71A, Wolfendhal Street, Colombo-13.<br>
-          077 2474 905 | 077 2474 177
+        <?php for ($col = 0; $col < 3; $col++):
+            $brCol = $invoiceHeaderBranches[$col] ?? null;
+            $pct = $col < 2 ? '33%' : '34%';
+            ?>
+        <td width="<?php echo $pct; ?>" align="left" valign="top">
+          <?php if (is_array($brCol)): ?>
+            <strong><?php echo htmlspecialchars((string)($brCol['name'] ?? '')); ?></strong><br>
+            <?php if (trim((string)($brCol['address_ta'] ?? '')) !== ''): ?>
+              <?php echo nl2br(htmlspecialchars((string)$brCol['address_ta'])); ?><br>
+            <?php endif; ?>
+            <?php if (trim((string)($brCol['address_en'] ?? '')) !== ''): ?>
+              <?php echo nl2br(htmlspecialchars((string)$brCol['address_en'])); ?><br>
+            <?php endif; ?>
+            <?php if (trim((string)($brCol['phones'] ?? '')) !== ''): ?>
+              <?php echo htmlspecialchars(str_replace('|', ' | ', (string)$brCol['phones'])); ?>
+            <?php endif; ?>
+          <?php endif; ?>
         </td>
-        <td width="33%" align="left" valign="top">
-          <strong>Main Branch (KILI)</strong><br>
-          பரவிப்பாஞ்சான், கிளிநொச்சி.<br>
-          Paravippanchan, Kilinochchi.<br>
-          021 720 1757 | 077 2474 605
-        </td>
-        <td width="34%" align="left" valign="top">
-          <strong>MULLAITIVU</strong><br>
-          பரவிப்பாஞ்சான், கிளிநொச்சி.<br>
-          Paravippanchan, Kilinochchi.<br>
-          021 720 1757 | 077 2474 605
-        </td>
+        <?php endfor; ?>
       </tr>
     </table>
     </div>

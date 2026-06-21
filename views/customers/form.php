@@ -28,6 +28,7 @@
 </style>
 <script>
 (function(){
+  function bootOsmDeliveryLocation(){
   const input = document.getElementById('delivery_location_other');
   const placeIdEl = document.querySelector('input[name="place_id"]');
   const latEl = document.querySelector('input[name="lat"]');
@@ -103,6 +104,12 @@
     }
   });
   input.addEventListener('input', function(){ var h = document.getElementById('delivery_location_value'); if (h) h.value = input.value; });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootOsmDeliveryLocation);
+  } else {
+    bootOsmDeliveryLocation();
+  }
 })();
 </script>
 <?php endif; ?>
@@ -157,13 +164,27 @@
   </div>
   <script>
   (function(){
+    function readSelectValue(sel) {
+      if (!sel) return '';
+      try {
+        if (sel._choices) {
+          const v = sel._choices.getValue(true);
+          if (Array.isArray(v)) {
+            const first = v[0];
+            return String((first && first.value !== undefined) ? first.value : (first || ''));
+          }
+          return String(v || '');
+        }
+      } catch (_) { /* ignore */ }
+      return String((sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].value) || sel.value || '');
+    }
     function syncDeliveryLocation() {
       var sel = document.getElementById('delivery_location_select');
       var hidden = document.getElementById('delivery_location_value');
       var wrap = document.getElementById('delivery_location_other_wrap');
       var otherInput = document.getElementById('delivery_location_other');
       if (!sel || !hidden) return;
-      var val = (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].value) || '';
+      var val = readSelectValue(sel);
       if (val === '__other__') {
         if (wrap) wrap.style.display = 'block';
         if (otherInput) hidden.value = otherInput.value;
@@ -181,8 +202,11 @@
       sel.addEventListener('change', syncDeliveryLocation);
       if (otherInput) otherInput.addEventListener('input', syncDeliveryLocation);
       if (form) form.addEventListener('submit', function() {
-        if ((sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].value) === '__other__' && otherInput) {
+        var val = readSelectValue(sel);
+        if (val === '__other__' && otherInput) {
           hidden.value = otherInput.value;
+        } else if (val !== '__other__') {
+          hidden.value = val;
         }
       });
       syncDeliveryLocation();

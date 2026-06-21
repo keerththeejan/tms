@@ -1,6 +1,12 @@
 <?php
 require_once __DIR__ . '/../app/bootstrap.php';
 
+if (!Auth::check()) {
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+}
+
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $error = '';
 $success = '';

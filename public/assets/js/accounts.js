@@ -1,10 +1,10 @@
 /**
  * Accounts module (Sidebar → Accounts).
- * Uses Cash Book JSON API (page=cashbook&cb_action=...).
+ * Uses Cash Book JSON API (page=api_cashbook&cb_action=...).
  */
 (function () {
   var cfg = window.TMS_ACCOUNTS || {};
-  var cashbookBase = cfg.cashbookUrl || 'index.php?page=cashbook';
+  var cashbookBase = cfg.cashbookApiUrl || 'index.php?page=api_cashbook';
   var csrf = cfg.csrf || '';
 
   function $(id) {
@@ -360,12 +360,12 @@
     var tr = $('accStmtTransfer');
     if (addTxn) {
       addTxn.href = acc
-        ? (cfg.cashbookUrl || 'index.php?page=cashbook') + '&cb_account_id=' + encodeURIComponent(String(acc.id)) + '&cb_open=txn'
+        ? (cfg.accountingEntryUrl || 'index.php?page=accounting&action=entry&voucher_type=PAYMENT')
         : '#';
     }
     if (tr) {
       tr.href = acc
-        ? (cfg.cashbookUrl || 'index.php?page=cashbook') + '&cb_account_id=' + encodeURIComponent(String(acc.id)) + '&cb_open=transfer'
+        ? (cfg.transferVoucherUrl || 'index.php?page=transfer_voucher&action=entry')
         : '#';
     }
   }

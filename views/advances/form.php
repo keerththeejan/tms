@@ -7,6 +7,9 @@
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
+<?php if (empty($employeesAll)): ?>
+<div class="alert alert-warning">No employees found. <a href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new'); ?>">Add an employee</a> before recording an advance.</div>
+<?php endif; ?>
 <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=advances&action=save'); ?>" class="card shadow-sm">
   <div class="card-body">
     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
@@ -14,7 +17,7 @@
     <div class="row g-3">
       <div class="col-md-6">
         <label class="form-label">Employee</label>
-        <select name="employee_id" class="form-select" required>
+        <select name="employee_id" class="form-select" required data-enhance="false">
           <option value="">Select employee</option>
           <?php foreach (($employeesAll ?? []) as $emp): ?>
             <option value="<?php echo (int)$emp['id']; ?>" <?php echo ((int)($advance['employee_id'] ?? 0) === (int)$emp['id']) ? 'selected' : ''; ?>>

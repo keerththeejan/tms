@@ -10,7 +10,7 @@
   <input type="hidden" name="id" value="<?php echo (int)($employee['id'] ?? 0); ?>">
   <div class="col-12 col-md-6">
     <label class="form-label">Employee</label>
-    <select name="employee_id" class="form-select" required>
+    <select name="employee_id" class="form-select" required data-enhance="false">
       <option value="">Select Employee</option>
       <?php 
         $selectedId = isset($selectedEmployeeId) ? (int)$selectedEmployeeId : (int)($employee['employee_id'] ?? 0);

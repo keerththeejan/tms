@@ -55,6 +55,9 @@
     mgmtSelectedId: null,
     mgmtFlashAccountId: null,
     mgmtLoadedAccount: null,
+    entrySort: 'date_desc',
+    categoryFilter: 'all',
+    auditQuery: '',
   };
 
   var searchTimer = null;
@@ -291,6 +294,145 @@
     return a ? a.name : '—';
   }
 
+  function selectedAccount() {
+    return state.accounts.find(function (x) { return String(x.id) === String(state.accountId); }) || null;
+  }
+
+  function accountBalance() {
+    var acc = selectedAccount();
+    return acc ? Number(acc.balance || 0) : 0;
+  }
+
+  function classifyEntry(row) {
+    var kind = (row && row.kind) ? String(row.kind) : '';
+    if (kind === 'transfer_out' || kind === 'transfer_in') {
+      return 'transfer';
+    }
+    var text = [row && row.notes, row && row.reference_no, row && row.items_json].join(' ').toLowerCase();
+    if (/salary|payroll|wage|employee/.test(text)) return 'payroll';
+    if (/fuel|diesel|petrol|gas/.test(text)) return 'fuel';
+    if (/collection|collected|received|payment/.test(text)) return 'collection';
+    if (kind === 'income') return 'income';
+    if (kind === 'expense') return 'expense';
+    return 'general';
+  }
+
+  function entrySortValue(row) {
+    if (!row) return 0;
+    return Number(row.amount || 0);
+  }
+
+  function getVisibleEntries() {
+    var rows = (state.entries || []).slice();
+    var category = state.categoryFilter || 'all';
+    if (category !== 'all') {
+      rows = rows.filter(function (row) {
+        return classifyEntry(row) === category;
+      });
+    }
+    var sort = state.entrySort || 'date_desc';
+    rows.sort(function (a, b) {
+      if (sort === 'amount_asc') {
+        return entrySortValue(a) - entrySortValue(b) || String(a.occurred_at || '').localeCompare(String(b.occurred_at || ''));
+      }
+      if (sort === 'amount_desc') {
+        return entrySortValue(b) - entrySortValue(a) || String(b.occurred_at || '').localeCompare(String(a.occurred_at || ''));
+      }
+      if (sort === 'date_asc') {
+        return String(a.occurred_at || '').localeCompare(String(b.occurred_at || '')) || String(a.id || '').localeCompare(String(b.id || ''));
+      }
+      return String(b.occurred_at || '').localeCompare(String(a.occurred_at || '')) || String(b.id || '').localeCompare(String(a.id || ''));
+    });
+    return rows;
+  }
+
+  function calcPeriodMovement() {
+    var totals = state.totals || {};
+    var income = Number(totals.income || 0);
+    var expense = Number(totals.expense || 0);
+    var tIn = Number(totals.transfer_in || 0);
+    var tOut = Number(totals.transfer_out || 0);
+    return income - expense - tOut + tIn;
+  }
+
+  function updateSummaryCards() {
+    var opening = $('cbOpeningBalance');
+    var monthlyIncome = $('cbMonthlyIncome');
+    var monthlyExpense = $('cbMonthlyExpense');
+    var closing = $('cbClosingBalance');
+    var balance = accountBalance();
+    var movement = calcPeriodMovement();
+    var openingBalance = balance - movement;
+    if (opening) opening.textContent = money(openingBalance);
+    if (monthlyIncome) monthlyIncome.textContent = money((state.totals && state.totals.income) || 0);
+    if (monthlyExpense) monthlyExpense.textContent = money((state.totals && state.totals.expense) || 0);
+    if (closing) closing.textContent = money(balance);
+  }
+
+  function renderCashbookChart() {
+    var canvas = $('cbCashbookChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    var rows = getVisibleEntries();
+    var buckets = {};
+    rows.forEach(function (row) {
+      var d = String(row.occurred_at || '').slice(0, 10);
+      if (!d) return;
+      if (!buckets[d]) {
+        buckets[d] = { income: 0, expense: 0 };
+      }
+      var amt = Number(row.amount || 0);
+      if (String(row.kind || '') === 'expense') {
+        buckets[d].expense += amt;
+      } else if (String(row.kind || '') === 'income') {
+        buckets[d].income += amt;
+      }
+    });
+    var labels = Object.keys(buckets).sort();
+    var incomeData = labels.map(function (k) { return buckets[k].income; });
+    var expenseData = labels.map(function (k) { return buckets[k].expense; });
+    if (window.TMS_CASHBOOK_CHART && typeof window.TMS_CASHBOOK_CHART.destroy === 'function') {
+      window.TMS_CASHBOOK_CHART.destroy();
+    }
+    window.TMS_CASHBOOK_CHART = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Income',
+            data: incomeData,
+            backgroundColor: 'rgba(25, 135, 84, 0.72)',
+            borderRadius: 10,
+          },
+          {
+            label: 'Expense',
+            data: expenseData,
+            backgroundColor: 'rgba(220, 53, 69, 0.72)',
+            borderRadius: 10,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function (value) {
+                return money(value);
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   function loadAccounts() {
     return AccountsCrud.listForOps().then(function (j) {
       if (!j.ok) throw new Error(j.error || 'Load failed');
@@ -370,6 +512,7 @@
     if (cI) cI.textContent = inc;
     if (cE) cE.textContent = exp;
     if (cB) cB.textContent = bal;
+    updateSummaryCards();
     if (elR) {
       elR.textContent =
         state.period === 'all'
@@ -407,6 +550,15 @@
     return '';
   }
 
+  function categoryBadge(row) {
+    var c = classifyEntry(row);
+    if (c === 'payroll') return '<span class="badge rounded-pill text-bg-info">Payroll</span>';
+    if (c === 'fuel') return '<span class="badge rounded-pill text-bg-warning text-dark">Fuel</span>';
+    if (c === 'collection') return '<span class="badge rounded-pill text-bg-success">Collection</span>';
+    if (c === 'transfer') return '<span class="badge rounded-pill text-bg-secondary">Transfer</span>';
+    return '<span class="badge rounded-pill text-bg-light text-dark border">General</span>';
+  }
+
   function renderEntries() {
     var host = $('cbEntryList');
     var tbody = $('cbEntryTableBody');
@@ -414,25 +566,26 @@
     var emptyMsg =
       '<div class="text-center text-muted py-5 px-3"><i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i><div class="fw-semibold">No records found</div><div class="small mt-1">Try another period or account.</div></div>';
 
-    if (!state.entries.length) {
+    var visibleEntries = getVisibleEntries();
+
+    if (!visibleEntries.length) {
       if (host) host.innerHTML = emptyMsg;
       if (tbody) {
         tbody.innerHTML =
           '<tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>No records found for this period.</td></tr>';
       }
+      renderCashbookChart();
       return;
     }
 
     var rowsHtml = '';
-    state.entries.forEach(function (row) {
+    visibleEntries.forEach(function (row) {
       var dt = (row.occurred_at || '').replace('T', ' ').slice(0, 16);
       var notes = (row.notes || '').trim();
       var parcel = row.parcel_id ? ' <span class="badge text-bg-light border">#' + row.parcel_id + '</span>' : '';
       var base = (cfg.baseUrl || '').replace(/\/?$/, '/');
       var att = row.attachment_path
-        ? ' <a class="small" href="' +
-          encodeURI(base + row.attachment_path.replace(/^\//, '')) +
-          '" target="_blank" rel="noopener">File</a>'
+        ? ' <a class="small" href="' + encodeURI(base + row.attachment_path.replace(/^\//, '')) + '" target="_blank" rel="noopener">File</a>'
         : '';
       var idStr = String(row.id);
       var tid = row.transfer_id != null && row.transfer_id !== '' ? String(row.transfer_id) : '';
@@ -446,9 +599,7 @@
         viewId +
         '"><i class="bi bi-eye"></i></button>';
       var editBtn = canEdit
-        ? '<button type="button" class="btn btn-sm btn-outline-primary rounded-pill cb-edit-txn" data-id="' +
-          idStr +
-          '"><i class="bi bi-pencil"></i></button>'
+        ? '<button type="button" class="btn btn-sm btn-outline-primary rounded-pill cb-edit-txn" data-id="' + idStr + '"><i class="bi bi-pencil"></i></button>'
         : '';
       var delBtn =
         '<button type="button" class="btn btn-sm btn-outline-danger rounded-pill cb-del-entry" data-id="' +
@@ -463,50 +614,26 @@
 
       rowsHtml +=
         '<tr class="cashbook-table-row">' +
-        '<td class="text-nowrap small text-muted">' +
-        dt +
-        '</td>' +
-        '<td class="fw-medium">' +
-        accName +
-        '</td>' +
-        '<td>' +
-        typeBadge(row) +
-        ' <span class="small">' +
-        entryTitle(row) +
-        '</span>' +
-        parcel +
-        '</td>' +
-        '<td class="text-end">' +
-        entryAmountHtml(row) +
-        '</td>' +
-        '<td class="text-end">' +
-        runBal +
-        '</td>' +
-        '<td class="text-end text-nowrap">' +
-        viewBtn +
-        ' ' +
-        editBtn +
-        ' ' +
-        delBtn +
-        '</td>' +
+        '<td class="text-nowrap small text-muted">' + dt + '</td>' +
+        '<td class="fw-medium">' + accName + '</td>' +
+        '<td>' + typeBadge(row) + ' ' + categoryBadge(row) + ' <span class="small">' + entryTitle(row) + '</span>' + parcel + '</td>' +
+        '<td class="text-end">' + entryAmountHtml(row) + '</td>' +
+        '<td class="text-end">' + runBal + '</td>' +
+        '<td class="text-end text-nowrap">' + viewBtn + ' ' + editBtn + ' ' + delBtn + '</td>' +
         '</tr>';
-
-      /* mobile cards */
     });
 
     if (tbody) tbody.innerHTML = rowsHtml;
 
     if (host) {
       var html = '';
-      state.entries.forEach(function (row) {
+      visibleEntries.forEach(function (row) {
         var dt = (row.occurred_at || '').replace('T', ' ').slice(0, 16);
         var notes = (row.notes || '').trim();
         var parcel = row.parcel_id ? ' <span class="badge text-bg-light border">Parcel #' + row.parcel_id + '</span>' : '';
         var base = (cfg.baseUrl || '').replace(/\/?$/, '/');
         var att = row.attachment_path
-          ? ' <a class="small" href="' +
-            encodeURI(base + row.attachment_path.replace(/^\//, '')) +
-            '" target="_blank" rel="noopener">Attachment</a>'
+          ? ' <a class="small" href="' + encodeURI(base + row.attachment_path.replace(/^\//, '')) + '" target="_blank" rel="noopener">Attachment</a>'
           : '';
         var idStr = String(row.id);
         var tid = row.transfer_id != null && row.transfer_id !== '' ? String(row.transfer_id) : '';
@@ -520,9 +647,7 @@
           viewId +
           '">View</button>';
         var editBtn = canEdit
-          ? '<button type="button" class="btn btn-sm btn-outline-primary rounded-pill cb-edit-txn" data-id="' +
-            idStr +
-            '">Edit</button>'
+          ? '<button type="button" class="btn btn-sm btn-outline-primary rounded-pill cb-edit-txn" data-id="' + idStr + '">Edit</button>'
           : '';
         var delBtn =
           '<button type="button" class="btn btn-sm btn-outline-danger rounded-pill cb-del-entry" data-id="' +
@@ -539,31 +664,20 @@
           '<div class="card cashbook-entry-card mb-2">' +
           '<div class="card-body py-2 px-3 d-flex flex-wrap align-items-start justify-content-between gap-2">' +
           '<div class="min-w-0">' +
-          '<div class="small text-muted">' +
-          dt +
-          '</div>' +
-          '<div class="fw-semibold">' +
-          typeBadge(row) +
-          ' ' +
-          entryTitle(row) +
-          parcel +
-          '</div>' +
+          '<div class="small text-muted">' + dt + '</div>' +
+          '<div class="fw-semibold">' + typeBadge(row) + ' ' + categoryBadge(row) + ' ' + entryTitle(row) + parcel + '</div>' +
           (notes ? '<div class="small text-secondary mt-1">' + escapeHtml(notes) + '</div>' : '') +
           runM +
           att +
           '</div>' +
           '<div class="text-end ms-auto">' +
-          '<div class="mb-1">' +
-          entryAmountHtml(row) +
-          '</div>' +
-          '<div class="btn-group btn-group-sm">' +
-          viewBtn +
-          editBtn +
-          delBtn +
-          '</div></div></div></div>';
+          '<div class="mb-1">' + entryAmountHtml(row) + '</div>' +
+          '<div class="btn-group btn-group-sm">' + viewBtn + editBtn + delBtn + '</div></div></div></div>';
       });
       host.innerHTML = html;
     }
+
+    renderCashbookChart();
   }
 
   function showEntryDetails(kind, idStr) {
@@ -1748,6 +1862,7 @@
           sec.classList.toggle('cashbook-panel-hidden', sec.getAttribute('data-cb-panel') !== state.panel);
         });
         if (state.panel === 'reports') loadReports();
+        if (state.panel === 'audit') loadAuditLogs();
         if (state.panel === 'accounts') {
           state.mgmtPage = 1;
           setMgmtMobileView('list');
@@ -1914,6 +2029,51 @@
         loadReports();
       });
 
+    $('cbAuditLoad') &&
+      $('cbAuditLoad').addEventListener('click', function () {
+        loadAuditLogs();
+      });
+
+    $('cbAuditSearch') &&
+      $('cbAuditSearch').addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          loadAuditLogs();
+        }, 300);
+      });
+
+    $('cbTxnCategoryFilter') &&
+      $('cbTxnCategoryFilter').addEventListener('change', function () {
+        state.categoryFilter = this.value || 'all';
+        renderEntries();
+      });
+
+    $('cbTxnSort') &&
+      $('cbTxnSort').addEventListener('change', function () {
+        state.entrySort = this.value || 'date_desc';
+        renderEntries();
+      });
+
+    $('cbBtnExportExcel') &&
+      $('cbBtnExportExcel').addEventListener('click', function () {
+        exportVisibleEntriesCsv();
+      });
+
+    $('cbBtnExportExcelMobile') &&
+      $('cbBtnExportExcelMobile').addEventListener('click', function () {
+        exportVisibleEntriesCsv();
+      });
+
+    $('cbBtnExportPdf') &&
+      $('cbBtnExportPdf').addEventListener('click', function () {
+        openPrintableCashbook(true);
+      });
+
+    $('cbBtnPrint') &&
+      $('cbBtnPrint').addEventListener('click', function () {
+        openPrintableCashbook(false);
+      });
+
     $('cbCustomerSave') &&
       $('cbCustomerSave').addEventListener('click', function () {
         var form = $('cbCustomerForm');
@@ -1960,17 +2120,6 @@
           });
       });
 
-    $('cbBtnExport') &&
-      $('cbBtnExport').addEventListener('click', function () {
-        if (!state.accountId) return;
-        var u = apiUrl('export_csv', {
-          account_id: state.accountId,
-          period: state.period,
-          anchor: state.anchor,
-          q: state.q,
-        });
-        window.location.href = u;
-      });
   }
 
   function loadAccountSummary() {
@@ -2055,6 +2204,119 @@
     });
   }
 
+  function loadAuditLogs() {
+    var host = $('cbAuditTable');
+    if (!host) return;
+    var q = $('cbAuditSearch') ? $('cbAuditSearch').value.trim() : state.auditQuery || '';
+    state.auditQuery = q;
+    host.innerHTML = '<div class="p-3 text-muted small">Loading audit trail…</div>';
+    get('audit_logs', { q: q, limit: 100 }).then(function (j) {
+      if (!j.ok) {
+        host.innerHTML = '<div class="p-3 text-danger small">Failed to load audit trail.</div>';
+        return;
+      }
+      var rows = j.logs || [];
+      if (!rows.length) {
+        host.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-shield-check fs-1 d-block mb-2 opacity-50"></i>No audit entries found.</div>';
+        return;
+      }
+      var html = '<table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Time</th><th>Entity</th><th>Action</th><th>User</th><th>IP</th><th>Meta</th></tr></thead><tbody>';
+      rows.forEach(function (r) {
+        var meta = '';
+        if (r.meta_json) {
+          try {
+            var obj = JSON.parse(r.meta_json);
+            meta = Object.keys(obj)
+              .slice(0, 3)
+              .map(function (k) { return k + ': ' + String(obj[k]); })
+              .join(', ');
+          } catch (e) {
+            meta = String(r.meta_json).slice(0, 80);
+          }
+        }
+        html +=
+          '<tr>' +
+          '<td class="small text-nowrap">' + escapeHtml(String(r.created_at || '')) + '</td>' +
+          '<td><span class="badge text-bg-light border">' + escapeHtml(String(r.entity || '')) + '</span> <span class="small text-muted">#' + escapeHtml(String(r.entity_id || '')) + '</span></td>' +
+          '<td>' + escapeHtml(String(r.action || '')) + '</td>' +
+          '<td class="small">' + escapeHtml(String(r.user_name || r.user_username || '')) + '</td>' +
+          '<td class="small text-muted">' + escapeHtml(String(r.ip || '')) + '</td>' +
+          '<td class="small text-muted">' + escapeHtml(meta) + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      host.innerHTML = html;
+    });
+  }
+
+  function exportVisibleEntriesCsv() {
+    var rows = getVisibleEntries();
+    var lines = ['Date,Account,Type,Category,Amount,Balance,Notes,Reference'];
+    rows.forEach(function (row) {
+      var cols = [
+        (row.occurred_at || '').replace('T', ' ').slice(0, 19),
+        selectedAccountName(),
+        entryTitle(row),
+        classifyEntry(row),
+        String(Number(row.amount || 0).toFixed(2)),
+        String(Number(row.running_balance || 0).toFixed(2)),
+        String(row.notes || '').replace(/\n/g, ' '),
+        String(row.reference_no || ''),
+      ];
+      lines.push(cols.map(function (v) {
+        return '"' + String(v).replace(/"/g, '""') + '"';
+      }).join(','));
+    });
+    var blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'cashbook-' + state.anchor + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+      try { a.remove(); } catch (e) {}
+    }, 0);
+  }
+
+  function openPrintableCashbook(autoPrint) {
+    var rows = getVisibleEntries();
+    var account = selectedAccount();
+    var opening = accountBalance() - calcPeriodMovement();
+    var closing = accountBalance();
+    var html = '<!doctype html><html><head><title>Cash Book Print</title>' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<style>body{font-family:Arial,sans-serif;padding:24px;color:#111827}h1{margin:0 0 8px}.muted{color:#6b7280}.kpi{display:inline-block;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px;margin:0 8px 8px 0;min-width:140px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #d1d5db;padding:8px;text-align:left;font-size:12px}th{background:#f8fafc}</style></head><body>' +
+      '<h1>Cash Book</h1>' +
+      '<div class="muted">Account: ' + escapeHtml(account ? account.name : selectedAccountName()) + ' | Period: ' + escapeHtml(state.period) + ' | Anchor: ' + escapeHtml(state.anchor) + '</div>' +
+      '<div style="margin-top:14px">' +
+      '<div class="kpi"><div class="muted">Opening</div><strong>' + money(opening) + '</strong></div>' +
+      '<div class="kpi"><div class="muted">Income</div><strong>' + money((state.totals && state.totals.income) || 0) + '</strong></div>' +
+      '<div class="kpi"><div class="muted">Expense</div><strong>' + money((state.totals && state.totals.expense) || 0) + '</strong></div>' +
+      '<div class="kpi"><div class="muted">Closing</div><strong>' + money(closing) + '</strong></div>' +
+      '</div>' +
+      '<table><thead><tr><th>Date</th><th>Account</th><th>Type</th><th>Category</th><th>Amount</th><th>Balance</th><th>Notes</th></tr></thead><tbody>';
+    rows.forEach(function (row) {
+      html += '<tr><td>' + escapeHtml(String(row.occurred_at || '').replace('T', ' ').slice(0, 19)) + '</td><td>' + escapeHtml(selectedAccountName()) + '</td><td>' + escapeHtml(entryTitle(row)) + '</td><td>' + escapeHtml(classifyEntry(row)) + '</td><td>' + money(row.amount) + '</td><td>' + money(row.running_balance || 0) + '</td><td>' + escapeHtml(String(row.notes || '')) + '</td></tr>';
+    });
+    html += '</tbody></table></body></html>';
+    var w = window.open('', '_blank', 'width=1200,height=900');
+    if (!w) {
+      toast('Popup blocked. Please allow popups to print or export PDF.', true);
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    if (autoPrint) {
+      w.focus();
+      setTimeout(function () {
+        try { w.print(); } catch (e) { /* ignore */ }
+      }, 300);
+    }
+  }
+
   function boot() {
     if (!$('cbEntryList') && !$('cbEntryTableBody')) return;
     // Optional deep-linking from Accounts module:
@@ -2080,6 +2342,10 @@
     syncCashbookAccountsChrome();
     var sortBoot = $('cbMgmtSort');
     if (sortBoot) state.mgmtSort = sortBoot.value || 'default';
+    var entrySortBoot = $('cbTxnSort');
+    if (entrySortBoot) state.entrySort = entrySortBoot.value || 'date_desc';
+    var categoryBoot = $('cbTxnCategoryFilter');
+    if (categoryBoot) state.categoryFilter = categoryBoot.value || 'all';
     bind();
     loadAccounts()
       .then(function () {

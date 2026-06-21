@@ -8,37 +8,51 @@
  <!-- jQuery is required by some DataTables builds and third-party scripts -->
  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
  <!-- Load DataTables only if jQuery is available, to avoid 'jQuery is not defined' halting other scripts -->
  <script>
  (function(){
+   function initDataTables(){
+     if (typeof DataTable === 'undefined') return;
+     document.querySelectorAll('table.datatable').forEach(function(tbl){
+       if (tbl.dataset.dtInit === '1') return;
+       var body = tbl.tBodies[0];
+       if (body) {
+         var colCount = tbl.tHead && tbl.tHead.rows[0] ? tbl.tHead.rows[0].cells.length : 0;
+         var badRow = Array.from(body.rows).some(function(tr){
+           if (colCount > 0 && tr.cells.length !== colCount) return true;
+           return Array.from(tr.cells).some(function(td){ return (td.colSpan || 1) > 1; });
+         });
+         if (badRow) return;
+       }
+       if (!tbl.closest('.table-responsive')) {
+         var wrap = document.createElement('div');
+         wrap.className = 'table-responsive';
+         tbl.parentNode.insertBefore(wrap, tbl);
+         wrap.appendChild(tbl);
+       }
+       tbl.classList.add('table','table-striped','table-hover','align-middle');
+       var dtOpts = { paging: true, searching: true, order: [], scrollX: tbl.dataset.dtScrollX !== 'false' };
+       var actionsCols = parseInt(tbl.dataset.dtActionsCol || '0', 10);
+       if (actionsCols > 0) {
+         var lastIdx = (tbl.tHead && tbl.tHead.rows[0] ? tbl.tHead.rows[0].cells.length : 0) - 1;
+         if (lastIdx >= 0) {
+           dtOpts.columnDefs = [{ orderable: false, searchable: false, targets: lastIdx }];
+         }
+       }
+       new DataTable(tbl, dtOpts);
+       tbl.dataset.dtInit = '1';
+     });
+   }
+   window.TMS_initDataTables = initDataTables;
    function load(src, cb){ var s=document.createElement('script'); s.src=src; s.async=false; s.onload=function(){ try{ cb&&cb(); }catch(e){} }; document.head.appendChild(s); }
    if (window.jQuery) {
      load('https://cdn.jsdelivr.net/npm/datatables.net@2.1.8/js/dataTables.min.js', function(){
-       load('https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/js/dataTables.bootstrap5.min.js');
+       load('https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/js/dataTables.bootstrap5.min.js', initDataTables);
      });
    }
  })();
  </script>
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-<script>
-  (function(){
-    if (typeof DataTable !== 'undefined') {
-      document.querySelectorAll('table.datatable').forEach(function(tbl){
-        // Ensure responsive container
-        if (!tbl.closest('.table-responsive')) {
-          var wrap = document.createElement('div');
-          wrap.className = 'table-responsive';
-          tbl.parentNode.insertBefore(wrap, tbl);
-          wrap.appendChild(tbl);
-        }
-        // Ensure Bootstrap table classes for better mobile readability
-        tbl.classList.add('table','table-striped','table-hover','align-middle');
-        // Default: horizontal scroll + paging. (Parcels list uses server-side filters — no DataTables there; see parcels/index.php.)
-        new DataTable(tbl, { paging: true, searching: true, order: [], scrollX: true });
-      });
-    }
-  })();
-</script>
 <script>
   (function(){
     var body = document.body;
@@ -82,6 +96,8 @@
     window.addEventListener('resize', handleResize);
   })();
 </script>
+<script src="<?php echo Helpers::baseUrl('assets/js/tms-ui.js?v=1'); ?>"></script>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
   // Enhance all Bootstrap selects with search using Choices.js
   (function(){
@@ -135,7 +151,7 @@
 <script>
   // Make non-DataTables tables responsive as well
   (function(){
-    document.querySelectorAll('table:not(.datatable)').forEach(function(tbl){
+    document.querySelectorAll('table:not(.datatable):not(#itemsTable)').forEach(function(tbl){
       if (!tbl.closest('.table-responsive')) {
         var wrap = document.createElement('div');
         wrap.className = 'table-responsive';

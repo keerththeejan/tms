@@ -182,6 +182,29 @@ SQL
         }
     }
 
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public static function listAuditLogs(\PDO $pdo, int $limit = 100, string $q = ''): array
+    {
+        $limit = max(1, min(500, $limit));
+        $sql = 'SELECT a.id, a.entity, a.entity_id, a.action, a.user_id, a.ip, a.meta_json, a.created_at, '
+            . 'u.full_name AS user_name, u.username AS user_username '
+            . 'FROM cashbook_audit_logs a '
+            . 'LEFT JOIN users u ON u.id = a.user_id';
+        $params = [];
+        if (trim($q) !== '') {
+            $sql .= ' WHERE a.entity LIKE ? OR a.entity_id LIKE ? OR a.action LIKE ? OR a.ip LIKE ? OR COALESCE(u.full_name, u.username, \'\') LIKE ?';
+            $term = '%' . trim($q) . '%';
+            $params = [$term, $term, $term, $term, $term];
+        }
+        $sql .= ' ORDER BY a.id DESC LIMIT ' . (int) $limit;
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+
+        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
     /** If only customer (or empty-type) accounts exist, add one main cash account for income/expense/transfers. */
     private static function ensureMinimumMainAccounts(\PDO $pdo): void
     {
@@ -1133,14 +1156,19 @@ SQL
         if ($amount <= 0) {
             throw new \InvalidArgumentException('Amount must be positive.');
         }
-        $pdo->beginTransaction();
+        $startedTransaction = !$pdo->inTransaction();
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
             if ($preventNegativeBalance) {
                 self::recalcBalance($pdo, $fromId);
                 $acc = self::getAccount($pdo, $fromId);
                 $bal = $acc ? (float) $acc['balance'] : 0.0;
                 if ($bal + 1e-6 < $amount) {
-                    $pdo->rollBack();
+                    if ($startedTransaction && $pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
                     throw new \InvalidArgumentException('Insufficient balance in source account for this transfer.');
                 }
             }
@@ -1149,7 +1177,9 @@ SQL
             $tid = (int) $pdo->lastInsertId();
             self::recalcBalance($pdo, $fromId);
             self::recalcBalance($pdo, $toId);
-            $pdo->commit();
+            if ($startedTransaction && $pdo->inTransaction()) {
+                $pdo->commit();
+            }
 
             return $tid;
         } catch (\Throwable $e) {
@@ -1162,20 +1192,27 @@ SQL
 
     public static function deleteTransfer(\PDO $pdo, int $id): void
     {
-        $pdo->beginTransaction();
+        $startedTransaction = !$pdo->inTransaction();
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
             $st = $pdo->prepare('SELECT from_account_id, to_account_id FROM cashbook_transfers WHERE id=?');
             $st->execute([$id]);
             $r = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$r) {
-                $pdo->commit();
+                if ($startedTransaction && $pdo->inTransaction()) {
+                    $pdo->commit();
+                }
 
                 return;
             }
             $pdo->prepare('DELETE FROM cashbook_transfers WHERE id=?')->execute([$id]);
             self::recalcBalance($pdo, (int) $r['from_account_id']);
             self::recalcBalance($pdo, (int) $r['to_account_id']);
-            $pdo->commit();
+            if ($startedTransaction && $pdo->inTransaction()) {
+                $pdo->commit();
+            }
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();

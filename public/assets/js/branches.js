@@ -1,5 +1,5 @@
 /**
- * Settings → Branches tab: letterhead form validation and default-slot visuals.
+ * Settings → Branches tab: letterhead form validation (3 fixed branches).
  */
 (function () {
   var form = document.getElementById('branchLetterheadForm');
@@ -13,35 +13,20 @@
 
   function validate() {
     var ok = true;
-    var branchNames = form.querySelectorAll('input[name="branch_name[]"]');
     var branchEns = form.querySelectorAll('input[name="branch_address_en[]"]');
     var branchTas = form.querySelectorAll('input[name="branch_address_ta[]"]');
     var branchPhones = form.querySelectorAll('input[name="branch_phones[]"]');
 
-    for (var i = 0; i < branchNames.length; i++) {
-      var bn = branchNames[i];
+    for (var i = 0; i < 3; i++) {
       var be = branchEns[i];
       var bt = branchTas[i];
       var bp = branchPhones[i];
-      var bnV = bn ? bn.value.trim() : '';
       var beV = be ? be.value.trim() : '';
       var btV = bt ? bt.value.trim() : '';
       var bpV = bp ? bp.value.trim() : '';
-      var hasAny = bnV !== '' || beV !== '' || btV !== '' || bpV !== '';
-      var required = i === 0 || hasAny;
-      if (required) {
-        if (bn && bnV === '') {
-          ok = false;
-          setErr(bn, true);
-        } else setErr(bn, false);
-        if (be && beV === '') {
-          ok = false;
-          setErr(be, true);
-        } else setErr(be, false);
-      } else {
-        if (bn) setErr(bn, false);
-        if (be) setErr(be, false);
-      }
+      if (be && beV === '') { ok = false; setErr(be, true); } else setErr(be, false);
+      if (bt && btV === '') { ok = false; setErr(bt, true); } else setErr(bt, false);
+      if (bp && bpV === '') { ok = false; setErr(bp, true); } else setErr(bp, false);
     }
     return ok;
   }
@@ -49,7 +34,7 @@
   function showClientError(msg) {
     var box = document.getElementById('branchLetterheadClientError');
     if (!box) return;
-    box.textContent = msg || 'Please fix validation errors and try again.';
+    box.textContent = msg || 'Please fill all three branch addresses and phone numbers.';
     box.classList.remove('d-none');
   }
 
@@ -64,9 +49,7 @@
     try {
       first.focus({ preventScroll: true });
     } catch (e2) {
-      try {
-        first.focus();
-      } catch (e3) { /* ignore */ }
+      try { first.focus(); } catch (e3) { /* ignore */ }
     }
   }
 
@@ -75,43 +58,29 @@
     if (!validate()) {
       e.preventDefault();
       e.stopPropagation();
-      showClientError('Please fill primary branch and English address; optional slots need name + English if any field is filled.');
+      showClientError('All three branches require Tamil address, English address, and phone numbers.');
       scrollToFirstError();
       return;
     }
+    var errBox = document.getElementById('branchLetterheadClientError');
+    if (errBox) errBox.classList.add('d-none');
     if (saveBtn) {
       saveBtn.disabled = true;
-      var a = saveBtn.querySelector('.save-label');
-      var b = saveBtn.querySelector('.save-loading');
-      if (a) a.classList.add('d-none');
-      if (b) b.classList.remove('d-none');
+      var lbl = saveBtn.querySelector('.save-label');
+      var loading = saveBtn.querySelector('.save-loading');
+      if (lbl) lbl.classList.add('d-none');
+      if (loading) loading.classList.remove('d-none');
     }
   });
 
-  form.addEventListener('input', function () {
-    validate();
-    var box = document.getElementById('branchLetterheadClientError');
-    if (box) box.classList.add('d-none');
+  form.querySelectorAll('input[name="default_branch_idx"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      form.querySelectorAll('.branch-letterhead-card').forEach(function (card) {
+        card.classList.remove('default');
+      });
+      var idx = radio.value;
+      var card = form.querySelector('.branch-letterhead-card[data-branch-index="' + idx + '"]');
+      if (card) card.classList.add('default');
+    });
   });
-
-  var radios = form.querySelectorAll('input[name="default_branch_idx"]');
-  function refreshDefault() {
-    var selected = 0;
-    for (var i = 0; i < radios.length; i++) {
-      if (radios[i].checked) {
-        selected = parseInt(radios[i].value || '0', 10) || 0;
-        break;
-      }
-    }
-    var cards = form.querySelectorAll('.branch-letterhead-card');
-    for (var c = 0; c < cards.length; c++) {
-      var idx = parseInt(cards[c].getAttribute('data-branch-index') || '0', 10) || 0;
-      if (idx === selected) cards[c].classList.add('default');
-      else cards[c].classList.remove('default');
-    }
-  }
-  for (var r = 0; r < radios.length; r++) {
-    radios[r].addEventListener('change', refreshDefault);
-  }
-  refreshDefault();
 })();

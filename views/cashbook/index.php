@@ -64,8 +64,39 @@ try {
             <button type="button" class="btn btn-success btn-sm rounded-pill px-3" id="cbBtnIncomeDesk"><i class="bi bi-plus-circle me-1"></i><span class="d-none d-sm-inline">Income</span></button>
             <button type="button" class="btn btn-danger btn-sm rounded-pill px-3" id="cbBtnExpenseDesk"><i class="bi bi-dash-circle me-1"></i><span class="d-none d-sm-inline">Expense</span></button>
             <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 text-dark" data-bs-toggle="modal" data-bs-target="#cashbookTransferModal"><i class="bi bi-shuffle me-1"></i><span class="d-none d-sm-inline">Transfer</span></button>
-            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="cbBtnExport"><i class="bi bi-download me-1"></i><span class="d-none d-sm-inline">Export</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="cbBtnExportExcel"><i class="bi bi-file-earmark-excel me-1"></i><span class="d-none d-sm-inline">Excel</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="cbBtnExportPdf"><i class="bi bi-file-earmark-pdf me-1"></i><span class="d-none d-sm-inline">PDF</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="cbBtnPrint"><i class="bi bi-printer me-1"></i><span class="d-none d-sm-inline">Print</span></button>
             <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#cashbookCustomerModal"><i class="bi bi-person-plus me-1"></i><span class="d-none d-sm-inline">Customer</span></button>
+          </div>
+        </div>
+        <div class="px-2 px-md-3 pb-2 cashbook-hide-for-accounts-mgmt">
+          <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-4 col-xl-3">
+              <label class="visually-hidden" for="cbTxnCategoryFilter">Category</label>
+              <select id="cbTxnCategoryFilter" class="form-select form-select-sm rounded-pill border-secondary-subtle" data-enhance="false" aria-label="Filter by transaction category">
+                <option value="all">All categories</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+                <option value="transfer">Transfer</option>
+                <option value="collection">Collections</option>
+                <option value="payroll">Payroll</option>
+                <option value="fuel">Fuel</option>
+                <option value="general">General</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4 col-xl-3">
+              <label class="visually-hidden" for="cbTxnSort">Sort entries</label>
+              <select id="cbTxnSort" class="form-select form-select-sm rounded-pill border-secondary-subtle" data-enhance="false" aria-label="Sort cashbook entries">
+                <option value="date_desc">Newest first</option>
+                <option value="date_asc">Oldest first</option>
+                <option value="amount_desc">Amount high → low</option>
+                <option value="amount_asc">Amount low → high</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-4 col-xl-6 text-md-end">
+              <span class="small text-muted">Search, category, and sort stay client-side for faster ledger review.</span>
+            </div>
           </div>
         </div>
         <ul class="nav nav-pills cashbook-tabs gap-1 flex-nowrap overflow-auto px-2 px-md-3 pb-2 mb-0 cashbook-hide-for-accounts-mgmt" role="tablist">
@@ -74,6 +105,7 @@ try {
           <li class="nav-item"><button type="button" class="nav-link cb-period-tab rounded-pill" data-period="weekly">Weekly</button></li>
           <li class="nav-item"><button type="button" class="nav-link cb-period-tab rounded-pill" data-period="monthly">Monthly</button></li>
           <li class="nav-item"><button type="button" class="nav-link cb-period-tab rounded-pill" data-period="yearly">Yearly</button></li>
+          <li class="nav-item"><button type="button" class="nav-link cb-period-tab rounded-pill" data-period="audit">Audit Trail</button></li>
         </ul>
       </div>
 
@@ -101,6 +133,78 @@ try {
               <div class="card-body py-3">
                 <div class="small text-white-50 text-uppercase fw-semibold mb-1">Balance</div>
                 <div class="fs-4 fw-bold text-white" id="cbCardBalance">0.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3 cashbook-hide-for-accounts-mgmt">
+          <div class="col-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 cashbook-summary-card">
+              <div class="card-body py-3">
+                <div class="small text-uppercase text-muted fw-semibold">Opening balance</div>
+                <div class="fs-5 fw-bold" id="cbOpeningBalance">0.00</div>
+                <div class="small text-muted">Before the selected period</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 cashbook-summary-card">
+              <div class="card-body py-3">
+                <div class="small text-uppercase text-muted fw-semibold">Monthly income</div>
+                <div class="fs-5 fw-bold text-success" id="cbMonthlyIncome">0.00</div>
+                <div class="small text-muted">Current selected month</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 cashbook-summary-card">
+              <div class="card-body py-3">
+                <div class="small text-uppercase text-muted fw-semibold">Monthly expense</div>
+                <div class="fs-5 fw-bold text-danger" id="cbMonthlyExpense">0.00</div>
+                <div class="small text-muted">Current selected month</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 cashbook-summary-card">
+              <div class="card-body py-3">
+                <div class="small text-uppercase text-muted fw-semibold">Closing balance</div>
+                <div class="fs-5 fw-bold text-primary" id="cbClosingBalance">0.00</div>
+                <div class="small text-muted">Current ledger balance</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3 cashbook-hide-for-accounts-mgmt">
+          <div class="col-12 col-xl-8">
+            <div class="card border-0 shadow-sm h-100 cashbook-chart-card">
+              <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="fw-semibold"><i class="bi bi-graph-up-arrow me-1 text-primary"></i>Cash Flow Trend</span>
+                <small class="text-muted">Selected period totals and movement</small>
+              </div>
+              <div class="card-body">
+                <div class="cashbook-chart-wrap">
+                  <canvas id="cbCashbookChart" aria-label="Cashbook income expense chart" role="img"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-xl-4">
+            <div class="card border-0 shadow-sm h-100 cashbook-summary-panel">
+              <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="fw-semibold"><i class="bi bi-tags me-1 text-primary"></i>Transaction Categories</span>
+                <small class="text-muted">Read-only classification</small>
+              </div>
+              <div class="card-body">
+                <div class="d-grid gap-2">
+                  <div class="d-flex justify-content-between align-items-center"><span class="small text-muted">Collections</span><span class="badge text-bg-success">Income</span></div>
+                  <div class="d-flex justify-content-between align-items-center"><span class="small text-muted">Payroll</span><span class="badge text-bg-danger">Expense</span></div>
+                  <div class="d-flex justify-content-between align-items-center"><span class="small text-muted">Transfers</span><span class="badge text-bg-secondary">Ledger move</span></div>
+                  <div class="d-flex justify-content-between align-items-center"><span class="small text-muted">Fuel / General</span><span class="badge text-bg-warning text-dark">Expense</span></div>
+                </div>
+                <div class="small text-muted mt-3">The filter above matches these classifications without altering saved records.</div>
               </div>
             </div>
           </div>
@@ -380,6 +484,20 @@ try {
           <p class="small text-muted mt-2 mb-0"><a href="<?php echo htmlspecialchars($reportsLegacyUrl); ?>">Open full Reports</a></p>
         </div>
 
+        <div data-cb-panel="audit" class="cashbook-panel-hidden mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <div>
+              <h2 class="h6 fw-bold mb-1">Audit trail</h2>
+              <p class="small text-muted mb-0">Latest account and transaction activity.</p>
+            </div>
+            <div class="d-flex gap-2">
+              <input type="search" id="cbAuditSearch" class="form-control form-control-sm rounded-pill" placeholder="Search audit…" autocomplete="off">
+              <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" id="cbAuditLoad"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+            </div>
+          </div>
+          <div id="cbAuditTable" class="table-responsive rounded-3 border bg-white shadow-sm cashbook-audit-table"></div>
+        </div>
+
         <p class="small text-muted d-none d-md-block mb-0 cashbook-hide-for-accounts-mgmt" id="cbRangeHint">Income and expense reflect the selected period. Balance is the current account balance.</p>
       </div>
     </div>
@@ -410,6 +528,7 @@ try {
     <button type="button" class="btn btn-success rounded-pill" id="cbBtnIncome"><i class="bi bi-plus-circle me-1"></i><span class="cb-mobile-action-label">Income</span></button>
     <button type="button" class="btn btn-danger rounded-pill" id="cbBtnExpense"><i class="bi bi-dash-circle me-1"></i><span class="cb-mobile-action-label">Expense</span></button>
     <button type="button" class="btn btn-warning rounded-pill text-dark" data-bs-toggle="modal" data-bs-target="#cashbookTransferModal"><i class="bi bi-shuffle me-1"></i><span class="cb-mobile-action-label">Transfer</span></button>
+    <button type="button" class="btn btn-outline-secondary rounded-pill" id="cbBtnExportExcelMobile"><i class="bi bi-file-earmark-excel me-1"></i><span class="cb-mobile-action-label">Excel</span></button>
     <button type="button" class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#cashbookCustomerModal"><i class="bi bi-person-plus me-1"></i><span class="cb-mobile-action-label">Customer</span></button>
   </div>
 
@@ -426,6 +545,7 @@ try {
         <button type="button" class="nav-link text-start cb-nav-panel rounded-pill px-3 py-2" data-panel="accounts"><i class="bi bi-bank me-2"></i>Accounts</button>
         <button type="button" class="nav-link text-start rounded-pill px-3 py-2" data-bs-toggle="modal" data-bs-target="#cashbookTransferModal"><i class="bi bi-shuffle me-2"></i>Transfer</button>
         <button type="button" class="nav-link text-start cb-nav-panel rounded-pill px-3 py-2" data-panel="reports"><i class="bi bi-graph-up-arrow me-2"></i>Reports</button>
+        <button type="button" class="nav-link text-start cb-nav-panel rounded-pill px-3 py-2" data-panel="audit"><i class="bi bi-shield-check me-2"></i>Audit Trail</button>
       </nav>
     </div>
   </div>

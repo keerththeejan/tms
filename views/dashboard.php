@@ -255,6 +255,47 @@
     background: var(--bs-primary-bg-subtle);
   }
 
+  .dashboard-page .finance-card,
+  .dashboard-page .chart-card {
+    border: 1px solid var(--dash-border);
+    border-radius: var(--dash-radius);
+    box-shadow: var(--dash-shadow);
+    background: #fff;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .dashboard-page .chart-wrap {
+    position: relative;
+    min-height: 320px;
+  }
+
+  .dashboard-page .mini-metric {
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    background: linear-gradient(180deg, #fbfcfe 0%, #f8fafc 100%);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .dashboard-page .mini-metric .mini-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--bs-secondary-color);
+    font-weight: 700;
+  }
+
+  .dashboard-page .mini-metric .mini-value {
+    font-size: clamp(1.05rem, 0.95rem + 0.28vw, 1.25rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .dashboard-page .mini-metric .mini-sub {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+  }
+
   /* Breakpoints: 480 / 768 / 1024 / 1280 */
   @media (max-width: 1279.98px) {
     .dashboard-page {
@@ -358,6 +399,24 @@
     $kpiExpTitle = !$isSingleDay
       ? 'Expenses (' . htmlspecialchars($df) . '–' . htmlspecialchars($dt) . ')'
       : ($isTodayRange ? "Today's Expenses" : 'Expenses (' . htmlspecialchars($df) . ')');
+    $kpiNetMovement = $kpiCollections - $kpiExpenses;
+    $dashLabels = [];
+    $dashPending = [];
+    $dashCollections = [];
+    $dashExpenses = [];
+    foreach (($branchesAll ?? []) as $b) {
+      $bid = (int)($b['id'] ?? 0);
+      $dashLabels[] = (string)($b['name'] ?? 'Branch');
+      $dashPending[] = (int)($pendingByBranch[$bid] ?? 0);
+      $dashCollections[] = (float)($collectionsTodayByBranch[$bid] ?? 0);
+      $dashExpenses[] = (float)($expensesTodayByBranch[$bid] ?? 0);
+    }
+    
+    // Transfer Voucher Statistics
+    $kpiTransfersToday = (int)($transfersToday ?? 0);
+    $kpiTransfersAmount = (float)($transfersAmount ?? 0);
+    $kpiTransfersPending = (int)($transfersPending ?? 0);
+    $kpiTransfersPosted = (int)($transfersPosted ?? 0);
   ?>
 
   <section class="mb-3">
@@ -397,7 +456,7 @@
             </div>
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,110,253,.10); color:#0d6efd;"><i class="bi bi-cash-stack"></i></div>
           </div>
-          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">Go to payments</a></div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>">Go to delivery notes</a></div>
         </div>
       </div>
       <div class="col-12 col-md-6 col-xl-3">
@@ -410,6 +469,203 @@
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#8a6d00;"><i class="bi bi-wallet2"></i></div>
           </div>
           <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Go to expenses</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-3">
+    <p class="section-title">Transfer Vouchers</p>
+    <p class="section-subtitle">Fund transfer statistics for the selected period.</p>
+    <div class="row g-3">
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Today's Transfers</div>
+              <div class="kpi-value"><?php echo $kpiTransfersToday; ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,202,240,.16); color:#0dcaf0;"><i class="bi bi-arrow-left-right"></i></div>
+          </div>
+          <div class="mt-2"><a class="small text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>">Open voucher entry</a></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Transfer Amount</div>
+              <div class="kpi-value">Rs. <?php echo number_format($kpiTransfersAmount, 2); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(102,16,242,.12); color:#6610f2;"><i class="bi bi-currency-rupee"></i></div>
+          </div>
+          <div class="mt-2"><small class="text-muted">Total transferred today</small></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Pending Transfers</div>
+              <div class="kpi-value"><?php echo $kpiTransfersPending; ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#ffc107;"><i class="bi bi-clock-history"></i></div>
+          </div>
+          <div class="mt-2"><small class="text-muted">Awaiting posting</small></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Posted Transfers</div>
+              <div class="kpi-value"><?php echo $kpiTransfersPosted; ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(25,135,84,.12); color:#198754;"><i class="bi bi-check-circle"></i></div>
+          </div>
+          <div class="mt-2"><small class="text-muted">Completed transfers</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-3">
+    <div class="row g-3">
+      <div class="col-12 col-xl-4">
+        <div class="finance-card h-100">
+          <div class="card-header-dash d-flex justify-content-between align-items-center">
+            <span>Financial Pulse</span>
+            <small class="text-muted fw-normal">Current view</small>
+          </div>
+          <div class="card-body">
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Collections</div>
+                  <div class="mini-value text-success">Rs. <?php echo number_format($kpiCollections, 2); ?></div>
+                  <div class="mini-sub">Received in the selected range</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Expenses</div>
+                  <div class="mini-value text-danger">Rs. <?php echo number_format($kpiExpenses, 2); ?></div>
+                  <div class="mini-sub">Posted in the selected range</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Net Movement</div>
+                  <div class="mini-value text-primary">Rs. <?php echo number_format($kpiNetMovement, 2); ?></div>
+                  <div class="mini-sub">Collections minus expenses</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Outstanding Due</div>
+                  <div class="mini-value text-warning">Rs. <?php echo number_format((float)($totalDue ?? 0), 2); ?></div>
+                  <div class="mini-sub">Unsettled delivery notes</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-8">
+        <div class="chart-card h-100">
+          <div class="card-header-dash d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>Branch Performance</span>
+            <small class="text-muted fw-normal">Pending, collections, and expenses by branch</small>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <canvas id="dashboardBranchChart" aria-label="Branch performance chart" role="img"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-3">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="card card-dash h-100">
+          <div class="card-header-dash d-flex justify-content-between align-items-center">
+            <span>Transfer Voucher</span>
+            <small class="text-muted fw-normal">Account-to-account movement</small>
+          </div>
+          <div class="card-body">
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Total</div>
+                  <div class="mini-value text-primary"><?php echo (int)($tvSummary['total_vouchers'] ?? 0); ?></div>
+                  <div class="mini-sub">In the selected range</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Posted</div>
+                  <div class="mini-value text-success"><?php echo (int)($tvSummary['posted_count'] ?? 0); ?></div>
+                  <div class="mini-sub">Completed transfers</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Draft</div>
+                  <div class="mini-value text-warning"><?php echo (int)($tvSummary['draft_count'] ?? 0); ?></div>
+                  <div class="mini-sub">Waiting posting</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="mini-metric">
+                  <div class="mini-label">Amount</div>
+                  <div class="mini-value text-info">Rs. <?php echo number_format((float)($tvSummary['total_amount'] ?? 0), 2); ?></div>
+                  <div class="mini-sub">Movement total</div>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 d-grid">
+              <a class="btn btn-outline-primary btn-sm" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>"><i class="bi bi-receipt-cutoff me-1"></i> Open Voucher Entry</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="card card-dash h-100">
+          <div class="card-header-dash d-flex justify-content-between align-items-center">
+            <span>Recent Transfer Voucher Activity</span>
+            <a class="small text-decoration-none fw-normal" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>">Open entry</a>
+          </div>
+          <div class="card-body p-0">
+            <?php if (empty($tvRecentAuditLogs ?? [])): ?>
+              <div class="p-3 text-muted small">No recent transfer voucher activity.</div>
+            <?php else: ?>
+              <div class="table-responsive dash-table-scroll-y dash-table-x">
+                <table class="table table-sm table-dash table-hover align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Voucher</th>
+                      <th>User</th>
+                      <th>When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($tvRecentAuditLogs as $log): ?>
+                    <tr>
+                      <td data-label="Action"><?php echo htmlspecialchars((string) ($log['action'] ?? '')); ?></td>
+                      <td data-label="Voucher"><?php echo htmlspecialchars((string) ($log['entity_id'] ?? '')); ?></td>
+                      <td data-label="User"><?php echo htmlspecialchars((string) ($log['user_name'] ?? $log['user_username'] ?? '')); ?></td>
+                      <td data-label="When"><small class="text-muted"><?php echo htmlspecialchars((string) ($log['created_at'] ?? '')); ?></small></td>
+                    </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
+          </div>
         </div>
       </div>
     </div>
@@ -464,15 +720,15 @@
           </div>
         </a>
       </div>
-      <?php if (Auth::canCollectPayments()): ?>
+      <?php if (Auth::hasAnyRole(['admin','accountant'])): ?>
       <div class="col">
-        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">
-          <div class="action-icon bg-danger bg-opacity-10 text-danger">
-            <i class="bi bi-cash-coin"></i>
+        <a class="action-card card card-body d-flex flex-row align-items-center gap-3" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=TRANSFER'); ?>">
+          <div class="action-icon bg-info bg-opacity-10 text-info">
+            <i class="bi bi-receipt-cutoff"></i>
           </div>
           <div class="min-w-0">
-            <div class="action-title">Payments</div>
-            <div class="action-desc">Due: <strong>Rs. <?php echo number_format((float)($totalDue ?? 0), 2); ?></strong></div>
+            <div class="action-title">Voucher Entry</div>
+            <div class="action-desc">Transfer and accounting vouchers</div>
           </div>
         </a>
       </div>
@@ -657,13 +913,13 @@
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending&to_branch_id=' . $bid); ?>"><?php echo (int)($pendingByBranch[$bid] ?? 0); ?></a>
                   </td>
                   <td class="text-end" data-label="Due">
-                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=payments&branch_id=' . $bid); ?>">Rs. <?php echo number_format((float)($dueByBranch[$bid] ?? 0), 2); ?></a>
+                    <span>Rs. <?php echo number_format((float)($dueByBranch[$bid] ?? 0), 2); ?></span>
                   </td>
                   <td class="text-end" data-label="Parcels today">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&to_branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>"><?php echo (int)($todayParcelsByBranch[$bid] ?? 0); ?></a>
                   </td>
                   <td class="text-end" data-label="Collections">
-                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=payments&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>">Rs. <?php echo number_format((float)($collectionsTodayByBranch[$bid] ?? 0), 2); ?></a>
+                    <span>Rs. <?php echo number_format((float)($collectionsTodayByBranch[$bid] ?? 0), 2); ?></span>
                   </td>
                   <td class="text-end" data-label="Expenses">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>">Rs. <?php echo number_format((float)($expensesTodayByBranch[$bid] ?? 0), 2); ?></a>
@@ -683,7 +939,6 @@
       <div class="card card-dash w-100">
         <div class="card-header-dash d-flex justify-content-between align-items-center">
           <span>Recent Payments</span>
-          <a class="small text-decoration-none fw-normal" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>">View all</a>
         </div>
         <div class="card-body">
           <?php if (empty($recentPayments)): ?>
@@ -824,4 +1079,13 @@
     </div>
   </div>
 </div>
+
+<script>
+window.TMS_DASHBOARD_DATA = <?php echo json_encode([
+  'labels' => $dashLabels,
+  'pending' => $dashPending,
+  'collections' => $dashCollections,
+  'expenses' => $dashExpenses,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+</script>
  

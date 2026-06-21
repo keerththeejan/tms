@@ -1,6 +1,7 @@
 <?php
 /** @var array $branches */
 $branchListEmbed = $branchListEmbed ?? false;
+$branchListFixedMode = $branchListFixedMode ?? false;
 $error = $error ?? '';
 $branchListError = $branchListError ?? null;
 $brErr = $branchListError !== null ? (string)$branchListError : (string)$error;
@@ -278,10 +279,14 @@ $csrf = Helpers::csrfToken();
   <header class="mb-3">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
       <div>
-        <h1 id="branches-heading" class="h5 fw-bold mb-1">Operational branches</h1>
-        <p class="small text-muted mb-0">Parcels, users, delivery notes, and reports use this master list. Updates apply everywhere immediately.</p>
+        <h1 id="branches-heading" class="h5 fw-bold mb-1"><?php echo !empty($branchListFixedMode) ? 'Fixed branch registry' : 'Operational branches'; ?></h1>
+        <p class="small text-muted mb-0"><?php echo !empty($branchListFixedMode)
+            ? 'Exactly three branches (Colombo, Kilinochchi, Mullaitivu). Edit addresses under the form above.'
+            : 'Parcels, users, delivery notes, and reports use this master list. Updates apply everywhere immediately.'; ?></p>
       </div>
+      <?php if (empty($branchListFixedMode)): ?>
       <a href="<?php echo htmlspecialchars($newUrl); ?>" class="btn btn-sm btn-primary flex-shrink-0"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i><span class="d-none d-sm-inline">New branch</span><span class="d-sm-none">New</span></a>
+      <?php endif; ?>
     </div>
   </header>
   <?php else: ?>
@@ -413,6 +418,7 @@ $csrf = Helpers::csrfToken();
             </td>
             <td class="text-end">
               <div class="actions-gap">
+                <?php if (empty($branchListFixedMode)): ?>
                 <a class="btn btn-sm btn-outline-secondary btn-icon-action" href="<?php echo htmlspecialchars($editUrl); ?>" title="Edit branch" aria-label="Edit <?php echo htmlspecialchars($name); ?>">
                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
                 </a>
@@ -431,6 +437,14 @@ $csrf = Helpers::csrfToken();
                   data-branch-name="<?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>">
                   <i class="bi bi-trash" aria-hidden="true"></i>
                 </button>
+                <?php else: ?>
+                <?php if ($isDefault): ?>
+                  <span class="badge text-bg-primary">Default header</span>
+                <?php endif; ?>
+                <?php if ($isMain): ?>
+                  <span class="badge text-bg-success">Main hub</span>
+                <?php endif; ?>
+                <?php endif; ?>
               </div>
             </td>
           </tr>

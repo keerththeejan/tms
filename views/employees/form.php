@@ -18,9 +18,6 @@ $pageSubtitle = $employee['id']
       <p class="emp-form-hero-text mb-0 d-none d-xl-block text-muted small"><?php echo htmlspecialchars($pageSubtitle, ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
     <div class="d-flex flex-wrap gap-1 gap-sm-2 align-items-center justify-content-end emp-form-hero-actions emp-form-hero-actions--toolbar flex-shrink-0">
-      <?php if ($cashbookAccountId > 0): ?>
-        <a class="btn btn-outline-primary btn-sm d-none d-md-inline-flex" href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=accounts&tab=statement&account_id=' . $cashbookAccountId), ENT_QUOTES, 'UTF-8'); ?>"><i class="bi bi-bank me-1"></i> Account</a>
-      <?php endif; ?>
       <a href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>" class="btn btn-outline-secondary btn-sm emp-form-back"><i class="bi bi-arrow-left"></i> Back</a>
       <button type="submit" form="empFormMain" class="btn btn-primary btn-sm emp-form-toolbar-save"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Save</button>
     </div>

@@ -1,6 +1,13 @@
 <?php
 require_once __DIR__ . '/../app/bootstrap.php';
 
+$config = Helpers::config();
+if (($config['env'] ?? 'local') !== 'local' || !Auth::check() || !Auth::hasRole('admin')) {
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+}
+
 $pdo = Database::pdo();
 
 try {

@@ -20,7 +20,7 @@
     <input type="text" class="form-control" name="position" placeholder="Position" value="<?php echo htmlspecialchars($position ?? ''); ?>">
   </div>
   <div class="col-6 col-md-3 col-lg-2">
-    <select name="branch_id" class="form-select">
+    <select name="branch_id" class="form-select" data-enhance="false">
       <?php $bid = (int)($branch_id ?? 0); ?>
       <option value="0" <?php echo ($bid===0)?'selected':''; ?>>Branch (any)</option>
       <?php foreach (($branchesAll ?? []) as $b): ?>
@@ -37,6 +37,15 @@
   </div>
 </form>
 
+<?php if (empty($employees)): ?>
+<div class="alert alert-light border text-center py-4 mb-3">
+  <i class="bi bi-clipboard-data display-6 d-block mb-2 opacity-50" aria-hidden="true"></i>
+  <div class="fw-semibold mb-1">No employees for payroll</div>
+  <p class="text-muted small mb-3">Add employees and enter monthly payroll (basic, EPF, ETF, allowances, deductions).</p>
+  <a class="btn btn-sm btn-outline-primary me-2" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new'); ?>"><i class="bi bi-person-plus"></i> Add employee</a>
+  <a class="btn btn-sm btn-primary" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new_payroll'); ?>"><i class="bi bi-plus-lg"></i> Payroll entry</a>
+</div>
+<?php else: ?>
 <div class="hr-table-wrap table-responsive">
   <table class="table table-sm table-striped align-middle" id="employeesPayrollTable" style="width: 100%; min-width: 1400px;">
     <thead>
@@ -134,4 +143,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+<?php endif; ?>
 </div><!-- /.hr-page -->

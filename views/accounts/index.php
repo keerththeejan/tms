@@ -271,8 +271,10 @@ $csrf = Helpers::csrfToken();
 <script>
 window.TMS_ACCOUNTS = <?php echo json_encode([
   'csrf' => $csrf,
-  'cashbookUrl' => Helpers::baseUrl('index.php?page=cashbook'),
+  'cashbookApiUrl' => Helpers::baseUrl('index.php?page=api_cashbook'),
   'accountsUrl' => Helpers::baseUrl('index.php?page=accounts'),
+  'accountingEntryUrl' => Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=PAYMENT'),
+  'transferVoucherUrl' => Helpers::baseUrl('index.php?page=transfer_voucher&action=entry'),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="<?php echo Helpers::baseUrl('assets/js/accounts.js?v=1'); ?>"></script>

@@ -110,4 +110,85 @@ class DataReset
             return ['success' => false, 'cleared' => $cleared, 'errors' => $errors];
         }
     }
+
+    /**
+     * Remove all customers and dependent parcel/billing records (keeps users, branches, vehicles, etc.).
+     *
+     * @return array{success: bool, cleared: array<string>, errors: array<string>, customers_deleted: int}
+     */
+    public static function deleteAllCustomerData(PDO $pdo): array
+    {
+        $cleared = [];
+        $errors = [];
+        $customersDeleted = 0;
+
+        try {
+            $pdo->beginTransaction();
+
+            $steps = [
+                'parcel_items' => 'DELETE pi FROM parcel_items pi INNER JOIN parcels p ON p.id = pi.parcel_id',
+                'delivery_note_parcels' => 'DELETE dnp FROM delivery_note_parcels dnp INNER JOIN parcels p ON p.id = dnp.parcel_id',
+                'payments' => 'DELETE pay FROM payments pay INNER JOIN delivery_notes dn ON dn.id = pay.delivery_note_id',
+                'parcels' => 'DELETE FROM parcels',
+                'delivery_notes' => 'DELETE FROM delivery_notes',
+                'delivery_route_assignments' => 'DELETE FROM delivery_route_assignments',
+                'invoices' => 'DELETE FROM invoices',
+            ];
+
+            foreach ($steps as $label => $sql) {
+                try {
+                    $pdo->exec($sql);
+                    $cleared[] = $label;
+                } catch (Throwable $e) {
+                    $errors[] = $label . ': ' . $e->getMessage();
+                }
+            }
+
+            try {
+                $pdo->exec('UPDATE payment_vouchers SET customer_id = NULL WHERE customer_id IS NOT NULL');
+                $cleared[] = 'payment_vouchers.customer_id';
+            } catch (Throwable $e) {
+                $errors[] = 'payment_vouchers: ' . $e->getMessage();
+            }
+
+            try {
+                $ids = $pdo->query('SELECT id FROM customers')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                foreach ($ids as $cid) {
+                    CashbookRepository::detachCashbookAccountForDeletedCustomer($pdo, (int)$cid);
+                }
+                $customersDeleted = count($ids);
+            } catch (Throwable $e) {
+                $errors[] = 'cashbook_accounts: ' . $e->getMessage();
+            }
+
+            try {
+                $pdo->exec('DELETE FROM customers');
+                $cleared[] = 'customers';
+            } catch (Throwable $e) {
+                $errors[] = 'customers: ' . $e->getMessage();
+                throw $e;
+            }
+
+            $pdo->commit();
+
+            return [
+                'success' => true,
+                'cleared' => $cleared,
+                'errors' => $errors,
+                'customers_deleted' => $customersDeleted,
+            ];
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $errors[] = 'Transaction failed: ' . $e->getMessage();
+
+            return [
+                'success' => false,
+                'cleared' => $cleared,
+                'errors' => $errors,
+                'customers_deleted' => 0,
+            ];
+        }
+    }
 }

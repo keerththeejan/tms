@@ -58,6 +58,15 @@ body.debug-layout * {
   color: #fff;
 }
 
+body[data-theme="dark"] .app.app-layout > #sidebar,
+body[data-theme="dark"] .app.app-layout > .app-sidebar {
+  background: linear-gradient(180deg, #050b17 0%, #0f172a 45%, #111827 100%) !important;
+}
+
+body[data-theme="dark"] .topbar {
+  background: rgba(2, 6, 23, 0.78);
+}
+
 .app.app-layout > #sidebar .nav-link i {
   flex: 0 0 20px;
   width: 20px;

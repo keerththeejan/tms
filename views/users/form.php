@@ -1,4 +1,10 @@
 <?php /** @var array $userRow */ ?>
+<?php
+  $rolesCatalog = $rolesCatalog ?? [];
+  $rolesDynamic = $rolesDynamic ?? [];
+  $currentUserId = (int)($currentUserId ?? 0);
+  $isSelf = ((int)($userRow['id'] ?? 0) > 0) && ((int)($userRow['id'] ?? 0) === $currentUserId);
+?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3 class="mb-0"><?php echo $userRow['id'] ? 'Edit User' : 'New User'; ?></h3>
   <a href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
@@ -24,19 +30,13 @@
           <span>Role</span>
           <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddRole" aria-expanded="false"><i class="bi bi-person-gear"></i> Quick Add</button>
         </label>
-        <select name="role" class="form-select">
+        <select name="role" class="form-select" id="userRoleSelect">
           <?php 
-            // Built-in roles
-            $roles = ['admin'=>'Admin','accountant'=>'Accountant','cashier'=>'Cashier','collector'=>'Due Collector','parcel_user'=>'Parcel User','staff'=>'Staff'];
-            $currentRole = (string)($userRow['role'] ?? '');
-            // None option first
-            echo '<option value="" ' . ($currentRole === '' ? 'selected' : '') . '>-- None --</option>';
-            // Render built-ins
-            foreach ($roles as $k=>$label): ?>
-              <option value="<?php echo $k; ?>" <?php echo $currentRole===$k?'selected':''; ?>><?php echo $label; ?></option>
-            <?php endforeach; 
-            // Render dynamic roles coming from DB (users table)
-            $renderedKeys = array_fill_keys(array_keys($roles), true);
+            $currentRole = (string)($userRow['role'] ?? 'staff');
+            $renderedKeys = [];
+            foreach ($rolesCatalog as $k => $label): $renderedKeys[$k] = true; ?>
+              <option value="<?php echo htmlspecialchars($k); ?>" <?php echo $currentRole===$k?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option>
+            <?php endforeach;
             if (!empty($rolesDynamic) && is_array($rolesDynamic)) {
               foreach ($rolesDynamic as $r) {
                 $rk = trim((string)($r['role'] ?? ''));
@@ -48,7 +48,6 @@
             <?php 
               }
             }
-            // In case current role is custom and not in dynamic list yet
             if ($currentRole !== '' && !isset($renderedKeys[$currentRole])) { 
               $label = ucwords(str_replace('_',' ', $currentRole)); ?>
               <option value="<?php echo htmlspecialchars($currentRole); ?>" selected><?php echo htmlspecialchars($label); ?></option>
@@ -65,10 +64,7 @@
         </div>
       </div>
       <div class="col-md-4">
-        <label class="form-label d-flex justify-content-between align-items-center">
-          <span>Branch (optional)</span>
-          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#quickAddUserBranch" aria-expanded="false"><i class="bi bi-building-add"></i> Quick Add</button>
-        </label>
+        <label class="form-label">Branch (optional)</label>
         <select name="branch_id" class="form-select">
           <option value="0">-- None --</option>
           <?php foreach (($branchesAll ?? []) as $b): ?>
@@ -81,16 +77,7 @@
             <option value="<?php echo $bid; ?>" <?php echo $selected ? 'selected' : ''; ?><?php echo ($inactive && !$selected) ? ' disabled' : ''; ?>><?php echo $label; ?></option>
           <?php endforeach; ?>
         </select>
-        <div class="collapse mt-2" id="quickAddUserBranch">
-          <div class="border rounded p-2 bg-light">
-            <div class="row g-2">
-              <div class="col-6"><input type="text" id="ub_name" class="form-control form-control-sm" placeholder="Branch name"></div>
-              <div class="col-4"><input type="text" id="ub_code" class="form-control form-control-sm" placeholder="Code"></div>
-              <div class="col-2 d-flex align-items-center"><div class="form-check"><input id="ub_main" class="form-check-input" type="checkbox"> <label class="form-check-label" for="ub_main">Main</label></div></div>
-              <div class="col-12 text-end"><button type="button" id="ub_submit" class="btn btn-sm btn-primary"><i class="bi bi-save"></i> Save & Use</button></div>
-            </div>
-          </div>
-        </div>
+        <div class="form-text">Colombo, Kilinochchi, or Mullaitivu only.</div>
       </div>
       <div class="col-md-4">
         <label class="form-label">Password <?php echo $userRow['id'] ? '(leave blank to keep)' : ''; ?></label>
@@ -98,8 +85,9 @@
       </div>
       <div class="col-md-4 d-flex align-items-end">
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="active" id="activeChk" value="1" <?php echo ((int)($userRow['active'] ?? 1) === 1) ? 'checked' : ''; ?>>
+          <input class="form-check-input" type="checkbox" name="active" id="activeChk" value="1" <?php echo ((int)($userRow['active'] ?? 1) === 1) ? 'checked' : ''; ?> <?php echo $isSelf ? 'disabled' : ''; ?>>
           <label class="form-check-label" for="activeChk">Active</label>
+          <?php if ($isSelf): ?><input type="hidden" name="active" value="1"><div class="form-text">Your account stays active while you are logged in.</div><?php endif; ?>
         </div>
       </div>
     </div>
@@ -110,55 +98,37 @@
 </form>
 <script>
 (function(){
-  const btn = document.getElementById('ub_submit');
-  const select = document.querySelector('select[name="branch_id"]');
+  function readSelectValue(sel) {
+    if (!sel) return '';
+    try {
+      if (sel._choices) {
+        const v = sel._choices.getValue(true);
+        if (Array.isArray(v)) {
+          const first = v[0];
+          return String((first && first.value !== undefined) ? first.value : (first || ''));
+        }
+        return String(v || '');
+      }
+    } catch (_) { /* ignore */ }
+    return String(sel.value || '');
+  }
+  function syncNativeSelect(sel) {
+    if (!sel || !sel._choices) return;
+    const val = readSelectValue(sel);
+    if (val !== '') sel.value = val;
+  }
+  function refreshChoices(sel) {
+    if (!sel || !sel._choices) return;
+    try { sel.dispatchEvent(new Event('refresh-choices')); } catch (_) { /* ignore */ }
+  }
+  const userForm = document.querySelector('form[action*="page=users&action=save"]');
+  userForm?.addEventListener('submit', function() {
+    syncNativeSelect(document.querySelector('select[name="role"]'));
+    syncNativeSelect(document.querySelector('select[name="branch_id"]'));
+  });
+
   const roleBtn = document.getElementById('ur_submit');
   const roleSelect = document.querySelector('select[name="role"]');
-  async function quickAdd(name, code, isMain){
-    const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
-    const form = new FormData();
-    form.append('csrf_token', csrf);
-    form.append('ajax', '1');
-    form.append('id', '0');
-    form.append('name', name);
-    form.append('code', code);
-    if (isMain) form.append('is_main', '1');
-    const res = await fetch('<?php echo Helpers::baseUrl('index.php?page=branches&action=save'); ?>', {
-      method: 'POST',
-      headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
-      body: form
-    });
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-    if (!data || !data.id) throw new Error('Invalid response');
-    return { id: data.id, name: data.name || name };
-  }
-  btn?.addEventListener('click', async function(){
-    const nameEl = document.getElementById('ub_name');
-    const codeEl = document.getElementById('ub_code');
-    const mainEl = document.getElementById('ub_main');
-    const name = nameEl?.value.trim();
-    const code = codeEl?.value.trim();
-    const isMain = !!mainEl?.checked;
-    if (!name || !code) { alert('Name and Code are required.'); return; }
-    try {
-      const b = await quickAdd(name, code, isMain);
-      if (select) {
-        const idStr = String(b.id);
-        const label = String(b.name || name);
-        let exists = false;
-        Array.from(select.options).forEach(o=>{ if (String(o.value) === idStr) { o.textContent = label; exists = true; } });
-        if (!exists) { const opt = document.createElement('option'); opt.value = idStr; opt.textContent = label; select.appendChild(opt); }
-        const wasDisabled = select.disabled; if (wasDisabled) select.disabled = false;
-        select.value = idStr;
-        select.dispatchEvent(new Event('change'));
-        select.dispatchEvent(new Event('input'));
-        if (wasDisabled) select.disabled = true;
-      }
-      if (nameEl) nameEl.value=''; if (codeEl) codeEl.value=''; if (mainEl) mainEl.checked=false;
-      const collapseEl = document.getElementById('quickAddUserBranch'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});
-    } catch(e){ alert('Failed to add branch.'); }
-  });
 
   // Quick Add Role: just add option to dropdown and select it
   roleBtn?.addEventListener('click', function(){
@@ -180,6 +150,7 @@
     roleSelect.value = key;
     roleSelect.dispatchEvent(new Event('change'));
     roleSelect.dispatchEvent(new Event('input'));
+    refreshChoices(roleSelect);
     if (wasDisabled) roleSelect.disabled = true;
     input.value = '';
     const collapseEl = document.getElementById('quickAddRole'); if (collapseEl && window.bootstrap) new bootstrap.Collapse(collapseEl, {toggle:true});

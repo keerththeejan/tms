@@ -14,7 +14,7 @@ $user = Auth::user();
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/tms-design-system.css'); ?>">
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/app-layout-rebuild.css'); ?>">
-  <?php if (in_array($_GET['page'] ?? '', ['employees', 'salaries', 'advances'], true)): ?>
+  <?php if (in_array($_GET['page'] ?? '', ['employees', 'advances'], true)): ?>
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/hr-responsive.css'); ?>">
   <?php endif; ?>
   <?php
@@ -56,9 +56,7 @@ $user = Auth::user();
     </div>
     <?php if ($user): ?>
     <ul class="nav nav-pills flex-column p-2 small" role="list">
-      <?php if ($currentPage !== 'cashbook'): ?>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='dashboard'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=dashboard'); ?>"<?php echo $navCurrent($currentPage==='dashboard'); ?>><i class="bi bi-speedometer2" aria-hidden="true"></i><span>Dashboard</span></a></li>
-      <?php endif; ?>
       <?php if (($user['role'] ?? '') === 'admin'): ?>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='users'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>"<?php echo $navCurrent($currentPage==='users'); ?>><i class="bi bi-people" aria-hidden="true"></i><span>Users</span></a></li>
       <?php endif; ?>
@@ -71,9 +69,6 @@ $user = Auth::user();
       <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route'); ?>"<?php echo $navCurrent($isRouteActive); ?>><i class="bi bi-geo-alt" aria-hidden="true"></i><span>Route Planning</span></a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $isRouteVehiclesActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=route_vehicles'); ?>"<?php echo $navCurrent($isRouteVehiclesActive); ?>><i class="bi bi-truck-front" aria-hidden="true"></i><span>Vehicle Routes</span></a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $isDNIndexActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>"<?php echo $navCurrent($isDNIndexActive); ?>><i class="bi bi-receipt" aria-hidden="true"></i><span>Delivery Notes</span></a></li>
-      <?php if (Auth::canCollectPayments()): ?>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='payments'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=payments'); ?>"<?php echo $navCurrent($currentPage==='payments'); ?>><i class="bi bi-currency-dollar" aria-hidden="true"></i><span>Payments</span></a></li>
-      <?php endif; ?>
       <?php if (Auth::canManageExpenses()): ?>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='expenses'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>"<?php echo $navCurrent($currentPage==='expenses'); ?>><i class="bi bi-wallet2" aria-hidden="true"></i><span>Expenses</span></a></li>
       <?php endif; ?>
@@ -81,42 +76,10 @@ $user = Auth::user();
         <li class="nav-item nav-section">HR</li>
         <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action!=='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees'); ?>"<?php echo $navCurrent($currentPage==='employees' && $action!=='payroll'); ?>><i class="bi bi-person-badge" aria-hidden="true"></i><span>Employee Details</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='employees' && $action==='payroll')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=payroll'); ?>"<?php echo $navCurrent($currentPage==='employees' && $action==='payroll'); ?>><i class="bi bi-clipboard-data" aria-hidden="true"></i><span>Salary Report</span></a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='salaries'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=salaries'); ?>"<?php echo $navCurrent($currentPage==='salaries'); ?>><i class="bi bi-cash-coin" aria-hidden="true"></i><span>Salaries</span></a></li>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='advances'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>"<?php echo $navCurrent($currentPage==='advances'); ?>><i class="bi bi-cash-stack" aria-hidden="true"></i><span>Advances</span></a></li>
-        <li class="nav-item nav-section">Accounts</li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='cashbook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=cashbook'); ?>"<?php echo $navCurrent($currentPage==='cashbook'); ?>><i class="bi bi-cash-stack" aria-hidden="true"></i><span>Cash Book</span></a></li>
-        <?php
-          $accTab = $_GET['tab'] ?? 'all';
-          $accActive = ($currentPage === 'accounts');
-          $accOpen = $accActive ? ' show' : '';
-        ?>
-        <li class="nav-item">
-          <button class="nav-link text-white w-100 text-start d-flex align-items-center justify-content-between <?php echo $accActive?'active':''; ?>" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarAccountsSub" aria-expanded="<?php echo $accActive ? 'true' : 'false'; ?>" aria-controls="sidebarAccountsSub"<?php echo $navCurrent($accActive); ?>>
-            <span class="d-inline-flex align-items-center gap-2"><i class="bi bi-journal-richtext" aria-hidden="true"></i><span>Accounts</span></span>
-            <i class="bi bi-chevron-down small opacity-75" aria-hidden="true"></i>
-          </button>
-          <div class="collapse<?php echo $accOpen; ?>" id="sidebarAccountsSub">
-            <ul class="nav nav-pills flex-column ms-4 my-1 gap-1" role="list">
-              <li class="nav-item">
-                <a class="nav-link text-white py-1 <?php echo $accActive && ($accTab==='all' || $accTab==='') ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts&tab=all'); ?>">
-                  <span>All Accounts</span>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white py-1 <?php echo $accActive && $accTab==='add' ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts&tab=add'); ?>">
-                  <span>Add Account</span>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white py-1 <?php echo $accActive && $accTab==='statement' ? 'active' : ''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounts&tab=statement'); ?>">
-                  <span>Account Statement</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='daybook'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=daybook'); ?>"<?php echo $navCurrent($currentPage==='daybook'); ?>><i class="bi bi-journal-text" aria-hidden="true"></i><span>Daybook</span></a></li>
-        <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='ledger'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=ledger'); ?>"<?php echo $navCurrent($currentPage==='ledger'); ?>><i class="bi bi-journal-check" aria-hidden="true"></i><span>Account Ledger</span></a></li>
+        <li class="nav-item nav-section">Accounting</li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='accounting' && ($_GET['action'] ?? 'dashboard')==='dashboard')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=dashboard'); ?>"<?php echo $navCurrent($currentPage==='accounting' && ($_GET['action'] ?? 'dashboard')==='dashboard'); ?>><i class="bi bi-calculator" aria-hidden="true"></i><span>Accounting</span></a></li>
+        <li class="nav-item"><a class="nav-link text-white <?php echo ($currentPage==='accounting' && ($_GET['action'] ?? '')==='entry')?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=entry&voucher_type=PAYMENT&payment_mode=CASH'); ?>"<?php echo $navCurrent($currentPage==='accounting' && ($_GET['action'] ?? '')==='entry'); ?>><i class="bi bi-receipt-cutoff" aria-hidden="true"></i><span>Voucher Entry</span></a></li>
       <?php endif; ?>
       <li class="nav-item nav-section">Tools</li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='search'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=search'); ?>"<?php echo $navCurrent($currentPage==='search'); ?>><i class="bi bi-search" aria-hidden="true"></i><span>Search</span></a></li>
@@ -147,7 +110,7 @@ $user = Auth::user();
       $uiHeaderAddr = Helpers::companyHeaderAddressLines('', 3);
       $pageTitle = 'Dashboard';
       if ($currentPage && $currentPage !== 'dashboard') {
-        $pageTitle = $currentPage === 'cashbook' ? 'Cash Book' : ucwords(str_replace('_', ' ', (string)$currentPage));
+        $pageTitle = ucwords(str_replace('_', ' ', (string)$currentPage));
       }
     ?>
     <div class="topbar" role="banner">
@@ -161,6 +124,9 @@ $user = Auth::user();
             </div>
           </div>
           <div class="d-flex align-items-center gap-2 flex-shrink-0 topbar-actions">
+            <button class="btn btn-outline-secondary d-flex align-items-center gap-1" type="button" id="themeToggleBtn" aria-label="Toggle theme" title="Toggle light and dark mode">
+              <i class="bi bi-moon-stars" aria-hidden="true"></i><span class="d-none d-md-inline small">Theme</span>
+            </button>
             <button class="btn btn-outline-secondary d-flex align-items-center gap-1" type="button" title="Notifications (coming soon)" aria-label="Notifications"><i class="bi bi-bell" aria-hidden="true"></i><span class="d-none d-md-inline small">Alerts</span></button>
             <div class="dropdown">
               <button class="btn btn-outline-secondary d-flex align-items-center gap-1 dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Account menu" aria-label="Account menu">

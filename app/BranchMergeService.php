@@ -83,16 +83,18 @@ final class BranchMergeService
             '__main__' => [],
         ];
         $unknown = [];
+        $messages = [];
         foreach ($rows as $r) {
             $key = self::nameToGroupKey((string)($r['name'] ?? ''));
             if ($key === null) {
                 $unknown[] = (int)$r['id'] . ' = ' . ($r['name'] ?? '');
+                $groups['colombo'][] = $r;
                 continue;
             }
             $groups[$key][] = $r;
         }
         if ($unknown !== []) {
-            throw new \RuntimeException('Unrecognized branch names (rename or remove first): ' . implode('; ', $unknown));
+            $messages[] = 'Unrecognized branch names merged into Colombo: ' . implode('; ', $unknown);
         }
         foreach (['colombo', 'kilinochchi', 'mullaitivu'] as $need) {
             if ($groups[$need] === []) {
@@ -100,7 +102,6 @@ final class BranchMergeService
             }
         }
 
-        $messages = [];
         $keepers = [];
         foreach (['colombo', 'kilinochchi', 'mullaitivu'] as $g) {
             $keeper = self::pickKeeperRow($groups[$g]);
@@ -214,6 +215,24 @@ final class BranchMergeService
         return $st && $st->fetch() !== false;
     }
 
+    private static function tableHasColumn(\PDO $pdo, string $table, string $column): bool
+    {
+        if (!self::tableExists($pdo, $table)) {
+            return false;
+        }
+        $t = preg_replace('/[^a-z0-9_]/i', '', $table);
+        $c = preg_replace('/[^a-z0-9_]/i', '', $column);
+        if ($t === '' || $c === '') {
+            return false;
+        }
+        $st = $pdo->prepare(
+            'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $st->execute([$t, $c]);
+        return (int)$st->fetchColumn() > 0;
+    }
+
     private static function mergeBranchIds(\PDO $pdo, int $fromId, int $toId): void
     {
         if ($fromId === $toId) {
@@ -223,7 +242,7 @@ final class BranchMergeService
         if (self::tableExists($pdo, 'delivery_notes')) {
             self::mergeDeliveryNotes($pdo, $fromId, $toId);
         }
-        if (self::tableExists($pdo, 'delivery_route_assignments')) {
+        if (self::tableExists($pdo, 'delivery_route_assignments') && self::tableHasColumn($pdo, 'delivery_route_assignments', 'branch_id')) {
             self::mergeDeliveryRouteAssignments($pdo, $fromId, $toId);
         }
         if (self::tableExists($pdo, 'routes')) {
@@ -301,8 +320,15 @@ final class BranchMergeService
 
     private static function mergeRoutes(\PDO $pdo, int $fromId, int $toId): void
     {
-        $pdo->prepare('UPDATE routes SET from_branch_id = ? WHERE from_branch_id = ?')->execute([$toId, $fromId]);
-        $pdo->prepare('UPDATE routes SET to_branch_id = ? WHERE to_branch_id = ?')->execute([$toId, $fromId]);
+        if (!self::tableHasColumn($pdo, 'routes', 'from_branch_id') || !self::tableHasColumn($pdo, 'routes', 'to_branch_id')) {
+            return;
+        }
+        try {
+            $pdo->prepare('UPDATE routes SET from_branch_id = ? WHERE from_branch_id = ?')->execute([$toId, $fromId]);
+            $pdo->prepare('UPDATE routes SET to_branch_id = ? WHERE to_branch_id = ?')->execute([$toId, $fromId]);
+        } catch (\PDOException $e) {
+            return;
+        }
         for ($i = 0; $i < 40; $i++) {
             $row = $pdo->query(
                 'SELECT r1.id AS id1, r2.id AS id2 FROM routes r1

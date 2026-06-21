@@ -1,4 +1,8 @@
 <?php /** @var array $supplier */ ?>
+<?php
+  $supplier = is_array($supplier ?? null) ? $supplier : [];
+  $supplier += ['id' => 0, 'name' => '', 'phone' => '', 'branch_id' => 0, 'supplier_code' => ''];
+?>
 <style>
   .sup-form-page { --sf-radius: 14px; --sf-border: rgba(17,24,39,.08); }
   .sup-form-page .sf-head { margin-bottom: 1rem; }
@@ -24,7 +28,7 @@
   }
 </style>
 
-<div class="sup-form-page">
+<div class="sup-form-page container-fluid px-0">
   <div class="sf-head d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h1 class="sf-title"><?php echo $supplier['id'] ? 'Edit supplier' : 'New supplier'; ?></h1>
     <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>" class="btn btn-outline-secondary rounded-pill"><i class="bi bi-arrow-left me-1"></i> Back to list</a>
@@ -53,7 +57,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label" for="supBranch">Branch</label>
-            <select name="branch_id" id="supBranch" class="form-select" required>
+            <select name="branch_id" id="supBranch" class="form-select" data-enhance="false" required>
               <option value="">— Select branch —</option>
               <?php foreach (($branchesAll ?? []) as $b): ?>
                 <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($supplier['branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>

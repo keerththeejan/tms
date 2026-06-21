@@ -20,6 +20,70 @@ function _merge_delivery_location_options(PDO $pdo) {
     return $opts;
 }
 
+/** Built-in TMS user roles (key => label). */
+function _users_role_catalog(): array
+{
+    return [
+        'admin' => 'Admin',
+        'accountant' => 'Accountant',
+        'cashier' => 'Cashier',
+        'collector' => 'Due Collector',
+        'parcel_user' => 'Parcel User',
+        'staff' => 'Staff',
+    ];
+}
+
+/** Roles for dropdowns: built-ins plus any custom roles already in the DB. */
+function _users_roles_for_forms(PDO $pdo): array
+{
+    $catalog = _users_role_catalog();
+    $dynamic = [];
+    try {
+        $rows = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $r) {
+            $rk = trim((string)($r['role'] ?? ''));
+            if ($rk !== '' && !isset($catalog[$rk])) {
+                $dynamic[] = ['role' => $rk];
+            }
+        }
+    } catch (Throwable $e) { /* ignore */ }
+    return ['catalog' => $catalog, 'dynamic' => $dynamic];
+}
+
+function _users_count_active_admins(PDO $pdo, ?int $excludeId = null): int
+{
+    $sql = "SELECT COUNT(*) FROM users WHERE role = 'admin' AND active = 1";
+    $params = [];
+    if ($excludeId !== null && $excludeId > 0) {
+        $sql .= ' AND id <> ?';
+        $params[] = $excludeId;
+    }
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+    return (int)$st->fetchColumn();
+}
+
+function _users_is_last_active_admin(PDO $pdo, int $userId): bool
+{
+    if ($userId <= 0) {
+        return false;
+    }
+    $st = $pdo->prepare('SELECT role, active FROM users WHERE id = ? LIMIT 1');
+    $st->execute([$userId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row || (string)($row['role'] ?? '') !== 'admin' || (int)($row['active'] ?? 0) !== 1) {
+        return false;
+    }
+    return _users_count_active_admins($pdo) <= 1;
+}
+
+function _users_sanitize_row_for_form(?array $userRow): array
+{
+    $row = is_array($userRow) ? $userRow : [];
+    unset($row['password_hash']);
+    return $row;
+}
+
 /** Link cash book account to new customer; failures do not block customer save. */
 function _cashbook_ensure_customer_account(PDO $pdo, int $customerId, string $name): void
 {
@@ -335,110 +399,74 @@ switch ($page) {
 
         // Customers list for filter
         $customersAll = $pdo->query('SELECT id, name, phone FROM customers ORDER BY name LIMIT 500')->fetchAll();
+        $tvSummary = ['total_vouchers' => 0, 'total_amount' => 0, 'posted_count' => 0, 'draft_count' => 0, 'cancelled_count' => 0];
+        $tvRecentAuditLogs = [];
+        try {
+            $tvSummary = TransferVoucherRepository::summary($pdo, $df, $dt);
+            $tvRecentAuditLogs = TransferVoucherRepository::recentAuditLogs($pdo, 6);
+        } catch (Throwable $e) {
+            $tvSummary = ['total_vouchers' => 0, 'total_amount' => 0, 'posted_count' => 0, 'draft_count' => 0, 'cancelled_count' => 0];
+            $tvRecentAuditLogs = [];
+        }
+
+        // Transfer voucher statistics for today
+        $tvTodaySummary = ['total_vouchers' => 0, 'total_amount' => 0, 'posted_count' => 0, 'draft_count' => 0, 'cancelled_count' => 0];
+        try {
+            $tvTodaySummary = TransferVoucherRepository::summary($pdo, $today, $today);
+        } catch (Throwable $e) {
+            $tvTodaySummary = ['total_vouchers' => 0, 'total_amount' => 0, 'posted_count' => 0, 'draft_count' => 0, 'cancelled_count' => 0];
+        }
+        $transfersToday = (int)($tvTodaySummary['total_vouchers'] ?? 0);
+        $transfersAmount = (float)($tvTodaySummary['total_amount'] ?? 0);
+        $transfersPending = (int)($tvTodaySummary['draft_count'] ?? 0);
+        $transfersPosted = (int)($tvTodaySummary['posted_count'] ?? 0);
 
         Helpers::view('dashboard', compact(
             'pendingParcels','totalDue','todayParcels','today','collectionsToday','expensesToday','recentPayments',
             'isMain','branchesAll','pendingByBranch','dueByBranch','todayParcelsByBranch','collectionsTodayByBranch','expensesTodayByBranch',
-            'df','dt','fb','tb','cust','customersAll','statusStats',
+            'df','dt','fb','tb','cust','customersAll','statusStats','tvSummary','tvRecentAuditLogs',
+            'transfersToday','transfersAmount','transfersPending','transfersPosted',
             'scopeAllBranches','isSingleDay','isTodayRange'
         ));
         break;
 
     case 'accounts':
-        if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
-        $pdo = Database::pdo();
-        $todayAcc = date('Y-m-d');
-        $from = Helpers::parseDateOr((string)($_GET['from'] ?? ''), date('Y-m-01'));
-        $to = Helpers::parseDateOr((string)($_GET['to'] ?? ''), $todayAcc);
-        [$from, $to] = Helpers::orderDateRange($from, $to);
-        $branchId = (int)(Auth::user()['branch_id'] ?? 0);
-        $payStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) BETWEEN ? AND ?');
-        $payStmt->execute([$from, $to]);
-        $totalPayments = (float)($payStmt->fetch()['s'] ?? 0);
-        $expStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?');
-        $expStmt->execute([$from, $to]);
-        $totalExpenses = (float)($expStmt->fetch()['s'] ?? 0);
-        Helpers::view('accounts/index', compact('from','to','totalPayments','totalExpenses','branchId'));
+        Helpers::redirect('index.php?page=accounting&action=chart');
         break;
 
     case 'daybook':
-        if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
-        $pdo = Database::pdo();
-        $date = Helpers::parseDateOr((string)($_GET['date'] ?? ''), date('Y-m-d'));
-        // Collect payments and expenses for the day
-        $pb = $pdo->prepare("SELECT p.id, p.amount, p.paid_at, 'Payment' AS type FROM payments p WHERE DATE(p.paid_at)=? ORDER BY p.paid_at, p.id");
-        $pb->execute([$date]);
-        $payments = $pb->fetchAll();
-        $eb = $pdo->prepare("SELECT e.id, e.amount, e.expense_date AS paid_at, 'Expense' AS type FROM expenses e WHERE e.expense_date=? ORDER BY e.expense_date, e.id");
-        $eb->execute([$date]);
-        $expenses = $eb->fetchAll();
-        Helpers::view('daybook/index', compact('date','payments','expenses'));
+        Helpers::redirect('index.php?page=accounting&action=daybook');
         break;
 
     case 'ledger':
-        if (!Auth::hasAnyRole(['admin','accountant'])) { http_response_code(403); echo 'Forbidden'; break; }
-        $pdo = Database::pdo();
-        $todayLed = date('Y-m-d');
-        $from = Helpers::parseDateOr((string)($_GET['from'] ?? ''), date('Y-m-01'));
-        $to = Helpers::parseDateOr((string)($_GET['to'] ?? ''), $todayLed);
-        [$from, $to] = Helpers::orderDateRange($from, $to);
-        $account = $_GET['account'] ?? 'customers'; // placeholder selector
-        // For now, show payments vs expenses in range
-        // Daily series
-        $pStmt = $pdo->prepare("SELECT DATE(paid_at) AS d, SUM(amount) AS s FROM payments WHERE DATE(paid_at) BETWEEN ? AND ? GROUP BY DATE(paid_at) ORDER BY d");
-        $pStmt->execute([$from,$to]);
-        $pSeries = $pStmt->fetchAll();
-        $eStmt = $pdo->prepare("SELECT expense_date AS d, SUM(amount) AS s FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY expense_date ORDER BY d");
-        $eStmt->execute([$from,$to]);
-        $eSeries = $eStmt->fetchAll();
-
-        // Opening balance before From date: collections - expenses
-        $stmtOpP = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) < ?");
-        $stmtOpP->execute([$from]);
-        $openingPayments = (float)($stmtOpP->fetch()['s'] ?? 0);
-        $stmtOpE = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date < ?");
-        $stmtOpE->execute([$from]);
-        $openingExpenses = (float)($stmtOpE->fetch()['s'] ?? 0);
-        $openingBalance = $openingPayments - $openingExpenses;
-
-        // Period totals and net
-        $stmtTP = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE DATE(paid_at) BETWEEN ? AND ?");
-        $stmtTP->execute([$from,$to]);
-        $totalPayments = (float)($stmtTP->fetch()['s'] ?? 0);
-        $stmtTE = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS s FROM expenses WHERE expense_date BETWEEN ? AND ?");
-        $stmtTE->execute([$from,$to]);
-        $totalExpenses = (float)($stmtTE->fetch()['s'] ?? 0);
-        $netMovement = $totalPayments - $totalExpenses;
-        $closingBalance = $openingBalance + $netMovement;
-
-        Helpers::view('ledger/index', compact('from','to','account','pSeries','eSeries','openingBalance','netMovement','closingBalance','totalPayments','totalExpenses'));
+        Helpers::redirect('index.php?page=accounting&action=ledger');
         break;
 
     case 'cashbook':
+        Helpers::redirect('index.php?page=accounting&action=cash_book');
+        break;
+
+    case 'api_cashbook':
         if (!Auth::hasAnyRole(['admin', 'accountant'])) {
             http_response_code(403);
             echo 'Forbidden';
             break;
         }
-        $cbAction = $_GET['cb_action'] ?? $_POST['cb_action'] ?? '';
-        if ($cbAction !== '') {
-            CashbookApi::dispatch(Database::pdo());
+        CashbookApi::dispatch(Database::pdo());
+        break;
+
+    case 'transfer_voucher':
+        if (!Auth::hasAnyRole(['admin', 'accountant'])) {
+            http_response_code(403);
+            echo 'Forbidden';
             break;
         }
-        $pdoCb = Database::pdo();
-        $cashbookCustomers = [];
-        try {
-            $stCb = $pdoCb->query('SELECT id, name FROM customers ORDER BY name ASC LIMIT 2000');
-            if ($stCb) {
-                $cashbookCustomers = $stCb->fetchAll(PDO::FETCH_ASSOC);
-            }
-        } catch (Throwable $e) {
-            $cashbookCustomers = [];
+        $tvAction = $_GET['tv_action'] ?? $_POST['tv_action'] ?? '';
+        if ($tvAction !== '') {
+            TransferVoucherApi::dispatch(Database::pdo());
+            break;
         }
-        Helpers::view('cashbook/index', [
-            'csrf' => Helpers::csrfToken(),
-            'cashbookCustomers' => $cashbookCustomers,
-        ]);
+        Helpers::redirect('index.php?page=accounting&action=entry&voucher_type=TRANSFER');
         break;
 
     case 'routes':
@@ -728,36 +756,39 @@ switch ($page) {
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+            if ($id <= 0 || !BranchFixedMaster::isAllowedId($id)) {
+                http_response_code(403);
+                echo 'Only the three fixed branches (Colombo, Kilinochchi, Mullaitivu) can be updated. Use Settings → Branches.';
+                break;
+            }
             $name = trim($_POST['name'] ?? '');
             $code = trim($_POST['code'] ?? '');
             $is_main = isset($_POST['is_main']) ? 1 : 0;
             $location = trim($_POST['location'] ?? '');
             $is_active = isset($_POST['is_active']) ? 1 : 0;
-            if ($name === '' || $code === '') { $error = 'Name and Code are required.'; Helpers::view('branches/form', compact('error')); break; }
+            $canonical = BranchFixedMaster::CANONICAL[$id];
+            $name = $canonical['name'];
+            $code = $canonical['code'];
+            if ($id === 2) {
+                $is_main = 1;
+            } else {
+                $is_main = 0;
+            }
             $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
                          || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
                          || (($_POST['ajax'] ?? '') === '1');
 
             BranchRepository::ensureSchema($pdo);
-            if ($id > 0) {
-                $stmt = $pdo->prepare('UPDATE branches SET name=?, code=?, is_main=?, location=?, is_active=? WHERE id=?');
-                $stmt->execute([$name, $code, $is_main, ($location !== '' ? $location : null), $is_active, $id]);
-            } else {
-                $stmt = $pdo->prepare('INSERT INTO branches (name, code, is_main, location, is_active) VALUES (?,?,?,?,?)');
-                $stmt->execute([$name, $code, $is_main, ($location !== '' ? $location : null), $is_active]);
-                $id = (int)$pdo->lastInsertId();
-            }
+            $stmt = $pdo->prepare('UPDATE branches SET name=?, code=?, is_main=?, location=?, is_active=? WHERE id=?');
+            $stmt->execute([$name, $code, $is_main, ($location !== '' ? $location : null), $is_active, $id]);
             if ($is_main) {
-                // Ensure only one main branch
-                $stmt = $pdo->prepare('UPDATE branches SET is_main=0 WHERE id<>?');
-                $stmt->execute([$id]);
-                // Mark all users of that branch as is_main_branch=1, others 0
+                $pdo->prepare('UPDATE branches SET is_main=0 WHERE id<>?')->execute([$id]);
                 $pdo->prepare('UPDATE users SET is_main_branch = CASE WHEN branch_id = ? THEN 1 ELSE 0 END')->execute([$id]);
             }
             if ($wantsJson) {
                 header('Content-Type: application/json');
-                echo json_encode(['id'=>$id, 'name'=>$name, 'code'=>$code, 'is_main'=>$is_main, 'location'=>$location, 'is_active'=>$is_active]);
-                return;
+                echo json_encode(['ok'=>false,'error'=>'Branch quick-add is disabled. System uses three fixed branches only.']);
+                break;
             }
             Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
             break;
@@ -837,47 +868,22 @@ switch ($page) {
         }
 
         if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $id = (int)($_POST['id'] ?? 0);
-            if ($id > 0) {
-                // Prevent deleting the only main branch
-                $isMain = $pdo->prepare('SELECT is_main FROM branches WHERE id=?');
-                $isMain->execute([$id]);
-                $row = $isMain->fetch();
-                if ($row && (int)$row['is_main'] === 1) {
-                    $countMain = $pdo->query('SELECT COUNT(*) AS c FROM branches WHERE is_main=1')->fetch();
-                    if ((int)$countMain['c'] <= 1) {
-                        $error = 'Cannot delete the only Main Branch.';
-                        $branches = BranchRepository::allOrderedForAdmin($pdo);
-                        Helpers::view('branches/index', compact('branches','error'));
-                        break;
-                    }
-                }
-                try {
-                    $pdo->prepare('DELETE FROM branches WHERE id=?')->execute([$id]);
-                } catch (PDOException $e) {
-                    // Integrity constraint (e.g., referenced by expenses, users, parcels, etc.)
-                    if ($e->getCode() === '23000') {
-                        $error = 'Cannot delete this branch because it is used by other records (e.g., expenses, users, parcels). Delete or reassign those records first.';
-                        $branches = BranchRepository::allOrderedForAdmin($pdo);
-                        Helpers::view('branches/index', compact('branches','error'));
-                        break;
-                    }
-                    throw $e;
-                }
-            }
+            $_SESSION['branch_list_flash_err'] = 'Branches cannot be deleted. The system uses three fixed branches only.';
             Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
             break;
         }
 
         if ($action === 'new') {
-            $branch = ['id'=>0,'name'=>'','code'=>'','is_main'=>0,'location'=>'','is_active'=>1];
-            Helpers::view('branches/form', compact('branch'));
+            Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
             break;
         }
 
         if ($action === 'edit') {
             $id = (int)($_GET['id'] ?? 0);
+            if (!BranchFixedMaster::isAllowedId($id)) {
+                Helpers::redirect('index.php?page=settings&tab=branches#pane-branches');
+                break;
+            }
             $stmt = $pdo->prepare('SELECT * FROM branches WHERE id=?');
             $stmt->execute([$id]);
             $branch = $stmt->fetch();
@@ -892,10 +898,14 @@ switch ($page) {
         break;
 
     case 'users':
-        // Admin only
+        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         if (!Auth::hasRole('admin')) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
+        $currentUserId = (int)(Auth::user()['id'] ?? 0);
+        $roleData = _users_roles_for_forms($pdo);
+        $rolesCatalog = $roleData['catalog'];
+        $rolesDynamic = $roleData['dynamic'];
         $branchesAll = BranchRepository::forDropdowns($pdo);
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -904,16 +914,19 @@ switch ($page) {
             // Normalize username: trim only (allow internal spaces)
             $username = trim($_POST['username'] ?? '');
             $full_name = trim($_POST['full_name'] ?? '');
-            $role = $_POST['role'] ?? '';
+            $role = trim((string)($_POST['role'] ?? ''));
             $branch_id = (int)($_POST['branch_id'] ?? 0);
             $active = isset($_POST['active']) ? 1 : 0;
             $password = $_POST['password'] ?? '';
+            if ($id > 0 && $id === $currentUserId) {
+                // Cannot deactivate or demote yourself
+                $active = 1;
+            }
             if ($username === '' || $full_name === '') {
                 $error = 'Username and Full Name are required.';
-                $userRow = compact('id','username','full_name','role','branch_id','active');
-                $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
                 break;
             }
             // Pre-check: unique username (case-insensitive, ignore leading/trailing spaces only)
@@ -937,14 +950,35 @@ switch ($page) {
                 }
                 $suggestedUsername = $suggest;
                 $error = 'Username already exists: ' . htmlspecialchars($conflict) . '. Try: ' . htmlspecialchars($suggestedUsername);
-                $userRow = compact('id','username','full_name','role','branch_id','active');
-                $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','suggestedUsername','rolesDynamic'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','suggestedUsername','rolesDynamic','rolesCatalog','currentUserId'));
                 break;
             }
-            // If your DB schema requires NOT NULL on users.role, fallback to 'staff' when empty
+            // Empty role defaults to staff for DB compatibility
             $roleParam = ($role === '') ? 'staff' : $role;
+            if ($id > 0 && $id === $currentUserId && $roleParam !== 'admin' && _users_is_last_active_admin($pdo, $id)) {
+                $error = 'You are the only active admin. Assign another admin before changing your role.';
+                $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
+                $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                break;
+            }
+            if ($id > 0 && $active !== 1 && _users_is_last_active_admin($pdo, $id)) {
+                $error = 'Cannot deactivate the only active admin account.';
+                $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
+                $userRow['active'] = 1;
+                $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                break;
+            }
+            if ($id > 0 && $roleParam !== 'admin' && _users_is_last_active_admin($pdo, $id)) {
+                $error = 'Cannot change role of the only active admin. Promote another user to admin first.';
+                $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
+                $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                break;
+            }
             try {
                 $pdo->beginTransaction();
                 if ($id > 0) {
@@ -957,12 +991,20 @@ switch ($page) {
                         $stmt->execute([$username,$full_name,$roleParam,($branch_id>0?$branch_id:null),$active,$id]);
                     }
                 } else {
-                    if ($password === '') { $error = 'Password is required for new user.'; $userRow = compact('id','username','full_name','role','branch_id','active'); $pdo->rollBack(); $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]); Helpers::view('users/form', compact('userRow','branchesAll','error')); break; }
+                    if ($password === '') {
+                        $error = 'Password is required for new user.';
+                        $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
+                        $pdo->rollBack();
+                        $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
+                        Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                        break;
+                    }
                     $hash = password_hash($password, PASSWORD_BCRYPT);
                     $stmt = $pdo->prepare('INSERT INTO users (username, full_name, role, branch_id, active, password_hash) VALUES (?,?,?,?,?,?)');
                     $stmt->execute([$username,$full_name,$roleParam,($branch_id>0?$branch_id:null),$active,$hash]);
                 }
                 $pdo->commit();
+                $_SESSION['flash_users_msg'] = $id > 0 ? 'User updated.' : 'User created.';
                 Helpers::redirect('index.php?page=users');
                 break;
             } catch (PDOException $e) {
@@ -978,10 +1020,9 @@ switch ($page) {
                     }
                 }
                 $error = $msg;
-                $userRow = compact('id','username','full_name','role','branch_id','active');
-                $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+                $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
                 break;
             }
             break;
@@ -991,17 +1032,33 @@ switch ($page) {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$id]);
+                if ($id === $currentUserId) {
+                    $_SESSION['flash_users_error'] = 'You cannot delete your own account while logged in.';
+                    Helpers::redirect('index.php?page=users');
+                    break;
+                }
+                if (_users_is_last_active_admin($pdo, $id)) {
+                    $_SESSION['flash_users_error'] = 'Cannot delete the only active admin account.';
+                    Helpers::redirect('index.php?page=users');
+                    break;
+                }
+                try {
+                    $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$id]);
+                    $_SESSION['flash_users_msg'] = 'User deleted.';
+                } catch (PDOException $e) {
+                    $_SESSION['flash_users_error'] = ($e->getCode() === '23000')
+                        ? 'Cannot delete this user because they are referenced by payments, expenses, or other records.'
+                        : 'Failed to delete user.';
+                }
             }
             Helpers::redirect('index.php?page=users');
             break;
         }
 
         if ($action === 'new') {
-            $userRow = ['id'=>0,'username'=>'','full_name'=>'','role'=>'','branch_id'=>0,'active'=>1];
-            $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+            $userRow = ['id'=>0,'username'=>'','full_name'=>'','role'=>'staff','branch_id'=>0,'active'=>1];
             $branchesAll = BranchRepository::forDropdowns($pdo);
-            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic'));
+            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic','rolesCatalog','currentUserId'));
             break;
         }
 
@@ -1009,11 +1066,14 @@ switch ($page) {
             $id = (int)($_GET['id'] ?? 0);
             $stmt = $pdo->prepare('SELECT * FROM users WHERE id=?');
             $stmt->execute([$id]);
-            $userRow = $stmt->fetch();
-            if (!$userRow) { http_response_code(404); echo 'Not found'; break; }
-            $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
+            $userRow = _users_sanitize_row_for_form($stmt->fetch() ?: null);
+            if (!$userRow) {
+                $_SESSION['flash_users_error'] = 'User not found.';
+                Helpers::redirect('index.php?page=users');
+                break;
+            }
             $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic'));
+            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic','rolesCatalog','currentUserId'));
             break;
         }
 
@@ -1034,15 +1094,36 @@ switch ($page) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $users = $stmt->fetchAll();
-        $rolesDynamic = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role<>'' ORDER BY role")->fetchAll();
         $branchesAll = BranchRepository::forFilters($pdo);
-        Helpers::view('users/index', compact('users','branchesAll','rolesDynamic','usernameF','fullNameF','roleF','branchF','activeF'));
+        $success = $_SESSION['flash_users_msg'] ?? null;
+        unset($_SESSION['flash_users_msg']);
+        $error = $_SESSION['flash_users_error'] ?? null;
+        unset($_SESSION['flash_users_error']);
+        Helpers::view('users/index', compact('users','branchesAll','rolesDynamic','rolesCatalog','usernameF','fullNameF','roleF','branchF','activeF','currentUserId','success','error'));
         break;
 
     case 'customers':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
+
+        if ($action === 'purge_all' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Auth::isAdmin()) { http_response_code(403); echo 'Forbidden'; break; }
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $confirm = trim((string)($_POST['confirm_purge'] ?? ''));
+            if ($confirm !== 'DELETE CUSTOMERS') {
+                Helpers::redirect('index.php?page=customers&purge_error=1');
+                break;
+            }
+            $result = DataReset::deleteAllCustomerData($pdo);
+            if ($result['success']) {
+                Helpers::redirect('index.php?page=customers&purged=' . (int)($result['customers_deleted'] ?? 0));
+                break;
+            }
+            $_SESSION['customer_purge_errors'] = $result['errors'] ?? [];
+            Helpers::redirect('index.php?page=customers&purge_failed=1');
+            break;
+        }
 
         if ($action === 'import_template' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             header('Content-Type: text/csv; charset=utf-8');
@@ -1538,6 +1619,7 @@ switch ($page) {
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
+        BranchRepository::ensureSchema($pdo);
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
@@ -1546,7 +1628,7 @@ switch ($page) {
             // Disallow placeholder-like names such as 'none' or '-- none --'
             $nameNorm = strtolower(preg_replace('/[^a-z0-9]+/i','', $name));
             $phone = trim($_POST['phone'] ?? '');
-            $branch_id = (int)($_POST['branch_id'] ?? 0);
+            $branch_id = BranchRepository::resolveToFixedBranchId($pdo, (int)($_POST['branch_id'] ?? 0));
             $supplier_code = trim($_POST['supplier_code'] ?? '');
             $wantsJson = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest')
                          || (strpos(($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false)
@@ -1603,6 +1685,14 @@ switch ($page) {
             $stmt->execute([$id]);
             $supplier = $stmt->fetch();
             if (!$supplier) { http_response_code(404); echo 'Not found'; break; }
+            $rawBranchId = (int)($supplier['branch_id'] ?? 0);
+            $fixedBranchId = BranchRepository::resolveToFixedBranchId($pdo, $rawBranchId);
+            if ($fixedBranchId > 0 && $fixedBranchId !== $rawBranchId) {
+                $pdo->prepare('UPDATE suppliers SET branch_id = ? WHERE id = ?')->execute([$fixedBranchId, $id]);
+                $supplier['branch_id'] = $fixedBranchId;
+            } elseif ($fixedBranchId > 0) {
+                $supplier['branch_id'] = $fixedBranchId;
+            }
             $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($supplier['branch_id'] ?? 0)]);
             Helpers::view('suppliers/form', compact('supplier','branchesAll'));
             break;
@@ -1612,28 +1702,50 @@ switch ($page) {
         $name = trim($_GET['name'] ?? '');
         $phone = trim($_GET['phone'] ?? '');
         $code = trim($_GET['code'] ?? '');
-        $branch_id = (int)($_GET['branch_id'] ?? 0);
+        $branch_id = BranchRepository::resolveToFixedBranchId($pdo, (int)($_GET['branch_id'] ?? 0));
         $q = trim($_GET['q'] ?? '');
+        $suppliers = [];
+
+        try {
+            $orphans = $pdo->query('SELECT id, branch_id FROM suppliers WHERE branch_id IS NOT NULL AND branch_id NOT IN (1,2,3)')->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($orphans as $orphan) {
+                $fixed = BranchRepository::resolveToFixedBranchId($pdo, (int)($orphan['branch_id'] ?? 0));
+                if ($fixed > 0) {
+                    $pdo->prepare('UPDATE suppliers SET branch_id = ? WHERE id = ?')->execute([$fixed, (int)$orphan['id']]);
+                }
+            }
+        } catch (Throwable $e) { /* best-effort legacy branch remap */ }
 
         $hasFilters = ($name !== '' || $phone !== '' || $code !== '' || $branch_id > 0);
-        if ($hasFilters) {
-            $sql = 'SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id WHERE 1=1';
-            $params = [];
-            if ($name !== '') { $sql .= ' AND s.name LIKE ?'; $params[] = "%$name%"; }
-            if ($phone !== '') { $sql .= ' AND s.phone LIKE ?'; $params[] = "%$phone%"; }
-            if ($code !== '') { $sql .= ' AND s.supplier_code LIKE ?'; $params[] = "%$code%"; }
-            if ($branch_id > 0) { $sql .= ' AND s.branch_id = ?'; $params[] = $branch_id; }
-            $sql .= ' ORDER BY s.created_at DESC LIMIT 100';
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $suppliers = $stmt->fetchAll();
-        } else if ($q !== '') {
-            $stmt = $pdo->prepare("SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id WHERE s.name LIKE ? OR s.phone LIKE ? OR s.supplier_code LIKE ? ORDER BY s.created_at DESC LIMIT 100");
-            $like = "%$q%";
-            $stmt->execute([$like,$like,$like]);
-            $suppliers = $stmt->fetchAll();
-        } else {
-            $suppliers = $pdo->query('SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id ORDER BY s.created_at DESC LIMIT 100')->fetchAll();
+        try {
+            if ($hasFilters) {
+                $sql = 'SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id WHERE 1=1';
+                $params = [];
+                if ($name !== '') { $sql .= ' AND s.name LIKE ?'; $params[] = "%$name%"; }
+                if ($phone !== '') { $sql .= ' AND s.phone LIKE ?'; $params[] = "%$phone%"; }
+                if ($code !== '') { $sql .= ' AND s.supplier_code LIKE ?'; $params[] = "%$code%"; }
+                if ($branch_id > 0) { $sql .= ' AND s.branch_id = ?'; $params[] = $branch_id; }
+                $sql .= ' ORDER BY s.created_at DESC LIMIT 100';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $suppliers = $stmt->fetchAll();
+            } else if ($q !== '') {
+                $stmt = $pdo->prepare("SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id WHERE s.name LIKE ? OR s.phone LIKE ? OR s.supplier_code LIKE ? ORDER BY s.created_at DESC LIMIT 100");
+                $like = "%$q%";
+                $stmt->execute([$like,$like,$like]);
+                $suppliers = $stmt->fetchAll();
+            } else {
+                $suppliers = $pdo->query('SELECT s.*, b.name AS branch_name FROM suppliers s LEFT JOIN branches b ON b.id = s.branch_id ORDER BY s.created_at DESC LIMIT 100')->fetchAll();
+            }
+            foreach ($suppliers as &$supRow) {
+                $bid = (int)($supRow['branch_id'] ?? 0);
+                if ($bid > 0 && trim((string)($supRow['branch_name'] ?? '')) === '' && isset(BranchFixedMaster::CANONICAL[$bid])) {
+                    $supRow['branch_name'] = BranchFixedMaster::CANONICAL[$bid]['name'];
+                }
+            }
+            unset($supRow);
+        } catch (Throwable $e) {
+            $suppliers = [];
         }
         $success = null;
         if (isset($_GET['saved']) && $_GET['saved'] === '1') {
@@ -1642,7 +1754,7 @@ switch ($page) {
             $success = 'Supplier removed.';
         }
         $branchesAll = BranchRepository::forFilters($pdo);
-        Helpers::view('suppliers/index', compact('suppliers','q','name','phone','code','branch_id','branchesAll','success'));
+        Helpers::view('suppliers/index', compact('suppliers','q','name','phone','code','branch_id','branchesAll','success','hasFilters'));
         break;
 
     case 'parcels':
@@ -1653,6 +1765,7 @@ switch ($page) {
 
         try { $pdo->exec("ALTER TABLE parcels ADD COLUMN delivery_route VARCHAR(255) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        ParcelBillingService::ensureSchema($pdo);
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try {
@@ -1824,8 +1937,8 @@ switch ($page) {
             $customer_id = (int)($_POST['customer_id'] ?? 0);
             $supplier_id = (int)($_POST['supplier_id'] ?? 0);
             if ($supplier_id <= 0) { $supplier_id = null; }
-            $from_branch_id = (int)($_POST['from_branch_id'] ?? 0);
-            $to_branch_id = (int)($_POST['to_branch_id'] ?? 0);
+            $from_branch_id = BranchRepository::resolveToFixedBranchId($pdo, (int)($_POST['from_branch_id'] ?? 0));
+            $to_branch_id = BranchRepository::resolveToFixedBranchId($pdo, (int)($_POST['to_branch_id'] ?? 0));
             $weight = (float)($_POST['weight'] ?? 0);
             $status = $_POST['status'] ?? 'pending';
             // Serial/tracking number handling
@@ -1834,18 +1947,15 @@ switch ($page) {
             $vehicle_no = trim($_POST['vehicle_no'] ?? '');
             $delivery_route = trim((string)($_POST['delivery_route'] ?? ''));
             $delivery_location = trim((string)($_POST['delivery_location'] ?? ''));
-            // Invoice number: manual or auto (next from 1)
+            // Same-day billing: one invoice per customer per calendar day (resolved on create inside transaction)
+            $billDate = ParcelBillingService::normalizeBillDate($_POST['created_date'] ?? '');
+            $invoice_number = trim((string)($_POST['invoice_number'] ?? ''));
+            $forceNewInvoice = isset($_POST['force_new_invoice']) && (string)$_POST['force_new_invoice'] === '1';
+            $billReused = false;
+            $invoice_id = 0;
             $invoice_no = (int)($_POST['invoice_no'] ?? 0);
-            if ($id <= 0) {
-                if ($invoice_no <= 0) {
-                    $nextRow = $pdo->query('SELECT COALESCE(MAX(invoice_no),0)+1 AS n FROM parcels');
-                    $invoice_no = $nextRow ? (int)$nextRow->fetch(PDO::FETCH_ASSOC)['n'] : 1;
-                }
-            } else {
-                if ($invoice_no <= 0) {
-                    // will use existing invoice_no or id after we load $existing below
-                    $invoice_no = 0;
-                }
+            if ($id > 0 && $invoice_no <= 0) {
+                $invoice_no = 0; // filled from $existing below when editing
             }
             // Lorry full flag
             $lorry_full = isset($_POST['lorry_full']) && ($_POST['lorry_full'] === '1' || $_POST['lorry_full'] === 'on');
@@ -1872,6 +1982,9 @@ switch ($page) {
                     if ($invoice_no <= 0) {
                         $invoice_no = (int)($existing['invoice_no'] ?? 0);
                         if ($invoice_no <= 0) { $invoice_no = (int)$existing['id']; }
+                    }
+                    if ($invoice_number === '') {
+                        $invoice_number = trim((string)($existing['invoice_number'] ?? ''));
                     }
                 }
                 // Status-only update: parcel is In Transit and form submitted with status_only_edit
@@ -1911,8 +2024,12 @@ switch ($page) {
                         echo json_encode(['ok'=>false,'error'=>$error]);
                         break;
                     }
+                    $items = $items ?? [];
+                    $vehiclesAll = $vehiclesAll ?? [];
+                    $deliveryRoutesAll = $deliveryRoutesAll ?? [];
+                    $lastParcel = null;
                     $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error') + ['policy'=>['priceOnly'=>false,'lockAll'=>true,'canEnterItemAmounts'=>$canEnterItemAmounts]]);
+                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','deliveryRoutesAll','lastParcel') + ['policy'=>['priceOnly'=>false,'lockAll'=>true,'canEnterItemAmounts'=>$canEnterItemAmounts]]);
                     break;
                 }
                 if ($isKilinochchi) {
@@ -1958,7 +2075,8 @@ switch ($page) {
                             break;
                         }
                         $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-                        Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy'));
+                        $lastParcel = null;
+                        Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','lastParcel'));
                         break;
                     }
                 } else {
@@ -1990,7 +2108,35 @@ switch ($page) {
                     break;
                 }
                 $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll'));
+                $lastParcel = null;
+                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel'));
+                break;
+            }
+
+            if (!$priceOnlyEdit && $from_branch_id > 0 && $to_branch_id > 0 && $from_branch_id === $to_branch_id) {
+                $error = 'From and To branch must be different.';
+                $parcel = compact('id','customer_id','supplier_id','from_branch_id','to_branch_id','weight','status','tracking_number','vehicle_no','delivery_route');
+                try {
+                    $vehiclesAll = $pdo->query('SELECT id, reg_number AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll();
+                } catch (Throwable $e) {
+                    try { $vehiclesAll = $pdo->query('SELECT id, plate_no AS vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                    catch (Throwable $e2) {
+                        try { $vehiclesAll = $pdo->query('SELECT id, vehicle_no FROM vehicles ORDER BY id DESC LIMIT 500')->fetchAll(); }
+                        catch (Throwable $e3) { $vehiclesAll = []; }
+                    }
+                }
+                $deliveryRoutesAll = [];
+                try { $deliveryRoutesAll = $pdo->query('SELECT id, name FROM delivery_routes ORDER BY name')->fetchAll(); } catch (Throwable $e) { $deliveryRoutesAll = []; }
+                $policy = ['priceOnly'=>$isKilinochchi, 'lockAll'=>false, 'canEnterItemAmounts'=>$canEnterItemAmounts];
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    http_response_code(422);
+                    echo json_encode(['ok'=>false,'error'=>$error]);
+                    break;
+                }
+                $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
+                $lastParcel = null;
+                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel'));
                 break;
             }
 
@@ -2029,7 +2175,8 @@ switch ($page) {
                         break;
                     }
                     $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll'));
+                    $lastParcel = null;
+                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel'));
                     break;
                 }
             }
@@ -2040,6 +2187,9 @@ switch ($page) {
             // Detect status transition to in_transit (for billing prompt)
             $statusWas = $existing ? (string)($existing['status'] ?? '') : '';
             $becameInTransit = ($id > 0 && $existing && $statusWas !== 'in_transit' && $status === 'in_transit');
+
+            // Schema DDL must run outside transactions (MySQL implicit commit on ALTER/CREATE).
+            ParcelBillingService::ensureSchema($pdo);
 
             try {
             $pdo->beginTransaction();
@@ -2142,9 +2292,27 @@ switch ($page) {
                         ]);
                         break;
                     }
-                    Helpers::redirect('index.php?page=parcels&action=new&duplicate=' . (int)$duplicate['id'] . '&customer_id=' . urlencode((string)$customer_id) . '&vehicle_no=' . urlencode((string)$vehicle_no) . '&from_branch_id=' . urlencode((string)$from_branch_id) . '&to_branch_id=' . urlencode((string)$to_branch_id));
+                    Helpers::redirect('index.php?page=parcels&action=new&duplicate=' . (int)$duplicate['id'] . '&customer_id=' . urlencode((string)$customer_id) . '&vehicle_no=' . urlencode((string)$vehicle_no) . '&from_branch_id=' . urlencode((string)$from_branch_id) . '&to_branch_id=' . urlencode((string)$to_branch_id) . '&date=' . urlencode($billDate));
                     break;
                 }
+
+                // Reuse today's bill for this customer or allocate a new INV-YYYYMMDD-NNN (row lock inside transaction)
+                $invResolved = ParcelBillingService::resolveInvoiceForNewParcel(
+                    $pdo,
+                    $customer_id,
+                    $billDate,
+                    $from_branch_id,
+                    $to_branch_id,
+                    $invoice_no,
+                    $invoice_number,
+                    $forceNewInvoice
+                );
+                $invoice_no = (int)$invResolved['invoice_no'];
+                $invoice_number = (string)$invResolved['invoice_number'];
+                $invoice_id = (int)($invResolved['invoice_id'] ?? 0);
+                $billReused = !empty($invResolved['is_reused']);
+                $invNumParam = ($invoice_number !== '') ? $invoice_number : null;
+                $invIdParam = $invoice_id > 0 ? $invoice_id : null;
                 
                 if ($isKilinochchi) {
                     // Compute price now for Kilinochchi create
@@ -2176,21 +2344,21 @@ switch ($page) {
                     $price = $p;
                     $createdAtOverride = trim($_POST['created_date'] ?? '');
                     if ($createdAtOverride) {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, delivery_route, created_at) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null),$createdAtOverride]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, invoice_number, invoice_id, delivery_route, created_at) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,$invNumParam,$invIdParam,($delivery_route!==''?$delivery_route:null),$createdAtOverride]);
                     } else {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, delivery_route) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null)]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, price, status, tracking_number, vehicle_no, invoice_no, invoice_number, invoice_id, delivery_route) VALUES (?,?,?,?,?,?,?, NULLIF(?, ''), ?, ?, ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$price,$status,$tracking_number,$vehicle_no,$invoice_no,$invNumParam,$invIdParam,($delivery_route!==''?$delivery_route:null)]);
                     }
                 } else {
                     // Other branches: do not set price at create
                     $createdAtOverride = trim($_POST['created_date'] ?? '');
                     if ($createdAtOverride) {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, delivery_route, created_at) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null),$createdAtOverride]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, invoice_number, invoice_id, delivery_route, created_at) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,$invNumParam,$invIdParam,($delivery_route!==''?$delivery_route:null),$createdAtOverride]);
                     } else {
-                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, delivery_route) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?)");
-                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,($delivery_route!==''?$delivery_route:null)]);
+                        $stmt = $pdo->prepare("INSERT INTO parcels (customer_id, supplier_id, from_branch_id, to_branch_id, weight, status, tracking_number, vehicle_no, invoice_no, invoice_number, invoice_id, delivery_route) VALUES (?,?,?,?,?,?,NULLIF(?, ''),?, ?, ?, ?, ?)");
+                        $stmt->execute([$customer_id,$supplier_id,$from_branch_id,$to_branch_id,$weight,$status,$tracking_number,$vehicle_no,$invoice_no,$invNumParam,$invIdParam,($delivery_route!==''?$delivery_route:null)]);
                     }
                 }
                 $id = (int)$pdo->lastInsertId();
@@ -2225,43 +2393,47 @@ switch ($page) {
                     } catch (Throwable $e) { /* ignore if table missing */ }
                 }
             }
-            // Same bill: if a delivery note already exists for this customer, destination branch, and parcel day, attach this parcel
-            if ($parcelWasCreate && $id > 0 && $customer_id > 0 && $to_branch_id > 0) {
+            // Daily invoice: link parcel, recalculate invoice totals, attach delivery note
+            if ($parcelWasCreate && $id > 0 && $customer_id > 0) {
                 try {
-                    $existsDnp = $pdo->prepare('SELECT 1 FROM delivery_note_parcels WHERE parcel_id=? LIMIT 1');
-                    $existsDnp->execute([$id]);
-                    if (!$existsDnp->fetch()) {
-                        $dt = $pdo->prepare('SELECT DATE(created_at) AS d FROM parcels WHERE id=?');
-                        $dt->execute([$id]);
-                        $dd = $dt->fetch();
-                        $billYmd = $dd && !empty($dd['d']) ? (string)$dd['d'] : date('Y-m-d');
-                        $findDn = $pdo->prepare('SELECT id FROM delivery_notes WHERE customer_id=? AND branch_id=? AND delivery_date=? LIMIT 1');
-                        $findDn->execute([$customer_id, $to_branch_id, $billYmd]);
-                        $dnR = $findDn->fetch();
-                        if ($dnR) {
-                            $dnId = (int)$dnR['id'];
-                            $amt = 0.0;
-                            $pr = $pdo->prepare('SELECT price FROM parcels WHERE id=?');
-                            $pr->execute([$id]);
-                            $pRow = $pr->fetch();
-                            if ($pRow && $pRow['price'] !== null && (float)$pRow['price'] > 0) {
-                                $amt = (float)$pRow['price'];
-                            } else {
-                                $sumItems = $pdo->prepare('SELECT COALESCE(SUM(COALESCE(qty,0)*COALESCE(rate,0) + COALESCE(additional_amount,0)),0) AS s FROM parcel_items WHERE parcel_id=?');
-                                $sumItems->execute([$id]);
-                                $amt = (float)($sumItems->fetch()['s'] ?? 0);
-                            }
-                            $insDnp = $pdo->prepare('INSERT IGNORE INTO delivery_note_parcels (delivery_note_id, parcel_id, amount) VALUES (?,?,?)');
-                            $insDnp->execute([$dnId, $id, $amt]);
-                            $sumStmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS s FROM delivery_note_parcels WHERE delivery_note_id=?');
-                            $sumStmt->execute([$dnId]);
-                            $s = (float)($sumStmt->fetch()['s'] ?? 0);
-                            $pdo->prepare('UPDATE delivery_notes SET total_amount=? WHERE id=?')->execute([$s, $dnId]);
+                    $dt = $pdo->prepare('SELECT DATE(created_at) AS d FROM parcels WHERE id=?');
+                    $dt->execute([$id]);
+                    $dd = $dt->fetch();
+                    $billYmd = $dd && !empty($dd['d']) ? (string)$dd['d'] : $billDate;
+                    if (!empty($invoice_id)) {
+                        ParcelBillingService::linkParcelAndRecalculate(
+                            $pdo,
+                            $id,
+                            $invoice_id,
+                            $customer_id,
+                            $billYmd,
+                            $invoice_no,
+                            $invoice_number,
+                            $from_branch_id,
+                            $to_branch_id
+                        );
+                    }
+                    if ($to_branch_id > 0) {
+                        $amt = ParcelBillingService::computeParcelAmount($pdo, $id, $price !== null ? (float)$price : null);
+                        ParcelBillingService::attachParcelToBill(
+                            $pdo,
+                            $id,
+                            $customer_id,
+                            $to_branch_id,
+                            $billYmd,
+                            $amt,
+                            $invoice_no,
+                            $invoice_number
+                        );
+                        if (!empty($invoice_id)) {
+                            ParcelBillingService::recalculateInvoiceTotals($pdo, $invoice_id);
                         }
                     }
                 } catch (Throwable $e) { /* ignore link errors */ }
             }
-            $pdo->commit();
+            if ($pdo->inTransaction()) {
+                $pdo->commit();
+            }
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
@@ -2461,10 +2633,22 @@ switch ($page) {
                . '&customer_id=' . urlencode((string)$customer_id)
                . '&vehicle_no=' . urlencode((string)$vehicle_no)
                . '&from_branch_id=' . urlencode((string)$from_branch_id)
-               . '&to_branch_id=' . urlencode((string)$to_branch_id);
+               . '&to_branch_id=' . urlencode((string)$to_branch_id)
+               . '&date=' . urlencode($billDate);
+            $billSummaryAfterSave = ($customer_id > 0)
+                ? ParcelBillingService::findExistingBill($pdo, $customer_id, $billDate, $from_branch_id, $to_branch_id)
+                : null;
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok'=>true,'id'=>(int)$id,'redirect'=>Helpers::baseUrl($q)]);
+                echo json_encode([
+                    'ok' => true,
+                    'id' => (int)$id,
+                    'redirect' => Helpers::baseUrl($q),
+                    'invoice_no' => $invoice_no,
+                    'invoice_number' => $invoice_number,
+                    'bill_reused' => $billReused,
+                    'bill' => $billSummaryAfterSave,
+                ]);
                 break;
             }
             Helpers::redirect($q);
@@ -2494,8 +2678,15 @@ switch ($page) {
                     }
                     // Delete parcel items first to satisfy FK
                     try { $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]); } catch (Throwable $e) { /* ignore if table absent */ }
+                    $invSt = $pdo->prepare('SELECT invoice_id FROM parcels WHERE id=? LIMIT 1');
+                    $invSt->execute([$id]);
+                    $invRow = $invSt->fetch(PDO::FETCH_ASSOC);
+                    $affectedInvoiceId = (int)($invRow['invoice_id'] ?? 0);
                     // Delete the parcel
                     $pdo->prepare('DELETE FROM parcels WHERE id=?')->execute([$id]);
+                    if ($affectedInvoiceId > 0) {
+                        ParcelBillingService::recalculateInvoiceTotals($pdo, $affectedInvoiceId);
+                    }
                     $pdo->commit();
                 } catch (Throwable $e) {
                     if ($pdo->inTransaction()) { $pdo->rollBack(); }
@@ -2566,11 +2757,15 @@ switch ($page) {
                 } catch (Throwable $e) { /* ignore */ }
             }
             if ((int)($parcel['from_branch_id'] ?? 0) <= 0) {
-                $defFrom = BranchRepository::getDefaultBranchIdForForms($pdo);
+                $defFrom = BranchRepository::resolveToFixedBranchId($pdo, (int)($user['branch_id'] ?? 0));
+                if ($defFrom <= 0) {
+                    $defFrom = BranchRepository::getDefaultBranchIdForForms($pdo);
+                }
                 if ($defFrom > 0) {
                     $parcel['from_branch_id'] = $defFrom;
                 }
             }
+            BranchRepository::normalizeParcelBranchIds($pdo, $parcel);
             // Last bill (most recent parcel) for "Open last bill" / "Add more parcel" options
             $lastParcel = null;
             try {
@@ -2583,10 +2778,23 @@ switch ($page) {
                 $lastParcel = $lastStmt->fetch() ?: null;
             } catch (Throwable $e) { /* ignore */ }
 
+            // Same-day bill summary for UI (customer + parcel date)
+            $todayBillSummary = null;
+            $billDatePre = $preDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preDate) ? $preDate : date('Y-m-d');
+            if ($cidPrefill > 0) {
+                $fromPre = BranchRepository::resolveToFixedBranchId($pdo, (int)($parcel['from_branch_id'] ?? 0));
+                $toPre = BranchRepository::resolveToFixedBranchId($pdo, (int)($parcel['to_branch_id'] ?? 0));
+                $todayBillSummary = ParcelBillingService::findExistingBill($pdo, $cidPrefill, $billDatePre, $fromPre, $toPre);
+                if ($todayBillSummary) {
+                    $parcel['invoice_no'] = (int)$todayBillSummary['invoice_no'];
+                    $parcel['invoice_number'] = (string)$todayBillSummary['invoice_number'];
+                }
+            }
+
             // Determine lock/priceOnly flags for UI
             $policy = ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>$canEnterItemAmounts];
             $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel','deliveryRoutesAll'));
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel','deliveryRoutesAll','todayBillSummary'));
             break;
         }
 
@@ -2596,6 +2804,7 @@ switch ($page) {
             $stmt->execute([$id]);
             $parcel = $stmt->fetch();
             if (!$parcel) { http_response_code(404); echo 'Not found'; break; }
+            BranchRepository::normalizeParcelBranchIds($pdo, $parcel);
             $itStmt = $pdo->prepare('SELECT * FROM parcel_items WHERE parcel_id=? ORDER BY id');
             $itStmt->execute([$id]);
             $items = $itStmt->fetchAll();
@@ -2615,6 +2824,34 @@ switch ($page) {
             }
             $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
             Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy','deliveryRoutesAll'));
+            break;
+        }
+
+        // AJAX: same-day bill summary for customer + date (parcel form)
+        if ($action === 'bill_for_customer_date') {
+            header('Content-Type: application/json; charset=utf-8');
+            if (!Auth::check()) {
+                echo json_encode(['ok' => false, 'error' => 'Forbidden']);
+                break;
+            }
+            ParcelBillingService::ensureSchema($pdo);
+            $customer_id = (int)($_GET['customer_id'] ?? $_POST['customer_id'] ?? 0);
+            $from_branch_id = BranchRepository::resolveToFixedBranchId($pdo, (int)($_GET['from_branch_id'] ?? $_POST['from_branch_id'] ?? 0));
+            $to_branch_id = BranchRepository::resolveToFixedBranchId($pdo, (int)($_GET['to_branch_id'] ?? $_POST['to_branch_id'] ?? 0));
+            $date = trim((string)($_GET['date'] ?? $_POST['date'] ?? ''));
+            if ($date === '') {
+                $date = date('Y-m-d');
+            }
+            if ($customer_id <= 0) {
+                echo json_encode(['ok' => true, 'found' => false, 'bill' => null]);
+                break;
+            }
+            $bill = ParcelBillingService::findExistingBill($pdo, $customer_id, $date, $from_branch_id, $to_branch_id);
+            echo json_encode([
+                'ok' => true,
+                'found' => $bill !== null,
+                'bill' => $bill,
+            ]);
             break;
         }
 
@@ -3318,8 +3555,15 @@ switch ($page) {
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         $user = Auth::user();
-        $branchId = (int)($user['branch_id'] ?? 0);
-        $branchFilterId = Auth::isMainBranch() ? (int)($_GET['branch_id'] ?? $branchId) : $branchId;
+        $branchId = BranchRepository::resolveToFixedBranchId($pdo, (int)($user['branch_id'] ?? 0));
+        if ($branchId <= 0) {
+            $mainRow = $pdo->query('SELECT id FROM branches WHERE is_main = 1 ORDER BY id LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+            $branchId = (int)($mainRow['id'] ?? 2);
+        }
+        $branchFilterId = Auth::isMainBranch() ? BranchRepository::resolveToFixedBranchId($pdo, (int)($_GET['branch_id'] ?? $branchId)) : $branchId;
+        if ($branchFilterId <= 0) {
+            $branchFilterId = $branchId;
+        }
         $action = $_GET['action'] ?? 'index';
         // Ensure per-DN email status columns exist
         try { $pdo->exec("ALTER TABLE delivery_notes ADD COLUMN last_email_status VARCHAR(10) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
@@ -3827,84 +4071,122 @@ switch ($page) {
         }
 
         if ($action === 'route_vehicles') {
-            // Vehicle-wise route list for THIS branch and selected date range (by parcels created_at)
-            $from = $_GET['from'] ?? date('Y-m-01');
-            $to = $_GET['to'] ?? date('Y-m-d');
-            $direction = $_GET['direction'] ?? 'from'; // 'from' (dispatch) or 'to' (arrivals)
+            // Vehicle-wise route list for branch and selected date range (by parcels created_at)
+            $from = Helpers::parseDateOr((string)($_GET['from'] ?? ''), date('Y-m-01'));
+            $to = Helpers::parseDateOr((string)($_GET['to'] ?? ''), date('Y-m-d'));
+            [$from, $to] = Helpers::orderDateRange($from, $to);
+            $direction = ($_GET['direction'] ?? 'from') === 'to' ? 'to' : 'from';
             $vehicle = trim($_GET['vehicle'] ?? '');
+            $routeBranchId = Auth::isMainBranch()
+                ? BranchRepository::resolveToFixedBranchId($pdo, (int)($_GET['branch_id'] ?? 0))
+                : $branchId;
+            if ($routeBranchId <= 0) {
+                $routeBranchId = $branchId;
+            }
             $branchColumn = ($direction === 'to') ? 'p.to_branch_id' : 'p.from_branch_id';
-            // For arrivals (to-branch), consider last update time; for dispatch (from-branch), use created_at
             $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(p.updated_at, p.created_at))' : 'DATE(p.created_at)';
-            $sql = "SELECT COALESCE(p.vehicle_no,'—') AS vehicle_no,
+            $sql = "SELECT COALESCE(NULLIF(TRIM(p.vehicle_no), ''), '—') AS vehicle_no,
                            COUNT(*) AS parcels_count,
                            SUM(CASE WHEN p.status='delivered' THEN 1 ELSE 0 END) AS delivered_count,
                            MAX($dateExpr) AS last_date
                     FROM parcels p
-                    LEFT JOIN delivery_note_parcels dnp ON dnp.parcel_id = p.id
                     WHERE $branchColumn = ? AND $dateExpr BETWEEN ? AND ?";
-            $params = [$branchId, $from, $to];
-            if ($vehicle !== '') { $sql .= ' AND COALESCE(p.vehicle_no, "") LIKE ?'; $params[] = "%$vehicle%"; }
+            $params = [$routeBranchId, $from, $to];
+            if ($vehicle !== '') { $sql .= " AND COALESCE(p.vehicle_no, '') LIKE ?"; $params[] = "%$vehicle%"; }
             $sql .= "
-                    GROUP BY COALESCE(p.vehicle_no,'—')
-                    ORDER BY (COALESCE(p.vehicle_no,'')='') ASC, MAX($dateExpr) DESC";
+                    GROUP BY COALESCE(NULLIF(TRIM(p.vehicle_no), ''), '—')
+                    HAVING vehicle_no <> '—'
+                    ORDER BY MAX($dateExpr) DESC, vehicle_no ASC";
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $routes = $stmt->fetchAll();
-            Helpers::view('delivery_notes/route_vehicles', compact('routes','from','to','direction','vehicle'));
+            $branchesAll = BranchRepository::forFilters($pdo);
+            $isMain = Auth::isMainBranch();
+            $hasFilters = ($vehicle !== '' || $routeBranchId !== $branchId || $from !== date('Y-m-01') || $to !== date('Y-m-d') || $direction !== 'from');
+            Helpers::view('delivery_notes/route_vehicles', compact('routes','from','to','direction','vehicle','branchesAll','isMain','routeBranchId','hasFilters'));
             break;
         }
 
         if ($action === 'route_vehicles_update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $from = $_POST['from'] ?? date('Y-m-01');
-            $to = $_POST['to'] ?? date('Y-m-d');
-            $direction = $_POST['direction'] ?? 'from';
+            $from = Helpers::parseDateOr((string)($_POST['from'] ?? ''), date('Y-m-01'));
+            $to = Helpers::parseDateOr((string)($_POST['to'] ?? ''), date('Y-m-d'));
+            [$from, $to] = Helpers::orderDateRange($from, $to);
+            $direction = ($_POST['direction'] ?? 'from') === 'to' ? 'to' : 'from';
+            $routeBranchId = Auth::isMainBranch()
+                ? BranchRepository::resolveToFixedBranchId($pdo, (int)($_POST['branch_id'] ?? 0))
+                : $branchId;
+            if ($routeBranchId <= 0) {
+                $routeBranchId = $branchId;
+            }
             $old_vehicle = (string)($_POST['old_vehicle'] ?? '');
             $new_vehicle = trim((string)($_POST['new_vehicle'] ?? ''));
+            $redir = 'index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction);
+            if (Auth::isMainBranch()) {
+                $redir .= '&branch_id=' . (int)$routeBranchId;
+            }
             if ($new_vehicle === '') {
-                Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&err=vehicle_required');
+                Helpers::redirect($redir . '&err=vehicle_required');
                 break;
             }
             $branchColumn = ($direction === 'to') ? 'to_branch_id' : 'from_branch_id';
             $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(updated_at, created_at))' : 'DATE(created_at)';
             $sql = "UPDATE parcels SET vehicle_no = ? WHERE $branchColumn = ? AND $dateExpr BETWEEN ? AND ? AND COALESCE(vehicle_no,'') = ?";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$new_vehicle, $branchId, $from, $to, $old_vehicle]);
-            Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&saved=1');
+            $stmt->execute([$new_vehicle, $routeBranchId, $from, $to, $old_vehicle]);
+            Helpers::redirect($redir . '&saved=1');
             break;
         }
 
         if ($action === 'route_vehicles_clear' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $from = $_POST['from'] ?? date('Y-m-01');
-            $to = $_POST['to'] ?? date('Y-m-d');
-            $direction = $_POST['direction'] ?? 'from';
+            $from = Helpers::parseDateOr((string)($_POST['from'] ?? ''), date('Y-m-01'));
+            $to = Helpers::parseDateOr((string)($_POST['to'] ?? ''), date('Y-m-d'));
+            [$from, $to] = Helpers::orderDateRange($from, $to);
+            $direction = ($_POST['direction'] ?? 'from') === 'to' ? 'to' : 'from';
+            $routeBranchId = Auth::isMainBranch()
+                ? BranchRepository::resolveToFixedBranchId($pdo, (int)($_POST['branch_id'] ?? 0))
+                : $branchId;
+            if ($routeBranchId <= 0) {
+                $routeBranchId = $branchId;
+            }
             $old_vehicle = trim((string)($_POST['old_vehicle'] ?? ''));
+            $redir = 'index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction);
+            if (Auth::isMainBranch()) {
+                $redir .= '&branch_id=' . (int)$routeBranchId;
+            }
             if ($old_vehicle === '') {
-                Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&err=vehicle_required');
+                Helpers::redirect($redir . '&err=vehicle_required');
                 break;
             }
             $branchColumn = ($direction === 'to') ? 'to_branch_id' : 'from_branch_id';
             $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(updated_at, created_at))' : 'DATE(created_at)';
             $sql = "UPDATE parcels SET vehicle_no = '' WHERE $branchColumn = ? AND $dateExpr BETWEEN ? AND ? AND COALESCE(vehicle_no,'') = ?";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$branchId, $from, $to, $old_vehicle]);
-            Helpers::redirect('index.php?page=delivery_notes&action=route_vehicles&from=' . urlencode($from) . '&to=' . urlencode($to) . '&direction=' . urlencode($direction) . '&saved=1');
+            $stmt->execute([$routeBranchId, $from, $to, $old_vehicle]);
+            Helpers::redirect($redir . '&saved=1');
             break;
         }
 
         if ($action === 'route_detail') {
             // Show parcels for a given vehicle number, grouped by customer, only those not yet attached to a DN for this branch
             $vehicle_no = trim($_GET['vehicle_no'] ?? '');
-            $from = $_GET['from'] ?? date('Y-m-01');
-            $to = $_GET['to'] ?? date('Y-m-d');
-            $direction = $_GET['direction'] ?? 'from';
+            $from = Helpers::parseDateOr((string)($_GET['from'] ?? ''), date('Y-m-01'));
+            $to = Helpers::parseDateOr((string)($_GET['to'] ?? ''), date('Y-m-d'));
+            [$from, $to] = Helpers::orderDateRange($from, $to);
+            $direction = ($_GET['direction'] ?? 'from') === 'to' ? 'to' : 'from';
             $placeFilter = trim($_GET['place'] ?? '');
+            $detailBranchId = Auth::isMainBranch()
+                ? BranchRepository::resolveToFixedBranchId($pdo, (int)($_GET['branch_id'] ?? 0))
+                : $branchId;
+            if ($detailBranchId <= 0) {
+                $detailBranchId = $branchId;
+            }
             $branchColumn = ($direction === 'to') ? 'p.to_branch_id' : 'p.from_branch_id';
             // Date range uses last update time for arrivals
             $dateExpr = ($direction === 'to') ? 'DATE(COALESCE(p.updated_at, p.created_at))' : 'DATE(p.created_at)';
             $where = ["$branchColumn = ?", "$dateExpr BETWEEN ? AND ?"];
-            $params = [$branchId, $from, $to];
+            $params = [$detailBranchId, $from, $to];
             if ($vehicle_no !== '') { $where[] = 'COALESCE(p.vehicle_no,"") = ?'; $params[] = $vehicle_no; }
             if ($placeFilter !== '') { $where[] = 'COALESCE(c.delivery_location,"") LIKE ?'; $params[] = '%'.$placeFilter.'%'; }
             // Fetch parcels with customer info and delivered flags
@@ -4265,6 +4547,46 @@ switch ($page) {
             break;
         }
 
+        if ($action === 'collect_payment' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Auth::canCollectPayments()) { http_response_code(403); echo 'Forbidden'; break; }
+            if (!Auth::isMainBranch()) { http_response_code(403); echo 'Forbidden'; break; }
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $from = $_POST['from'] ?? date('Y-m-01');
+            $to = $_POST['to'] ?? date('Y-m-d');
+            $q = trim((string)($_POST['q'] ?? ''));
+            $redir = 'index.php?page=delivery_notes&from=' . urlencode($from) . '&to=' . urlencode($to) . ($q !== '' ? '&q=' . urlencode($q) : '');
+            $dnId = (int)($_POST['delivery_note_id'] ?? 0);
+            $amount = (float)($_POST['amount'] ?? 0);
+            $paid_at = $_POST['paid_at'] ?? date('Y-m-d H:i:s');
+            if ($dnId <= 0 || $amount <= 0) {
+                Helpers::redirect($redir . '&err=payment_invalid');
+                break;
+            }
+            $stmt = $pdo->prepare('SELECT dn.*, COALESCE((SELECT SUM(amount) FROM payments WHERE delivery_note_id=dn.id),0) AS paid FROM delivery_notes dn WHERE dn.id=?');
+            $stmt->execute([$dnId]);
+            $dn = $stmt->fetch();
+            if (!$dn) {
+                Helpers::redirect($redir . '&err=payment_not_found');
+                break;
+            }
+            $undel = $pdo->prepare('SELECT COUNT(*) FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND ' . Helpers::parcelSqlBlocksPaymentUntilDelivery());
+            $undel->execute([$dnId]);
+            if ((int)$undel->fetchColumn() > 0) {
+                Helpers::redirect($redir . '&err=payment_not_delivered');
+                break;
+            }
+            $netTotal = (float)$dn['total_amount'] + (float)($dn['discount'] ?? 0);
+            $due = $netTotal - (float)$dn['paid'];
+            if ($amount > $due) {
+                Helpers::redirect($redir . '&err=payment_overdue');
+                break;
+            }
+            $ins = $pdo->prepare('INSERT INTO payments (delivery_note_id, amount, paid_at, received_by) VALUES (?,?,?,?)');
+            $ins->execute([$dnId, $amount, $paid_at, (int)($user['id'] ?? 0)]);
+            Helpers::redirect($redir . '&collected=1');
+            break;
+        }
+
         if ($action === 'customer_summary') {
             // Summary report: invoice count per customer for current branch, with date range
             $from = $_GET['from'] ?? date('Y-m-01');
@@ -4354,179 +4676,6 @@ switch ($page) {
         $stmt->execute($params);
         $notes = $stmt->fetchAll();
         Helpers::view('delivery_notes/index', compact('notes','from','to','q'));
-        break;
-
-    case 'payments':
-        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
-        if (!Auth::canCollectPayments()) { http_response_code(403); echo 'Forbidden'; break; }
-        $pdo = Database::pdo();
-        $user = Auth::user();
-        $branchId = (int)($user['branch_id'] ?? 0);
-        $isMain = Auth::isMainBranch();
-        $action = $_GET['action'] ?? 'index';
-        // For Main branch users, allow selecting any branch or All (0). Default to All.
-        $branchFilterId = $isMain ? (int)($_GET['branch_id'] ?? 0) : $branchId;
-
-        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!$isMain) { http_response_code(403); echo 'Forbidden'; break; }
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $dnId = (int)($_POST['delivery_note_id'] ?? 0);
-            $amount = (float)($_POST['amount'] ?? 0);
-            $paid_at = $_POST['paid_at'] ?? date('Y-m-d H:i:s');
-            if ($dnId <= 0 || $amount <= 0) { $error = 'Valid delivery note and positive amount required.'; }
-            // fetch DN with customer info and due
-            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, COALESCE((SELECT SUM(amount) FROM payments WHERE delivery_note_id=dn.id),0) AS paid FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id WHERE dn.id=?');
-            $stmt->execute([$dnId]);
-            $dn = $stmt->fetch();
-            if (!$dn) { http_response_code(404); echo 'Delivery note not found'; break; }
-            // Enforce AFTER delivery: ensure all parcels in this DN are delivered
-            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND ' . Helpers::parcelSqlBlocksPaymentUntilDelivery());
-            $undel->execute([$dnId]);
-            $undelCnt = (int)$undel->fetchColumn();
-            if ($undelCnt > 0) {
-                $error = 'Payments are allowed only after delivery. Some parcels in this delivery note are not delivered yet.';
-            }
-            // Recompute current due and prevent overpayment
-            $netTotal = (float)$dn['total_amount'] + (float)($dn['discount'] ?? 0);
-            $due = $netTotal - (float)$dn['paid'];
-            if ($amount > $due) {
-                $error = 'Amount exceeds due. Please enter an amount up to the current due.';
-            }
-            if (!empty($error)) {
-                $payment = ['delivery_note_id'=>$dnId,'amount'=>max(0,$amount),'paid_at'=>$paid_at];
-                Helpers::view('payments/form', compact('payment','dn','error','isMain'));
-                break;
-            }
-            $ins = $pdo->prepare('INSERT INTO payments (delivery_note_id, amount, paid_at, received_by) VALUES (?,?,?,?)');
-            $ins->execute([$dnId, $amount, $paid_at, (int)($user['id'] ?? null)]);
-            Helpers::redirect('index.php?page=payments');
-            break;
-        }
-
-        if ($action === 'new') {
-            if (!$isMain) { http_response_code(403); echo 'Forbidden'; break; }
-            $id = (int)($_GET['id'] ?? 0);
-            $stmt = $pdo->prepare('SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone, COALESCE((SELECT SUM(amount) FROM payments WHERE delivery_note_id=dn.id),0) AS paid FROM delivery_notes dn LEFT JOIN customers c ON c.id = dn.customer_id WHERE dn.id=?');
-            $stmt->execute([$id]);
-            $dn = $stmt->fetch();
-            if (!$dn) { http_response_code(404); echo 'Delivery note not found'; break; }
-            // Block payments before delivery if any parcels are undelivered
-            $undel = $pdo->prepare('SELECT COUNT(*) AS cnt FROM delivery_note_parcels dnp JOIN parcels p ON p.id=dnp.parcel_id WHERE dnp.delivery_note_id=? AND ' . Helpers::parcelSqlBlocksPaymentUntilDelivery());
-            $undel->execute([$id]);
-            $undelCnt = (int)$undel->fetchColumn();
-            $error = '';
-            if ($undelCnt > 0) {
-                $error = 'Payments are allowed only after delivery. Some parcels in this delivery note are not delivered yet.';
-            }
-            $netTotal = (float)$dn['total_amount'] + (float)($dn['discount'] ?? 0);
-            $payment = ['delivery_note_id'=>$id,'amount'=>max(0, $netTotal - (float)$dn['paid']),'paid_at'=>date('Y-m-d H:i:s')];
-            Helpers::view('payments/form', compact('payment','dn','isMain','error'));
-            break;
-        }
-
-        // index: list DNs with outstanding due for selected branch (or All for main), filter by date range and search
-        // Default range: last 30 days, so recent dues and payments are visible without manual filtering
-        $from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
-        $to = $_GET['to'] ?? date('Y-m-d');
-        $groupMode = $_GET['group'] ?? 'customer'; // 'customer' (default) or 'dn'
-        $q = trim($_GET['q'] ?? '');
-            $sql = 'SELECT dn.*, c.name AS customer_name, c.phone AS customer_phone,
-                       ((dn.total_amount + COALESCE(dn.discount,0)) - COALESCE(paid.total_paid,0)) AS due,
-                       COALESCE(paid.total_paid,0) AS paid,
-                       COALESCE(dn.discount, 0) AS discount,
-                       (dn.total_amount + COALESCE(dn.discount, 0)) AS amount_after_discount,
-                       dn.total_amount AS display_total
-                FROM delivery_notes dn
-                LEFT JOIN customers c ON c.id = dn.customer_id
-                LEFT JOIN (
-                    SELECT delivery_note_id, SUM(amount) AS total_paid
-                    FROM payments GROUP BY delivery_note_id
-                ) paid ON paid.delivery_note_id = dn.id
-                WHERE dn.delivery_date BETWEEN ? AND ?';
-        $params = [$from, $to];
-        if ($branchFilterId > 0) {
-            $sql .= ' AND dn.branch_id = ?';
-            $params[] = $branchFilterId;
-        }
-        if ($q !== '') {
-            $sql .= ' AND (c.phone LIKE ? OR c.name LIKE ?)';
-            $like = "%$q%";
-            array_push($params, $like, $like);
-        }
-        $sql .= ' HAVING due > 0.01 ORDER BY dn.delivery_date DESC, dn.id DESC LIMIT 200';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $dues = $stmt->fetchAll();
-
-        // Build grouped data by customer when requested
-        $dueGroups = [];
-        if ($groupMode === 'customer') {
-            foreach ($dues as $row) {
-                $cid = (int)($row['customer_id'] ?? 0);
-                if ($cid <= 0) { $cid = -1; }
-                if (!isset($dueGroups[$cid])) {
-                    $dueGroups[$cid] = [
-                        'customer_id' => $cid,
-                        'customer_name' => (string)($row['customer_name'] ?? 'Unknown'),
-                        'customer_phone' => (string)($row['customer_phone'] ?? ''),
-                        'bills' => [],
-                        'total_amount' => 0.0,
-                        'discount' => 0.0,
-                        'amount_after_discount' => 0.0,
-                        'paid' => 0.0,
-                        'due' => 0.0,
-                    ];
-                }
-                $dueGroups[$cid]['bills'][] = [
-                    'id' => (int)$row['id'],
-                    'delivery_date' => (string)$row['delivery_date'],
-                    'total_amount' => (float)$row['total_amount'],
-                    'discount' => (float)($row['discount'] ?? 0),
-                    'amount_after_discount' => (float)($row['amount_after_discount'] ?? ((float)$row['total_amount'] + (float)($row['discount'] ?? 0))),
-                    'paid' => (float)$row['paid'],
-                    'due' => (float)$row['due'],
-                ];
-                $dueGroups[$cid]['total_amount'] += (float)$row['total_amount'];
-                $dueGroups[$cid]['discount'] += (float)($row['discount'] ?? 0);
-                $dueGroups[$cid]['amount_after_discount'] += (float)($row['amount_after_discount'] ?? ((float)$row['total_amount'] + (float)($row['discount'] ?? 0)));
-                $dueGroups[$cid]['paid'] += (float)$row['paid'];
-                $dueGroups[$cid]['due'] += (float)$row['due'];
-            }
-            // Reindex to a numeric array for the view
-            $dueGroups = array_values($dueGroups);
-        }
-        
-        // Get payment history for DataTable
-
-        
-        $fromStart = $from . ' 00:00:00';
-        $toEnd = $to . ' 23:59:59';
-        $paymentsSql = 'SELECT p.*, dn.id as dn_id, c.name AS customer_name, c.phone AS customer_phone, 
-                               u.full_name AS received_by_name, b.name AS branch_name
-                        FROM payments p
-                        LEFT JOIN delivery_notes dn ON dn.id = p.delivery_note_id
-                        LEFT JOIN customers c ON c.id = dn.customer_id
-                        LEFT JOIN users u ON u.id = p.received_by
-                        LEFT JOIN branches b ON b.id = dn.branch_id
-                        WHERE p.paid_at BETWEEN ? AND ?';
-        $paymentsParams = [$fromStart, $toEnd];
-        if ($branchFilterId > 0) {
-            $paymentsSql .= ' AND dn.branch_id = ?';
-            $paymentsParams[] = $branchFilterId;
-        }
-        if ($q !== '') {
-            $paymentsSql .= ' AND (c.phone LIKE ? OR c.name LIKE ?)';
-            $like = "%$q%";
-            array_push($paymentsParams, $like, $like);
-        }
-        $paymentsSql .= ' ORDER BY p.paid_at DESC, p.id DESC LIMIT 500';
-        $paymentsStmt = $pdo->prepare($paymentsSql);
-        $paymentsStmt->execute($paymentsParams);
-        $payments = $paymentsStmt->fetchAll();
-        
-        // For main users, provide branches list for dropdown
-        $branchesAll = $isMain ? BranchRepository::forDropdowns($pdo) : [];
-        Helpers::view('payments/index', compact('dues','dueGroups','groupMode','payments','from','to','q','isMain','branchesAll','branchFilterId'));
         break;
 
     case 'expenses':
@@ -4882,7 +5031,7 @@ switch ($page) {
         $isAdmin = Auth::hasRole('admin');
         $isAccountant = (isset($user['role']) && $user['role'] === 'accountant');
         if (!($isAdmin || $isAccountant)) { http_response_code(403); echo 'Forbidden'; break; }
-        $branchId = (int)($user['branch_id'] ?? 0);
+        $branchId = BranchRepository::resolveToFixedBranchId($pdo, (int)($user['branch_id'] ?? 0));
         $action = $_GET['action'] ?? 'index';
 
         // Best-effort ensure tables exist
@@ -4908,12 +5057,18 @@ switch ($page) {
                 Helpers::view('advances/form', compact('advance','employeesAll','error'));
                 break;
             }
+            $empBranchStmt = $pdo->prepare('SELECT branch_id FROM employees WHERE id=? LIMIT 1');
+            $empBranchStmt->execute([$employee_id]);
+            $empBranchId = BranchRepository::resolveToFixedBranchId($pdo, (int)($empBranchStmt->fetchColumn() ?: $branchId));
+            if ($empBranchId <= 0) {
+                $empBranchId = $branchId;
+            }
             if ($id>0) {
                 $stmt = $pdo->prepare('UPDATE employee_advances SET employee_id=?, branch_id=?, amount=?, advance_date=?, purpose=? WHERE id=?');
-                $stmt->execute([$employee_id,$branchId,$amount,$advance_date,($purpose?:null),$id]);
+                $stmt->execute([$employee_id,$empBranchId,$amount,$advance_date,($purpose?:null),$id]);
             } else {
                 $stmt = $pdo->prepare('INSERT INTO employee_advances (employee_id, branch_id, amount, advance_date, purpose, created_by) VALUES (?,?,?,?,?,?)');
-                $stmt->execute([$employee_id,$branchId,$amount,$advance_date,($purpose?:null),(int)($user['id'] ?? 0)]);
+                $stmt->execute([$employee_id,$empBranchId,$amount,$advance_date,($purpose?:null),(int)($user['id'] ?? 0)]);
             }
             Helpers::redirect('index.php?page=advances');
             break;
@@ -5301,7 +5456,7 @@ switch ($page) {
             $emp_code = trim($_GET['emp_code'] ?? '');
             $name = trim($_GET['name'] ?? '');
             $position = trim($_GET['position'] ?? '');
-            $branch_id = (int)($_GET['branch_id'] ?? 0);
+            $branch_id = BranchRepository::resolveToFixedBranchId($pdo, (int)($_GET['branch_id'] ?? 0));
             $month_year = trim($_GET['month_year'] ?? ''); // YYYY-MM
 
             $sql = "SELECT e.id, e.emp_code, e.name, e.position, b.name AS branch_name,
@@ -5325,7 +5480,7 @@ switch ($page) {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $employees = $stmt->fetchAll();
-            $branchesAll = BranchRepository::forDropdowns($pdo);
+            $branchesAll = BranchRepository::forFilters($pdo);
             Helpers::view('employees/payroll', compact('employees','emp_code','name','position','branch_id','month_year','branchesAll'));
             break;
         }
@@ -5470,177 +5625,6 @@ switch ($page) {
         ));
         break;
 
-    case 'salaries':
-        if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
-        $pdo = Database::pdo();
-        $user = Auth::user();
-        $isAdmin = Auth::hasRole('admin');
-        $isAccountant = (isset($user['role']) && $user['role'] === 'accountant');
-        if (!($isAdmin || $isAccountant)) { http_response_code(403); echo 'Forbidden'; break; }
-        $action = $_GET['action'] ?? 'index';
-
-        if ($action === 'generate' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $year = (int)($_POST['year'] ?? date('Y'));
-            $month_num = (int)($_POST['month_num'] ?? date('n'));
-            // Generate salary entries for all employees if missing
-            $sqlEmpGen = "
-                SELECT e.id,
-                       COALESCE(ep.basic_salary, 0) AS basic_salary
-                FROM employees e
-                LEFT JOIN (
-                  SELECT ep1.employee_id, ep1.basic_salary
-                  FROM employee_payroll ep1
-                  INNER JOIN (
-                    SELECT employee_id, MAX(month_year) AS mm
-                    FROM employee_payroll
-                    GROUP BY employee_id
-                  ) m ON m.employee_id = ep1.employee_id AND m.mm = ep1.month_year
-                ) ep ON ep.employee_id = e.id";
-            try {
-                $empStmt = $pdo->query($sqlEmpGen);
-                $employees = $empStmt->fetchAll();
-            } catch (Throwable $e) { $employees = []; }
-            $ins = $pdo->prepare('INSERT IGNORE INTO salaries (employee_id, month, month_num, amount, status) VALUES (?,?,?,?,\'pending\')');
-            foreach ($employees as $e) {
-                $amt = (float)($e['basic_salary'] ?? 0);
-                $ins->execute([(int)$e['id'], $year, $month_num, $amt]);
-            }
-            Helpers::redirect('index.php?page=salaries&year=' . $year . '&month_num=' . $month_num);
-            break;
-        }
-
-        if ($action === 'pay' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
-            $id = (int)($_POST['id'] ?? 0);
-            $payment_date = $_POST['payment_date'] ?? date('Y-m-d');
-            if ($id > 0) {
-                $pdo->prepare("UPDATE salaries SET status='paid', payment_date=? WHERE id=?")->execute([$payment_date, $id]);
-            }
-            Helpers::redirect('index.php?page=salaries');
-            break;
-        }
-
-        // index with OPTIONAL filters: Year, Month, Branch, Employee, Position, Payment Date range
-        $year = (int)($_GET['year'] ?? 0);
-        $month_num = (int)($_GET['month_num'] ?? 0);
-        if ($year <= 0) { $year = (int)date('Y'); }
-        if ($month_num <= 0) { $month_num = (int)date('n'); }
-        $branchFilter = (int)($_GET['branch_id'] ?? 0);
-        $employeeFilter = trim($_GET['employee'] ?? '');
-        $positionFilter = trim($_GET['position'] ?? '');
-        $payFrom = trim($_GET['pay_from'] ?? '');
-        $payTo = trim($_GET['pay_to'] ?? '');
-        $where = [];
-        $params = [];
-        if ($year > 0) { $where[] = 's.month = ?'; $params[] = $year; }
-        if ($month_num > 0) { $where[] = 's.month_num = ?'; $params[] = $month_num; }
-        if ($branchFilter > 0) { $where[] = 'e.branch_id = ?'; $params[] = $branchFilter; }
-        if ($employeeFilter !== '') { $where[] = 'e.name LIKE ?'; $params[] = "%$employeeFilter%"; }
-        if ($positionFilter !== '') { $where[] = 'e.position LIKE ?'; $params[] = "%$positionFilter%"; }
-        if ($payFrom !== '') { $where[] = '(s.payment_date IS NOT NULL AND s.payment_date >= ?)'; $params[] = $payFrom; }
-        if ($payTo !== '') { $where[] = '(s.payment_date IS NOT NULL AND s.payment_date <= ?)'; $params[] = $payTo; }
-
-        // Ensure salaries exist for selected Year/Month so that all employees show up
-        if ($year > 0 && $month_num > 0) {
-            // Insert missing rows as pending with each employee's latest basic_salary from employee_payroll (fallback 0)
-            $sqlEmp = "
-                SELECT e.id,
-                       COALESCE(ep.basic_salary, 0) AS basic_salary
-                FROM employees e
-                LEFT JOIN (
-                  SELECT ep1.employee_id, ep1.basic_salary
-                  FROM employee_payroll ep1
-                  INNER JOIN (
-                    SELECT employee_id, MAX(month_year) AS mm
-                    FROM employee_payroll
-                    GROUP BY employee_id
-                  ) m ON m.employee_id = ep1.employee_id AND m.mm = ep1.month_year
-                ) ep ON ep.employee_id = e.id";
-            try {
-                $empStmt = $pdo->query($sqlEmp);
-                $employeesForGen = $empStmt->fetchAll();
-            } catch (Throwable $e) { $employeesForGen = []; }
-            if ($employeesForGen) {
-                $ins = $pdo->prepare("INSERT IGNORE INTO salaries (employee_id, month, month_num, amount, status) VALUES (?,?,?,?, 'pending')");
-                foreach ($employeesForGen as $eRow) {
-                    $amt = (float)($eRow['basic_salary'] ?? 0);
-                    $ins->execute([(int)$eRow['id'], $year, $month_num, $amt]);
-                }
-            }
-        }
-        $sql = 'SELECT s.*, e.name AS employee_name, e.position, b.name AS branch_name
-                FROM salaries s
-                LEFT JOIN employees e ON e.id = s.employee_id
-                LEFT JOIN branches b ON b.id = e.branch_id';
-        if (!empty($where)) { $sql .= ' WHERE ' . implode(' AND ', $where); }
-        $sql .= ' ORDER BY s.month DESC, s.month_num DESC, b.name, e.name LIMIT 200';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $rows = $stmt->fetchAll();
-        $branchesAll = BranchRepository::forFilters($pdo);
-        // Totals for current result set
-        $total = 0; $paid = 0; $countTotal = 0; $countPaid = 0; $countPending = 0;
-        foreach ($rows as $r) {
-            $amt = (float)$r['amount'];
-            $total += $amt; $countTotal++;
-            if ($r['status'] === 'paid') { $paid += $amt; $countPaid++; } else { $countPending++; }
-        }
-
-        // Totals by branch for CURRENT date filters (include ALL branches even if zero)
-        // Apply ONLY year/month filters to salaries; do NOT apply branch filter here so every branch (e.g., Mullaitivu) appears
-        $sqlBranch = 'SELECT b.id AS branch_id, b.name AS branch_name,
-                             COALESCE(SUM(s.amount),0) AS total,
-                             COALESCE(SUM(CASE WHEN s.status="paid" THEN s.amount ELSE 0 END),0) AS paid,
-                             COALESCE(SUM(CASE WHEN s.status<>"paid" AND s.status IS NOT NULL THEN s.amount ELSE 0 END),0) AS pending
-                      FROM branches b
-                      LEFT JOIN employees e ON e.branch_id = b.id
-                      LEFT JOIN (
-                          SELECT * FROM salaries 
-                          WHERE 1=1';
-        $paramsB = [];
-        if ($year > 0) { $sqlBranch .= ' AND month = ?'; $paramsB[] = $year; }
-        if ($month_num > 0) { $sqlBranch .= ' AND month_num = ?'; $paramsB[] = $month_num; }
-        $sqlBranch .= ' ) s ON s.employee_id = e.id';
-        // No WHERE clause here to ensure all branches appear
-        $sqlBranch .= ' GROUP BY b.id, b.name ORDER BY b.name';
-        $stmtB = $pdo->prepare($sqlBranch);
-        $stmtB->execute($paramsB);
-        $byBranchTotals = $stmtB->fetchAll();
-
-        // Status counts for CURRENT FILTERS (only for non-NULL status)
-        $sqlStatus = 'SELECT s.status, COUNT(*) AS c
-                      FROM salaries s JOIN employees e ON e.id = s.employee_id';
-        $whereStatus = [];
-        $paramsStatus = [];
-        if ($year > 0) { $whereStatus[] = 's.month = ?'; $paramsStatus[] = $year; }
-        if ($month_num > 0) { $whereStatus[] = 's.month_num = ?'; $paramsStatus[] = $month_num; }
-        if ($branchFilter > 0) { $whereStatus[] = 'e.branch_id = ?'; $paramsStatus[] = $branchFilter; }
-        if (!empty($whereStatus)) { $sqlStatus .= ' WHERE ' . implode(' AND ', $whereStatus); }
-        $sqlStatus .= ' AND s.status IS NOT NULL GROUP BY s.status';
-        $stmtS = $pdo->prepare($sqlStatus);
-        $stmtS->execute($paramsStatus);
-        $statusCounts = [];
-        foreach ($stmtS->fetchAll() as $r) { $statusCounts[$r['status']] = (int)$r['c']; }
-
-        // Last 6 months trend (optionally filtered by branch only)
-        $trendParams = [];
-        $sqlTrend = 'SELECT s.month, s.month_num,
-                            COALESCE(SUM(s.amount),0) AS total,
-                            COALESCE(SUM(CASE WHEN s.status="paid" THEN s.amount ELSE 0 END),0) AS paid
-                     FROM salaries s
-                     JOIN employees e ON e.id = s.employee_id';
-        $trendWhere = [];
-        if ($branchFilter > 0) { $trendWhere[] = 'e.branch_id = ?'; $trendParams[] = $branchFilter; }
-        if (!empty($trendWhere)) { $sqlTrend .= ' WHERE ' . implode(' AND ', $trendWhere); }
-        $sqlTrend .= ' GROUP BY s.month, s.month_num ORDER BY s.month DESC, s.month_num DESC LIMIT 6';
-        $stmtT = $pdo->prepare($sqlTrend);
-        $stmtT->execute($trendParams);
-        $trend = $stmtT->fetchAll();
-
-        Helpers::view('salaries/index', compact('rows','year','month_num','branchFilter','branchesAll','total','paid','countTotal','countPaid','countPending','byBranchTotals','statusCounts','trend','employeeFilter','positionFilter','payFrom','payTo'));
-        break;
-
     case 'search':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
@@ -5680,6 +5664,7 @@ switch ($page) {
 
     case 'reports':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
+        if (!Auth::canViewReports()) { http_response_code(403); echo 'Forbidden'; break; }
         $pdo = Database::pdo();
         $from = $_GET['from'] ?? date('Y-m-01');
         $to = $_GET['to'] ?? date('Y-m-d');
@@ -5875,6 +5860,35 @@ switch ($page) {
             return;
         }
         Helpers::redirect('index.php?page=parcels&action=new&customer_id=' . $cid);
+        break;
+
+    case 'accounting':
+        if (!Auth::hasAnyRole(['admin', 'accountant'])) {
+            http_response_code(403);
+            echo 'Forbidden';
+            break;
+        }
+        $accAction = $_GET['acc_action'] ?? $_POST['acc_action'] ?? '';
+        if ($accAction !== '') {
+            AccountingController::dispatch(Database::pdo());
+            break;
+        }
+        $accPageAction = (string) ($_GET['action'] ?? 'dashboard');
+        if ($accPageAction === '') {
+            $accPageAction = 'dashboard';
+        }
+        $voucherType = strtoupper((string) ($_GET['voucher_type'] ?? 'PAYMENT'));
+        $paymentMode = strtoupper((string) ($_GET['payment_mode'] ?? 'CASH'));
+        AccountingModule::renderPage($accPageAction, compact('voucherType', 'paymentMode'));
+        break;
+
+    case 'api_accounting':
+        if (!Auth::hasAnyRole(['admin', 'accountant'])) {
+            http_response_code(403);
+            echo 'Forbidden';
+            break;
+        }
+        AccountingController::dispatch(Database::pdo());
         break;
 
     default:

@@ -1,4 +1,8 @@
 <?php /** @var array $suppliers */ ?>
+<?php
+  $suppliers = $suppliers ?? [];
+  $hasFilters = !empty($hasFilters);
+?>
 <style>
   .sup-page {
     --sup-border: rgba(17, 24, 39, 0.08);
@@ -95,7 +99,7 @@
   }
 </style>
 
-<div class="sup-page">
+<div class="sup-page container-fluid px-0">
   <div class="sup-head d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
     <div>
       <h1 class="sup-title">
@@ -137,7 +141,7 @@
       </div>
       <div class="col-6 col-md-6 col-lg-3">
         <label class="form-label">Branch</label>
-        <select name="branch_id" class="form-select">
+        <select name="branch_id" class="form-select" data-enhance="false">
           <?php $bid = (int)($branch_id ?? 0); ?>
           <option value="0" <?php echo ($bid === 0) ? 'selected' : ''; ?>>All branches</option>
           <?php foreach (($branchesAll ?? []) as $b): ?>
@@ -156,13 +160,19 @@
     <?php if (empty($suppliers)): ?>
       <div class="sup-empty">
         <i class="bi bi-inbox" aria-hidden="true"></i>
-        <div class="fw-semibold text-dark mb-1">No suppliers match</div>
-        <div class="small mb-3">Adjust filters or add a new supplier.</div>
+        <?php if ($hasFilters): ?>
+          <div class="fw-semibold text-dark mb-1">No suppliers match your filters</div>
+          <div class="small mb-3">Try different search terms or clear filters.</div>
+          <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>" class="btn btn-outline-secondary btn-sm rounded-pill me-2"><i class="bi bi-x-lg me-1"></i> Clear filters</a>
+        <?php else: ?>
+          <div class="fw-semibold text-dark mb-1">No suppliers yet</div>
+          <div class="small mb-3">Add vendors linked to Colombo, Kilinochchi, or Mullaitivu for parcel entry.</div>
+        <?php endif; ?>
         <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=new'); ?>" class="btn btn-primary btn-sm rounded-pill"><i class="bi bi-plus-lg me-1"></i> Add supplier</a>
       </div>
     <?php else: ?>
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 sup-table datatable w-100">
+        <table class="table table-hover align-middle mb-0 sup-table datatable w-100" data-dt-actions-col="1" data-dt-scroll-x="false">
           <thead>
             <tr>
               <th style="width:72px;">ID</th>
@@ -170,7 +180,7 @@
               <th>Phone</th>
               <th>Code</th>
               <th>Branch</th>
-              <th class="text-end" style="min-width:180px;">Actions</th>
+              <th class="text-end sup-actions-col" style="min-width:180px;">Actions</th>
             </tr>
           </thead>
           <tbody>

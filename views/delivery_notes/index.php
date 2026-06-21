@@ -24,6 +24,26 @@
   Saved successfully.
   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
+<?php elseif (($_GET['collected'] ?? '') === '1'): ?>
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  Payment recorded successfully.
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+<?php elseif (($_GET['err'] ?? '') === 'payment_not_delivered'): ?>
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+  Payments are allowed only after all parcels in the delivery note are delivered.
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+<?php elseif (($_GET['err'] ?? '') === 'payment_overdue'): ?>
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+  Payment amount exceeds the current due balance.
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+<?php elseif (in_array(($_GET['err'] ?? ''), ['payment_invalid', 'payment_not_found'], true)): ?>
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+  Could not record payment. Check the delivery note and amount.
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
 <?php elseif (($_GET['deleted'] ?? '') === '1'): ?>
 <div class="alert alert-success alert-dismissible fade show" role="alert">
   Deleted successfully.
@@ -149,9 +169,12 @@
             <a class="btn btn-sm btn-outline-info" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=email_form&id='.(int)$n['id']); ?>"><i class="bi bi-envelope"></i> Email</a>
             
             <?php if (Auth::canCollectPayments()): ?>
-            <form id="dn-pay-<?php echo (int)$n['id']; ?>" class="d-inline" method="post" action="<?php echo Helpers::baseUrl('index.php?page=payments&action=save'); ?>">
+            <form id="dn-pay-<?php echo (int)$n['id']; ?>" class="d-inline" method="post" action="<?php echo Helpers::baseUrl('index.php?page=delivery_notes&action=collect_payment'); ?>">
               <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
               <input type="hidden" name="delivery_note_id" value="<?php echo (int)$n['id']; ?>">
+              <input type="hidden" name="from" value="<?php echo htmlspecialchars($from ?? ''); ?>">
+              <input type="hidden" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>">
+              <input type="hidden" name="q" value="<?php echo htmlspecialchars($q ?? ''); ?>">
               <input type="hidden" name="amount" value="0">
             </form>
             <button type="button" class="btn btn-sm btn-warning" onclick="(function(f){

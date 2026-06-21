@@ -1,6 +1,12 @@
 <?php
 require_once __DIR__ . '/../app/bootstrap.php';
 
+if (!Auth::check() || !Auth::hasAnyRole(['admin', 'accountant'])) {
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+}
+
 // Simple standalone email form using global Mailer
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $error = '';

@@ -108,6 +108,18 @@ class CashbookApi
                     self::json(['ok' => true] + $d);
 
                     return;
+                case 'audit_logs':
+                    if (!Auth::hasAnyRole(['admin', 'accountant'])) {
+                        self::json(['ok' => false, 'error' => 'Forbidden'], 403);
+
+                        return;
+                    }
+                    $limit = (int) ($_GET['limit'] ?? 100);
+                    $q = trim((string) ($_GET['q'] ?? ''));
+                    $logs = CashbookRepository::listAuditLogs($pdo, $limit, $q);
+                    self::json(['ok' => true, 'logs' => $logs]);
+
+                    return;
                 case 'customer_accounts_sync':
                     if (!$isPost) {
                         self::json(['ok' => false, 'error' => 'POST required'], 405);

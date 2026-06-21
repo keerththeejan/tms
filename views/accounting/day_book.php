@@ -1,0 +1,308 @@
+<?php
+/**
+ * Desktop Accounting Style Day Book
+ * BUSY/Tally ERP Style Interface
+ */
+$baseUrl = Helpers::baseUrl('');
+$fromDate = $_GET['from_date'] ?? date('Y-m-01');
+$toDate = $_GET['to_date'] ?? date('Y-m-t');
+$voucherType = $_GET['voucher_type'] ?? '';
+?>
+<style>
+.acc-daybook-module {
+    background-color: #F5F5DC;
+    font-family: 'Tahoma', 'Arial', sans-serif;
+    font-size: 11px;
+    color: #000;
+    padding: 0;
+    margin: 0;
+    min-height: 100vh;
+}
+
+.acc-daybook-header {
+    background: linear-gradient(180deg, #4A4A4A 0%, #2C2C2C 100%);
+    color: #FFF;
+    padding: 4px 8px;
+    border-bottom: 2px solid #1A1A1A;
+}
+
+.acc-daybook-header-title {
+    font-size: 14px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.acc-daybook-toolbar {
+    background-color: #FFF;
+    border: 1px solid #999;
+    margin: 4px;
+    padding: 6px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.acc-daybook-form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.acc-daybook-form-group label {
+    font-size: 10px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 2px;
+}
+
+.acc-daybook-form-group input,
+.acc-daybook-form-group select {
+    font-size: 11px;
+    padding: 3px 5px;
+    border: 1px solid #999;
+    background-color: #FFF;
+    font-family: 'Tahoma', 'Arial', sans-serif;
+}
+
+.acc-daybook-btn {
+    font-size: 11px;
+    font-weight: bold;
+    padding: 4px 12px;
+    border: 1px solid #000;
+    background: linear-gradient(180deg, #4A90E2 0%, #357ABD 100%);
+    color: #FFF;
+    cursor: pointer;
+    font-family: 'Tahoma', 'Arial', sans-serif;
+    text-transform: uppercase;
+}
+
+.acc-daybook-btn:hover {
+    background: linear-gradient(180deg, #5AA0F2 0%, #458ACD 100%);
+}
+
+.acc-daybook-table-section {
+    background-color: #FFF;
+    border: 1px solid #999;
+    margin: 4px;
+    padding: 6px;
+}
+
+.acc-daybook-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.acc-daybook-table thead {
+    background: linear-gradient(180deg, #4A4A4A 0%, #2C2C2C 100%);
+    color: #FFF;
+}
+
+.acc-daybook-table th {
+    padding: 4px 6px;
+    text-align: left;
+    font-weight: bold;
+    border: 1px solid #000;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.acc-daybook-table td {
+    padding: 4px 6px;
+    border: 1px solid #999;
+}
+
+.acc-daybook-table .text-right {
+    text-align: right;
+}
+
+.acc-daybook-table .text-center {
+    text-align: center;
+}
+
+.acc-daybook-summary {
+    background-color: #FFF;
+    border: 1px solid #999;
+    margin: 4px;
+    padding: 6px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.acc-daybook-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.acc-daybook-summary-item label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #333;
+}
+
+.acc-daybook-summary-item span {
+    font-size: 12px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    min-width: 120px;
+    text-align: right;
+}
+
+.acc-daybook-summary-item span.debit {
+    color: #CC0000;
+}
+
+.acc-daybook-summary-item span.credit {
+    color: #006600;
+}
+</style>
+
+<div class="acc-daybook-module">
+    <!-- Header -->
+    <div class="acc-daybook-header">
+        <span class="acc-daybook-header-title">
+            <i class="bi bi-book"></i> Day Book
+        </span>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="acc-daybook-toolbar">
+        <div class="acc-daybook-form-group">
+            <label>From Date</label>
+            <input type="date" id="accFromDate" value="<?php echo htmlspecialchars($fromDate); ?>">
+        </div>
+        <div class="acc-daybook-form-group">
+            <label>To Date</label>
+            <input type="date" id="accToDate" value="<?php echo htmlspecialchars($toDate); ?>">
+        </div>
+        <div class="acc-daybook-form-group">
+            <label>Voucher Type</label>
+            <select id="accVoucherTypeFilter">
+                <option value="">All Types</option>
+                <option value="PAYMENT" <?php echo $voucherType === 'PAYMENT' ? 'selected' : ''; ?>>Payment</option>
+                <option value="RECEIPT" <?php echo $voucherType === 'RECEIPT' ? 'selected' : ''; ?>>Receipt</option>
+                <option value="JOURNAL" <?php echo $voucherType === 'JOURNAL' ? 'selected' : ''; ?>>Journal</option>
+                <option value="CONTRA" <?php echo $voucherType === 'CONTRA' ? 'selected' : ''; ?>>Contra</option>
+                <option value="TRANSFER" <?php echo $voucherType === 'TRANSFER' ? 'selected' : ''; ?>>Transfer</option>
+            </select>
+        </div>
+        <button type="button" class="acc-daybook-btn" onclick="accLoadDayBook()">
+            Load
+        </button>
+        <button type="button" class="acc-daybook-btn" onclick="accExportExcel()">
+            Export Excel
+        </button>
+        <button type="button" class="acc-daybook-btn" onclick="accPrintDayBook()">
+            Print
+        </button>
+    </div>
+
+    <!-- Table Section -->
+    <div class="acc-daybook-table-section">
+        <table class="acc-daybook-table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">Date</th>
+                    <th style="width: 100px;">Voucher No</th>
+                    <th style="width: 80px;">Type</th>
+                    <th style="width: 30%;">Account Name</th>
+                    <th style="width: 35%;">Narration</th>
+                    <th class="text-right" style="width: 100px;">Debit</th>
+                    <th class="text-right" style="width: 100px;">Credit</th>
+                </tr>
+            </thead>
+            <tbody id="accDayBookBody">
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 20px; color: #999;">
+                        Click "Load" to view Day Book entries
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary -->
+    <div class="acc-daybook-summary">
+        <div class="acc-daybook-summary-item">
+            <label>Total Debit:</label>
+            <span id="accTotalDebit" class="debit">0.00</span>
+        </div>
+        <div class="acc-daybook-summary-item">
+            <label>Total Credit:</label>
+            <span id="accTotalCredit" class="credit">0.00</span>
+        </div>
+        <div class="acc-daybook-summary-item">
+            <label>Net:</label>
+            <span id="accNet">0.00</span>
+        </div>
+    </div>
+</div>
+
+<script>
+const accBaseUrl = '<?php echo htmlspecialchars($baseUrl); ?>';
+
+async function accLoadDayBook() {
+    const fromDate = document.getElementById('accFromDate').value;
+    const toDate = document.getElementById('accToDate').value;
+    const voucherType = document.getElementById('accVoucherTypeFilter').value;
+
+    try {
+        const response = await fetch(accBaseUrl + 'index.php?page=api_accounting&acc_action=day_book&from_date=' + encodeURIComponent(fromDate) + '&to_date=' + encodeURIComponent(toDate) + '&voucher_type=' + encodeURIComponent(voucherType));
+        const data = await response.json();
+        
+        if (data.ok && data.data) {
+            accRenderDayBook(data.data);
+        } else {
+            alert('Error loading Day Book: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error loading Day Book: ' + error.message);
+    }
+}
+
+function accRenderDayBook(entries) {
+    const tbody = document.getElementById('accDayBookBody');
+    
+    if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
+        document.getElementById('accTotalDebit').textContent = '0.00';
+        document.getElementById('accTotalCredit').textContent = '0.00';
+        document.getElementById('accNet').textContent = '0.00';
+        return;
+    }
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    tbody.innerHTML = entries.map(entry => {
+        totalDebit += parseFloat(entry.debit_amount || 0);
+        totalCredit += parseFloat(entry.credit_amount || 0);
+        const esc = (window.AccModule && AccModule.escapeHtml) ? AccModule.escapeHtml : (s => String(s ?? ''));
+        return `
+            <tr>
+                <td>${esc(entry.entry_date)}</td>
+                <td>${esc(entry.voucher_number)}</td>
+                <td>${esc(entry.voucher_type)}</td>
+                <td>${esc(entry.account_name)}</td>
+                <td>${esc(entry.narration)}</td>
+                <td class="text-right">${parseFloat(entry.debit_amount || 0).toFixed(2)}</td>
+                <td class="text-right">${parseFloat(entry.credit_amount || 0).toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    document.getElementById('accTotalDebit').textContent = totalDebit.toFixed(2);
+    document.getElementById('accTotalCredit').textContent = totalCredit.toFixed(2);
+    document.getElementById('accNet').textContent = (totalDebit - totalCredit).toFixed(2);
+}
+
+function accExportExcel() {
+    alert('Excel export functionality - to be implemented');
+}
+
+function accPrintDayBook() {
+    window.print();
+}
+</script>

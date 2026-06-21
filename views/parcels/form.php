@@ -1,10 +1,10 @@
 <?php /** @var array $parcel */ ?>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
   body:has(.parcel-form-page) {
     overflow-x: hidden;
     max-width: 100%;
   }
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
   /* —— SaaS dashboard tokens (8px grid, 12–16px cards) —— */
   /* Mobile-first: fluid layout, no page-level horizontal scroll */
   .parcel-form-page.pf-saas .pf-page-wrap {
@@ -87,7 +87,8 @@
   .parcel-form-page .pf-animate-in {
     animation: pfFadeSlideIn 0.45s ease forwards;
   }
-  .parcel-form-page .pf-animate-delay-2 { animation-delay: 0.08s; opacity: 0; animation-fill-mode: forwards; }
+  .parcel-form-page .pf-animate-delay-2 { animation-delay: 0.08s; animation-fill-mode: forwards; }
+  .parcel-form-page.pf-enterprise-v2 .pf-animate-delay-2 { opacity: 1; }
   .parcel-form-page .pf-sticky-head {
     position: sticky;
     top: 0;
@@ -627,6 +628,7 @@
   @media (prefers-reduced-motion: reduce) {
     .parcel-form-page .pf-details-field-row > [class*="col-"],
     .parcel-form-page .pf-animate-in { transition: none !important; animation: none !important; }
+    .parcel-form-page .pf-animate-delay-2 { opacity: 1 !important; animation: none !important; }
   }
   .parcel-form-page.pf-saas {
     scroll-behavior: smooth;
@@ -714,6 +716,28 @@
   /* Invoice & date: prevent overlap in narrow columns */
   .parcel-form-page .pf-invoice-date-row > [class*="col-"] {
     min-width: 0;
+  }
+  .parcel-form-page .pf-bill-banner {
+    border-radius: 10px;
+    border: 1px solid rgba(13, 110, 253, 0.25);
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(13, 202, 240, 0.06));
+    padding: 0.65rem 0.85rem;
+    font-size: 0.8125rem;
+  }
+  .parcel-form-page .pf-bill-banner .pf-bill-number {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #0d6efd;
+  }
+  .parcel-form-page .pf-bill-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin-top: 0.35rem;
+    color: #334155;
+  }
+  .parcel-form-page .pf-bill-stats strong {
+    color: #0f172a;
   }
   /* Floating labels (Bootstrap 5) */
   .parcel-form-page .pf-floating .form-floating > .form-control,
@@ -1838,11 +1862,14 @@
     height: 100%;
   }
 </style>
-<div class="parcel-form-page pf-saas pf-layout-optimized pf-modern-refactor">
+<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/parcel-entry-enterprise.css'); ?>">
+<div class="parcel-form-page pf-saas pf-layout-optimized pf-modern-refactor pf-enterprise-v2">
 <div class="container-fluid px-1 px-sm-2 px-lg-2 pf-page-wrap pf-form-inner-fluid">
 
 <?php 
   $isEdit = (int)($parcel['id'] ?? 0) > 0; 
+  $items = $items ?? [];
+  $lastParcel = $lastParcel ?? null;
   $policy = $policy ?? ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>false,'statusOnlyEdit'=>false];
   $priceOnly = !empty($policy['priceOnly']);
   $lockAll = !empty($policy['lockAll']);
@@ -1854,7 +1881,18 @@
   if ($parcelStatus === '' || !isset($parcelStatusMap[$parcelStatus])) {
     $parcel['status'] = 'pending';
   }
+  try {
+    BranchRepository::normalizeParcelBranchIds(Database::pdo(), $parcel);
+  } catch (Throwable $e) { /* ignore */ }
+  $userFixedBranchId = 0;
+  try {
+    $userFixedBranchId = BranchRepository::resolveToFixedBranchId(Database::pdo(), (int)(Auth::user()['branch_id'] ?? 0));
+  } catch (Throwable $e) { /* ignore */ }
   $branchesList = array_values($branchesAll ?? []);
+  $todayBillSummary = $todayBillSummary ?? null;
+  $hasExistingBill = is_array($todayBillSummary) && !empty($todayBillSummary['invoice_number']);
+  $prefillInvoiceNumber = trim((string)($parcel['invoice_number'] ?? ($todayBillSummary['invoice_number'] ?? '')));
+  $prefillCustomerName = trim((string)($todayBillSummary['customer_name'] ?? ''));
 ?>
 <nav class="pf-breadcrumb mb-2" aria-label="breadcrumb">
   <ol class="breadcrumb mb-0">
@@ -1863,18 +1901,26 @@
     <li class="breadcrumb-item active" aria-current="page"><?php echo $parcel['id'] ? 'Edit' : 'New'; ?></li>
   </ol>
 </nav>
-<header class="page-header pf-page-hero d-flex flex-wrap justify-content-between align-items-center gap-2">
+<header class="page-header pf-page-hero pf-sticky-top-bar d-flex flex-wrap justify-content-between align-items-center gap-3">
   <div>
-    <h1 class="h4 mb-0"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
-    <div class="text-muted small d-none d-sm-block mt-1">Fast entry • consistent billing • logistics workflow</div>
+    <h1 class="h4 mb-0 pf-page-title"><?php echo $parcel['id'] ? 'Edit Parcel' : 'New Parcel'; ?></h1>
+    <div class="pf-hero-sub d-none d-sm-block">Select customer → enter shipment → add items → save</div>
   </div>
   <div class="pf-header-tools">
-    <span class="pf-serial-pill">
+    <div class="pf-invoice-header-chip" id="pfInvoiceHeaderChip" aria-live="polite">
+      <span class="pf-ihc-label">Invoice</span>
+      <span class="pf-ihc-value" id="sbInvoiceHeader"><?php echo $prefillInvoiceNumber !== '' ? htmlspecialchars($prefillInvoiceNumber) : '—'; ?></span>
+    </div>
+    <div class="pf-header-date-field">
+      <label class="pf-ihc-label" for="parcelDate">Parcel date</label>
+      <input type="date" class="form-control form-control-sm" id="parcelDate" name="created_date" form="parcelForm" value="<?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?>" aria-label="Parcel date">
+    </div>
+    <span class="pf-serial-pill d-none d-lg-inline-flex">
       <label for="serialInputHeader" class="mb-0">Serial</label>
       <input type="text" id="serialInputHeader" name="tracking_number" form="parcelForm" class="form-control form-control-sm pf-serial-input" placeholder="Auto" value="<?php echo htmlspecialchars((string)($parcel['tracking_number'] ?? '')); ?>" aria-label="Parcel serial or tracking number" autocomplete="off" />
     </span>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm rounded-3"><i class="bi bi-arrow-left" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Back to Parcels</span></a>
-    <button type="submit" form="parcelForm" class="btn btn-primary btn-sm pf-btn-save" id="pfSaveBtnTop"><i class="bi bi-save" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Save Parcel</span></button>
+    <a href="<?php echo Helpers::baseUrl('index.php?page=parcels'); ?>" class="btn btn-outline-secondary btn-sm rounded-3"><i class="bi bi-arrow-left" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Back</span></a>
+    <button type="submit" form="parcelForm" class="btn btn-primary pf-btn-save pf-header-save-btn" id="pfSaveBtnTop"><i class="bi bi-save" aria-hidden="true"></i><span class="ms-1 d-none d-sm-inline">Save Parcel</span></button>
   </div>
 </header>
 
@@ -2004,142 +2050,78 @@
   <div class="pf-form-scroll-region">
   <div class="<?php echo $statusOnlyEdit ? 'd-none' : ''; ?>">
   <div class="container-fluid px-0 pf-form-inner-fluid">
-    <div class="row g-2 g-lg-3 align-items-start pf-main-columns">
-      <div class="col-12 col-lg-6 col-xl-6 pf-animate pf-animate-in">
-  <div class="pf-form-sections d-flex flex-column gap-2 gap-lg-3 mb-2 mb-lg-0 pf-dense pf-floating">
-    <!-- Customer -->
-    <section class="section-card pf-customer-stack" role="region" aria-labelledby="pf-h-customer">
-      <div class="section-title" id="pf-h-customer"><i class="bi bi-person-badge me-2 text-primary" aria-hidden="true"></i>Customer Info</div>
-      <div class="section-body pt-2 pt-lg-3">
-          <div class="row g-2 align-items-start pf-customer-row">
-            <div class="col-12 col-lg-4">
-              <label class="pf-label" for="customerSelectHidden">Select customer</label>
-              <select name="customer_id" id="customerSelectHidden" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-invalid="false" aria-describedby="customerInvalidFeedback">
+    <div class="pf-enterprise-layout">
+    <div class="pf-enterprise-top">
+      <div class="pf-workspace-col pf-animate pf-animate-in">
+  <div class="pf-form-sections pf-erp-sections">
+    <!-- Section 2: Customer & Delivery -->
+    <section class="section-card pf-customer-delivery-card" role="region" aria-labelledby="pf-h-customer">
+      <div class="section-title" id="pf-h-customer"><i class="bi bi-person-badge me-2 text-primary" aria-hidden="true"></i>Customer &amp; Delivery</div>
+      <div class="section-body">
+        <div class="row g-3 align-items-start">
+          <div class="col-lg-6">
+            <label class="pf-label" for="customerSearch">Search customer</label>
+            <div class="customer-search-results mb-2">
+              <div class="input-group input-group-sm pf-input-group">
+                <span class="input-group-text bg-white border-end-0 text-secondary"><i class="bi bi-search" aria-hidden="true"></i></span>
+                <input type="text" id="customerSearch" class="form-control form-control-sm border-start-0" placeholder="Name or phone…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Search customer by name or phone" aria-describedby="customerSummary customerInvalidFeedback">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddCustomer" title="Quick add customer" aria-label="Quick add customer"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
+              </div>
+              <div id="customerSearchResults" class="list-group list-group-flush shadow-sm rounded mt-1 border pf-search-results"></div>
+            </div>
+            <label class="pf-label" for="customerSelectHidden">Customer</label>
+            <select name="customer_id" id="customerSelectHidden" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-invalid="false" aria-describedby="customerInvalidFeedback">
         <option value="" disabled hidden <?php echo ((int)($parcel['customer_id'] ?? 0) <= 0) ? 'selected' : ''; ?>>-- Select Customer --</option>
         <?php foreach (($customersAll ?? []) as $c): ?>
           <?php 
             $nm = (string)($c['name'] ?? '');
             $phRaw = trim((string)($c['phone'] ?? ''));
-            // Hide internal placeholder phones like NA<epoch>-<3digits>
             $isPlaceholder = preg_match('/^NA\d{10}-\d{3}$/', $phRaw) === 1;
             $label = $nm . (!$isPlaceholder && $phRaw !== '' ? ' (' . $phRaw . ')' : '');
           ?>
           <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)($parcel['customer_id'] ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
         <?php endforeach; ?>
       </select>
-              <div class="invalid-feedback" id="customerInvalidFeedback">Please choose a customer.</div>
-            </div>
-            <div class="col-12 col-lg-8">
-              <label class="pf-label" for="customerSearch">Search by name or phone</label>
-              <div class="customer-search-results">
-                <div class="input-group input-group-sm pf-input-group">
-                  <span class="input-group-text bg-white border-end-0 text-secondary"><i class="bi bi-search" aria-hidden="true"></i></span>
-                  <input type="text" id="customerSearch" class="form-control form-control-sm border-start-0" placeholder="Type to search…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Search customer by name or phone" aria-describedby="customerSummary customerInvalidFeedback">
-                  <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddCustomer" title="Quick add customer" aria-label="Quick add customer"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
-                </div>
-                <div id="customerSearchResults" class="list-group list-group-flush shadow-sm rounded mt-1 border pf-search-results"></div>
-              </div>
+            <div class="invalid-feedback" id="customerInvalidFeedback">Please choose a customer.</div>
+          </div>
+          <div class="col-lg-6">
+            <?php if ($lockAll || $priceOnly): ?>
+            <label class="pf-label" for="deliveryLocationInput">Delivery location</label>
+            <input type="text" name="delivery_location" class="form-control form-control-sm" id="deliveryLocationInput" placeholder="Customer delivery location" value="<?php echo htmlspecialchars((string)($parcel['delivery_location'] ?? '')); ?>" disabled aria-label="Delivery location">
+            <?php else: ?>
+            <label class="pf-label" for="deliveryLocationInput">Delivery location</label>
+            <input type="text" name="delivery_location" class="form-control form-control-sm" id="deliveryLocationInput" placeholder="Delivery location" value="<?php echo htmlspecialchars((string)($parcel['delivery_location'] ?? '')); ?>" autocomplete="off" aria-label="Delivery location" aria-required="true">
+            <?php endif; ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-bs-toggle="collapse" data-bs-target="#findByLocation" aria-expanded="false"><i class="bi bi-geo me-1"></i> Find by location</button>
+            <div class="collapse border rounded px-2 py-2 bg-light mt-2" id="findByLocation">
+              <input type="text" id="locQuery" class="form-control form-control-sm" placeholder="Area (e.g., Kilinochchi)">
+              <div id="locResults" class="small pf-loc-results mt-1"></div>
             </div>
           </div>
-      <div class="mt-1">
-        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-bs-toggle="collapse" data-bs-target="#findByLocation" aria-expanded="false"><i class="bi bi-geo"></i> Find by Delivery Location</button>
-        <div class="collapse border rounded px-2 py-1 bg-light mt-1" id="findByLocation">
-          <div class="mb-1">
-            <input type="text" id="locQuery" class="form-control form-control-sm" placeholder="Type delivery location area (e.g., Kilinochchi)">
-          </div>
-          <div id="locResults" class="small pf-loc-results"></div>
         </div>
-      </div>
-      <div id="customerSummary" class="mt-1 small pf-form-text" role="status" aria-live="polite"></div>
+        <div id="customerSummary" class="mt-2 small pf-customer-activity-banner" role="status" aria-live="polite"></div>
+        <div id="pfBillSummaryBanner" class="pf-bill-banner-compact mt-2<?php echo ($hasExistingBill && !$isEdit) ? '' : ' d-none'; ?>" role="status" aria-live="polite">
+          <i class="bi bi-receipt-cutoff text-success"></i>
+          <span id="pfBillStatusMessage"><?php echo $hasExistingBill ? 'Existing invoice found. New parcel will be added to Invoice ' . htmlspecialchars((string)($todayBillSummary['invoice_number'] ?? '')) : ''; ?></span>
+          <span class="pf-bill-meta">
+            <span class="text-muted">Invoice:</span> <strong class="pf-bill-number" id="pfBillNumberLabel"><?php echo htmlspecialchars((string)($todayBillSummary['invoice_number'] ?? '')); ?></strong>
+            <span class="text-muted ms-2">Parcels:</span> <strong id="pfBillParcelCount"><?php echo (int)($todayBillSummary['parcel_count'] ?? 0); ?></strong>
+            <span class="text-muted ms-2">Total:</span> <strong id="pfBillRunningTotal"><?php echo number_format((float)($todayBillSummary['grand_total'] ?? 0), 2); ?></strong>
+          </span>
+          <span class="visually-hidden" id="pfBillCustomerName"><?php echo htmlspecialchars($prefillCustomerName); ?></span>
+        </div>
       </div>
     </section>
 
-    <div class="row g-2 g-lg-3 align-items-stretch pf-loc-sup-inv-row">
-      <!-- Location (after invoice on narrow screens — see order-* classes) -->
-      <div class="col-12 col-lg-4 order-2 order-lg-1">
-        <section class="section-card h-100" role="region" aria-labelledby="pf-h-location">
-          <div class="section-title" id="pf-h-location"><i class="bi bi-geo-alt me-2 text-primary" aria-hidden="true"></i>Location</div>
-          <div class="section-body pt-2 pt-lg-3">
-          <?php if ($lockAll || $priceOnly): ?>
-          <label class="pf-label" for="deliveryLocationInput">Delivery location</label>
-          <input type="text" name="delivery_location" class="form-control form-control-sm" id="deliveryLocationInput" placeholder="Customer delivery location" value="<?php echo htmlspecialchars((string)($parcel['delivery_location'] ?? '')); ?>" disabled aria-label="Delivery location">
-          <?php else: ?>
-          <div class="form-floating pf-floating-tight">
-            <input type="text" name="delivery_location" class="form-control" id="deliveryLocationInput" placeholder=" " value="<?php echo htmlspecialchars((string)($parcel['delivery_location'] ?? '')); ?>" autocomplete="off" aria-label="Delivery location" aria-required="true">
-            <label for="deliveryLocationInput">Delivery location</label>
-          </div>
-          <?php endif; ?>
-          </div>
-        </section>
-      </div>
-      <!-- Supplier -->
-      <div class="col-12 col-lg-4 order-3 order-lg-2">
-        <section class="section-card h-100" role="region" aria-labelledby="pf-h-supplier">
-          <div class="section-title" id="pf-h-supplier"><i class="bi bi-people me-2 text-primary" aria-hidden="true"></i>Supplier</div>
-          <div class="section-body pt-2 pt-lg-3">
-          <label class="pf-label" for="supplierSelect">Supplier (optional)</label>
-          <div class="input-group input-group-sm pf-input-group">
-            <select name="supplier_id" id="supplierSelect" class="form-select form-select-sm" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-choices-search="true" aria-label="Supplier">
-              <option value="0">-- None --</option>
-              <?php foreach (($suppliersAll ?? []) as $s): ?>
-                <?php 
-                  $raw = (string)($s['name'] ?? '');
-                  $nm = trim($raw);
-                  $norm = strtolower(preg_replace('/[^a-z0-9]+/i','', $nm));
-                  if ($nm === '' || $norm === 'none' || $norm === 'nonenone') { continue; }
-                  $ph = trim((string)($s['phone'] ?? ''));
-                  $label = $nm . ($ph !== '' ? ' (' . htmlspecialchars($ph) . ')' : '');
-                ?>
-                <option data-phone="<?php echo htmlspecialchars($ph); ?>" value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($parcel['supplier_id'] ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
-              <?php endforeach; ?>
-            </select>
-            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddSupplier" aria-label="Quick add supplier"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
-          </div>
-          <div id="supplierPhoneHint" class="pf-form-text mb-0"></div>
-          </div>
-        </section>
-      </div>
-      <!-- Invoice & date (first on mobile: parcel date next to customer flow) -->
-      <div class="col-12 col-lg-4 order-1 order-lg-3">
-        <section class="section-card h-100" role="region" aria-labelledby="pf-h-invoice">
-          <div class="section-title" id="pf-h-invoice"><i class="bi bi-file-earmark-text me-2 text-primary" aria-hidden="true"></i>Shipment Details</div>
-          <div class="section-body pt-2 pt-lg-3">
-          <div class="row g-2 pf-invoice-date-row">
-            <div class="col-12 col-sm-6">
-              <?php if ($lockAll && $isEdit): ?>
-              <input type="hidden" name="invoice_no" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>">
-              <label class="pf-label" for="pfInvoiceNoRo">Invoice no.</label>
-              <input type="number" id="pfInvoiceNoRo" class="form-control form-control-sm" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>" disabled readonly aria-label="Invoice number">
-              <?php else: ?>
-              <label class="pf-label" for="pfInvoiceNo">Invoice no. <?php echo $isEdit ? '' : '(optional)'; ?></label>
-              <input type="number" name="invoice_no" id="pfInvoiceNo" class="form-control form-control-sm" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? 0) ?: ''; ?>" placeholder="—" aria-label="Invoice number">
-              <?php endif; ?>
-            </div>
-            <div class="col-12 col-sm-6">
-              <label class="pf-label" for="parcelDate">Parcel date</label>
-              <input type="date" class="form-control form-control-sm" id="parcelDate" name="created_date" value="<?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?>" aria-label="Parcel date">
-            </div>
-          </div>
-          </div>
-        </section>
-      </div>
-    </div>
-
-      <!-- Branches -->
-      <section class="section-card pf-branches-section" role="region" aria-labelledby="pf-h-branches">
-          <div class="section-title" id="pf-h-branches"><i class="bi bi-diagram-3 me-2 text-primary" aria-hidden="true"></i>Branches</div>
-          <div class="section-body pt-2 pt-lg-3">
-          <?php if (empty($branchesList)): ?>
-          <div class="alert alert-warning py-2 mb-2 small" role="alert">
-            <strong>No active branches on first load.</strong> Branches are loaded from the server automatically. If the list stays empty, add or re-activate branches under <a href="<?php echo Helpers::baseUrl('index.php?page=settings&tab=branches#pane-branches'); ?>">Settings → Branches</a>.
-          </div>
-          <?php endif; ?>
-          <div id="pfBranchesDynamicMsg" class="small py-1 d-none" role="status" aria-live="polite"></div>
-          <div class="row g-2 pf-branches-row">
-            <div class="col-12 col-md-6 col-lg-6">
-              <label class="pf-label" for="fromBranchSelect">From branch</label>
-              <div class="pf-branch-input-group">
-                <select name="from_branch_id" id="fromBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="From branch">
+    <!-- Section 3: Shipment Details -->
+    <section class="section-card pf-shipping-unified" role="region" aria-labelledby="pf-h-shipping">
+      <div class="section-title" id="pf-h-shipping"><i class="bi bi-truck-front me-2 text-primary" aria-hidden="true"></i>Shipment Details</div>
+      <div class="section-body">
+        <div class="pf-shipping-grid pf-shipping-row">
+          <div class="pf-ship-field">
+            <label class="pf-label" for="fromBranchSelect">From branch</label>
+            <div class="pf-branch-input-group">
+              <select name="from_branch_id" id="fromBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="From branch">
         <option value="">Select Branch</option>
         <?php foreach (($branchesList ?? []) as $b):
             $bid = (int)$b['id'];
@@ -2151,12 +2133,12 @@
             data-phones="<?php echo htmlspecialchars((string)($b['phones'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string)($b['name'] ?? '')); ?></option>
         <?php endforeach; ?>
       </select>
-              </div>
             </div>
-            <div class="col-12 col-md-6 col-lg-6">
-              <label class="pf-label" for="toBranchSelect">To branch</label>
-              <div class="pf-branch-input-group">
-                <select name="to_branch_id" id="toBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="To branch">
+          </div>
+          <div class="pf-ship-field">
+            <label class="pf-label" for="toBranchSelect">To branch</label>
+            <div class="pf-branch-input-group">
+              <select name="to_branch_id" id="toBranchSelect" class="form-select form-select-sm" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-label="To branch">
         <option value="">Select Branch</option>
         <?php foreach (($branchesList ?? []) as $b):
             $bid = (int)$b['id'];
@@ -2168,19 +2150,10 @@
             data-phones="<?php echo htmlspecialchars((string)($b['phones'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string)($b['name'] ?? '')); ?></option>
         <?php endforeach; ?>
       </select>
-              </div>
-      <div id="toBranchSuggest" class="pf-form-text text-primary"></div>
             </div>
+            <div id="toBranchSuggest" class="pf-form-text text-primary small mb-0"></div>
           </div>
-          </div>
-      </section>
-
-    <div class="row g-2 g-lg-3 align-items-stretch">
-      <!-- Vehicle -->
-      <div class="col-12 col-md-6">
-        <section class="section-card h-100" role="region" aria-labelledby="pf-h-vehicle">
-          <div class="section-title" id="pf-h-vehicle"><i class="bi bi-truck me-2 text-primary" aria-hidden="true"></i>Transport Info</div>
-          <div class="section-body pt-2 pt-lg-3">
+          <div class="pf-ship-field">
       <?php if (!empty($vehiclesAll)): ?>
         <label class="pf-label" for="vehicleSelect">Vehicle</label>
         <div class="input-group input-group-sm pf-input-group">
@@ -2204,31 +2177,8 @@
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddVehicle" aria-label="Quick add vehicle"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
         </div>
       <?php endif; ?>
-      <div id="deliveryRouteHint" class="pf-form-text small text-success d-none" aria-live="polite"></div>
-      <?php 
-        $lorryChecked = 0; 
-        $pid = (int)($parcel['id'] ?? 0);
-        if ($pid > 0 && !empty($_SESSION['lorry_full_saved'][$pid])) { 
-          $lorryChecked = 1; 
-        } elseif (!empty($_SESSION['lorry_full_pref'])) { 
-          $lorryChecked = 1; 
-        }
-      ?>
-      <div class="form-check mt-1 small">
-        <input class="form-check-input" type="checkbox" value="1" id="lorry_full" name="lorry_full" <?php echo $lorryChecked ? 'checked' : ''; ?> <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
-        <label class="form-check-label" for="lorry_full">
-          Lorry Full (start next lorry after saving)
-        </label>
-      </div>
           </div>
-        </section>
-      </div>
-
-      <!-- Route -->
-      <div class="col-12 col-md-6">
-        <section class="section-card h-100" role="region" aria-labelledby="pf-h-route">
-          <div class="section-title" id="pf-h-route"><i class="bi bi-signpost me-2 text-primary" aria-hidden="true"></i>Route</div>
-          <div class="section-body pt-2 pt-lg-3">
+          <div class="pf-ship-field">
       <?php $drVal = trim((string)($parcel['delivery_route'] ?? '')); ?>
       <?php if (!empty($deliveryRoutesAll) && is_array($deliveryRoutesAll)): ?>
         <label class="pf-label" for="deliveryRouteField">Delivery route</label>
@@ -2244,14 +2194,106 @@
         <input type="text" name="delivery_route" id="deliveryRouteField" class="form-control form-control-sm" placeholder="Route" value="<?php echo htmlspecialchars($drVal); ?>" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Delivery route">
       <?php endif; ?>
           </div>
-        </section>
+          <div class="pf-ship-field">
+          <label class="pf-label" for="supplierSelect">Supplier</label>
+          <div class="input-group input-group-sm pf-input-group">
+            <select name="supplier_id" id="supplierSelect" class="form-select form-select-sm" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-choices-search="true" aria-label="Supplier">
+              <option value="0">-- None --</option>
+              <?php foreach (($suppliersAll ?? []) as $s): ?>
+                <?php 
+                  $raw = (string)($s['name'] ?? '');
+                  $nm = trim($raw);
+                  $norm = strtolower(preg_replace('/[^a-z0-9]+/i','', $nm));
+                  if ($nm === '' || $norm === 'none' || $norm === 'nonenone') { continue; }
+                  $ph = trim((string)($s['phone'] ?? ''));
+                  $label = $nm . ($ph !== '' ? ' (' . htmlspecialchars($ph) . ')' : '');
+                ?>
+                <option data-phone="<?php echo htmlspecialchars($ph); ?>" value="<?php echo (int)$s['id']; ?>" <?php echo ((int)($parcel['supplier_id'] ?? 0) === (int)$s['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
+              <?php endforeach; ?>
+            </select>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddSupplier" aria-label="Quick add supplier"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
+          </div>
+          <div id="supplierPhoneHint" class="pf-form-text mb-0 small"></div>
+          </div>
+          <div class="pf-ship-field pf-status-inline">
+            <?php if (!$statusOnlyEdit): ?>
+            <label class="pf-label" for="parcelStatusSelect">Status</label>
+            <select name="status" id="parcelStatusSelect" class="form-select form-select-sm w-100" data-enhance="false" <?php echo ($lockAll && !$statusOnlyEdit) ? 'disabled' : ''; ?> aria-label="Parcel status">
+              <?php foreach (Helpers::parcelStatusMap() as $stVal => $stLabel): ?>
+              <option value="<?php echo htmlspecialchars($stVal); ?>" <?php echo (($parcel['status'] ?? '') === $stVal) ? 'selected' : ''; ?>><?php echo htmlspecialchars($stLabel); ?></option>
+              <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+          </div>
+        </div>
+        <div id="pfBranchesDynamicMsg" class="small py-1 d-none" role="status" aria-live="polite"></div>
+        <?php if (empty($branchesList)): ?>
+        <div class="alert alert-warning py-2 mb-0 mt-2 small" role="alert">
+          <strong>No active branches on first load.</strong> Branches load automatically from the server.
+        </div>
+        <?php endif; ?>
+        <div class="pf-shipping-hidden-fields d-none" aria-hidden="true">
+          <input type="hidden" name="invoice_number" id="pfInvoiceNumberHidden" value="<?php echo htmlspecialchars($prefillInvoiceNumber); ?>">
+              <?php if ($lockAll && $isEdit): ?>
+              <input type="hidden" name="invoice_no" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>">
+              <input type="number" id="pfInvoiceNoRo" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? $parcel['id']); ?>" disabled readonly aria-label="Invoice number">
+              <?php elseif (!$isEdit && $hasExistingBill): ?>
+              <input type="hidden" name="invoice_no" id="pfInvoiceNo" value="<?php echo (int)($todayBillSummary['invoice_no'] ?? 0); ?>">
+              <input type="text" id="pfInvoiceNumberDisplay" value="<?php echo htmlspecialchars($prefillInvoiceNumber); ?>" readonly disabled aria-label="Bill invoice number">
+              <?php else: ?>
+              <input type="number" name="invoice_no" id="pfInvoiceNo" min="1" value="<?php echo (int)($parcel['invoice_no'] ?? 0) ?: ''; ?>" aria-label="Invoice number">
+              <?php endif; ?>
+        </div>
+        <div id="deliveryRouteHint" class="pf-form-text small text-success d-none mt-1" aria-live="polite"></div>
+      <?php 
+        $lorryChecked = 0; 
+        $pid = (int)($parcel['id'] ?? 0);
+        if ($pid > 0 && !empty($_SESSION['lorry_full_saved'][$pid])) { 
+          $lorryChecked = 1; 
+        } elseif (!empty($_SESSION['lorry_full_pref'])) { 
+          $lorryChecked = 1; 
+        }
+      ?>
+      <div class="form-check mt-2 small">
+        <input class="form-check-input" type="checkbox" value="1" id="lorry_full" name="lorry_full" <?php echo $lorryChecked ? 'checked' : ''; ?> <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> >
+        <label class="form-check-label" for="lorry_full">Lorry Full (start next lorry after saving)</label>
       </div>
-    </div>
-  </div>
+      <?php if (!$isEdit && !$lockAll): ?>
+      <div class="form-check mt-1 d-none">
+        <input class="form-check-input" type="checkbox" name="force_new_invoice" id="pfForceNewInvoice" value="1" disabled>
+        <label class="form-check-label small text-muted" for="pfForceNewInvoice">Separate daily bill</label>
       </div>
-      <div class="col-12 col-lg-6 col-xl-6 pf-animate pf-animate-in pf-animate-delay-2 pf-col-items">
+      <?php endif; ?>
+      </div>
+    </section>
 
-  <!-- Full-width Previous Bill Preview (moved outside left column) -->
+    <!-- Section 4: Live KPI summary -->
+    <div class="pf-kpi-strip" role="region" aria-label="Live shipment summary">
+      <div class="pf-kpi-card pf-kpi-accent"><span class="pf-kpi-label">Customer</span><span class="pf-kpi-value" id="sbLiveCustomer">—</span></div>
+      <div class="pf-kpi-card pf-kpi-accent"><span class="pf-kpi-label">Invoice</span><span class="pf-kpi-value" id="sbLiveInvoice"><?php echo $prefillInvoiceNumber !== '' ? htmlspecialchars($prefillInvoiceNumber) : '—'; ?></span></div>
+      <div class="pf-kpi-card"><span class="pf-kpi-label">Vehicle</span><span class="pf-kpi-value" id="sbLiveVehicle">—</span></div>
+      <div class="pf-kpi-card"><span class="pf-kpi-label">Route</span><span class="pf-kpi-value" id="sbLiveRoute">—</span></div>
+      <div class="pf-kpi-card"><span class="pf-kpi-label">Parcels</span><span class="pf-kpi-value" id="sbLiveParcels"><?php echo (int)($todayBillSummary['parcel_count'] ?? 0); ?></span></div>
+      <div class="pf-kpi-card pf-kpi-accent"><span class="pf-kpi-label">Running Total</span><span class="pf-kpi-value" id="sbLiveRunning"><?php echo number_format((float)($todayBillSummary['grand_total'] ?? 0), 2); ?></span></div>
+    </div>
+    <!-- Hidden sync targets for existing JS -->
+    <div class="visually-hidden" aria-hidden="true">
+      <span id="sbCustomer">—</span><span id="sbLocation">—</span><span id="sbFrom">—</span><span id="sbTo">—</span>
+      <span id="sbVehicle">—</span><span id="sbRoute">—</span><span id="sbInvoice">—</span>
+      <span id="sbParcelCount"><?php echo (int)($todayBillSummary['parcel_count'] ?? 0); ?></span>
+      <span id="sbRunningTotal"><?php echo number_format((float)($todayBillSummary['grand_total'] ?? 0), 2); ?></span>
+      <span id="sbTotal"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
+    </div>
+
+  </div><!-- /.pf-form-sections -->
+      </div><!-- /.pf-workspace-col -->
+    </div><!-- /.pf-enterprise-top -->
+
+    <!-- Section 5 & 6: Items table + totals panel -->
+    <div class="pf-items-workspace row g-3 pf-enterprise-items-row">
+      <div class="col-lg-8 col-xl-9 pf-col-items pf-animate pf-animate-in pf-animate-delay-2">
+
+  <!-- Full-width Previous Bill Preview -->
   <div id="billPreview" class="mb-3 pf-bill-preview">
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden pf-bill-preview-card">
       <div class="card-header d-flex justify-content-between align-items-center py-2">
@@ -2264,31 +2306,23 @@
     </div>
   </div>
 
-  <!-- Items & receipt section -->
-  <div class="section-card pf-items-section mt-1" role="region" aria-labelledby="pf-h-items-total">
-    <div class="section-title" id="pf-h-items-total"><i class="bi bi-list-ul me-2 text-primary" aria-hidden="true"></i> Items &amp; Total</div>
+  <!-- Section 5: Parcel Items -->
+  <div class="section-card pf-items-section" role="region" aria-labelledby="pf-h-items-total">
+    <div class="section-title pf-items-title-row" id="pf-h-items-total">
+      <span class="pf-items-title-text"><i class="bi bi-box-seam me-2 text-primary" aria-hidden="true"></i> Items &amp; Charges</span>
+      <?php if (!$lockAll): ?>
+      <button type="button" class="btn btn-sm btn-primary pf-btn-add-row btn-add-row" id="addRow" aria-label="Add parcel row"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add Parcel Row</button>
+      <?php endif; ?>
+    </div>
     <div class="section-body p-0">
-  <div class="receipt-box">
-    <div class="receipt-header d-flex justify-content-between align-items-center">
-      <div class="fw-semibold small">TS Transport</div>
-      <div class="text-muted small">Line items</div>
-    </div>
-    <div class="px-2 py-2 border-bottom bg-body-secondary bg-opacity-25 pf-receipt-summary-wrap">
-      <div class="pf-receipt-summary small">
-        <div class="pf-rs-block pf-rs-customer text-break">
-          <strong>Customer:</strong> <span id="customerDisplay">—</span>
-          <div class="text-muted mt-1"><strong>Location:</strong> <span id="customerLocDisplay">—</span></div>
-        </div>
-        <div class="pf-rs-block"><strong>Date:</strong> <span id="recDateSummary"><?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?></span></div>
-        <div class="pf-rs-block"><strong>From:</strong> <span id="fromBranchDisplay">—</span></div>
-        <div class="pf-rs-block"><strong>To:</strong> <span id="toBranchDisplay">—</span></div>
-        <div class="pf-rs-block"><strong>Vehicle:</strong> <span id="recVehicle">—</span></div>
+      <div class="visually-hidden" aria-hidden="true">
+        <span id="customerDisplay">—</span>
+        <span id="customerLocDisplay">—</span>
+        <span id="recDateSummary"><?php echo htmlspecialchars(substr((string)($parcel['created_at'] ?? date('Y-m-d')),0,10)); ?></span>
+        <span id="fromBranchDisplay">—</span>
+        <span id="toBranchDisplay">—</span>
+        <span id="recVehicle">—</span>
       </div>
-    </div>
-
-    <div class="container-fluid px-2 px-md-3">
-      <div class="card shadow-sm rounded-3 border-0">
-        <div class="card-body p-2 p-md-3">
       <div class="table-responsive pf-items-table-wrap pf-items-scroll-desktop">
         <table class="table table-sm table-bordered receipt-grid align-middle text-nowrap mb-0" id="itemsTable" aria-describedby="pf-h-items-total">
           <thead>
@@ -2373,7 +2407,7 @@
               <td class="text-center pf-item-remove-cell col-actions"><?php if (!$isEdit && !$lockAll): ?><button type="button" class="btn btn-outline-danger btn-sm remove-row pf-btn-icon-touch rounded-3" aria-label="Delete line"><i class="bi bi-trash3" aria-hidden="true"></i></button><?php endif; ?></td>
             </tr>
             <?php endforeach; ?>
-            <?php if (empty($items)): ?>
+            <?php if (empty($itemsList)): ?>
             <tr>
               <td class="text-center align-middle pf-item-no-cell col-no">1</td>
               <td class="col-description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
@@ -2405,66 +2439,61 @@
           </tbody>
         </table>
       </div>
-      <div class="text-center text-md-end mt-3">
-          <?php if (!$lockAll): ?>
-            <button type="button" class="btn btn-sm btn-primary pf-btn-add-row btn-add-row" id="addRow" aria-label="Add line item"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add Row</button>
-          <?php endif; ?>
-      </div>
-        </div>
-      </div>
     </div>
+  </div>
 
-      <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
-      <div class="receipt-total px-2 px-md-3 py-2 py-md-3">
-        <div class="row g-2 g-md-3 align-items-center justify-content-lg-end">
-          <div class="col-12 col-sm-6 col-lg-auto">
-            <label class="col-form-label mb-0" for="totalPrice"><strong>Total</strong></label>
-          </div>
-          <div class="col-12 col-sm-6 col-lg-auto">
-            <input type="number" step="0.01" min="0" class="form-control form-control-sm w-100" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php 
-              echo ($lockAll || !$priceOnly) ? 'disabled' : '';
-            ?> placeholder="0.00">
-          </div>
-          <?php if ($priceOnly && !$lockAll): ?>
-            <div class="col-12 col-sm-6 col-lg-auto">
-              <label class="col-form-label mb-0" for="discountInput"><strong>Discount</strong></label>
-            </div>
-            <div class="col-12 col-sm-6 col-lg-auto">
-              <input type="number" step="0.01" min="0" class="form-control form-control-sm w-100" name="discount" id="discountInput" value="" placeholder="0.00">
-            </div>
-          <?php endif; ?>
-          <div class="col-12 col-lg-auto text-lg-end">
-            <div class="pf-total-inline">
-              <span>Total</span>
-              <span class="fs-5 fw-bold" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
-  </div>
-  </div>
       </div><!-- /.pf-col-items -->
-    </div><!-- /.row -->
+
+      <div class="col-lg-4 col-xl-3 pf-totals-rail">
+        <aside class="pf-totals-sticky" aria-label="Total summary">
+          <h2 class="pf-totals-heading">Order Summary</h2>
+          <div class="pf-total-breakdown" id="pfItemsTotalPanel" aria-live="polite">
+            <div class="pf-tb-row"><span class="pf-tb-label">Total Parcels</span><span class="pf-tb-val" id="pfTotalParcels">0</span></div>
+            <div class="pf-tb-row"><span class="pf-tb-label">Sub Total</span><span class="pf-tb-val" id="pfSubTotal">—</span></div>
+            <div class="pf-tb-row"><span class="pf-tb-label">Additional Charges</span><span class="pf-tb-val" id="pfAdditionalTotal">—</span></div>
+            <div class="pf-tb-row pf-tb-grand"><span class="pf-tb-label">Grand Total</span><span class="pf-tb-val pf-grand-amt" id="pfGrandTotal">—</span></div>
+          </div>
+          <?php $currPrice = (float)($parcel['price'] ?? 0); ?>
+          <div class="pf-totals-form-fields">
+            <input type="number" step="0.01" min="0" class="form-control form-control-sm" name="price" id="totalPrice" value="<?php echo $currPrice>0? number_format($currPrice,2,'.','') : ''; ?>" <?php echo ($lockAll || !$priceOnly) ? 'disabled' : ''; ?> placeholder="0.00" aria-label="Total price">
+            <?php if ($priceOnly && !$lockAll): ?>
+            <input type="number" step="0.01" min="0" class="form-control form-control-sm mt-2" name="discount" id="discountInput" value="" placeholder="Discount" aria-label="Discount">
+            <?php endif; ?>
+            <span class="visually-hidden" id="totalDisplay"><?php echo $parcel['price']===null ? '—' : number_format((float)$parcel['price'],2); ?></span>
+          </div>
+          <button type="submit" form="parcelForm" class="btn btn-primary pf-btn-save w-100 mt-3" id="pfSaveBtnTotals"><i class="bi bi-save me-1"></i> Save Parcel</button>
+        </aside>
+      </div><!-- /.pf-totals-rail -->
+
+    </div><!-- /.pf-items-workspace -->
+    </div><!-- /.pf-enterprise-layout -->
   </div><!-- /.container-fluid main grid -->
   </div><!-- /.statusOnly hide block -->
 
-  <!-- Status and actions (native select: do not use Choices.js — keeps all 8 statuses visible) -->
+  <?php if ($statusOnlyEdit): ?>
   <div class="container-fluid px-0 pf-form-inner-fluid">
+    <section class="section-card">
+      <div class="section-body py-3">
+        <label class="pf-label" for="parcelStatusSelect">Status</label>
+        <select name="status" id="parcelStatusSelect" class="form-select form-select-sm w-100" data-enhance="false" aria-label="Parcel status">
+          <?php foreach (Helpers::parcelStatusMap() as $stVal => $stLabel): ?>
+          <option value="<?php echo htmlspecialchars($stVal); ?>" <?php echo (($parcel['status'] ?? '') === $stVal) ? 'selected' : ''; ?>><?php echo htmlspecialchars($stLabel); ?></option>
+          <?php endforeach; ?>
+        </select>
+        <div class="mt-3">
+          <button type="submit" id="parcelSubmitBtn" class="btn btn-primary pf-btn-save"><i class="bi bi-save me-1"></i> Save Parcel</button>
+        </div>
+      </div>
+    </section>
+  </div>
+  <?php endif; ?>
+
+  <!-- Legacy status row hidden — status field lives in Shipping Details -->
+  <div class="container-fluid px-0 pf-form-inner-fluid pf-status-bottom-card d-none">
   <div class="section-card mt-2">
     <div class="section-body py-2 px-2 px-sm-3">
       <div class="row g-2 align-items-end pf-status-row">
-        <div class="col-12 col-lg col-status min-w-0">
-          <label class="form-label mb-1" for="parcelStatusSelect">Status</label>
-          <select name="status" id="parcelStatusSelect" class="form-select form-select-sm w-100" data-enhance="false" <?php echo ($lockAll && !$statusOnlyEdit) ? 'disabled' : ''; ?> aria-label="Parcel status">
-            <?php foreach (Helpers::parcelStatusMap() as $stVal => $stLabel): ?>
-            <option value="<?php echo htmlspecialchars($stVal); ?>" <?php echo (($parcel['status'] ?? '') === $stVal) ? 'selected' : ''; ?>><?php echo htmlspecialchars($stLabel); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="col-12 col-lg-auto d-none d-lg-block flex-shrink-0">
-          <label class="form-label mb-1 opacity-0 user-select-none" aria-hidden="true">&nbsp;</label>
+        <div class="col-12 col-lg-auto flex-shrink-0">
           <button type="submit" id="parcelSubmitBtn" class="btn btn-primary btn-sm text-nowrap pf-btn-save"><i class="bi bi-save me-1" aria-hidden="true"></i> Save Parcel</button>
         </div>
       </div>
@@ -2678,8 +2707,6 @@
   }
 
   const parcelBranchJsonUrl = <?php echo json_encode(Helpers::baseUrl('index.php?page=branches&action=json'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_SLASHES); ?>;
-  const parcelBranchPreserveFrom = <?php echo (int)($parcel['from_branch_id'] ?? 0); ?>;
-  const parcelBranchPreserveTo = <?php echo (int)($parcel['to_branch_id'] ?? 0); ?>;
   let branchesData = <?php echo json_encode(array_map(function ($b) { return ['id' => (int)$b['id'], 'name' => $b['name']]; }, $branchesAll ?? []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 
   async function loadParcelBranchesFromApi() {
@@ -2691,19 +2718,13 @@
     }
     const prevFrom = String(fromSel.value || '').trim();
     const prevTo = String(toSel.value || '').trim();
-    const preserveFromId = parseInt(String(prevFrom || String(parcelBranchPreserveFrom || 0)), 10) || 0;
-    const preserveToId = parseInt(String(prevTo || String(parcelBranchPreserveTo || 0)), 10) || 0;
-    const url = parcelBranchJsonUrl
-      + (String(parcelBranchJsonUrl).indexOf('?') === -1 ? '?' : '&')
-      + 'preserve_from=' + encodeURIComponent(String(preserveFromId))
-      + '&preserve_to=' + encodeURIComponent(String(preserveToId));
     if (msgEl) {
       msgEl.classList.remove('d-none', 'text-danger', 'text-warning');
       msgEl.classList.add('text-muted');
       msgEl.textContent = 'Loading branches…';
     }
     try {
-      const res = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      const res = await fetch(parcelBranchJsonUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
       const payload = parseJsonResponse(await res.text());
       if (!res.ok || !payload || payload.ok !== true || !Array.isArray(payload.branches)) {
         if (msgEl) {
@@ -2713,19 +2734,12 @@
         }
         return;
       }
-      const preserveIds = new Set([preserveFromId, preserveToId].filter(function (x) { return x > 0; }));
       const active = payload.branches.filter(function (b) {
         const id = parseInt(String(b.id), 10);
-        const isOn = parseInt(String(b.is_active != null ? b.is_active : 1), 10) === 1;
-        return isOn || preserveIds.has(id);
+        return id >= 1 && id <= 3 && parseInt(String(b.is_active != null ? b.is_active : 1), 10) === 1;
       });
       active.sort(function (a, b) {
-        const ma = parseInt(String(a.is_main ?? 0), 10) === 1;
-        const mb = parseInt(String(b.is_main ?? 0), 10) === 1;
-        if (ma !== mb) {
-          return ma ? -1 : 1;
-        }
-        return String(a.name || '').localeCompare(String(b.name || ''));
+        return parseInt(String(a.id), 10) - parseInt(String(b.id), 10);
       });
       branchesData = active.map(function (b) {
         return { id: parseInt(String(b.id), 10), name: String(b.name || '') };
@@ -2811,6 +2825,7 @@
     document.getElementById('parcelSubmitBtn'),
     document.getElementById('pfSaveBtnMobile'),
     document.getElementById('pfSaveBtnTop'),
+    document.getElementById('pfSaveBtnTotals'),
   ].filter(function (el) { return el && el.tagName === 'BUTTON'; });
   if (form) {
     let isSubmitting = false;
@@ -2902,19 +2917,34 @@
         const loadingHtml = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving…';
         saveBtns.forEach(function (b) { b.disabled = true; b.innerHTML = loadingHtml; });
         try {
+          // Sync native select values (Choices.js / disabled fields) before FormData
+          [fromBranchEl, toBranchEl].forEach(function (sel) {
+            if (!sel || sel.disabled) return;
+            try {
+              if (sel._choices) {
+                const v = sel._choices.getValue(true);
+                const val = Array.isArray(v) ? (v[0] && v[0].value !== undefined ? v[0].value : v[0]) : v;
+                if (val !== undefined && val !== null) sel.value = String(val);
+              }
+            } catch (_) { /* ignore */ }
+          });
+          form.querySelectorAll('input.item-rate[disabled], input.item-add[disabled]').forEach(function (inp) {
+            inp.disabled = false;
+          });
+          const forceNewEl = document.getElementById('pfForceNewInvoice');
+          if (forceNewEl && forceNewEl.checked) {
+            const invHidden = document.getElementById('pfInvoiceNumberHidden');
+            if (invHidden) invHidden.value = '';
+            const invNo = document.getElementById('pfInvoiceNo');
+            if (invNo && invNo.type === 'hidden') invNo.value = '';
+          }
           const fd = new FormData(form);
           const res = await fetch(form.action, {
             method: 'POST',
             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
             body: fd
           });
-          let data = null;
-          try {
-            const raw = await res.text();
-            data = raw ? JSON.parse(raw) : null;
-          } catch (_) {
-            data = null;
-          }
+          const data = parseJsonResponse(await res.text());
           if (!res.ok || !data || data.ok !== true) {
             const msg = (data && data.error) ? String(data.error) : (res.status >= 500 ? 'Server error while saving. Please try again.' : 'Could not save. Check highlighted fields and try again.');
             showToast('error', 'Could not save', msg);
@@ -2924,13 +2954,22 @@
             return;
           }
 
-          showToast('success', 'Saved', `Parcel saved successfully (ID: ${data.id}).`);
+          showToast('success', 'Saved', `Parcel saved successfully (ID: ${data.id}).` + (data.invoice_number ? ` Bill: ${data.invoice_number}` : ''));
 
           // If backend suggests redirect, try to apply changes without full page reload
           // New parcel flow: keep customer/branches/vehicle, clear items
           const redirect = String(data.redirect || '');
           if (redirect.includes('page=parcels') && redirect.includes('action=new')) {
             try {
+              if (data.bill) {
+                if (typeof window.pfApplyBillSummary === 'function') {
+                  window.pfApplyBillSummary({ found: true, bill: data.bill });
+                }
+              } else if (typeof window.pfRefreshBillSummary === 'function') {
+                window.pfRefreshBillSummary();
+              }
+              const forceNewEl = document.getElementById('pfForceNewInvoice');
+              if (forceNewEl) forceNewEl.checked = false;
               const u = new URL(redirect, window.location.origin);
               const qs = u.searchParams;
               const cid = qs.get('customer_id') || '';
@@ -3017,8 +3056,33 @@
     syncRecDate();
   }
 
+  function updateItemsTotalPanel() {
+    if (!table) return;
+    const fmt = (n) => (n > 0 ? n.toFixed(2) : '—');
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    let lineCount = 0;
+    let subTotal = 0;
+    let additionalTotal = 0;
+    table.querySelectorAll('tbody tr').forEach((row) => {
+      const desc = (row.querySelector('.item-desc')?.value || '').trim();
+      const qty = parseFloat(row.querySelector('.item-qty')?.value || '0') || 0;
+      const rate = parseFloat(row.querySelector('.item-rate')?.value || '0') || 0;
+      let addSum = 0;
+      row.querySelectorAll('.item-add').forEach((inp) => { addSum += parseFloat(inp?.value || '0') || 0; });
+      if (desc || qty > 0 || rate > 0 || addSum > 0) lineCount++;
+      subTotal += (qty > 0 && rate > 0) ? (qty * rate) : 0;
+      additionalTotal += addSum;
+    });
+    const grand = subTotal + additionalTotal;
+    set('pfTotalParcels', String(lineCount));
+    set('pfSubTotal', fmt(subTotal));
+    set('pfAdditionalTotal', fmt(additionalTotal));
+    set('pfGrandTotal', grand > 0 ? grand.toFixed(2) : (totalDisplay?.textContent || '—'));
+  }
+
   function recalc(){
-    if (lockAll) { return; }
+    if (lockAll) { updateItemsTotalPanel(); return; }
+    if (!table) { return; }
     // When item amounts are allowed, derive from Qty × Rate and show Amount per row
     // EXCEPT during price-only edit (user types price manually)
     if (canEnterItemAmounts && !(isEdit && priceOnly)) {
@@ -3041,12 +3105,10 @@
       });
       if (totalDisplay) totalDisplay.textContent = total > 0 ? total.toFixed(2) : '—';
       if (totalPrice && !totalPrice.disabled) totalPrice.value = total > 0 ? total.toFixed(2) : '';
+      updateItemsTotalPanel();
+      syncEnterpriseUi();
       return;
     }
-
-
-
-
 
     // Otherwise (other branches), show price minus discount on edit
     if (isEdit) {
@@ -3054,10 +3116,14 @@
       const d = parseFloat(discountInput?.value || '0') || 0;
       const v = Math.max(0, p - Math.max(0, d));
       totalDisplay.textContent = v > 0 ? v.toFixed(2) : '—';
+      updateItemsTotalPanel();
+      syncEnterpriseUi();
       return;
     }
     // Default fallback for create in other branches
     totalDisplay.textContent = totalPrice?.value ? String(totalPrice.value) : '—';
+    updateItemsTotalPanel();
+    syncEnterpriseUi();
   }
 
   // Supplier phone hint + Vehicle display
@@ -3079,10 +3145,14 @@
     if (!recVehicle) return;
     const v = vehicleSelect ? (vehicleSelect.value || '') : (vehicleInput?.value || '');
     recVehicle.textContent = v && v.trim() !== '' ? v : '—';
+    syncEnterpriseUi();
   }
   vehicleSelect?.addEventListener('change', updateVehicle);
   vehicleInput?.addEventListener('input', updateVehicle);
   updateVehicle();
+  const deliveryRouteFieldEl = document.getElementById('deliveryRouteField');
+  deliveryRouteFieldEl?.addEventListener('change', syncEnterpriseUi);
+  deliveryRouteFieldEl?.addEventListener('input', syncEnterpriseUi);
 
   const customerSearchInput = document.getElementById('customerSearch');
   const customerSelectMain = document.getElementById('customerSelectHidden') || document.querySelector('select[name="customer_id"]');
@@ -3375,6 +3445,86 @@
   if (parcelDateEl2) parcelDateEl2.addEventListener('change', applyDeliveryRouteFromCustomer);
   if (parcelDateEl2) parcelDateEl2.addEventListener('input', applyDeliveryRouteFromCustomer);
 
+  // Same-day bill summary (one invoice per customer per day)
+  const billBanner = document.getElementById('pfBillSummaryBanner');
+  const billStatusMessage = document.getElementById('pfBillStatusMessage');
+  const billNumberLabel = document.getElementById('pfBillNumberLabel');
+  const billCustomerName = document.getElementById('pfBillCustomerName');
+  const billParcelCount = document.getElementById('pfBillParcelCount');
+  const billRunningTotal = document.getElementById('pfBillRunningTotal');
+  const invoiceNumberHidden = document.getElementById('pfInvoiceNumberHidden');
+  const forceNewInvoiceEl = document.getElementById('pfForceNewInvoice');
+  const invoiceNumberDisplay = document.getElementById('pfInvoiceNumberDisplay');
+  const invoiceNoEl = document.getElementById('pfInvoiceNo');
+  const isNewParcelForm = <?php echo $isEdit ? 'false' : 'true'; ?>;
+
+  function formatBillMoney(n) {
+    const x = parseFloat(n);
+    return isNaN(x) ? '0.00' : x.toFixed(2);
+  }
+
+  function applyBillSummary(data) {
+    if (!isNewParcelForm) return;
+    const found = !!(data && data.found && data.bill);
+    if (billBanner) billBanner.classList.toggle('d-none', !found);
+    if (found && data.bill) {
+      const b = data.bill;
+      if (billStatusMessage) {
+        const inv = b.invoice_number || '';
+        billStatusMessage.textContent = inv
+          ? ('Existing invoice found. New parcel will be added to Invoice ' + inv)
+          : (b.status_message || 'Existing invoice found.');
+      }
+      if (billNumberLabel) billNumberLabel.textContent = b.invoice_number || '—';
+      if (billCustomerName) {
+        const selIdx = customerSel?.selectedIndex ?? -1;
+        const fromSelect = customerSel?.options[selIdx]?.text?.trim() || '';
+        billCustomerName.textContent = b.customer_name || fromSelect || '—';
+      }
+      if (billParcelCount) billParcelCount.textContent = String(b.parcel_count || 0);
+      if (billRunningTotal) billRunningTotal.textContent = formatBillMoney(b.grand_total != null ? b.grand_total : b.parcel_total);
+      if (invoiceNumberHidden) invoiceNumberHidden.value = b.invoice_number || '';
+      if (invoiceNumberDisplay) invoiceNumberDisplay.value = b.invoice_number || '';
+      if (invoiceNoEl && invoiceNoEl.type === 'hidden') invoiceNoEl.value = String(b.invoice_no || '');
+    } else {
+      if (billStatusMessage) billStatusMessage.textContent = '';
+      if (invoiceNumberHidden) invoiceNumberHidden.value = '';
+    }
+    syncEnterpriseUi();
+  }
+
+  function refreshBillSummary() {
+    if (!isNewParcelForm) return;
+    const cid = customerSel ? (customerSel.value || '').trim() : '';
+    const dateVal = parcelDateEl2 ? (parcelDateEl2.value || '').trim() : '';
+    const fromBid = fromBranchSel ? (fromBranchSel.value || '').trim() : '';
+    const toBid = toBranchSel ? (toBranchSel.value || '').trim() : '';
+    if (!cid || cid === '0') {
+      applyBillSummary({ found: false });
+      return;
+    }
+    const date = dateVal || '<?php echo date('Y-m-d'); ?>';
+    let url = '<?php echo Helpers::baseUrl('index.php?page=parcels&action=bill_for_customer_date'); ?>'
+      + '&customer_id=' + encodeURIComponent(cid)
+      + '&date=' + encodeURIComponent(date);
+    if (fromBid && fromBid !== '0') url += '&from_branch_id=' + encodeURIComponent(fromBid);
+    if (toBid && toBid !== '0') url += '&to_branch_id=' + encodeURIComponent(toBid);
+    fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) { applyBillSummary(data); })
+      .catch(function() { applyBillSummary({ found: false }); });
+  }
+
+  if (customerSel) customerSel.addEventListener('change', refreshBillSummary);
+  if (parcelDateEl2) parcelDateEl2.addEventListener('change', refreshBillSummary);
+  if (parcelDateEl2) parcelDateEl2.addEventListener('input', refreshBillSummary);
+  if (fromBranchSel) fromBranchSel.addEventListener('change', refreshBillSummary);
+  if (toBranchSel) toBranchSel.addEventListener('change', refreshBillSummary);
+  if (forceNewInvoiceEl) forceNewInvoiceEl.addEventListener('change', refreshBillSummary);
+  if (isNewParcelForm) refreshBillSummary();
+  window.pfApplyBillSummary = applyBillSummary;
+  window.pfRefreshBillSummary = refreshBillSummary;
+
   // Quick Add Vehicle
   document.getElementById('qv_submit')?.addEventListener('click', async function(){
     const vInput = document.getElementById('qv_no');
@@ -3502,7 +3652,7 @@
     }
   });
 
-  table.addEventListener('input', function(e){
+  table?.addEventListener('input', function(e){
     const target = e.target;
     if (lockAll) return;
     if (!canEnterItemAmounts) return;
@@ -3532,9 +3682,9 @@
   }
 
   // Initial state: hide unwanted X when only one add-amount row exists
-  syncAddRemoveButtons(table);
+  if (table) syncAddRemoveButtons(table);
 
-  table.addEventListener('click', function(e){
+  table?.addEventListener('click', function(e){
     if (e.target.closest('.add-amount-btn')) {
       const cell = e.target.closest('.item-amount-cell');
       const list = cell?.querySelector('.item-add-list');
@@ -3779,6 +3929,51 @@
     var bd = branchesData.find(function (b) { return String(b.id) === v; });
     return bd && bd.name ? String(bd.name) : '—';
   }
+  function syncEnterpriseUi() {
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+    function copyText(fromId, toId) {
+      const src = document.getElementById(fromId);
+      const dst = document.getElementById(toId);
+      if (src && dst) dst.textContent = src.textContent || '—';
+    }
+    copyText('customerDisplay', 'sbCustomer');
+    copyText('customerDisplay', 'sbLiveCustomer');
+    copyText('customerLocDisplay', 'sbLocation');
+    copyText('fromBranchDisplay', 'sbFrom');
+    copyText('toBranchDisplay', 'sbTo');
+    copyText('customerLocDisplay', 'sbLocation');
+    copyText('recVehicle', 'sbVehicle');
+    copyText('recVehicle', 'sbLiveVehicle');
+    copyText('totalDisplay', 'sbTotal');
+    copyText('pfBillNumberLabel', 'sbInvoice');
+    copyText('pfBillNumberLabel', 'sbLiveInvoice');
+    copyText('pfBillNumberLabel', 'sbInvoiceHeader');
+    copyText('pfBillParcelCount', 'sbParcelCount');
+    copyText('pfBillParcelCount', 'sbLiveParcels');
+    copyText('pfBillRunningTotal', 'sbRunningTotal');
+    copyText('pfBillRunningTotal', 'sbLiveRunning');
+    const routeEl = document.getElementById('deliveryRouteField');
+    let routeText = '—';
+    if (routeEl) {
+      if (routeEl.tagName === 'SELECT') {
+        const opt = routeEl.options[routeEl.selectedIndex];
+        routeText = (opt && opt.value) ? (opt.textContent || opt.value).trim() : '—';
+      } else {
+        routeText = String(routeEl.value || '').trim() || '—';
+      }
+    }
+    setText('sbRoute', routeText);
+    setText('sbLiveRoute', routeText);
+    const invDisplay = document.getElementById('pfInvoiceNumberDisplay');
+    if (invDisplay && invDisplay.value) {
+      setText('sbInvoiceHeader', invDisplay.value);
+      setText('sbLiveInvoice', invDisplay.value);
+      setText('sbInvoice', invDisplay.value);
+    }
+  }
   function updateMeta(){
     const selIdx = customerSelect?.selectedIndex ?? -1;
     const custText = customerSelect?.options[selIdx]?.text || '-- Select Customer --';
@@ -3811,6 +4006,7 @@
         toBranchSuggest.innerHTML = html;
       }
     }
+    syncEnterpriseUi();
   }
   async function fetchCustomerSummary(){
     const custId = parseInt(customerSelect?.value || '0');
@@ -3919,7 +4115,7 @@
   fromBranchSelect?.addEventListener('input', updateMeta);
   toBranchSelect?.addEventListener('input', updateMeta);
   document.getElementById('parcelForm')?.addEventListener('click', function (e) {
-    if (!e.target.closest('.pf-branches-section select.form-select')) return;
+    if (!e.target.closest('.pf-shipping-unified select.form-select, .pf-branches-section select.form-select')) return;
     window.requestAnimationFrame(function () { try { updateMeta(); } catch (_) {} });
   });
   function clearBranchFieldInvalid(sel) {
@@ -3932,7 +4128,7 @@
   fromBranchSelect?.addEventListener('change', function () { clearBranchFieldInvalid(this); });
   toBranchSelect?.addEventListener('change', function () { clearBranchFieldInvalid(this); });
   function bootParcelBranchUi() {
-    const userBranchId = <?php echo (int)((Auth::user()['branch_id'] ?? 0)); ?>;
+    const userBranchId = <?php echo (int)$userFixedBranchId; ?>;
     if (fromBranchSelect && (!fromBranchSelect.value || fromBranchSelect.value === '0') && userBranchId > 0) {
       const opt = Array.from(fromBranchSelect.options).find(function (o) { return parseInt(o.value || '0', 10) === userBranchId; });
       if (opt) { syncBranchSelect(fromBranchSelect, String(userBranchId)); }

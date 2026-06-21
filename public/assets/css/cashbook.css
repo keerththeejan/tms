@@ -174,6 +174,73 @@
   transition: background-color 0.15s ease;
 }
 
+.cashbook-filter-strip {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.cashbook-summary-card,
+.cashbook-chart-card,
+.cashbook-summary-panel {
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border-radius: 16px;
+}
+
+.cashbook-chart-wrap {
+  position: relative;
+  min-height: 280px;
+}
+
+.cashbook-summary-card .card-body,
+.cashbook-summary-panel .card-body {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.cashbook-summary-panel .badge {
+  font-weight: 700;
+}
+
+.cashbook-audit-table .table,
+.cashbook-summary-panel .table {
+  margin-bottom: 0;
+}
+
+.cashbook-audit-table thead th,
+.cashbook-summary-panel thead th {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bs-secondary-color);
+}
+
+.cashbook-summary-card .fs-5,
+.cashbook-summary-card .fs-4 {
+  letter-spacing: -0.02em;
+}
+
+body[data-theme="dark"] .cashbook-summary-card,
+body[data-theme="dark"] .cashbook-chart-card,
+body[data-theme="dark"] .cashbook-summary-panel,
+body[data-theme="dark"] .cashbook-filter-strip,
+body[data-theme="dark"] .cashbook-audit-table {
+  background: rgba(15, 23, 42, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+body[data-theme="dark"] .cashbook-summary-card .card-body,
+body[data-theme="dark"] .cashbook-summary-panel .card-body,
+body[data-theme="dark"] .cashbook-chart-card .card-body,
+body[data-theme="dark"] .cashbook-audit-table .table {
+  background: transparent !important;
+  color: var(--tms-text);
+}
+
+body[data-theme="dark"] .cashbook-filter-strip,
+body[data-theme="dark"] .cashbook-filter-strip .text-muted,
+body[data-theme="dark"] .cashbook-summary-panel .text-muted,
+body[data-theme="dark"] .cashbook-summary-card .text-muted {
+  color: var(--tms-muted) !important;
+}
+
 .cashbook-acc-card {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }

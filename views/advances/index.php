@@ -13,7 +13,7 @@
     <input type="date" class="form-control" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>">
   </div>
   <div class="col-12 col-md-3">
-    <select class="form-select" name="employee_id">
+    <select class="form-select" name="employee_id" data-enhance="false">
       <option value="0">All Employees</option>
       <?php foreach (($employeesAll ?? []) as $emp): ?>
         <option value="<?php echo (int)$emp['id']; ?>" <?php echo ((int)($empFilter ?? 0) === (int)$emp['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($emp['name'] ?? ('#'.$emp['id'])); ?></option>
@@ -25,6 +25,18 @@
     <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=advances'); ?>">Clear</a>
   </div>
 </form>
+<?php if (empty($advances)): ?>
+<div class="alert alert-light border text-center py-4 mb-3">
+  <i class="bi bi-cash-stack display-6 d-block mb-2 opacity-50" aria-hidden="true"></i>
+  <div class="fw-semibold mb-1">No advances in this period</div>
+  <p class="text-muted small mb-3">Record staff cash advances here, then settle them when repaid.</p>
+  <?php if (empty($employeesAll)): ?>
+    <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=employees&action=new'); ?>"><i class="bi bi-person-plus"></i> Add employee first</a>
+  <?php else: ?>
+    <a class="btn btn-sm btn-primary" href="<?php echo Helpers::baseUrl('index.php?page=advances&action=new'); ?>"><i class="bi bi-plus-lg"></i> New Advance</a>
+  <?php endif; ?>
+</div>
+<?php else: ?>
 <div class="hr-table-wrap card shadow-sm rounded-3 border-0 overflow-hidden">
   <div class="card-body p-0">
 <div class="table-responsive">
@@ -81,4 +93,5 @@
 </div>
   </div>
 </div>
+<?php endif; ?>
 </div><!-- /.hr-page -->

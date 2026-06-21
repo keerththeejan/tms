@@ -16,6 +16,17 @@ final class BranchRepository
             return;
         }
         self::$schemaChecked = true;
+        self::applySchemaColumns($pdo);
+        try {
+            BranchFixedMaster::ensure($pdo);
+        } catch (\Throwable $e) {
+            // migration best-effort; do not block app boot
+        }
+    }
+
+    /** Column patches only (no fixed-branch migration). */
+    public static function applySchemaColumns(\PDO $pdo): void
+    {
         try {
             $pdo->exec('ALTER TABLE branches ADD COLUMN location VARCHAR(255) NULL DEFAULT NULL AFTER code');
         } catch (\PDOException $e) {
@@ -69,14 +80,41 @@ final class BranchRepository
         }
     }
 
+    /** Fixed three-branch IDs in display order: Colombo, Kilinochchi, Mullaitivu. */
+    public static function fixedBranchIds(): array
+    {
+        return BranchFixedMaster::allowedIds();
+    }
+
+    private static function fixedOnlyWhere(string $alias = ''): string
+    {
+        $col = ($alias !== '' ? $alias . '.' : '') . 'id';
+        return $col . ' IN (1,2,3)';
+    }
+
+    private static function fixedOrderBy(string $alias = 'id'): string
+    {
+        $col = $alias;
+        if (str_contains($alias, '.')) {
+            // already qualified
+        } elseif ($alias === 'id') {
+            $col = 'id';
+        }
+        return BranchFixedMaster::fixedOrderSql($col);
+    }
+
     /** Default branch for invoices / receipts / header (first is_default active row). */
     public static function getDefaultForPrint(\PDO $pdo): ?array
     {
         self::ensureSchema($pdo);
-        $stmt = $pdo->query('SELECT * FROM branches WHERE is_default = 1 AND is_active = 1 LIMIT 1');
+        $stmt = $pdo->query(
+            'SELECT * FROM branches WHERE is_default = 1 AND is_active = 1 AND id IN (1,2,3) LIMIT 1'
+        );
         $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
         if (!$row) {
-            $stmt = $pdo->query('SELECT * FROM branches WHERE is_active = 1 ORDER BY is_main DESC, id ASC LIMIT 1');
+            $stmt = $pdo->query(
+                'SELECT * FROM branches WHERE is_active = 1 AND id IN (1,2,3) ORDER BY ' . self::fixedOrderBy('id') . ' LIMIT 1'
+            );
             $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
         }
         return $row ?: null;
@@ -107,14 +145,12 @@ final class BranchRepository
     public static function getMainBranchId(\PDO $pdo): int
     {
         self::ensureSchema($pdo);
-        $stmt = $pdo->query('SELECT id FROM branches WHERE is_main = 1 AND is_active = 1 ORDER BY id ASC LIMIT 1');
+        $stmt = $pdo->query('SELECT id FROM branches WHERE is_main = 1 AND is_active = 1 AND id IN (1,2,3) ORDER BY id ASC LIMIT 1');
         $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
         if ($row && (int)$row['id'] > 0) {
             return (int)$row['id'];
         }
-        $stmt = $pdo->query('SELECT id FROM branches WHERE is_active = 1 ORDER BY id ASC LIMIT 1');
-        $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
-        return $row ? (int)$row['id'] : 0;
+        return 2;
     }
 
     /**
@@ -126,7 +162,9 @@ final class BranchRepository
     {
         self::ensureSchema($pdo);
         $stmt = $pdo->query(
-            'SELECT id, name, address_tamil, address_english, phones, is_default, is_main, settings_slot FROM branches WHERE is_active = 1 ORDER BY is_default DESC, settings_slot IS NULL, settings_slot ASC, is_main DESC, name ASC'
+            'SELECT id, name, address_tamil, address_english, phones, is_default, is_main, settings_slot
+             FROM branches WHERE is_active = 1 AND id IN (1,2,3)
+             ORDER BY ' . self::fixedOrderBy('id')
         );
         $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
         $out = [];
@@ -147,92 +185,22 @@ final class BranchRepository
     public static function invoiceHeaderBranchesThree(\PDO $pdo): array
     {
         self::ensureSchema($pdo);
-        // 1) Prefer Settings slots (0..2) because this is the most reliable way to define
-        //    "Colombo / Kilinochchi / Mullaitivu" header columns on hosted servers.
         $result = [null, null, null];
-        $usedIds = [];
-        try {
-            $stSlots = $pdo->query(
-                'SELECT id, name, address_tamil, address_english, phones, settings_slot
-                 FROM branches
-                 WHERE is_active = 1 AND settings_slot BETWEEN 0 AND 2
-                 ORDER BY settings_slot ASC'
-            );
-            $slotRows = $stSlots ? $stSlots->fetchAll(\PDO::FETCH_ASSOC) : [];
-            foreach ($slotRows as $r) {
-                $slot = isset($r['settings_slot']) ? (int)$r['settings_slot'] : -1;
-                $id = (int)($r['id'] ?? 0);
-                if ($slot < 0 || $slot > 2 || $id <= 0) {
-                    continue;
-                }
-                $shape = self::rowToCompanyBranchShape($r);
-                $shape['id'] = $id;
-                $result[$slot] = $shape;
-                $usedIds[$id] = true;
-            }
-        } catch (\Throwable $e) {
-            // ignore and fall back
-        }
-
-        // 2) Load remaining active branches (used for keyword matching / fill).
         $stmt = $pdo->query(
-            'SELECT id, name, address_tamil, address_english, phones FROM branches WHERE is_active = 1 ORDER BY id ASC'
+            'SELECT id, name, address_tamil, address_english, phones, settings_slot
+             FROM branches WHERE id IN (1,2,3) ORDER BY ' . self::fixedOrderBy('id')
         );
         $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-        $keywordsByColumn = [
-            ['colombo', 'kolumbu', 'கொழும்பு', 'col'],
-            ['kilinochchi', 'kilinochi', 'kilino', 'கிளிநொச்சி', 'kili'],
-            ['mullaitivu', 'mullaithivu', 'mullativu', 'mulllaitivu', 'முல்லைத்தீவு', 'mullai', 'mlt'],
-        ];
-        // Only match keywords for columns still empty after settings_slot mapping.
-        foreach ($keywordsByColumn as $colIdx => $keywords) {
-            if (is_array($result[$colIdx])) {
-                continue;
-            }
-            foreach ($rows as $r) {
-                $id = (int)($r['id'] ?? 0);
-                if ($id <= 0 || isset($usedIds[$id])) {
-                    continue;
-                }
-                $rawName = trim((string)($r['name'] ?? ''));
-                $nameNorm = function_exists('mb_strtolower')
-                    ? mb_strtolower($rawName, 'UTF-8')
-                    : strtolower($rawName);
-                foreach ($keywords as $kw) {
-                    if ($kw === '') {
-                        continue;
-                    }
-                    if (str_contains($nameNorm, $kw)) {
-                        $shape = self::rowToCompanyBranchShape($r);
-                        $shape['id'] = $id;
-                        $result[$colIdx] = $shape;
-                        $usedIds[$id] = true;
-                        break 2;
-                    }
-                }
-            }
-        }
-
-        // Fill still-empty slots with remaining active branches by order.
-        foreach ($result as $colIdx => $colVal) {
-            if (is_array($colVal)) {
-                continue;
-            }
-            foreach ($rows as $r) {
-                $id = (int)($r['id'] ?? 0);
-                if ($id <= 0 || isset($usedIds[$id])) {
-                    continue;
-                }
-                $shape = self::rowToCompanyBranchShape($r);
-                $shape['id'] = $id;
-                $result[$colIdx] = $shape;
-                $usedIds[$id] = true;
+        foreach ($rows as $idx => $r) {
+            if ($idx > 2) {
                 break;
             }
+            $shape = self::rowToCompanyBranchShape($r);
+            $shape['id'] = (int)($r['id'] ?? 0);
+            $shape['name'] = (string)(BranchFixedMaster::CANONICAL[$shape['id']]['name'] ?? $shape['name']);
+            $result[$idx] = $shape;
         }
 
-        // Final fallback: enrich missing fields from config/company.json legacy slots.
-        // This is important on hosted environments where branch addresses may be incomplete in DB.
         $legacyBranches = [];
         try {
             if (class_exists('Helpers')) {
@@ -246,6 +214,11 @@ final class BranchRepository
             $legacyBranches = [];
         }
         if ($legacyBranches !== []) {
+            $keywordsByColumn = [
+                ['colombo', 'kolumbu', 'கொழும்பு', 'col'],
+                ['kilinochchi', 'kilinochi', 'kilino', 'கிளிநொச்சி', 'kili'],
+                ['mullaitivu', 'mullaithivu', 'mullativu', 'mulllaitivu', 'முல்லைத்தீவு', 'mullai', 'mlt'],
+            ];
             $matchLegacyByKeywords = static function (array $branches, array $keywords): ?array {
                 foreach ($branches as $b) {
                     if (!is_array($b)) {
@@ -346,53 +319,29 @@ final class BranchRepository
     public static function getSettingsFormBranches(\PDO $pdo, array $company): array
     {
         self::ensureSchema($pdo);
-        $stmt = $pdo->query(
-            'SELECT * FROM branches WHERE settings_slot IS NOT NULL AND settings_slot BETWEEN 0 AND 2 ORDER BY settings_slot ASC'
-        );
-        $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-        $bySlot = [];
-        foreach ($rows as $r) {
-            $slot = (int)($r['settings_slot'] ?? -1);
-            if ($slot >= 0 && $slot <= 2) {
-                $bySlot[$slot] = $r;
-            }
-        }
         $slots = [];
-        $anyDb = false;
         for ($i = 0; $i < 3; $i++) {
-            if (isset($bySlot[$i])) {
-                $anyDb = true;
-                $b = $bySlot[$i];
+            $branchId = $i + 1;
+            $b = self::findById($pdo, $branchId);
+            $canonical = BranchFixedMaster::CANONICAL[$branchId] ?? null;
+            if ($b) {
                 $slots[] = [
-                    'id' => (int)$b['id'],
-                    'name' => (string)($b['name'] ?? ''),
+                    'id' => $branchId,
+                    'name' => (string)($canonical['name'] ?? $b['name'] ?? ''),
                     'address_ta' => (string)($b['address_tamil'] ?? ''),
                     'address_en' => (string)($b['address_english'] ?? ''),
                     'phones' => (string)($b['phones'] ?? ''),
                 ];
             } else {
-                $slots[] = ['id' => 0, 'name' => '', 'address_ta' => '', 'address_en' => '', 'phones' => ''];
+                $legacy = $company['branches'][$i] ?? null;
+                $slots[] = [
+                    'id' => $branchId,
+                    'name' => (string)($canonical['name'] ?? (is_array($legacy) ? ($legacy['name'] ?? '') : '')),
+                    'address_ta' => is_array($legacy) ? (string)($legacy['address_ta'] ?? '') : '',
+                    'address_en' => is_array($legacy) ? (string)($legacy['address_en'] ?? '') : '',
+                    'phones' => is_array($legacy) ? (string)($legacy['phones'] ?? '') : '',
+                ];
             }
-        }
-        if ($anyDb) {
-            return $slots;
-        }
-        $legacy = $company['branches'] ?? [];
-        if (!is_array($legacy)) {
-            return $slots;
-        }
-        for ($i = 0; $i < 3; $i++) {
-            $b = $legacy[$i] ?? null;
-            if (!is_array($b)) {
-                continue;
-            }
-            $slots[$i] = [
-                'id' => 0,
-                'name' => (string)($b['name'] ?? ''),
-                'address_ta' => (string)($b['address_ta'] ?? ''),
-                'address_en' => (string)($b['address_en'] ?? ''),
-                'phones' => (string)($b['phones'] ?? ''),
-            ];
         }
         return $slots;
     }
@@ -419,11 +368,9 @@ final class BranchRepository
     public static function syncSettingsFromCompanyPost(\PDO $pdo, array $post): array
     {
         self::ensureSchema($pdo);
-        $names = $post['branch_name'] ?? [];
         $tas = $post['branch_address_ta'] ?? [];
         $ens = $post['branch_address_en'] ?? [];
         $phones = $post['branch_phones'] ?? [];
-        $ids = $post['branch_db_id'] ?? [];
         $defaultIdx = isset($post['default_branch_idx']) ? (int)$post['default_branch_idx'] : 0;
         if ($defaultIdx < 0) {
             $defaultIdx = 0;
@@ -434,65 +381,34 @@ final class BranchRepository
 
         $pdo->beginTransaction();
         try {
-            $pdo->exec('UPDATE branches SET settings_slot = NULL WHERE settings_slot BETWEEN 0 AND 2');
-
             for ($i = 0; $i < 3; $i++) {
-                $name = trim((string)($names[$i] ?? ''));
+                $branchId = $i + 1;
+                $canonical = BranchFixedMaster::CANONICAL[$branchId];
                 $ta = trim((string)($tas[$i] ?? ''));
                 $en = trim((string)($ens[$i] ?? ''));
                 $ph = trim((string)($phones[$i] ?? ''));
-                $existingId = isset($ids[$i]) ? (int)$ids[$i] : 0;
-
-                $empty = ($name === '' && $ta === '' && $en === '' && $ph === '');
-                if ($empty) {
-                    continue;
-                }
-                if ($name === '') {
-                    $name = 'Branch';
-                }
-
-                if ($existingId > 0) {
-                    $st = $pdo->prepare(
-                        'UPDATE branches SET name=?, address_tamil=?, address_english=?, phones=?, settings_slot=? WHERE id=?'
+                if ($en === '' || $ph === '') {
+                    throw new \InvalidArgumentException(
+                        'Branch ' . $canonical['name'] . ' requires English address and phone numbers.'
                     );
-                    $st->execute([
-                        $name,
-                        $ta !== '' ? $ta : null,
-                        $en !== '' ? $en : null,
-                        $ph !== '' ? $ph : null,
-                        $i,
-                        $existingId,
-                    ]);
-                } else {
-                    $code = 'BR-' . strtoupper(substr(bin2hex(random_bytes(5)), 0, 10));
-                    $st = $pdo->prepare(
-                        'INSERT INTO branches (name, code, address_tamil, address_english, phones, is_main, is_active, is_default, settings_slot, location) VALUES (?,?,?,?,?,?,?,?,?,NULL)'
-                    );
-                    $st->execute([
-                        $name,
-                        $code,
-                        $ta !== '' ? $ta : null,
-                        $en !== '' ? $en : null,
-                        $ph !== '' ? $ph : null,
-                        0,
-                        1,
-                        0,
-                        $i,
-                    ]);
                 }
+                $st = $pdo->prepare(
+                    'UPDATE branches SET name=?, code=?, address_tamil=?, address_english=?, phones=?, settings_slot=?, is_active=1 WHERE id=?'
+                );
+                $st->execute([
+                    $canonical['name'],
+                    $canonical['code'],
+                    $ta !== '' ? $ta : null,
+                    $en,
+                    $ph,
+                    $i,
+                    $branchId,
+                ]);
             }
 
-            $pdo->exec('UPDATE branches SET is_default = 0');
-            $stPick = $pdo->prepare(
-                'SELECT id FROM branches WHERE settings_slot = ? AND settings_slot BETWEEN 0 AND 2 LIMIT 1'
-            );
-            $stPick->execute([$defaultIdx]);
-            $pickRow = $stPick->fetch(\PDO::FETCH_ASSOC);
-            $chosenId = $pickRow ? (int)$pickRow['id'] : 0;
-            if ($chosenId > 0) {
-                $st = $pdo->prepare('UPDATE branches SET is_default = 1 WHERE id = ?');
-                $st->execute([$chosenId]);
-            }
+            $pdo->exec('UPDATE branches SET is_default = 0 WHERE id IN (1,2,3)');
+            $defaultBranchId = $defaultIdx + 1;
+            $pdo->prepare('UPDATE branches SET is_default = 1 WHERE id = ?')->execute([$defaultBranchId]);
 
             $pdo->commit();
         } catch (\Throwable $e) {
@@ -513,54 +429,108 @@ final class BranchRepository
     {
         self::ensureSchema($pdo);
         $stmt = $pdo->query(
-            'SELECT name, address_tamil, address_english, phones, settings_slot FROM branches WHERE settings_slot BETWEEN 0 AND 2 ORDER BY settings_slot ASC'
+            'SELECT name, address_tamil, address_english, phones, settings_slot FROM branches WHERE id IN (1,2,3) ORDER BY ' . self::fixedOrderBy('id')
         );
         $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-        $bySlot = [];
-        foreach ($rows as $r) {
-            $s = (int)($r['settings_slot'] ?? -1);
-            if ($s >= 0 && $s <= 2) {
-                $bySlot[$s] = $r;
-            }
-        }
         $mirror = [];
         for ($i = 0; $i < 3; $i++) {
-            if (isset($bySlot[$i])) {
-                $b = $bySlot[$i];
+            $b = $rows[$i] ?? null;
+            if ($b) {
                 $mirror[] = [
-                    'name' => (string)($b['name'] ?? ''),
+                    'name' => (string)(BranchFixedMaster::CANONICAL[$i + 1]['name'] ?? $b['name'] ?? ''),
                     'address_ta' => (string)($b['address_tamil'] ?? ''),
                     'address_en' => (string)($b['address_english'] ?? ''),
                     'phones' => (string)($b['phones'] ?? ''),
                 ];
             } else {
-                $mirror[] = ['name' => '', 'address_ta' => '', 'address_en' => '', 'phones' => ''];
+                $mirror[] = ['name' => (string)(BranchFixedMaster::CANONICAL[$i + 1]['name'] ?? ''), 'address_ta' => '', 'address_en' => '', 'phones' => ''];
             }
         }
         return $mirror;
     }
 
     /**
-     * @param int[] $preserveIds Always include these branch ids (e.g. current parcel from/to when inactive).
+     * Fixed three active branches — single source for all dropdowns and AJAX lists.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function forFixedThree(\PDO $pdo): array
+    {
+        self::ensureSchema($pdo);
+        BranchFixedMaster::ensureRowsPresent($pdo);
+        $stmt = $pdo->query(
+            'SELECT id, name, code, is_main, is_active, location, address_tamil, address_english, phones, is_default
+             FROM branches WHERE is_active = 1 AND id IN (1,2,3)
+             ORDER BY ' . self::fixedOrderBy('id')
+        );
+        $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+        foreach ($rows as &$r) {
+            $id = (int)$r['id'];
+            if (isset(BranchFixedMaster::CANONICAL[$id])) {
+                $r['name'] = BranchFixedMaster::CANONICAL[$id]['name'];
+                $r['code'] = BranchFixedMaster::CANONICAL[$id]['code'];
+            }
+        }
+        unset($r);
+        return array_values($rows);
+    }
+
+    /** Map legacy branch ids (e.g. old "Main Branch (KILI)") to fixed ids 1–3. */
+    public static function resolveToFixedBranchId(\PDO $pdo, int $branchId): int
+    {
+        if (BranchFixedMaster::isAllowedId($branchId)) {
+            self::ensureSchema($pdo);
+            $st = $pdo->prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1 LIMIT 1');
+            $st->execute([$branchId]);
+            if ($st->fetch()) {
+                return $branchId;
+            }
+        }
+        if ($branchId <= 0) {
+            return 0;
+        }
+        self::ensureSchema($pdo);
+        $st = $pdo->prepare('SELECT name, code FROM branches WHERE id = ? LIMIT 1');
+        $st->execute([$branchId]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) {
+            return 0;
+        }
+        $key = BranchFixedMaster::nameToKey((string)($row['name'] ?? ''));
+        if ($key === null) {
+            $code = strtoupper(trim((string)($row['code'] ?? '')));
+            $key = match ($code) {
+                'COL' => 'colombo',
+                'KIL' => 'kilinochchi',
+                'MUL' => 'mullaitivu',
+                default => null,
+            };
+        }
+        return $key !== null ? BranchFixedMaster::keyToTargetId($key) : 0;
+    }
+
+    /**
+     * @param array<string,mixed> $parcel
+     */
+    public static function normalizeParcelBranchIds(\PDO $pdo, array &$parcel): void
+    {
+        $from = self::resolveToFixedBranchId($pdo, (int)($parcel['from_branch_id'] ?? 0));
+        $to = self::resolveToFixedBranchId($pdo, (int)($parcel['to_branch_id'] ?? 0));
+        if ($from > 0) {
+            $parcel['from_branch_id'] = $from;
+        }
+        if ($to > 0) {
+            $parcel['to_branch_id'] = $to;
+        }
+    }
+
+    /**
+     * @param int[] $preserveIds Ignored — fixed three-branch system always returns ids 1–3.
      * @return list<array<string,mixed>>
      */
     public static function forDropdowns(\PDO $pdo, array $preserveIds = []): array
     {
-        self::ensureSchema($pdo);
-        $preserveIds = array_values(array_unique(array_filter(array_map('intval', $preserveIds), static function ($v) {
-            return $v > 0;
-        })));
-        if ($preserveIds === []) {
-            $stmt = $pdo->query(
-                'SELECT id, name, code, is_main, is_active, location, address_tamil, address_english, phones, is_default FROM branches WHERE is_active = 1 ORDER BY is_main DESC, name ASC'
-            );
-            return $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-        }
-        $placeholders = implode(',', array_fill(0, count($preserveIds), '?'));
-        $sql = 'SELECT id, name, code, is_main, is_active, location, address_tamil, address_english, phones, is_default FROM branches WHERE is_active = 1 OR id IN (' . $placeholders . ') ORDER BY is_main DESC, name ASC';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($preserveIds);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        return self::forFixedThree($pdo);
     }
 
     /**
@@ -568,18 +538,17 @@ final class BranchRepository
      */
     public static function forParcelForm(\PDO $pdo, array $parcel): array
     {
-        return self::forDropdowns($pdo, [
-            (int)($parcel['from_branch_id'] ?? 0),
-            (int)($parcel['to_branch_id'] ?? 0),
-        ]);
+        return self::forFixedThree($pdo);
     }
 
     /** All branches for filters, reports, and admin lists (includes inactive). */
     public static function forFilters(\PDO $pdo): array
     {
         self::ensureSchema($pdo);
+        BranchFixedMaster::ensureRowsPresent($pdo);
         $stmt = $pdo->query(
-            'SELECT id, name, code, is_main, is_active, location, address_tamil, address_english, phones, is_default FROM branches ORDER BY name ASC'
+            'SELECT id, name, code, is_main, is_active, location, address_tamil, address_english, phones, is_default
+             FROM branches WHERE id IN (1,2,3) ORDER BY ' . self::fixedOrderBy('id')
         );
         return $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
     }
@@ -588,7 +557,10 @@ final class BranchRepository
     public static function forDashboard(\PDO $pdo): array
     {
         self::ensureSchema($pdo);
-        $stmt = $pdo->query('SELECT id, name, code, is_main, is_active, is_default FROM branches ORDER BY name ASC');
+        BranchFixedMaster::ensureRowsPresent($pdo);
+        $stmt = $pdo->query(
+            'SELECT id, name, code, is_main, is_active, is_default FROM branches WHERE id IN (1,2,3) ORDER BY ' . self::fixedOrderBy('id')
+        );
         return $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
     }
 
@@ -596,7 +568,9 @@ final class BranchRepository
     public static function allOrderedForAdmin(\PDO $pdo): array
     {
         self::ensureSchema($pdo);
-        $stmt = $pdo->query('SELECT * FROM branches ORDER BY is_main DESC, is_default DESC, name ASC');
+        $stmt = $pdo->query(
+            'SELECT * FROM branches WHERE id IN (1,2,3) ORDER BY ' . self::fixedOrderBy('id')
+        );
         return $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
     }
 

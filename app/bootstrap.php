@@ -4,10 +4,26 @@
 // Strict types and error reporting for development
 declare(strict_types=1);
 
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
+$config = require __DIR__ . '/../config/config.php';
+$isProduction = ($config['env'] ?? 'local') !== 'local';
 
-session_name((require __DIR__ . '/../config/config.php')['session_name'] ?? 'tms_session');
+if ($isProduction) {
+    ini_set('display_errors', '0');
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', '1');
+    error_reporting(E_ALL);
+}
+
+session_name($config['session_name'] ?? 'tms_session');
+$secureCookie = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => $secureCookie,
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_start();
 
 // Load Composer autoloader if available (for PHPMailer, etc.)
@@ -21,7 +37,9 @@ require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/ParcelSaveService.php';
+require_once __DIR__ . '/ParcelBillingService.php';
 require_once __DIR__ . '/BranchRepository.php';
+require_once __DIR__ . '/BranchFixedMaster.php';
 require_once __DIR__ . '/EmployeeListService.php';
 require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/Sms.php';
@@ -29,9 +47,20 @@ require_once __DIR__ . '/DataReset.php';
 require_once __DIR__ . '/CashbookRepository.php';
 require_once __DIR__ . '/CashbookAccountService.php';
 require_once __DIR__ . '/CashbookApi.php';
+require_once __DIR__ . '/TransferVoucherRepository.php';
+require_once __DIR__ . '/TransferVoucherApi.php';
+require_once __DIR__ . '/AccountingSchemaRepository.php';
+require_once __DIR__ . '/AccountGroupRepository.php';
+require_once __DIR__ . '/AccountRepository.php';
+require_once __DIR__ . '/AccountingVoucherRepository.php';
+require_once __DIR__ . '/VoucherDetailRepository.php';
+require_once __DIR__ . '/LedgerEntryRepository.php';
+require_once __DIR__ . '/AccountingController.php';
+require_once __DIR__ . '/AccountingModule.php';
+require_once __DIR__ . '/TransportAccountingService.php';
+require_once __DIR__ . '/AuditLogRepository.php';
 
-// Load config and initialize DB
-$config = require __DIR__ . '/../config/config.php';
+// Load config and initialize DB (already loaded above)
 Database::init($config);
 try {
     BranchRepository::ensureSchema(Database::pdo());
@@ -42,6 +71,16 @@ try {
     CashbookRepository::ensureSchema(Database::pdo());
 } catch (Throwable $e) {
     /* cashbook optional until DB ready */
+}
+try {
+    TransferVoucherRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* transfer vouchers optional until DB ready */
+}
+try {
+    AccountGroupRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* accounting module optional until DB ready */
 }
 
 // Initialize Mailer (available as $GLOBALS['mailer'])

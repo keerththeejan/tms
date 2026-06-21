@@ -1,4 +1,5 @@
 <?php /** @var array $customers */ ?>
+<?php $customers = $customers ?? []; ?>
 <style>
   .customers-page { --ui-border: rgba(17,24,39,.10); --ui-shadow: 0 1px 2px rgba(16,24,40,.06); --ui-radius: 14px; }
   .customers-page .page-head { display:flex; align-items:flex-start; justify-content:space-between; gap: 12px; margin-bottom: 12px; }
@@ -33,6 +34,14 @@
   $importedCnt = isset($_GET['imported']) ? (int)$_GET['imported'] : null;
   $failedCnt = isset($_GET['failed']) ? (int)$_GET['failed'] : null;
   $importFailed = (string)($_GET['import_failed'] ?? '') === '1';
+  $purgeFailed = (string)($_GET['purge_failed'] ?? '') === '1';
+  $purgeError = (string)($_GET['purge_error'] ?? '') === '1';
+  $purgedCnt = isset($_GET['purged']) ? (int)$_GET['purged'] : null;
+  $purgeErrors = [];
+  if ($purgeFailed && isset($_SESSION['customer_purge_errors']) && is_array($_SESSION['customer_purge_errors'])) {
+    $purgeErrors = $_SESSION['customer_purge_errors'];
+    unset($_SESSION['customer_purge_errors']);
+  }
   $hasImportErrors = (string)($_GET['import_errors'] ?? '') === '1';
   $importErrors = [];
   if ($hasImportErrors && isset($_SESSION['import_customer_errors']) && is_array($_SESSION['import_customer_errors'])) {
@@ -52,6 +61,9 @@
           </div>
           <div class="d-flex flex-wrap gap-2 justify-content-end">
             <button type="button" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#customerImportModal"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i><span>Import</span></button>
+            <?php if (Auth::isAdmin()): ?>
+            <button type="button" class="btn btn-outline-danger d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#customerPurgeModal"><i class="bi bi-trash3" aria-hidden="true"></i><span>Clear all</span></button>
+            <?php endif; ?>
             <a href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>" class="btn btn-primary d-inline-flex align-items-center gap-1"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>New customer</span></a>
           </div>
         </div>
@@ -60,7 +72,18 @@
   </div>
 </div>
 
-<?php if ($importFailed): ?>
+<?php if ($purgeError): ?>
+  <div class="alert alert-warning">Type <strong>DELETE CUSTOMERS</strong> exactly to confirm clearing all customer data.</div>
+<?php elseif ($purgeFailed): ?>
+  <div class="alert alert-danger">
+    Failed to clear all customer data.
+    <?php if (!empty($purgeErrors)): ?>
+      <div class="mt-2 small"><?php foreach ($purgeErrors as $pe): ?><div><?php echo htmlspecialchars((string)$pe); ?></div><?php endforeach; ?></div>
+    <?php endif; ?>
+  </div>
+<?php elseif ($purgedCnt !== null): ?>
+  <div class="alert alert-success">Cleared <strong><?php echo (int)$purgedCnt; ?></strong> customer record(s) and related parcels, delivery notes, and invoices.</div>
+<?php elseif ($importFailed): ?>
   <div class="alert alert-danger">Import failed. Please upload a valid <strong>.csv</strong> file exported from Excel.</div>
 <?php elseif ($importedCnt !== null || $failedCnt !== null): ?>
   <div class="alert alert-info">
@@ -74,6 +97,38 @@
       </div>
     <?php endif; ?>
   </div>
+<?php endif; ?>
+
+<?php if (Auth::isAdmin()): ?>
+<div class="modal fade" id="customerPurgeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger">Clear all customer data</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=customers&action=purge_all'); ?>">
+        <div class="modal-body">
+          <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+          <p class="mb-2">This permanently deletes <strong>all customers</strong> and their related:</p>
+          <ul class="small mb-3">
+            <li>Parcels and parcel items</li>
+            <li>Delivery notes and payments</li>
+            <li>Daily invoices</li>
+            <li>Route assignments</li>
+          </ul>
+          <p class="mb-2">Users, branches, vehicles, and suppliers are <strong>not</strong> removed.</p>
+          <label class="form-label" for="confirm_purge">Type <strong>DELETE CUSTOMERS</strong> to confirm</label>
+          <input type="text" class="form-control" id="confirm_purge" name="confirm_purge" autocomplete="off" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger"><i class="bi bi-trash3 me-1"></i> Clear all customer data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 <?php endif; ?>
 
 <div class="modal fade" id="customerImportModal" tabindex="-1" aria-hidden="true">
@@ -146,6 +201,15 @@
 
 <div class="card shadow-sm rounded-3 border-0 overflow-hidden table-wrap">
   <div class="card-body p-0">
+<?php if (empty($customers)): ?>
+    <div class="text-center text-muted py-5 px-3">
+      <i class="bi bi-people display-6 d-block mb-2 opacity-50" aria-hidden="true"></i>
+      <div class="fw-semibold text-dark mb-1">No customers yet</div>
+      <div class="small mb-3">Add a customer manually or import from CSV.</div>
+      <a href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>" class="btn btn-primary btn-sm rounded-pill me-2"><i class="bi bi-plus-lg me-1"></i> Add customer</a>
+      <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" data-bs-toggle="modal" data-bs-target="#customerImportModal"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Import CSV</button>
+    </div>
+<?php else: ?>
 <div class="table-responsive">
   <table class="table table-sm table-striped align-middle datatable customers-table mb-0">
     <thead>
@@ -169,8 +233,8 @@
             <?php $ph = trim((string)($c['phone'] ?? '')); $showPh = (preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1) ? '' : $ph; echo htmlspecialchars($showPh); ?>
           </td>
           <td class="d-none d-lg-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($c['email'] ?? '')); ?>"><?php echo htmlspecialchars($c['email'] ?? ''); ?></span></td>
-          <td class="d-none d-lg-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($c['address'] ?? '')); ?>"><?php echo htmlspecialchars($c['address']); ?></span></td>
-          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($c['delivery_location'] ?? '')); ?>"><?php echo htmlspecialchars($c['delivery_location']); ?></span></td>
+          <td class="d-none d-lg-table-cell"><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($c['address'] ?? '')); ?>"><?php echo htmlspecialchars((string)($c['address'] ?? '')); ?></span></td>
+          <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)($c['delivery_location'] ?? '')); ?>"><?php echo htmlspecialchars((string)($c['delivery_location'] ?? '')); ?></span></td>
           <td><?php echo htmlspecialchars($c['customer_type'] ?? ''); ?></td>
           <td class="text-end">
             <div class="dropdown d-inline">
@@ -195,6 +259,7 @@
     </tbody>
   </table>
 </div>
+<?php endif; ?>
   </div>
 </div>
 
