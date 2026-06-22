@@ -8,7 +8,15 @@
   document.addEventListener('DOMContentLoaded', function () {
     bindFilters();
     document.getElementById('accCoaNewBtn')?.addEventListener('click', openNew);
+    document.getElementById('accCoaNewGroupBtn')?.addEventListener('click', openNewGroup);
+    document.getElementById('accAddGroupInlineBtn')?.addEventListener('click', openNewGroup);
     document.getElementById('accAccountForm')?.addEventListener('submit', saveAccount);
+    document.getElementById('accGroupForm')?.addEventListener('submit', saveGroup);
+    document.getElementById('accSeedGroupsBtn')?.addEventListener('click', seedDefaultGroups);
+    document.getElementById('accGroupType')?.addEventListener('change', syncGroupNatureDefault);
+    document.getElementById('accAccountModal')?.addEventListener('show.bs.modal', function () {
+      loadGroups(true);
+    });
     loadData();
   });
 
@@ -18,27 +26,143 @@
   }
 
   function loadData() {
-    Promise.all([
-      AccModule.fetchJson({ acc_action: 'list_accounts' }),
-      AccModule.fetchJson({ acc_action: 'list_account_groups' }),
-    ]).then(function (results) {
-      if (!results[0].ok) throw new Error(results[0].error || 'Accounts load failed');
-      accounts = results[0].data || [];
-      groups = (results[1].ok ? results[1].data : []) || [];
-      fillGroupSelect();
+    loadGroups(false);
+    AccModule.fetchJson({ acc_action: 'list_accounts' }).then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Accounts load failed');
+      accounts = res.data || [];
       renderTable();
     }).catch(function (e) {
       AccModule.toast(String(e.message || e), 'error');
     });
   }
 
+  function loadGroups(silent) {
+    return AccModule.fetchJson({ acc_action: 'list_account_groups' }).then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Account groups load failed');
+      groups = res.data || [];
+      fillGroupSelect();
+      return groups;
+    }).catch(function (e) {
+      groups = [];
+      fillGroupSelect();
+      if (!silent) {
+        AccModule.toast(String(e.message || e), 'error');
+      }
+      return [];
+    });
+  }
+
   function fillGroupSelect() {
     var sel = document.getElementById('accAccountGroup');
+    var emptyBox = document.getElementById('accGroupEmptyState');
     if (!sel) return;
-    sel.innerHTML = groups.map(function (g) {
-      return '<option value="' + g.id + '">' + escapeHtml((g.group_code || '') + ' — ' + (g.group_name || '')) + '</option>';
+
+    if (!groups.length) {
+      sel.innerHTML = '<option value="">— Select account group —</option>';
+      if (emptyBox) emptyBox.classList.remove('d-none');
+    } else {
+      if (emptyBox) emptyBox.classList.add('d-none');
+      var sorted = sortGroupsForSelect(groups);
+      sel.innerHTML = '<option value="">— Select account group —</option>' + sorted.map(function (g) {
+        var indent = g._depth > 0 ? '\u00A0\u00A0'.repeat(g._depth) + '\u2514 ' : '';
+        return '<option value="' + g.id + '">' + escapeHtml(indent + (g.group_name || '') + ' (' + (g.group_code || '') + ')') + '</option>';
+      }).join('');
+    }
+
+    fillParentGroupSelect();
+    AccModule.refreshSelect2(sel);
+  }
+
+  function sortGroupsForSelect(list) {
+    var byId = {};
+    list.forEach(function (g) { byId[g.id] = g; });
+    function depth(g) {
+      var d = 0;
+      var cur = g;
+      var guard = 0;
+      while (cur && cur.parent_id && byId[cur.parent_id] && guard < 10) {
+        d++;
+        cur = byId[cur.parent_id];
+        guard++;
+      }
+      return d;
+    }
+    return list.slice().map(function (g) {
+      g._depth = depth(g);
+      return g;
+    }).sort(function (a, b) {
+      if (a.sort_order !== b.sort_order) return Number(a.sort_order || 0) - Number(b.sort_order || 0);
+      return String(a.group_name || '').localeCompare(String(b.group_name || ''));
+    });
+  }
+
+  function fillParentGroupSelect() {
+    var sel = document.getElementById('accGroupParent');
+    if (!sel) return;
+    var current = sel.value;
+    var sorted = sortGroupsForSelect(groups);
+    sel.innerHTML = '<option value="">— None (top level) —</option>' + sorted.map(function (g) {
+      var indent = g._depth > 0 ? '\u00A0\u00A0'.repeat(g._depth) + '\u2514 ' : '';
+      return '<option value="' + g.id + '">' + escapeHtml(indent + (g.group_name || '')) + '</option>';
     }).join('');
-    AccModule.initSelect2(sel.parentElement);
+    if (current) sel.value = current;
+  }
+
+  function syncGroupNatureDefault() {
+    var type = document.getElementById('accGroupType')?.value || 'EXPENSES';
+    var natureEl = document.getElementById('accGroupNature');
+    if (!natureEl) return;
+    natureEl.value = (type === 'LIABILITIES' || type === 'CAPITAL' || type === 'INCOME') ? 'CREDIT' : 'DEBIT';
+  }
+
+  function openNewGroup() {
+    var form = document.getElementById('accGroupForm');
+    if (form) form.reset();
+    fillParentGroupSelect();
+    syncGroupNatureDefault();
+    var el = document.getElementById('accGroupModal');
+    if (el && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(el).show();
+  }
+
+  function saveGroup(e) {
+    e.preventDefault();
+    var name = document.getElementById('accGroupName').value.trim();
+    if (!name) {
+      AccModule.toast('Group name is required.', 'warning');
+      return;
+    }
+    var payload = {
+      group_code: document.getElementById('accGroupCode').value.trim(),
+      group_name: name,
+      parent_id: document.getElementById('accGroupParent').value || null,
+      group_type: document.getElementById('accGroupType').value,
+      nature: document.getElementById('accGroupNature').value,
+    };
+    AccModule.postJson({ acc_action: 'save_account_group' }, payload).then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Save failed');
+      AccModule.toast('Account group saved');
+      bootstrap.Modal.getInstance(document.getElementById('accGroupModal'))?.hide();
+      return loadGroups(true).then(function () {
+        if (res.data && res.data.id) {
+          AccModule.setSelectValue(document.getElementById('accAccountGroup'), String(res.data.id));
+        }
+      });
+    }).catch(function (e) { AccModule.toast(String(e.message || e), 'error'); });
+  }
+
+  function seedDefaultGroups() {
+    var btn = document.getElementById('accSeedGroupsBtn');
+    if (btn) btn.disabled = true;
+    AccModule.postJson({ acc_action: 'seed_default_account_groups' }, {}).then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Could not create default groups');
+      groups = res.data || [];
+      fillGroupSelect();
+      AccModule.toast(res.message || 'Default account groups ready');
+    }).catch(function (e) {
+      AccModule.toast(String(e.message || e), 'error');
+    }).finally(function () {
+      if (btn) btn.disabled = false;
+    });
   }
 
   function filteredAccounts() {
@@ -83,7 +207,10 @@
     document.getElementById('accAccountForm').reset();
     document.getElementById('accAccountId').value = '';
     document.getElementById('accAccountCode').readOnly = false;
-    showModal();
+    AccModule.setSelectValue(document.getElementById('accAccountGroup'), '');
+    loadGroups(true).finally(function () {
+      showModal();
+    });
   }
 
   function openEdit(id) {
@@ -95,7 +222,7 @@
       document.getElementById('accAccountCode').value = a.account_code;
       document.getElementById('accAccountCode').readOnly = true;
       document.getElementById('accAccountName').value = a.account_name;
-      document.getElementById('accAccountGroup').value = a.account_group_id;
+      AccModule.setSelectValue(document.getElementById('accAccountGroup'), String(a.account_group_id || ''));
       document.getElementById('accOpeningBalance').value = a.opening_balance;
       document.getElementById('accOpeningType').value = a.opening_balance_type || 'DEBIT';
       document.getElementById('accAccountActive').value = String(a.is_active ?? 1);
@@ -105,11 +232,22 @@
 
   function saveAccount(e) {
     e.preventDefault();
+    var groupId = AccModule.getSelectValue(document.getElementById('accAccountGroup'));
+    if (!groupId) {
+      AccModule.toast('Please select an account group.', 'warning');
+      return;
+    }
+    var code = document.getElementById('accAccountCode').value.trim();
+    var name = document.getElementById('accAccountName').value.trim();
+    if (!code || !name) {
+      AccModule.toast('Account code and name are required.', 'warning');
+      return;
+    }
     var payload = {
       id: document.getElementById('accAccountId').value || 0,
-      account_code: document.getElementById('accAccountCode').value.trim(),
-      account_name: document.getElementById('accAccountName').value.trim(),
-      account_group_id: document.getElementById('accAccountGroup').value,
+      account_code: code,
+      account_name: name,
+      account_group_id: groupId,
       opening_balance: document.getElementById('accOpeningBalance').value,
       opening_balance_type: document.getElementById('accOpeningType').value,
       is_active: document.getElementById('accAccountActive').value,

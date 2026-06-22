@@ -81,6 +81,14 @@ class AccountingController
                     self::listAccountGroups($pdo);
                     return;
 
+                case 'seed_default_account_groups':
+                    self::seedDefaultAccountGroups($pdo, $isPost);
+                    return;
+
+                case 'save_account_group':
+                    self::saveAccountGroup($pdo, $isPost);
+                    return;
+
                 case 'day_book':
                     self::dayBook($pdo);
                     return;
@@ -413,8 +421,107 @@ class AccountingController
 
     private static function listAccountGroups(PDO $pdo): void
     {
+        AccountGroupRepository::ensureSchema($pdo);
+        AccountingSchemaRepository::syncStandardAccountGroups($pdo);
         $groups = AccountGroupRepository::listGroups($pdo);
         self::json(['ok' => true, 'data' => $groups]);
+    }
+
+    private static function saveAccountGroup(PDO $pdo, bool $isPost): void
+    {
+        if (!$isPost) {
+            self::json(['ok' => false, 'error' => 'POST required'], 405);
+            return;
+        }
+
+        $payload = $_POST;
+        $name = trim((string) ($payload['group_name'] ?? ''));
+        $code = strtoupper(trim((string) ($payload['group_code'] ?? '')));
+        $parentId = !empty($payload['parent_id']) ? (int) $payload['parent_id'] : null;
+        $groupType = strtoupper(trim((string) ($payload['group_type'] ?? 'EXPENSES')));
+        $nature = strtoupper(trim((string) ($payload['nature'] ?? '')));
+
+        if ($name === '') {
+            self::json(['ok' => false, 'error' => 'Group name is required.'], 400);
+            return;
+        }
+
+        if (!in_array($groupType, ['ASSETS', 'LIABILITIES', 'CAPITAL', 'INCOME', 'EXPENSES'], true)) {
+            self::json(['ok' => false, 'error' => 'Invalid group type.'], 400);
+            return;
+        }
+
+        if ($code === '') {
+            $code = strtoupper(preg_replace('/[^A-Z0-9]+/', '_', $name));
+            $code = trim($code, '_');
+            if (strlen($code) > 40) {
+                $code = substr($code, 0, 40);
+            }
+        }
+
+        if (strlen($code) > 40) {
+            self::json(['ok' => false, 'error' => 'Group code must be at most 40 characters.'], 400);
+            return;
+        }
+
+        if (AccountGroupRepository::getByCode($pdo, $code)) {
+            self::json(['ok' => false, 'error' => 'Group code already exists.'], 400);
+            return;
+        }
+
+        if ($parentId !== null && $parentId > 0) {
+            $parent = AccountGroupRepository::getById($pdo, $parentId);
+            if (!$parent) {
+                self::json(['ok' => false, 'error' => 'Parent group not found.'], 400);
+                return;
+            }
+            $groupType = (string) ($parent['group_type'] ?? $groupType);
+        }
+
+        if ($nature === '') {
+            $nature = in_array($groupType, ['LIABILITIES', 'CAPITAL', 'INCOME'], true) ? 'CREDIT' : 'DEBIT';
+        }
+
+        if (!in_array($nature, ['DEBIT', 'CREDIT'], true)) {
+            self::json(['ok' => false, 'error' => 'Invalid nature.'], 400);
+            return;
+        }
+
+        $group = AccountGroupRepository::create($pdo, [
+            'group_code' => $code,
+            'group_name' => $name,
+            'parent_id' => $parentId,
+            'group_type' => $groupType,
+            'nature' => $nature,
+            'is_primary' => $parentId === null ? 1 : 0,
+            'is_system' => 0,
+            'sort_order' => (int) ($payload['sort_order'] ?? 500),
+        ]);
+
+        self::json(['ok' => true, 'data' => $group]);
+    }
+
+    private static function seedDefaultAccountGroups(PDO $pdo, bool $isPost): void
+    {
+        if (!$isPost) {
+            self::json(['ok' => false, 'error' => 'POST required'], 405);
+            return;
+        }
+
+        $created = AccountGroupRepository::ensureDefaultGroups($pdo);
+        AccountingSchemaRepository::syncStandardAccountGroups($pdo);
+        $groups = AccountGroupRepository::listGroups($pdo);
+        if ($groups === []) {
+            self::json(['ok' => false, 'error' => 'Unable to create default account groups.'], 500);
+            return;
+        }
+
+        self::json([
+            'ok' => true,
+            'data' => $groups,
+            'created' => $created,
+            'message' => $created > 0 ? 'Default account groups created.' : 'Account groups are already available.',
+        ]);
     }
 
     private static function dayBook(PDO $pdo): void
@@ -600,11 +707,17 @@ class AccountingController
         $payload = $_POST;
         $id = (int) ($payload['id'] ?? 0);
         $userId = Auth::user()['id'] ?? null;
+        $groupId = (int) ($payload['account_group_id'] ?? 0);
+
+        if ($groupId <= 0) {
+            self::json(['ok' => false, 'error' => 'Please select an account group.'], 400);
+            return;
+        }
 
         if ($id > 0) {
             $account = AccountRepository::update($pdo, $id, [
                 'account_name' => $payload['account_name'] ?? '',
-                'account_group_id' => (int) ($payload['account_group_id'] ?? 0),
+                'account_group_id' => $groupId,
                 'opening_balance' => (float) ($payload['opening_balance'] ?? 0),
                 'opening_balance_type' => $payload['opening_balance_type'] ?? 'DEBIT',
                 'is_active' => (int) ($payload['is_active'] ?? 1),
@@ -613,7 +726,7 @@ class AccountingController
             $account = AccountRepository::create($pdo, [
                 'account_code' => (string) ($payload['account_code'] ?? ''),
                 'account_name' => (string) ($payload['account_name'] ?? ''),
-                'account_group_id' => (int) ($payload['account_group_id'] ?? 0),
+                'account_group_id' => $groupId,
                 'opening_balance' => (float) ($payload['opening_balance'] ?? 0),
                 'opening_balance_type' => $payload['opening_balance_type'] ?? 'DEBIT',
                 'is_active' => (int) ($payload['is_active'] ?? 1),

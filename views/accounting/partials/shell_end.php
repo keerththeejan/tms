@@ -4,6 +4,7 @@
 
 <div class="toast-container position-fixed bottom-0 end-0 p-3 acc-toast-host" id="accToastHost"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>

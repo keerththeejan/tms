@@ -13,6 +13,14 @@ class AccountGroupRepository
         AccountingSchemaRepository::ensureSchema($pdo);
     }
 
+    /** Ensure primary account groups exist; returns number of groups created. */
+    public static function ensureDefaultGroups(PDO $pdo): int
+    {
+        self::ensureSchema($pdo);
+
+        return AccountingSchemaRepository::seedAccountGroupsIfEmpty($pdo);
+    }
+
     /** @return list<array<string,mixed>> */
     public static function listGroups(PDO $pdo, bool $includeInactive = false): array
     {

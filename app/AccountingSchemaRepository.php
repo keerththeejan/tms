@@ -11,6 +11,7 @@ class AccountingSchemaRepository
     public static function ensureSchema(PDO $pdo): void
     {
         self::createAccountGroupsTable($pdo);
+        self::ensureAccountGroupColumns($pdo);
         self::seedAccountGroups($pdo);
         self::createAccountsTable($pdo);
         self::seedAccounts($pdo);
@@ -84,7 +85,7 @@ SQL);
         self::exec($pdo, <<<'SQL'
 CREATE TABLE account_groups (
   id bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  group_code varchar(20) NOT NULL UNIQUE,
+  group_code varchar(40) NOT NULL UNIQUE,
   group_name varchar(100) NOT NULL,
   parent_id bigint unsigned NULL,
   group_type enum('ASSETS', 'LIABILITIES', 'CAPITAL', 'INCOME', 'EXPENSES') NOT NULL,
@@ -105,51 +106,184 @@ SQL);
 
     private static function seedAccountGroups(PDO $pdo): void
     {
-        $count = (int) $pdo->query('SELECT COUNT(*) FROM account_groups')->fetchColumn();
-        if ($count > 0) {
-            return;
+        self::seedAccountGroupsIfEmpty($pdo);
+    }
+
+    /** @return int Number of groups seeded (0 if groups already exist). */
+    public static function seedAccountGroupsIfEmpty(PDO $pdo): int
+    {
+        if (!self::tableExists($pdo, 'account_groups')) {
+            return 0;
         }
 
-        $rows = [
-            ['ASSETS', 'Assets', null, 'ASSETS', 'DEBIT', 1, 1, 1],
-            ['LIABILITIES', 'Liabilities', null, 'LIABILITIES', 'CREDIT', 1, 1, 2],
-            ['CAPITAL', 'Capital', null, 'CAPITAL', 'CREDIT', 1, 1, 3],
-            ['INCOME', 'Income', null, 'INCOME', 'CREDIT', 1, 1, 4],
-            ['EXPENSES', 'Expenses', null, 'EXPENSES', 'DEBIT', 1, 1, 5],
-        ];
+        $count = (int) $pdo->query('SELECT COUNT(*) FROM account_groups WHERE deleted_at IS NULL')->fetchColumn();
+        if ($count > 0) {
+            return self::syncStandardAccountGroups($pdo);
+        }
 
+        $deletedCount = (int) $pdo->query('SELECT COUNT(*) FROM account_groups')->fetchColumn();
+        if ($deletedCount > 0) {
+            return self::syncStandardAccountGroups($pdo);
+        }
+
+        return self::insertStandardAccountGroups($pdo);
+    }
+
+    /**
+     * Standard TMS account group hierarchy.
+     * Display names match the business chart; group_code values preserve system integrations.
+     *
+     * @return list<array{0:string,1:string,2:?string,3:string,4:string,5:int,6:int}>
+     */
+    public static function standardAccountGroupDefinitions(): array
+    {
+        return [
+            ['ASSETS', 'Assets', null, 'ASSETS', 'DEBIT', 1, 1],
+            ['LIABILITIES', 'Liabilities', null, 'LIABILITIES', 'CREDIT', 1, 2],
+            ['CAPITAL', 'Equity', null, 'CAPITAL', 'CREDIT', 1, 3],
+            ['INCOME', 'Income', null, 'INCOME', 'CREDIT', 1, 4],
+            ['EXPENSES', 'Expenses', null, 'EXPENSES', 'DEBIT', 1, 5],
+            ['CURRENT_ASSETS', 'Current Assets', 'ASSETS', 'ASSETS', 'DEBIT', 0, 10],
+            ['FIXED_ASSETS', 'Fixed Assets', 'ASSETS', 'ASSETS', 'DEBIT', 0, 11],
+            ['CURRENT_LIABILITIES', 'Current Liabilities', 'LIABILITIES', 'LIABILITIES', 'CREDIT', 0, 20],
+            ['LONG_TERM_LIABILITIES', 'Long-Term Liabilities', 'LIABILITIES', 'LIABILITIES', 'CREDIT', 0, 21],
+            ['SALES_INCOME', 'Sales Revenue', 'INCOME', 'INCOME', 'CREDIT', 0, 30],
+            ['SERVICE_INCOME', 'Service Revenue', 'INCOME', 'INCOME', 'CREDIT', 0, 31],
+            ['ADMIN_EXPENSES', 'Administrative Expenses', 'EXPENSES', 'EXPENSES', 'DEBIT', 0, 40],
+            ['TRANSPORT_EXPENSES', 'Transport Expenses', 'EXPENSES', 'EXPENSES', 'DEBIT', 0, 41],
+            ['SALARY_EXPENSES', 'Salary Expenses', 'EXPENSES', 'EXPENSES', 'DEBIT', 0, 42],
+            ['CASH', 'Cash', 'CURRENT_ASSETS', 'ASSETS', 'DEBIT', 0, 100],
+            ['BANK', 'Bank', 'CURRENT_ASSETS', 'ASSETS', 'DEBIT', 0, 101],
+            ['SUNDRY_DEBTORS', 'Sundry Debtors', 'CURRENT_ASSETS', 'ASSETS', 'DEBIT', 0, 102],
+            ['SUNDRY_CREDITORS', 'Sundry Creditors', 'CURRENT_LIABILITIES', 'LIABILITIES', 'CREDIT', 0, 200],
+            ['FUEL_EXPENSES', 'Fuel Expenses', 'TRANSPORT_EXPENSES', 'EXPENSES', 'DEBIT', 0, 300],
+            ['VEHICLE_EXPENSES', 'Vehicle Expenses', 'TRANSPORT_EXPENSES', 'EXPENSES', 'DEBIT', 0, 301],
+            ['DRIVER_SALARY', 'Driver Salary', 'SALARY_EXPENSES', 'EXPENSES', 'DEBIT', 0, 302],
+        ];
+    }
+
+    /** @return int Number of groups inserted. */
+    public static function insertStandardAccountGroups(PDO $pdo): int
+    {
+        self::repairTruncatedAccountGroupCodes($pdo);
+
+        $created = 0;
         $ins = $pdo->prepare(
             'INSERT INTO account_groups (group_code, group_name, parent_id, group_type, nature, is_primary, is_system, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?, ?, ?, 1, ?)'
         );
-        foreach ($rows as $row) {
-            $ins->execute($row);
+
+        foreach (self::standardAccountGroupDefinitions() as [$code, $name, $parentCode, $type, $nature, $isPrimary, $sort]) {
+            if (self::findGroupIdByCode($pdo, $code) !== null) {
+                continue;
+            }
+            $parentId = null;
+            if ($parentCode !== null) {
+                $parentId = self::findGroupIdByCode($pdo, $parentCode);
+                if ($parentId === null) {
+                    continue;
+                }
+            }
+            $ins->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort]);
+            $created++;
         }
 
-        $childRows = [
-            ['CURRENT_ASSETS', 'Current Assets', 'ASSETS', 'ASSETS', 'DEBIT', 10],
-            ['FIXED_ASSETS', 'Fixed Assets', 'ASSETS', 'ASSETS', 'DEBIT', 11],
-            ['CURRENT_LIABILITIES', 'Current Liabilities', 'LIABILITIES', 'LIABILITIES', 'CREDIT', 20],
-            ['LONG_TERM_LIABILITIES', 'Long Term Liabilities', 'LIABILITIES', 'LIABILITIES', 'CREDIT', 21],
-            ['CASH', 'Cash', 'CURRENT_ASSETS', 'ASSETS', 'DEBIT', 100],
-            ['BANK', 'Bank', 'CURRENT_ASSETS', 'ASSETS', 'DEBIT', 101],
-            ['SUNDRY_DEBTORS', 'Sundry Debtors', 'CURRENT_ASSETS', 'ASSETS', 'DEBIT', 102],
-            ['SUNDRY_CREDITORS', 'Sundry Creditors', 'CURRENT_LIABILITIES', 'LIABILITIES', 'CREDIT', 200],
-            ['FUEL_EXPENSES', 'Fuel Expenses', 'EXPENSES', 'EXPENSES', 'DEBIT', 300],
-            ['VEHICLE_EXPENSES', 'Vehicle Expenses', 'EXPENSES', 'EXPENSES', 'DEBIT', 301],
-            ['DRIVER_SALARY', 'Driver Salary', 'EXPENSES', 'EXPENSES', 'DEBIT', 302],
-            ['SALES_INCOME', 'Sales Income', 'INCOME', 'INCOME', 'CREDIT', 400],
-            ['SERVICE_INCOME', 'Service Income', 'INCOME', 'INCOME', 'CREDIT', 401],
+        return $created;
+    }
+
+    /** Insert missing standard groups and refresh display names. @return int Number of groups created. */
+    public static function syncStandardAccountGroups(PDO $pdo): int
+    {
+        if (!self::tableExists($pdo, 'account_groups')) {
+            return 0;
+        }
+
+        self::repairTruncatedAccountGroupCodes($pdo);
+
+        $created = 0;
+        $insert = $pdo->prepare(
+            'INSERT INTO account_groups (group_code, group_name, parent_id, group_type, nature, is_primary, is_system, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, 1, ?)'
+        );
+        $update = $pdo->prepare(
+            'UPDATE account_groups SET group_code = ?, group_name = ?, parent_id = ?, group_type = ?, nature = ?, is_primary = ?, sort_order = ?, deleted_at = NULL
+             WHERE id = ?'
+        );
+
+        foreach (self::standardAccountGroupDefinitions() as [$code, $name, $parentCode, $type, $nature, $isPrimary, $sort]) {
+            $parentId = null;
+            if ($parentCode !== null) {
+                $parentId = self::findGroupIdByCode($pdo, $parentCode);
+            }
+
+            $existingId = self::findGroupIdByCode($pdo, $code);
+
+            if ($existingId) {
+                $update->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort, $existingId]);
+                continue;
+            }
+
+            $insert->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort]);
+            $created++;
+        }
+
+        return $created;
+    }
+
+    private static function findGroupIdByCode(PDO $pdo, string $code): ?int
+    {
+        foreach (self::groupCodeLookupVariants($code) as $lookupCode) {
+            $st = $pdo->prepare('SELECT id FROM account_groups WHERE group_code = ? LIMIT 1');
+            $st->execute([$lookupCode]);
+            $id = $st->fetchColumn();
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<string> */
+    private static function groupCodeLookupVariants(string $code): array
+    {
+        $aliases = [
+            'LONG_TERM_LIABILITIES' => ['LONG_TERM_LIABILITIES', 'LONG_TERM_LIABILITIE'],
         ];
 
-        $childIns = $pdo->prepare(
-            'INSERT INTO account_groups (group_code, group_name, parent_id, group_type, nature, is_primary, is_system, sort_order)
-             SELECT ?, ?, p.id, ?, ?, 0, 1, ?
-             FROM account_groups p WHERE p.group_code = ? LIMIT 1'
-        );
-        foreach ($childRows as [$code, $name, $parentCode, $type, $nature, $sort]) {
-            $childIns->execute([$code, $name, $type, $nature, $sort, $parentCode]);
+        return $aliases[$code] ?? [$code];
+    }
+
+    private static function repairTruncatedAccountGroupCodes(PDO $pdo): void
+    {
+        try {
+            self::exec($pdo, 'ALTER TABLE account_groups MODIFY group_code varchar(40) NOT NULL');
+        } catch (Throwable $e) {
+            /* column may already be wide enough */
         }
+
+        $st = $pdo->prepare(
+            'SELECT id FROM account_groups WHERE group_code = ? AND NOT EXISTS (
+                SELECT 1 FROM account_groups g2 WHERE g2.group_code = ?
+             ) LIMIT 1'
+        );
+        $st->execute(['LONG_TERM_LIABILITIE', 'LONG_TERM_LIABILITIES']);
+        $id = $st->fetchColumn();
+        if ($id) {
+            $pdo->prepare('UPDATE account_groups SET group_code = ?, group_name = ? WHERE id = ?')
+                ->execute(['LONG_TERM_LIABILITIES', 'Long-Term Liabilities', (int) $id]);
+        }
+    }
+
+    private static function ensureAccountGroupColumns(PDO $pdo): void
+    {
+        if (!self::tableExists($pdo, 'account_groups')) {
+            return;
+        }
+        if (!self::columnExists($pdo, 'account_groups', 'deleted_at')) {
+            self::exec($pdo, 'ALTER TABLE account_groups ADD COLUMN deleted_at timestamp NULL AFTER updated_at');
+        }
+        self::repairTruncatedAccountGroupCodes($pdo);
     }
 
     private static function createAccountsTable(PDO $pdo): void

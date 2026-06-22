@@ -77,6 +77,7 @@
   function initSelect2(scope) {
     if (typeof jQuery === 'undefined' || !jQuery.fn.select2) return;
     jQuery(scope || document).find('select.acc-select2').each(function () {
+      if (this.id === 'accAccountGroup') return;
       if (jQuery(this).data('select2')) return;
       jQuery(this).select2({
         theme: 'bootstrap-5',
@@ -86,12 +87,46 @@
     });
   }
 
+  function refreshSelect2(selectEl) {
+    if (typeof jQuery === 'undefined' || !jQuery.fn.select2 || !selectEl) return;
+    var $el = jQuery(selectEl);
+    if ($el.data('select2')) {
+      $el.select2('destroy');
+    }
+    $el.select2({
+      theme: 'bootstrap-5',
+      width: '100%',
+      allowClear: true,
+      placeholder: $el.attr('data-placeholder') || 'Select…',
+    });
+  }
+
+  function getSelectValue(selectEl) {
+    if (!selectEl) return '';
+    if (typeof jQuery !== 'undefined' && jQuery(selectEl).data('select2')) {
+      return jQuery(selectEl).val() || '';
+    }
+    return selectEl.value || '';
+  }
+
+  function setSelectValue(selectEl, value) {
+    if (!selectEl) return;
+    if (typeof jQuery !== 'undefined' && jQuery(selectEl).data('select2')) {
+      jQuery(selectEl).val(value).trigger('change');
+      return;
+    }
+    selectEl.value = value;
+  }
+
   window.AccModule = {
     apiUrl: apiUrl,
     money: money,
     escapeHtml: escapeHtml,
     toast: toast,
     initSelect2: initSelect2,
+    refreshSelect2: refreshSelect2,
+    getSelectValue: getSelectValue,
+    setSelectValue: setSelectValue,
     cfg: cfg,
     fetchJson: function (params, options) {
       options = options || {};

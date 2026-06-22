@@ -5,7 +5,7 @@
 -- Account Groups Table
 CREATE TABLE IF NOT EXISTS account_groups (
   id bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  group_code varchar(20) NOT NULL UNIQUE,
+  group_code varchar(40) NOT NULL UNIQUE,
   group_name varchar(100) NOT NULL,
   parent_id bigint unsigned NULL,
   group_type enum('ASSETS', 'LIABILITIES', 'CAPITAL', 'INCOME', 'EXPENSES') NOT NULL,
