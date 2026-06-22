@@ -216,6 +216,8 @@
       <tr>
         <th class="col-num">#</th>
         <th>Name</th>
+        <th class="d-none d-md-table-cell">Ledger</th>
+        <th class="d-none d-lg-table-cell text-end">Outstanding</th>
         <th class="col-phone">Phone</th>
         <th class="d-none d-lg-table-cell">Email</th>
         <th class="d-none d-lg-table-cell">Address</th>
@@ -229,6 +231,21 @@
         <tr>
           <td><?php echo $rowNum; ?></td>
           <td><span class="cell-ellipsis" title="<?php echo htmlspecialchars((string)$c['name']); ?>"><?php echo htmlspecialchars($c['name']); ?></span></td>
+          <td class="d-none d-md-table-cell">
+            <?php if (!empty($c['ledger_code'])): ?>
+              <code class="small"><?php echo htmlspecialchars((string)$c['ledger_code']); ?></code>
+            <?php else: ?>
+              <span class="text-muted small">—</span>
+            <?php endif; ?>
+          </td>
+          <td class="d-none d-lg-table-cell text-end">
+            <?php $out = (float)($c['outstanding_amount'] ?? 0); ?>
+            <?php if ($out > 0): ?>
+              <span class="badge bg-warning-subtle text-warning-emphasis"><?php echo number_format($out, 2); ?></span>
+            <?php else: ?>
+              <span class="text-muted small">0.00</span>
+            <?php endif; ?>
+          </td>
           <td>
             <?php $ph = trim((string)($c['phone'] ?? '')); $showPh = (preg_match('/^NA\d{10}-\d{3}$/', $ph) === 1) ? '' : $ph; echo htmlspecialchars($showPh); ?>
           </td>
@@ -243,6 +260,9 @@
               </button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=edit&id='.(int)$c['id']); ?>"><i class="bi bi-pencil-square me-2"></i>Edit</a></li>
+                <?php if (!empty($c['ledger_account_id'])): ?>
+                <li><a class="dropdown-item" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=customer_ledger&customer_id='.(int)$c['id']); ?>"><i class="bi bi-journal-text me-2"></i>View Ledger</a></li>
+                <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
                 <li>
                   <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=customers&action=delete'); ?>" class="px-3" onsubmit="return confirm('Delete this customer?');">

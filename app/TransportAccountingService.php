@@ -206,16 +206,25 @@ class TransportAccountingService
                 throw new RuntimeException('Sales income account not found. Please configure Chart of Accounts.');
             }
 
-            // Get customer account (sundry debtor)
-            $customerAccount = $pdo->prepare(
-                'SELECT id FROM accounts WHERE account_name LIKE ? AND account_group_id IN (SELECT id FROM account_groups WHERE group_code = ?) LIMIT 1'
-            );
-            $customerAccount->execute(['%' . ($invoiceData['customer_name'] ?? '') . '%', 'SUNDRY_DEBTORS']);
-            $customerAccountId = $customerAccount->fetchColumn();
-            
-            if (!$customerAccountId) {
-                // Create customer account if not exists
-                $customerAccountId = self::createCustomerAccount($pdo, $invoiceData['customer_name'] ?? 'Customer');
+            // Get customer account (sundry debtor) via customer ledger link when available
+            $customerId = (int) ($invoiceData['customer_id'] ?? 0);
+            if ($customerId > 0) {
+                $customerAccountId = CustomerLedgerRepository::resolveAccountIdForCustomer(
+                    $pdo,
+                    $customerId,
+                    (string) ($invoiceData['customer_name'] ?? 'Customer'),
+                    $userId
+                );
+            } else {
+                $customerAccount = $pdo->prepare(
+                    'SELECT id FROM accounts WHERE account_name LIKE ? AND account_group_id IN (SELECT id FROM account_groups WHERE group_code = ?) LIMIT 1'
+                );
+                $customerAccount->execute(['%' . ($invoiceData['customer_name'] ?? '') . '%', 'SUNDRY_DEBTORS']);
+                $customerAccountId = $customerAccount->fetchColumn();
+
+                if (!$customerAccountId) {
+                    $customerAccountId = self::createCustomerAccount($pdo, $invoiceData['customer_name'] ?? 'Customer');
+                }
             }
 
             $amount = (float) ($invoiceData['amount'] ?? 0);

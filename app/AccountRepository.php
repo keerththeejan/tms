@@ -152,6 +152,12 @@ class AccountRepository
             throw new RuntimeException('Cannot delete account that has ledger entries.');
         }
 
+        $st = $pdo->prepare('SELECT COUNT(*) FROM customer_ledger WHERE account_id = ?');
+        $st->execute([$id]);
+        if ((int) $st->fetchColumn() > 0) {
+            throw new RuntimeException('Cannot delete account linked to a customer ledger.');
+        }
+
         $st = $pdo->prepare('UPDATE accounts SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?');
         return $st->execute([$id]);
     }

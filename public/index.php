@@ -99,6 +99,30 @@ function _cashbook_sync_customer_account_name(PDO $pdo, int $customerId, string 
     }
 }
 
+/** Link customer ledger (AR account) to new customer; failures do not block customer save. */
+function _customer_ledger_ensure(PDO $pdo, int $customerId, string $name): void
+{
+    try {
+        $userId = null;
+        if (class_exists('Auth') && Auth::check()) {
+            $user = Auth::user();
+            $userId = isset($user['id']) ? (int) $user['id'] : null;
+        }
+        CustomerLedgerRepository::ensureForCustomer($pdo, $customerId, trim($name), true, $userId);
+    } catch (Throwable $e) {
+        /* non-fatal */
+    }
+}
+
+function _customer_ledger_sync_name(PDO $pdo, int $customerId, string $name): void
+{
+    try {
+        CustomerLedgerRepository::syncCustomerName($pdo, $customerId, trim($name));
+    } catch (Throwable $e) {
+        /* non-fatal */
+    }
+}
+
 action_router:
 
 // Public routes
@@ -1238,6 +1262,7 @@ switch ($page) {
                     $newCid = (int) $pdo->lastInsertId();
                     if ($newCid > 0) {
                         CashbookRepository::ensureCustomerAccount($pdo, $newCid, $nameV);
+                        _customer_ledger_ensure($pdo, $newCid, $nameV);
                     }
                     $pdo->commit();
                     $imported++;
@@ -1369,6 +1394,8 @@ switch ($page) {
                     $stmt = $pdo->prepare('UPDATE customers SET name=?, phone=?, email=?, address=?, delivery_location=?, place_id=?, lat=?, lng=?, customer_type=? WHERE id=?');
                     $stmt->execute([$name,$phoneDb,($email!==''?$email:null),$address,$delivery_location,($place_id!==''?$place_id:null),$lat,$lng,$customer_type,$id]);
                     _cashbook_sync_customer_account_name($pdo, $id, $name);
+                    _customer_ledger_sync_name($pdo, $id, $name);
+                    _customer_ledger_ensure($pdo, $id, $name);
                 } else {
                     $pdo->beginTransaction();
                     try {
@@ -1377,6 +1404,7 @@ switch ($page) {
                         $id = (int)$pdo->lastInsertId();
                         if ($id > 0) {
                             $cashbookAccountId = CashbookRepository::ensureCustomerAccount($pdo, $id, $name);
+                            _customer_ledger_ensure($pdo, $id, $name);
                         }
                         $customerCreated = true;
                         $pdo->commit();
@@ -1435,7 +1463,7 @@ switch ($page) {
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
                 // Guard against FK violations: check references before delete
-                $refParcels = 0; $refDN = 0;
+                $refParcels = 0; $refDN = 0; $refLedger = 0;
                 try {
                     $st1 = $pdo->prepare('SELECT COUNT(*) FROM parcels WHERE customer_id=?');
                     $st1->execute([$id]);
@@ -1446,12 +1474,20 @@ switch ($page) {
                     $st2->execute([$id]);
                     $refDN = (int)$st2->fetchColumn();
                 } catch (Throwable $e) { $refDN = 0; }
+                try {
+                    if (CustomerLedgerRepository::customerHasLedgerTransactions($pdo, $id)) {
+                        $refLedger = 1;
+                    }
+                } catch (Throwable $e) { $refLedger = 0; }
 
-                if ($refParcels > 0 || $refDN > 0) {
+                if ($refParcels > 0 || $refDN > 0 || $refLedger > 0) {
                     http_response_code(400);
                     $totalRefs = $refParcels + $refDN;
                     $msg = 'Cannot delete this customer because it is referenced by existing records: '
                          . $refParcels . ' parcel(s) and ' . $refDN . ' delivery note(s).';
+                    if ($refLedger > 0) {
+                        $msg .= ' The linked customer ledger has accounting transactions.';
+                    }
                     echo '<!doctype html><html><head><meta charset="utf-8"><title>Delete Customer</title>'
                        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
                        . '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"></head><body>'
@@ -1464,6 +1500,9 @@ switch ($page) {
                 }
 
                 CashbookRepository::detachCashbookAccountForDeletedCustomer($pdo, $id);
+                try {
+                    CustomerLedgerRepository::detachForDeletedCustomer($pdo, $id);
+                } catch (Throwable $e) { /* non-fatal */ }
 
                 // Safe to delete
                 try {
@@ -1502,7 +1541,16 @@ switch ($page) {
             $customer = $stmt->fetch();
             if (!$customer) { http_response_code(404); echo 'Not found'; break; }
             $deliveryLocationOptions = _merge_delivery_location_options($pdo);
-            Helpers::view('customers/form', compact('customer','deliveryLocationOptions'));
+            $customerLedger = null;
+            try {
+                CustomerLedgerRepository::ensureSchema($pdo);
+                $customerLedger = CustomerLedgerRepository::getByCustomerId($pdo, $id);
+                if (!$customerLedger) {
+                    _customer_ledger_ensure($pdo, $id, (string)($customer['name'] ?? ''));
+                    $customerLedger = CustomerLedgerRepository::getByCustomerId($pdo, $id);
+                }
+            } catch (Throwable $e) { /* optional */ }
+            Helpers::view('customers/form', compact('customer','deliveryLocationOptions','customerLedger'));
             break;
         }
 
@@ -1537,6 +1585,11 @@ switch ($page) {
         } else {
             $customers = $pdo->query('SELECT * FROM customers ORDER BY created_at DESC LIMIT 100')->fetchAll();
         }
+        try {
+            CustomerLedgerRepository::ensureSchema($pdo);
+            CustomerLedgerRepository::syncMissingIfNeeded($pdo);
+            $customers = CustomerLedgerRepository::enrichCustomerRows($pdo, $customers);
+        } catch (Throwable $e) { /* optional */ }
         Helpers::view('customers/index', compact('customers','q','name','phone','email','address','delivery_location','type'));
         break;
 
@@ -5825,6 +5878,7 @@ switch ($page) {
                 $cid = (int)$pdo->lastInsertId();
                 if ($cid > 0) {
                     CashbookRepository::ensureCustomerAccount($pdo, $cid, $name);
+                    _customer_ledger_ensure($pdo, $cid, $name);
                 }
                 $pdo->commit();
             } catch (Throwable $e) {

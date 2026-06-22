@@ -89,6 +89,14 @@ class AccountingController
                     self::ledger($pdo);
                     return;
 
+                case 'list_customer_ledgers':
+                    self::listCustomerLedgers($pdo);
+                    return;
+
+                case 'get_customer_ledger':
+                    self::getCustomerLedger($pdo);
+                    return;
+
                 case 'trial_balance':
                     self::trialBalance($pdo);
                     return;
@@ -431,7 +439,36 @@ class AccountingController
         }
 
         $ledger = AccountRepository::getLedger($pdo, $accountId, $fromDate, $toDate);
-        self::json(['ok' => true, 'data' => $ledger]);
+        $customerLink = CustomerLedgerRepository::getByAccountId($pdo, $accountId);
+        self::json(['ok' => true, 'data' => $ledger, 'customer' => $customerLink]);
+    }
+
+    private static function listCustomerLedgers(PDO $pdo): void
+    {
+        $filters = [
+            'q' => $_GET['q'] ?? '',
+            'status' => $_GET['status'] ?? '',
+        ];
+        $rows = CustomerLedgerRepository::listWithStats($pdo, $filters);
+        self::json(['ok' => true, 'data' => $rows]);
+    }
+
+    private static function getCustomerLedger(PDO $pdo): void
+    {
+        $customerId = (int) ($_GET['customer_id'] ?? 0);
+        if ($customerId <= 0) {
+            self::json(['ok' => false, 'error' => 'Invalid customer id'], 400);
+            return;
+        }
+
+        $row = CustomerLedgerRepository::getByCustomerId($pdo, $customerId);
+        if (!$row) {
+            self::json(['ok' => false, 'error' => 'Customer ledger not found'], 404);
+            return;
+        }
+
+        $stats = CustomerLedgerRepository::getCustomerStats($pdo, $customerId, (int) $row['account_id']);
+        self::json(['ok' => true, 'data' => array_merge($row, $stats)]);
     }
 
     private static function trialBalance(PDO $pdo): void

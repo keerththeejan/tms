@@ -128,7 +128,7 @@ class AccountingModule
             'vouchers' => 'accounting/vouchers_list',
             'daybook' => 'accounting/day_book',
             'ledger' => 'accounting/ledger',
-            'customer_ledger' => 'accounting/ledger',
+            'customer_ledger' => 'accounting/customer_ledger',
             'supplier_ledger' => 'accounting/ledger',
             'cash_book' => 'accounting/cash_book',
             'bank_book' => 'accounting/bank_book',

@@ -16,6 +16,26 @@
 <?php if (!empty($error)): ?>
   <div class="alert alert-danger py-2"><?php echo htmlspecialchars((string)($error ?? '')); ?></div>
 <?php endif; ?>
+<?php
+  $customerLedger = $customerLedger ?? null;
+  if (!empty($customerLedger['ledger_code'])):
+?>
+  <div class="alert alert-light border py-2 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div>
+      <span class="text-muted small me-2">Ledger Code</span>
+      <code><?php echo htmlspecialchars((string)$customerLedger['ledger_code']); ?></code>
+      <span class="badge bg-primary-subtle text-primary ms-2"><?php echo htmlspecialchars((string)($customerLedger['ledger_type'] ?? 'Accounts Receivable')); ?></span>
+      <?php if (isset($customerLedger['is_active']) && (int)$customerLedger['is_active'] !== 1): ?>
+        <span class="badge bg-secondary ms-1">Inactive</span>
+      <?php endif; ?>
+    </div>
+    <?php if (!empty($customerLedger['account_id'])): ?>
+    <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=customer_ledger&customer_id='.(int)($customer['id'] ?? 0)); ?>">
+      <i class="bi bi-journal-text me-1"></i> View Ledger
+    </a>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
 <?php if (!$gmKey): ?>
 <!-- OSM Fallback: Nominatim + Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>

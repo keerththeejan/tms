@@ -58,6 +58,7 @@ require_once __DIR__ . '/LedgerEntryRepository.php';
 require_once __DIR__ . '/AccountingController.php';
 require_once __DIR__ . '/AccountingModule.php';
 require_once __DIR__ . '/TransportAccountingService.php';
+require_once __DIR__ . '/CustomerLedgerRepository.php';
 require_once __DIR__ . '/AuditLogRepository.php';
 
 // Load config and initialize DB (already loaded above)
@@ -79,6 +80,8 @@ try {
 }
 try {
     AccountGroupRepository::ensureSchema(Database::pdo());
+    CustomerLedgerRepository::ensureSchema(Database::pdo());
+    CustomerLedgerRepository::syncMissingIfNeeded(Database::pdo());
 } catch (Throwable $e) {
     /* accounting module optional until DB ready */
 }
