@@ -5,6 +5,9 @@
 <?php else: ?>
 </main>
 <?php endif; ?>
+<?php if (!empty($accLoadAccountsJs)): ?>
+<?php include __DIR__ . '/../accounting/partials/accounts_modals.php'; ?>
+<?php endif; ?>
  <!-- jQuery is required by some DataTables builds and third-party scripts -->
  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -15,6 +18,7 @@
    function initDataTables(){
      if (typeof DataTable === 'undefined') return;
      document.querySelectorAll('table.datatable').forEach(function(tbl){
+       if (tbl.id === 'accCoaTable') return;
        if (tbl.dataset.dtInit === '1') return;
        var body = tbl.tBodies[0];
        if (body) {
@@ -97,6 +101,17 @@
   })();
 </script>
 <script src="<?php echo Helpers::baseUrl('assets/js/tms-ui.js?v=1'); ?>"></script>
+<?php if (!empty($accLoadAccountsJs)):
+  $accAccountsJsPath = dirname(__DIR__, 2) . '/public/assets/js/accounting-accounts.js';
+  $accAccountsJsVer = is_file($accAccountsJsPath) ? (string) filemtime($accAccountsJsPath) : '6';
+  $accJsPath = dirname(__DIR__, 2) . '/public/assets/js/accounting-module.js';
+  $accJsVerFooter = is_file($accJsPath) ? (string) filemtime($accJsPath) : '6';
+?>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="<?php echo Helpers::baseUrl('assets/js/accounting-module.js?v=' . rawurlencode($accJsVerFooter)); ?>"></script>
+<script src="<?php echo Helpers::baseUrl('assets/js/accounting-accounts.js?v=' . rawurlencode($accAccountsJsVer)); ?>"></script>
+<?php endif; ?>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
   // Enhance all Bootstrap selects with search using Choices.js
@@ -107,6 +122,8 @@
       if (sel.dataset.enhanced === '1') return;
       // Skip if developer opted out
       if (sel.dataset.enhance === 'false') return;
+      // Skip accounting module selects (managed by accounting-accounts.js)
+      if (sel.closest('#accModule')) return;
       var optionCount = sel.options ? sel.options.length : 0;
       var searchEnabled = sel.dataset.choicesSearch === 'true' || optionCount >= 5; // force search e.g. delivery route
       var cfg = {

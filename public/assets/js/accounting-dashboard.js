@@ -34,7 +34,7 @@
       el.textContent = String(val || 0);
       return;
     }
-    el.textContent = 'Rs. ' + AccModule.money(val);
+    el.textContent = AccModule.money(val);
     if (signed) {
       el.classList.toggle('positive', (parseFloat(val) || 0) >= 0);
       el.classList.toggle('negative', (parseFloat(val) || 0) < 0);

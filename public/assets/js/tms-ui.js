@@ -47,8 +47,11 @@
   }
 
   function money(value) {
+    if (window.TMS && typeof window.TMS.formatMoney === 'function') {
+      return window.TMS.formatMoney(value);
+    }
     var n = Number(value) || 0;
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return 'LKR ' + n.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function initDashboardChart() {

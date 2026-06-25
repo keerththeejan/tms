@@ -8,15 +8,19 @@
   var baseUrl = cfg.baseUrl || '';
 
   function apiUrl(params) {
-    var q = new URLSearchParams(Object.assign({ page: 'api_accounting' }, params));
+    var q = new URLSearchParams(Object.assign({ page: 'accounting' }, params));
     return baseUrl + 'index.php?' + q.toString();
   }
 
   function money(n) {
-    return (parseFloat(n) || 0).toLocaleString('en-IN', {
+    if (window.TMS && typeof window.TMS.formatMoney === 'function') {
+      return window.TMS.formatMoney(n);
+    }
+    var formatted = (parseFloat(n) || 0).toLocaleString('en-LK', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+    return 'LKR ' + formatted;
   }
 
   function escapeHtml(s) {
@@ -89,16 +93,22 @@
 
   function refreshSelect2(selectEl) {
     if (typeof jQuery === 'undefined' || !jQuery.fn.select2 || !selectEl) return;
+    if (selectEl.id === 'accAccountGroup' || selectEl.id === 'accGroupParent') return;
     var $el = jQuery(selectEl);
     if ($el.data('select2')) {
       $el.select2('destroy');
     }
-    $el.select2({
+    var opts = {
       theme: 'bootstrap-5',
       width: '100%',
       allowClear: true,
       placeholder: $el.attr('data-placeholder') || 'Select…',
-    });
+    };
+    var modal = $el.closest('.modal');
+    if (modal.length) {
+      opts.dropdownParent = modal;
+    }
+    $el.select2(opts);
   }
 
   function getSelectValue(selectEl) {
@@ -130,14 +140,42 @@
     cfg: cfg,
     fetchJson: function (params, options) {
       options = options || {};
-      return fetch(apiUrl(params), options).then(function (r) { return r.json(); });
+      return fetch(apiUrl(params), options).then(function (r) {
+        if (!r.ok) {
+          return r.text().then(function (t) {
+            throw new Error((t || '').trim() || ('Request failed (' + r.status + ')'));
+          });
+        }
+        return r.json();
+      });
     },
     postJson: function (params, body) {
       return fetch(apiUrl(params), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
         body: JSON.stringify(Object.assign({ csrf_token: cfg.csrf || '' }, body || {})),
-      }).then(function (r) { return r.json(); });
+      }).then(function (r) {
+        return r.text().then(function (text) {
+          var data = {};
+          if (text) {
+            try {
+              data = JSON.parse(text);
+            } catch (e) {
+              console.error('[AccModule] Invalid JSON response:', text);
+              throw new Error((text || '').trim().substring(0, 200) || ('Request failed (' + r.status + ')'));
+            }
+          }
+          if (!data.message && data.error) data.message = data.error;
+          if (data.success === undefined && data.ok !== undefined) data.success = !!data.ok;
+          if (data.ok === undefined && data.success !== undefined) data.ok = !!data.success;
+          return data;
+        });
+      });
     },
   };
 

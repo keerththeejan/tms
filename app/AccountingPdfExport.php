@@ -8,6 +8,11 @@ declare(strict_types=1);
  */
 class AccountingPdfExport
 {
+    private static function fmtMoney(float|int|string $amount): string
+    {
+        return Helpers::formatMoney($amount);
+    }
+
     /**
      * Export Day Book to PDF
      */
@@ -94,8 +99,8 @@ class AccountingPdfExport
                 htmlspecialchars($entry['voucher_type'] ?? ''),
                 htmlspecialchars($entry['account_name'] ?? ''),
                 htmlspecialchars($entry['narration'] ?? ''),
-                number_format((float) ($entry['debit_amount'] ?? 0), 2),
-                number_format((float) ($entry['credit_amount'] ?? 0), 2)
+                self::fmtMoney($entry['debit_amount'] ?? 0),
+                self::fmtMoney($entry['credit_amount'] ?? 0)
             );
         }
 
@@ -122,8 +127,8 @@ class AccountingPdfExport
                 </tfoot>
             </table>',
             $rows,
-            number_format($totalDebit, 2),
-            number_format($totalCredit, 2)
+            self::fmtMoney($totalDebit),
+            self::fmtMoney($totalCredit)
         ));
     }
 
@@ -148,9 +153,9 @@ class AccountingPdfExport
                 htmlspecialchars($entry['voucher_number'] ?? ''),
                 htmlspecialchars($entry['voucher_type'] ?? ''),
                 htmlspecialchars($entry['narration'] ?? $entry['voucher_narration'] ?? ''),
-                number_format((float) ($entry['debit_amount'] ?? 0), 2),
-                number_format((float) ($entry['credit_amount'] ?? 0), 2),
-                number_format((float) ($entry['running_balance'] ?? 0), 2),
+                self::fmtMoney($entry['debit_amount'] ?? 0),
+                self::fmtMoney($entry['credit_amount'] ?? 0),
+                self::fmtMoney($entry['running_balance'] ?? 0),
                 htmlspecialchars($entry['balance_type'] ?? '')
             );
         }
@@ -187,10 +192,10 @@ class AccountingPdfExport
                 </table>',
                 htmlspecialchars($account['account_name'] ?? ''),
                 htmlspecialchars($account['account_code'] ?? ''),
-                number_format((float) ($ledger['opening_balance'] ?? 0), 2),
+                self::fmtMoney($ledger['opening_balance'] ?? 0),
                 htmlspecialchars($ledger['opening_balance_type'] ?? ''),
                 $rows,
-                number_format((float) ($ledger['closing_balance'] ?? 0), 2),
+                self::fmtMoney($ledger['closing_balance'] ?? 0),
                 htmlspecialchars($ledger['closing_balance_type'] ?? '')
             )
         );
@@ -216,8 +221,8 @@ class AccountingPdfExport
                 htmlspecialchars($acc['account_name'] ?? ''),
                 htmlspecialchars($acc['group_name'] ?? ''),
                 htmlspecialchars($acc['group_type'] ?? ''),
-                number_format((float) ($acc['debit_amount'] ?? 0), 2),
-                number_format((float) ($acc['credit_amount'] ?? 0), 2)
+                self::fmtMoney($acc['debit_amount'] ?? 0),
+                self::fmtMoney($acc['credit_amount'] ?? 0)
             );
         }
 
@@ -247,9 +252,9 @@ class AccountingPdfExport
                 </tfoot>
             </table>',
             $rows,
-            number_format((float) ($trialBalance['debit_total'] ?? 0), 2),
-            number_format((float) ($trialBalance['credit_total'] ?? 0), 2),
-            number_format((float) (($trialBalance['debit_total'] ?? 0) - ($trialBalance['credit_total'] ?? 0)), 2)
+            self::fmtMoney($trialBalance['debit_total'] ?? 0),
+            self::fmtMoney($trialBalance['credit_total'] ?? 0),
+            self::fmtMoney(($trialBalance['debit_total'] ?? 0) - ($trialBalance['credit_total'] ?? 0))
         ));
     }
 
@@ -270,7 +275,7 @@ class AccountingPdfExport
                 htmlspecialchars($acc['account_code'] ?? ''),
                 htmlspecialchars($acc['account_name'] ?? ''),
                 htmlspecialchars($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
 
@@ -286,7 +291,7 @@ class AccountingPdfExport
                 htmlspecialchars($acc['account_code'] ?? ''),
                 htmlspecialchars($acc['account_name'] ?? ''),
                 htmlspecialchars($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
 
@@ -331,11 +336,11 @@ class AccountingPdfExport
                 Net %s: %s
             </div>',
             $incomeRows,
-            number_format((float) ($profitLoss['total_income'] ?? 0), 2),
+            self::fmtMoney($profitLoss['total_income'] ?? 0),
             $expenseRows,
-            number_format((float) ($profitLoss['total_expenses'] ?? 0), 2),
+            self::fmtMoney($profitLoss['total_expenses'] ?? 0),
             ((float) ($profitLoss['net_profit'] ?? 0) >= 0) ? 'Profit' : 'Loss',
-            number_format(abs((float) ($profitLoss['net_profit'] ?? 0)), 2)
+            self::fmtMoney(abs((float) ($profitLoss['net_profit'] ?? 0)))
         ));
     }
 
@@ -356,7 +361,7 @@ class AccountingPdfExport
                 htmlspecialchars($acc['account_code'] ?? ''),
                 htmlspecialchars($acc['account_name'] ?? ''),
                 htmlspecialchars($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
 
@@ -372,7 +377,7 @@ class AccountingPdfExport
                 htmlspecialchars($acc['account_code'] ?? ''),
                 htmlspecialchars($acc['account_name'] ?? ''),
                 htmlspecialchars($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
 
@@ -388,7 +393,7 @@ class AccountingPdfExport
                 htmlspecialchars($acc['account_code'] ?? ''),
                 htmlspecialchars($acc['account_name'] ?? ''),
                 htmlspecialchars($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
 
@@ -451,11 +456,11 @@ class AccountingPdfExport
                 Assets = Liabilities + Capital: %s
             </div>',
             $assetRows,
-            number_format((float) ($balanceSheet['total_assets'] ?? 0), 2),
+            self::fmtMoney($balanceSheet['total_assets'] ?? 0),
             $liabilityRows,
-            number_format((float) ($balanceSheet['total_liabilities'] ?? 0), 2),
+            self::fmtMoney($balanceSheet['total_liabilities'] ?? 0),
             $capitalRows,
-            number_format((float) ($balanceSheet['total_capital'] ?? 0), 2),
+            self::fmtMoney($balanceSheet['total_capital'] ?? 0),
             (abs((float) ($balanceSheet['total_assets'] ?? 0) - ((float) ($balanceSheet['total_liabilities'] ?? 0) + (float) ($balanceSheet['total_capital'] ?? 0))) < 0.01) ? 'BALANCED' : 'NOT BALANCED'
         ));
     }

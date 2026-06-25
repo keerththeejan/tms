@@ -22,6 +22,15 @@ $config = [
     // App
     'main_branch_code' => 'MAIN', // Used for seeding/identifying main branch
 
+    // Currency (Sri Lankan Rupee — single source of truth for all modules)
+    'currency' => [
+        'code' => 'LKR',
+        'symbol' => 'LKR',
+        'format' => 'LKR',
+        'locale' => 'en-LK',
+        'decimals' => 2,
+    ],
+
     // Company branding (used in print views)
     'company' => [
         'name' => 'TS Transport',

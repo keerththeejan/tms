@@ -70,22 +70,22 @@ $toName = (string) ($voucher['to_account_name'] ?? '');
   <div class="tv-totals">
     <div class="tv-total-row">
       <span class="label">Total Debit</span>
-      <span class="value">Rs. <?php echo number_format((float) ($voucher['total_debit'] ?? 0), 2); ?></span>
+      <span class="value"><?php echo Helpers::formatMoney((float) ($voucher['total_debit'] ?? 0)); ?></span>
     </div>
     <div class="tv-total-row">
       <span class="label">Total Credit</span>
-      <span class="value">Rs. <?php echo number_format((float) ($voucher['total_credit'] ?? 0), 2); ?></span>
+      <span class="value"><?php echo Helpers::formatMoney((float) ($voucher['total_credit'] ?? 0)); ?></span>
     </div>
     <div class="tv-total-row">
       <span class="label">Balance</span>
-      <span class="value">Rs. <?php echo number_format((float) ($voucher['balance_amount'] ?? 0), 2); ?></span>
+      <span class="value"><?php echo Helpers::formatMoney((float) ($voucher['balance_amount'] ?? 0)); ?></span>
     </div>
   </div>
   <?php else: ?>
   <div class="tv-grid">
     <div class="tv-box"><div class="label">From Account</div><div class="value"><?php echo htmlspecialchars($fromName); ?></div></div>
     <div class="tv-box"><div class="label">To Account</div><div class="value"><?php echo htmlspecialchars($toName); ?></div></div>
-    <div class="tv-box"><div class="label">Amount</div><div class="value">Rs. <?php echo number_format((float) ($voucher['amount'] ?? 0), 2); ?></div></div>
+    <div class="tv-box"><div class="label">Amount</div><div class="value"><?php echo Helpers::formatMoney((float) ($voucher['amount'] ?? 0)); ?></div></div>
     <div class="tv-box"><div class="label">Reference</div><div class="value"><?php echo htmlspecialchars((string) ($voucher['reference_number'] ?? '')); ?></div></div>
   </div>
   <?php endif; ?>

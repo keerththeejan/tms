@@ -10,6 +10,19 @@ class AccountingController
 {
     public static function json(array $data, int $code = 200): void
     {
+        if (isset($data['ok']) && !isset($data['success'])) {
+            $data['success'] = (bool) $data['ok'];
+        }
+        if (!isset($data['ok']) && isset($data['success'])) {
+            $data['ok'] = (bool) $data['success'];
+        }
+        if (isset($data['error']) && !isset($data['message'])) {
+            $data['message'] = $data['error'];
+        }
+        if (!isset($data['errors'])) {
+            $data['errors'] = [];
+        }
+
         http_response_code($code);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -71,6 +84,14 @@ class AccountingController
 
                 case 'search_accounts':
                     self::searchAccounts($pdo);
+                    return;
+
+                case 'chart_accounts':
+                    self::chartAccounts($pdo);
+                    return;
+
+                case 'next_account_code':
+                    self::nextAccountCode($pdo);
                     return;
 
                 case 'get_account_balance':
@@ -150,7 +171,14 @@ class AccountingController
                     return;
             }
         } catch (Throwable $e) {
-            self::json(['ok' => false, 'error' => $e->getMessage()], 500);
+            error_log('[AccountingController] ' . ($action ?? 'unknown') . ': ' . $e->getMessage());
+            self::json([
+                'ok' => false,
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error' => $e->getMessage(),
+                'errors' => [],
+            ], 500);
         }
     }
 
@@ -393,8 +421,37 @@ class AccountingController
 
     private static function listAccounts(PDO $pdo): void
     {
-        $accounts = AccountRepository::listAccounts($pdo);
-        self::json(['ok' => true, 'data' => $accounts]);
+        $accounts = AccountRepository::listAccounts($pdo, ($_GET['include_inactive'] ?? '') === '1');
+        self::json(['ok' => true, 'success' => true, 'data' => $accounts]);
+    }
+
+    private static function chartAccounts(PDO $pdo): void
+    {
+        $page = max(1, (int) ($_GET['page_no'] ?? 1));
+        $limit = max(1, min(500, (int) ($_GET['limit'] ?? 50)));
+        $result = AccountRepository::listForChart($pdo, [
+            'q' => $_GET['q'] ?? '',
+            'group_type' => $_GET['group_type'] ?? '',
+            'status' => $_GET['status'] ?? '',
+            'sort' => $_GET['sort'] ?? 'account_code',
+            'order' => $_GET['order'] ?? 'ASC',
+        ], $page, $limit);
+
+        self::json([
+            'ok' => true,
+            'success' => true,
+            'data' => $result['rows'],
+            'total' => $result['total'],
+            'page' => $page,
+            'limit' => $limit,
+        ]);
+    }
+
+    private static function nextAccountCode(PDO $pdo): void
+    {
+        $groupId = (int) ($_GET['account_group_id'] ?? 0);
+        $code = AccountRepository::generateNextCode($pdo, $groupId > 0 ? $groupId : null);
+        self::json(['ok' => true, 'success' => true, 'data' => ['account_code' => $code]]);
     }
 
     private static function searchAccounts(PDO $pdo): void
@@ -421,10 +478,8 @@ class AccountingController
 
     private static function listAccountGroups(PDO $pdo): void
     {
-        AccountGroupRepository::ensureSchema($pdo);
-        AccountingSchemaRepository::syncStandardAccountGroups($pdo);
-        $groups = AccountGroupRepository::listGroups($pdo);
-        self::json(['ok' => true, 'data' => $groups]);
+        $groups = AccountGroupRepository::listForAccountForm($pdo);
+        self::json(['ok' => true, 'success' => true, 'data' => $groups]);
     }
 
     private static function saveAccountGroup(PDO $pdo, bool $isPost): void
@@ -440,6 +495,8 @@ class AccountingController
         $parentId = !empty($payload['parent_id']) ? (int) $payload['parent_id'] : null;
         $groupType = strtoupper(trim((string) ($payload['group_type'] ?? 'EXPENSES')));
         $nature = strtoupper(trim((string) ($payload['nature'] ?? '')));
+        $description = trim((string) ($payload['description'] ?? ''));
+        $isActive = (int) ($payload['is_active'] ?? 1);
 
         if ($name === '') {
             self::json(['ok' => false, 'error' => 'Group name is required.'], 400);
@@ -493,12 +550,19 @@ class AccountingController
             'parent_id' => $parentId,
             'group_type' => $groupType,
             'nature' => $nature,
+            'description' => $description !== '' ? $description : null,
+            'is_active' => $isActive === 1 ? 1 : 0,
             'is_primary' => $parentId === null ? 1 : 0,
             'is_system' => 0,
             'sort_order' => (int) ($payload['sort_order'] ?? 500),
         ]);
 
-        self::json(['ok' => true, 'data' => $group]);
+        if (empty($group['id'])) {
+            self::json(['ok' => false, 'error' => 'Group was saved but could not be loaded.'], 500);
+            return;
+        }
+
+        self::json(['ok' => true, 'success' => true, 'message' => 'Account group created successfully.', 'data' => $group]);
     }
 
     private static function seedDefaultAccountGroups(PDO $pdo, bool $isPost): void
@@ -509,7 +573,11 @@ class AccountingController
         }
 
         $created = AccountGroupRepository::ensureDefaultGroups($pdo);
-        AccountingSchemaRepository::syncStandardAccountGroups($pdo);
+        try {
+            AccountingSchemaRepository::syncStandardAccountGroups($pdo);
+        } catch (Throwable $e) {
+            /* non-fatal */
+        }
         $groups = AccountGroupRepository::listGroups($pdo);
         if ($groups === []) {
             self::json(['ok' => false, 'error' => 'Unable to create default account groups.'], 500);
@@ -700,7 +768,7 @@ class AccountingController
     private static function saveAccount(PDO $pdo, bool $isPost): void
     {
         if (!$isPost) {
-            self::json(['ok' => false, 'error' => 'POST required'], 405);
+            self::json(['ok' => false, 'success' => false, 'message' => 'POST required', 'errors' => []], 405);
             return;
         }
 
@@ -709,49 +777,93 @@ class AccountingController
         $userId = Auth::user()['id'] ?? null;
         $groupId = (int) ($payload['account_group_id'] ?? 0);
 
-        if ($groupId <= 0) {
-            self::json(['ok' => false, 'error' => 'Please select an account group.'], 400);
+        $errors = AccountRepository::validateAccountData($pdo, $payload, $id > 0 ? $id : null);
+        if ($errors !== []) {
+            self::json([
+                'ok' => false,
+                'success' => false,
+                'message' => reset($errors) ?: 'Validation failed.',
+                'errors' => $errors,
+            ], 400);
             return;
         }
 
-        if ($id > 0) {
-            $account = AccountRepository::update($pdo, $id, [
-                'account_name' => $payload['account_name'] ?? '',
-                'account_group_id' => $groupId,
-                'opening_balance' => (float) ($payload['opening_balance'] ?? 0),
-                'opening_balance_type' => $payload['opening_balance_type'] ?? 'DEBIT',
-                'is_active' => (int) ($payload['is_active'] ?? 1),
-            ]);
-        } else {
-            $account = AccountRepository::create($pdo, [
-                'account_code' => (string) ($payload['account_code'] ?? ''),
-                'account_name' => (string) ($payload['account_name'] ?? ''),
-                'account_group_id' => $groupId,
-                'opening_balance' => (float) ($payload['opening_balance'] ?? 0),
-                'opening_balance_type' => $payload['opening_balance_type'] ?? 'DEBIT',
-                'is_active' => (int) ($payload['is_active'] ?? 1),
-                'created_by' => $userId,
-            ]);
+        $group = AccountGroupRepository::getById($pdo, $groupId);
+        $balanceType = strtoupper(trim((string) ($payload['opening_balance_type'] ?? '')));
+        if ($balanceType === '' && $group) {
+            $balanceType = (string) ($group['nature'] ?? 'DEBIT');
+        }
+        if (!in_array($balanceType, ['DEBIT', 'CREDIT'], true)) {
+            $balanceType = 'DEBIT';
         }
 
-        self::json(['ok' => true, 'data' => $account]);
+        $accountData = [
+            'account_name' => trim((string) ($payload['account_name'] ?? '')),
+            'account_group_id' => $groupId,
+            'opening_balance' => (float) ($payload['opening_balance'] ?? 0),
+            'opening_balance_type' => $balanceType,
+            'is_active' => (int) ($payload['is_active'] ?? 1),
+        ];
+
+        try {
+            if ($id > 0) {
+                $existing = AccountRepository::getById($pdo, $id);
+                if (!$existing) {
+                    self::json(['ok' => false, 'success' => false, 'message' => 'Account not found.', 'errors' => []], 404);
+                    return;
+                }
+                $account = AccountRepository::update($pdo, $id, $accountData);
+                $message = 'Account updated successfully.';
+            } else {
+                $codeMode = strtolower(trim((string) ($payload['code_mode'] ?? 'auto')));
+                if (!in_array($codeMode, ['auto', 'manual'], true)) {
+                    $codeMode = 'auto';
+                }
+                $submittedCode = trim((string) ($payload['account_code'] ?? ''));
+                if ($codeMode === 'auto' || $submittedCode === '') {
+                    $accountData['account_code'] = AccountRepository::generateNextCode($pdo, $groupId);
+                } else {
+                    $accountData['account_code'] = $submittedCode;
+                }
+                $accountData['created_by'] = $userId;
+                $account = AccountRepository::create($pdo, $accountData);
+                $message = 'Account created successfully.';
+            }
+
+            self::json(['ok' => true, 'success' => true, 'message' => $message, 'data' => $account, 'errors' => []]);
+        } catch (PDOException $e) {
+            error_log('[AccountingController] save_account SQL: ' . $e->getMessage());
+            self::json([
+                'ok' => false,
+                'success' => false,
+                'message' => 'Database error.',
+                'error' => 'Database error.',
+                'errors' => [],
+            ], 500);
+        }
     }
 
     private static function deleteAccount(PDO $pdo, bool $isPost): void
     {
         if (!$isPost) {
-            self::json(['ok' => false, 'error' => 'POST required'], 405);
+            self::json(['ok' => false, 'success' => false, 'message' => 'POST required', 'errors' => []], 405);
             return;
         }
 
         $id = (int) ($_POST['id'] ?? 0);
         if ($id <= 0) {
-            self::json(['ok' => false, 'error' => 'Invalid account id'], 400);
+            self::json(['ok' => false, 'success' => false, 'message' => 'Invalid account id.', 'errors' => []], 400);
             return;
         }
 
-        AccountRepository::delete($pdo, $id, Auth::user()['id'] ?? null);
-        self::json(['ok' => true]);
+        try {
+            AccountRepository::delete($pdo, $id, Auth::user()['id'] ?? null);
+        } catch (RuntimeException $e) {
+            self::json(['ok' => false, 'success' => false, 'message' => $e->getMessage(), 'errors' => []], 400);
+            return;
+        }
+
+        self::json(['ok' => true, 'success' => true, 'message' => 'Account deleted successfully.', 'errors' => []]);
     }
 
     private static function cashBook(PDO $pdo): void

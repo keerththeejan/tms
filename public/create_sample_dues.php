@@ -19,9 +19,9 @@ try {
     $pdo->prepare("INSERT INTO delivery_notes (customer_id, branch_id, delivery_date, total_amount) VALUES (1, 1, '2025-09-15', 12000.00)")->execute();
     
     echo "Sample delivery notes with dues created successfully!\n";
-    echo "- DN #1: Rs. 15,000.00 (2025-09-13)\n";
-    echo "- DN #2: Rs. 8,500.50 (2025-09-14)\n";
-    echo "- DN #3: Rs. 12,000.00 (2025-09-15)\n";
+    echo "- DN #1: " . Helpers::formatMoney(15000) . " (2025-09-13)\n";
+    echo "- DN #2: " . Helpers::formatMoney(8500.50) . " (2025-09-14)\n";
+    echo "- DN #3: " . Helpers::formatMoney(12000) . " (2025-09-15)\n";
     
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";

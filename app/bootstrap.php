@@ -41,6 +41,10 @@ require_once __DIR__ . '/ParcelBillingService.php';
 require_once __DIR__ . '/BranchRepository.php';
 require_once __DIR__ . '/BranchFixedMaster.php';
 require_once __DIR__ . '/EmployeeListService.php';
+require_once __DIR__ . '/EmployeeSchemaRepository.php';
+require_once __DIR__ . '/EmployeePayrollService.php';
+require_once __DIR__ . '/EmployeeRepository.php';
+require_once __DIR__ . '/EmployeeApi.php';
 require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/Sms.php';
 require_once __DIR__ . '/DataReset.php';
@@ -58,6 +62,11 @@ require_once __DIR__ . '/LedgerEntryRepository.php';
 require_once __DIR__ . '/AccountingController.php';
 require_once __DIR__ . '/AccountingModule.php';
 require_once __DIR__ . '/TransportAccountingService.php';
+require_once __DIR__ . '/ExpenseSchemaRepository.php';
+require_once __DIR__ . '/ExpenseCategoryRepository.php';
+require_once __DIR__ . '/ExpenseRepository.php';
+require_once __DIR__ . '/ExpenseAccountingService.php';
+require_once __DIR__ . '/ExpenseApi.php';
 require_once __DIR__ . '/CustomerLedgerRepository.php';
 require_once __DIR__ . '/AuditLogRepository.php';
 
@@ -84,6 +93,16 @@ try {
     CustomerLedgerRepository::syncMissingIfNeeded(Database::pdo());
 } catch (Throwable $e) {
     /* accounting module optional until DB ready */
+}
+try {
+    ExpenseSchemaRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* expenses module optional until DB ready */
+}
+try {
+    EmployeeSchemaRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* HRMS module optional until DB ready */
 }
 
 // Initialize Mailer (available as $GLOBALS['mailer'])

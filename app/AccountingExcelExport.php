@@ -8,6 +8,11 @@ declare(strict_types=1);
  */
 class AccountingExcelExport
 {
+    private static function fmtMoney(float|int|string $amount): string
+    {
+        return Helpers::formatMoney($amount);
+    }
+
     /**
      * Export Day Book to Excel
      */
@@ -91,8 +96,8 @@ class AccountingExcelExport
                 self::escapeCsv($entry['voucher_type'] ?? ''),
                 self::escapeCsv($entry['account_name'] ?? ''),
                 self::escapeCsv($entry['narration'] ?? ''),
-                number_format((float) ($entry['debit_amount'] ?? 0), 2),
-                number_format((float) ($entry['credit_amount'] ?? 0), 2)
+                self::fmtMoney($entry['debit_amount'] ?? 0),
+                self::fmtMoney($entry['credit_amount'] ?? 0)
             );
         }
         
@@ -105,7 +110,7 @@ class AccountingExcelExport
         }
         
         $lines[] = '';
-        $lines[] = 'Total,' . number_format($totalDebit, 2) . ',' . number_format($totalCredit, 2);
+        $lines[] = 'Total,' . self::fmtMoney($totalDebit) . ',' . self::fmtMoney($totalCredit);
         
         return implode("\n", $lines);
     }
@@ -120,7 +125,7 @@ class AccountingExcelExport
         // Header
         $lines[] = 'Ledger - ' . ($account['account_name'] ?? 'Account');
         $lines[] = 'Account Code: ' . ($account['account_code'] ?? '');
-        $lines[] = 'Opening Balance: ' . number_format((float) ($ledger['opening_balance'] ?? 0), 2) . ' ' . ($ledger['opening_balance_type'] ?? '');
+        $lines[] = 'Opening Balance: ' . self::fmtMoney($ledger['opening_balance'] ?? 0) . ' ' . ($ledger['opening_balance_type'] ?? '');
         if ($fromDate && $toDate) {
             $lines[] = 'Period: ' . $fromDate . ' to ' . $toDate;
         }
@@ -137,16 +142,16 @@ class AccountingExcelExport
                 self::escapeCsv($entry['voucher_number'] ?? ''),
                 self::escapeCsv($entry['voucher_type'] ?? ''),
                 self::escapeCsv($entry['narration'] ?? $entry['voucher_narration'] ?? ''),
-                number_format((float) ($entry['debit_amount'] ?? 0), 2),
-                number_format((float) ($entry['credit_amount'] ?? 0), 2),
-                number_format((float) ($entry['running_balance'] ?? 0), 2),
+                self::fmtMoney($entry['debit_amount'] ?? 0),
+                self::fmtMoney($entry['credit_amount'] ?? 0),
+                self::fmtMoney($entry['running_balance'] ?? 0),
                 self::escapeCsv($entry['balance_type'] ?? '')
             );
         }
         
         // Closing balance
         $lines[] = '';
-        $lines[] = 'Closing Balance:,' . number_format((float) ($ledger['closing_balance'] ?? 0), 2) . ' ' . ($ledger['closing_balance_type'] ?? '');
+        $lines[] = 'Closing Balance:,' . self::fmtMoney($ledger['closing_balance'] ?? 0) . ' ' . ($ledger['closing_balance_type'] ?? '');
         
         return implode("\n", $lines);
     }
@@ -174,15 +179,15 @@ class AccountingExcelExport
                 self::escapeCsv($acc['account_name'] ?? ''),
                 self::escapeCsv($acc['group_name'] ?? ''),
                 self::escapeCsv($acc['group_type'] ?? ''),
-                number_format((float) ($acc['debit_amount'] ?? 0), 2),
-                number_format((float) ($acc['credit_amount'] ?? 0), 2)
+                self::fmtMoney($acc['debit_amount'] ?? 0),
+                self::fmtMoney($acc['credit_amount'] ?? 0)
             );
         }
         
         // Totals
         $lines[] = '';
-        $lines[] = 'Total,,' . number_format((float) ($trialBalance['debit_total'] ?? 0), 2) . ',' . number_format((float) ($trialBalance['credit_total'] ?? 0), 2);
-        $lines[] = 'Difference,,' . number_format((float) (($trialBalance['debit_total'] ?? 0) - ($trialBalance['credit_total'] ?? 0)), 2);
+        $lines[] = 'Total,,' . self::fmtMoney($trialBalance['debit_total'] ?? 0) . ',' . self::fmtMoney($trialBalance['credit_total'] ?? 0);
+        $lines[] = 'Difference,,' . self::fmtMoney(($trialBalance['debit_total'] ?? 0) - ($trialBalance['credit_total'] ?? 0));
         
         return implode("\n", $lines);
     }
@@ -209,11 +214,11 @@ class AccountingExcelExport
                 self::escapeCsv($acc['account_code'] ?? ''),
                 self::escapeCsv($acc['account_name'] ?? ''),
                 self::escapeCsv($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
         
-        $lines[] = 'Total Income,,,' . number_format((float) ($profitLoss['total_income'] ?? 0), 2);
+        $lines[] = 'Total Income,,,' . self::fmtMoney($profitLoss['total_income'] ?? 0);
         $lines[] = '';
         
         // Expenses section
@@ -226,16 +231,16 @@ class AccountingExcelExport
                 self::escapeCsv($acc['account_code'] ?? ''),
                 self::escapeCsv($acc['account_name'] ?? ''),
                 self::escapeCsv($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
         
-        $lines[] = 'Total Expenses,,,' . number_format((float) ($profitLoss['total_expenses'] ?? 0), 2);
+        $lines[] = 'Total Expenses,,,' . self::fmtMoney($profitLoss['total_expenses'] ?? 0);
         $lines[] = '';
         
         // Net profit/loss
         $netProfit = (float) ($profitLoss['net_profit'] ?? 0);
-        $lines[] = 'Net ' . ($netProfit >= 0 ? 'Profit' : 'Loss') . ',,,' . number_format(abs($netProfit), 2);
+        $lines[] = 'Net ' . ($netProfit >= 0 ? 'Profit' : 'Loss') . ',,,' . self::fmtMoney(abs($netProfit));
         
         return implode("\n", $lines);
     }
@@ -262,11 +267,11 @@ class AccountingExcelExport
                 self::escapeCsv($acc['account_code'] ?? ''),
                 self::escapeCsv($acc['account_name'] ?? ''),
                 self::escapeCsv($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
         
-        $lines[] = 'Total Assets,,,' . number_format((float) ($balanceSheet['total_assets'] ?? 0), 2);
+        $lines[] = 'Total Assets,,,' . self::fmtMoney($balanceSheet['total_assets'] ?? 0);
         $lines[] = '';
         
         // Liabilities section
@@ -279,11 +284,11 @@ class AccountingExcelExport
                 self::escapeCsv($acc['account_code'] ?? ''),
                 self::escapeCsv($acc['account_name'] ?? ''),
                 self::escapeCsv($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
         
-        $lines[] = 'Total Liabilities,,,' . number_format((float) ($balanceSheet['total_liabilities'] ?? 0), 2);
+        $lines[] = 'Total Liabilities,,,' . self::fmtMoney($balanceSheet['total_liabilities'] ?? 0);
         $lines[] = '';
         
         // Capital section
@@ -296,11 +301,11 @@ class AccountingExcelExport
                 self::escapeCsv($acc['account_code'] ?? ''),
                 self::escapeCsv($acc['account_name'] ?? ''),
                 self::escapeCsv($acc['group_name'] ?? ''),
-                number_format((float) ($acc['amount'] ?? 0), 2)
+                self::fmtMoney($acc['amount'] ?? 0)
             );
         }
         
-        $lines[] = 'Total Capital,,,' . number_format((float) ($balanceSheet['total_capital'] ?? 0), 2);
+        $lines[] = 'Total Capital,,,' . self::fmtMoney($balanceSheet['total_capital'] ?? 0);
         $lines[] = '';
         
         // Balance check
@@ -309,7 +314,7 @@ class AccountingExcelExport
         $isBalanced = abs($totalAssets - $totalLiabilitiesCapital) < 0.01;
         
         $lines[] = 'Balance Check:,' . ($isBalanced ? 'BALANCED' : 'NOT BALANCED');
-        $lines[] = 'Difference:,' . number_format($totalAssets - $totalLiabilitiesCapital, 2);
+        $lines[] = 'Difference:,' . self::fmtMoney($totalAssets - $totalLiabilitiesCapital);
         
         return implode("\n", $lines);
     }

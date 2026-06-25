@@ -76,7 +76,7 @@ $jsVer = is_file($jsPath) ? (string) filemtime($jsPath) : '1';
                     <tr>
                         <th class="col-sno">S.No</th>
                         <th class="col-account">Account</th>
-                        <th class="col-amount">Amount (Rs.)</th>
+                        <th class="col-amount">Amount (<?php echo htmlspecialchars(Helpers::currencySymbol()); ?>)</th>
                         <th class="col-narr">Short Narration</th>
                     </tr>
                 </thead>
@@ -92,7 +92,7 @@ $jsVer = is_file($jsPath) ? (string) filemtime($jsPath) : '1';
         </div>
 
         <div class="busy-status-bar">
-            <span class="busy-cur-bal" id="busyCurBal">( Cur. Bal. : Rs. 0.00 )</span>
+            <span class="busy-cur-bal" id="busyCurBal">( Cur. Bal. : <?php echo Helpers::formatMoney(0); ?> )</span>
         </div>
 
         <div class="busy-bottom-panel">

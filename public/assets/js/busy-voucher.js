@@ -234,7 +234,7 @@
         }
         const accountId = activeRow.querySelector('.account-id').value;
         if (!accountId) {
-            el.textContent = '( Cur. Bal. : Rs. 0.00 )';
+            el.textContent = '( Cur. Bal. : ' + formatMoneyLabel(0) + ' )';
             return;
         }
         const asOf = document.getElementById('busyVoucherDate')?.value || '';
@@ -256,7 +256,14 @@
     function formatBalanceLabel(balance) {
         const val = Math.abs(parseFloat(balance) || 0);
         const side = (parseFloat(balance) || 0) >= 0 ? 'Dr' : 'Cr';
-        return '( Cur. Bal. : Rs. ' + formatAmount(val) + ' ' + side + ' )';
+        return '( Cur. Bal. : ' + formatMoneyLabel(val) + ' ' + side + ' )';
+    }
+
+    function formatMoneyLabel(n) {
+        if (window.TMS && typeof window.TMS.formatMoney === 'function') {
+            return window.TMS.formatMoney(n);
+        }
+        return 'LKR ' + formatAmount(n);
     }
 
     function parseAmount(raw) {
@@ -269,7 +276,10 @@
     }
 
     function formatAmount(n) {
-        return (parseFloat(n) || 0).toLocaleString('en-IN', {
+        if (window.TMS && typeof window.TMS.formatMoney === 'function') {
+            return window.TMS.formatMoney(n, false);
+        }
+        return (parseFloat(n) || 0).toLocaleString('en-LK', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         });

@@ -1,0 +1,162 @@
+.exp-page {
+  --exp-accent: #0d6efd;
+  --exp-card-radius: 0.75rem;
+  padding-bottom: 2rem;
+}
+
+.exp-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.exp-subtitle {
+  font-size: 0.9rem;
+}
+
+.exp-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--exp-card-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.exp-filters-card {
+  padding: 1rem 1.25rem;
+}
+
+.exp-card-head {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.exp-card-body {
+  padding: 1rem;
+}
+
+.exp-stat-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--exp-card-radius);
+  padding: 0.85rem 1rem;
+  height: 100%;
+  min-height: 4.5rem;
+}
+
+.exp-stat-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  background: rgba(13, 110, 253, 0.1);
+  color: var(--exp-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
+.exp-stat-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.exp-stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.exp-table-wrap {
+  max-height: min(70vh, 640px);
+}
+
+.exp-table thead th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.exp-table td {
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.exp-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6c757d;
+}
+
+.exp-empty i {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+
+.exp-mobile-card {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 1rem;
+}
+
+.exp-mobile-card:last-child {
+  border-bottom: none;
+}
+
+.exp-mobile-card .exp-mc-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.exp-mobile-card .exp-mc-meta {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.exp-badge-status {
+  font-size: 0.7rem;
+  text-transform: capitalize;
+}
+
+.exp-actions .btn {
+  padding: 0.2rem 0.45rem;
+}
+
+@media (max-width: 575.98px) {
+  .exp-page-head .btn {
+    width: 100%;
+  }
+
+  .exp-filters-card .btn {
+    flex: 1 1 calc(50% - 0.5rem);
+  }
+
+  .exp-stat-value {
+    font-size: 0.95rem;
+  }
+}
+
+@media print {
+  .exp-filters-card,
+  .exp-page-head .btn,
+  #expStatsCards + .row,
+  .exp-actions,
+  #expPaginationWrap,
+  .modal {
+    display: none !important;
+  }
+
+  .exp-table-wrap {
+    max-height: none;
+    overflow: visible;
+  }
+}

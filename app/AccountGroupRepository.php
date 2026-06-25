@@ -24,17 +24,107 @@ class AccountGroupRepository
     /** @return list<array<string,mixed>> */
     public static function listGroups(PDO $pdo, bool $includeInactive = false): array
     {
+        self::ensureSchema($pdo);
+
         $sql = 'SELECT ag.*, parent.group_name AS parent_name, parent.group_code AS parent_code
                 FROM account_groups ag
                 LEFT JOIN account_groups parent ON parent.id = ag.parent_id';
-        
+
         if (!$includeInactive) {
             $sql .= ' WHERE ag.deleted_at IS NULL';
         }
-        
+
         $sql .= ' ORDER BY ag.sort_order ASC, ag.group_name ASC';
-        
-        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        try {
+            return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            if (stripos($e->getMessage(), 'deleted_at') === false) {
+                throw $e;
+            }
+            AccountingSchemaRepository::ensureSchema($pdo);
+            $sql = 'SELECT ag.*, parent.group_name AS parent_name, parent.group_code AS parent_code
+                    FROM account_groups ag
+                    LEFT JOIN account_groups parent ON parent.id = ag.parent_id
+                    ORDER BY ag.sort_order ASC, ag.group_name ASC';
+
+            return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+    }
+
+    /** Load groups for account form dropdown (sync + list). @return list<array<string,mixed>> */
+    public static function listForAccountForm(PDO $pdo): array
+    {
+        self::ensureSchema($pdo);
+        try {
+            AccountingSchemaRepository::syncStandardAccountGroups($pdo);
+        } catch (Throwable $e) {
+            /* continue with existing groups */
+        }
+
+        return self::listGroups($pdo);
+    }
+
+    /** @param list<array<string,mixed>> $groups */
+    public static function renderSelectOptionsHtml(array $groups): string
+    {
+        $sorted = self::sortGroupsForSelect($groups);
+        $html = '<option value="">— Select account group —</option>';
+        foreach ($sorted as $g) {
+            $depth = (int) ($g['_depth'] ?? 0);
+            $indent = $depth > 0 ? str_repeat("\xC2\xA0\xC2\xA0", $depth) . '└ ' : '';
+            $html .= sprintf(
+                '<option value="%d">%s%s (%s)</option>',
+                (int) $g['id'],
+                $indent,
+                htmlspecialchars((string) ($g['group_name'] ?? ''), ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars((string) ($g['group_code'] ?? ''), ENT_QUOTES, 'UTF-8')
+            );
+        }
+
+        return $html;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $groups
+     * @return list<array<string,mixed>>
+     */
+    public static function sortGroupsForSelect(array $groups): array
+    {
+        $byId = [];
+        foreach ($groups as $g) {
+            $byId[(string) ($g['id'] ?? '')] = $g;
+        }
+        $depth = static function (array $g) use ($byId): int {
+            $d = 0;
+            $cur = $g;
+            $guard = 0;
+            while (!empty($cur['parent_id']) && isset($byId[(string) $cur['parent_id']]) && $guard < 10) {
+                $d++;
+                $cur = $byId[(string) $cur['parent_id']];
+                $guard++;
+            }
+
+            return $d;
+        };
+
+        $rows = [];
+        foreach ($groups as $g) {
+            $row = $g;
+            $row['_depth'] = $depth($g);
+            $rows[] = $row;
+        }
+
+        usort($rows, static function (array $a, array $b): int {
+            $sort = ((int) ($a['sort_order'] ?? 0)) <=> ((int) ($b['sort_order'] ?? 0));
+            if ($sort !== 0) {
+                return $sort;
+            }
+
+            return strcmp((string) ($a['group_name'] ?? ''), (string) ($b['group_name'] ?? ''));
+        });
+
+        return $rows;
     }
 
     /** @return list<array<string,mixed>> */
@@ -106,9 +196,11 @@ class AccountGroupRepository
     /** @return array<string,mixed> */
     public static function create(PDO $pdo, array $data): array
     {
+        self::ensureSchema($pdo);
+
         $st = $pdo->prepare(
-            'INSERT INTO account_groups (group_code, group_name, parent_id, group_type, nature, is_primary, is_system, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO account_groups (group_code, group_name, parent_id, group_type, nature, description, is_active, is_primary, is_system, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $st->execute([
             $data['group_code'],
@@ -116,6 +208,8 @@ class AccountGroupRepository
             $data['parent_id'] ?? null,
             $data['group_type'],
             $data['nature'],
+            $data['description'] ?? null,
+            (int) ($data['is_active'] ?? 1),
             (int) ($data['is_primary'] ?? 0),
             (int) ($data['is_system'] ?? 0),
             (int) ($data['sort_order'] ?? 0),

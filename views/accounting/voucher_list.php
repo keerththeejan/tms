@@ -247,8 +247,8 @@ $baseUrl = Helpers::baseUrl('');
                     <td><?php echo htmlspecialchars($row['voucher_number'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($row['voucher_date'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($row['accounts_summary'] ?? ''); ?></td>
-                    <td class="text-right"><?php echo number_format((float) ($row['total_debit'] ?? 0), 2); ?></td>
-                    <td class="text-right"><?php echo number_format((float) ($row['total_credit'] ?? 0), 2); ?></td>
+                    <td class="text-right"><?php echo Helpers::formatMoney((float) ($row['total_debit'] ?? 0)); ?></td>
+                    <td class="text-right"><?php echo Helpers::formatMoney((float) ($row['total_credit'] ?? 0)); ?></td>
                     <td class="text-center">
                         <span class="acc-status-<?php echo strtolower($row['status'] ?? 'draft'); ?>">
                             <?php echo htmlspecialchars($row['status'] ?? 'DRAFT'); ?>

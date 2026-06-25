@@ -486,7 +486,7 @@
           <div class="d-flex align-items-start justify-content-between gap-2">
             <div>
               <div class="kpi-label"><?php echo htmlspecialchars($kpiCollTitle); ?></div>
-              <div class="kpi-value">Rs. <?php echo number_format($kpiCollections, 2); ?></div>
+              <div class="kpi-value"><?php echo Helpers::formatMoney($kpiCollections); ?></div>
             </div>
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(13,110,253,.10); color:#0d6efd;"><i class="bi bi-cash-stack"></i></div>
           </div>
@@ -498,7 +498,7 @@
           <div class="d-flex align-items-start justify-content-between gap-2">
             <div>
               <div class="kpi-label"><?php echo htmlspecialchars($kpiExpTitle); ?></div>
-              <div class="kpi-value">Rs. <?php echo number_format($kpiExpenses, 2); ?></div>
+              <div class="kpi-value"><?php echo Helpers::formatMoney($kpiExpenses); ?></div>
             </div>
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.16); color:#8a6d00;"><i class="bi bi-wallet2"></i></div>
           </div>
@@ -510,7 +510,7 @@
           <div class="d-flex align-items-start justify-content-between gap-2">
             <div>
               <div class="kpi-label">Outstanding Due</div>
-              <div class="kpi-value">Rs. <?php echo number_format((float)($totalDue ?? 0), 2); ?></div>
+              <div class="kpi-value"><?php echo Helpers::formatMoney((float)($totalDue ?? 0)); ?></div>
             </div>
             <div class="kpi-icon" aria-hidden="true" style="background: rgba(255,193,7,.12); color:#b45309;"><i class="bi bi-exclamation-circle"></i></div>
           </div>
@@ -547,16 +547,16 @@
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&status=pending&to_branch_id=' . $bid); ?>"><?php echo (int)($pendingByBranch[$bid] ?? 0); ?></a>
                   </td>
                   <td class="text-end" data-label="Due">
-                    <span>Rs. <?php echo number_format((float)($dueByBranch[$bid] ?? 0), 2); ?></span>
+                    <span><?php echo Helpers::formatMoney((float)($dueByBranch[$bid] ?? 0)); ?></span>
                   </td>
                   <td class="text-end" data-label="Parcels today">
                     <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=parcels&to_branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>"><?php echo (int)($todayParcelsByBranch[$bid] ?? 0); ?></a>
                   </td>
                   <td class="text-end" data-label="Collections">
-                    <span>Rs. <?php echo number_format((float)($collectionsTodayByBranch[$bid] ?? 0), 2); ?></span>
+                    <span><?php echo Helpers::formatMoney((float)($collectionsTodayByBranch[$bid] ?? 0)); ?></span>
                   </td>
                   <td class="text-end" data-label="Expenses">
-                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>">Rs. <?php echo number_format((float)($expensesTodayByBranch[$bid] ?? 0), 2); ?></a>
+                    <a class="text-decoration-none" href="<?php echo Helpers::baseUrl('index.php?page=expenses&branch_id=' . $bid . '&from=' . urlencode($today) . '&to=' . urlencode($today)); ?>"><?php echo Helpers::formatMoney((float)($expensesTodayByBranch[$bid] ?? 0)); ?></a>
                   </td>
                 </tr>
                 <?php endforeach; ?>

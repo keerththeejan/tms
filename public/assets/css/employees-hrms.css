@@ -1,0 +1,24 @@
+.hrms-page { padding-bottom: 2rem; }
+.hrms-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.hrms-filters-card, .hrms-table-card { border-radius: 0.75rem; border: 1px solid rgba(0,0,0,.08); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.hrms-stat-card { display: flex; gap: .75rem; align-items: center; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: .75rem; padding: .75rem; height: 100%; min-height: 4rem; }
+.hrms-stat-icon { font-size: 1.25rem; color: #0d6efd; opacity: .85; }
+.hrms-stat-label { font-size: .7rem; text-transform: uppercase; color: #6c757d; letter-spacing: .03em; }
+.hrms-stat-value { font-size: 1.1rem; font-weight: 700; }
+.hrms-table-wrap { max-height: min(70vh, 640px); }
+.hrms-table thead th { font-size: .72rem; text-transform: uppercase; white-space: nowrap; }
+.hrms-table td { font-size: .85rem; vertical-align: middle; }
+.hrms-photo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #e9ecef; }
+.hrms-photo-lg { width: 80px; height: 80px; border-radius: .5rem; object-fit: cover; }
+.hrms-photo-preview { max-width: 80px; max-height: 80px; border-radius: .5rem; }
+.hrms-empty { text-align: center; padding: 3rem 1rem; color: #6c757d; }
+.hrms-empty i { font-size: 2.5rem; display: block; margin-bottom: .5rem; opacity: .5; }
+.hrms-mobile-card { border-bottom: 1px solid rgba(0,0,0,.06); padding: 1rem; }
+@media (max-width: 575.98px) {
+  .hrms-head .btn { width: 100%; }
+  .hrms-filters-card .btn { flex: 1 1 calc(50% - .5rem); }
+}
+@media print {
+  .hrms-filters-card, .hrms-head .btn, #hrmsStats, .hrms-actions, #hrmsPagination, .modal { display: none !important; }
+  .hrms-table-wrap { max-height: none; overflow: visible; }
+}

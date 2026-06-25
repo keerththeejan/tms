@@ -1,201 +1,218 @@
-<?php /** @var array $expenses */ /** @var array $byBranch */ /** @var float $overall */ /** @var bool $isAdmin */ ?>
-<div class="container-fluid px-0">
-  <div class="row g-2">
-    <div class="col-12">
-      <div class="card shadow-sm rounded-3 border-0">
-        <div class="card-body p-3">
-          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3">
-            <h3 class="h5 mb-0 fw-bold">Expenses</h3>
-            <a href="<?php echo Helpers::baseUrl('index.php?page=expenses&action=new'); ?>" class="btn btn-primary d-inline-flex align-items-center gap-1"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>New expense</span></a>
-          </div>
-<form class="row g-2" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
-  <input type="hidden" name="page" value="expenses">
-  <div class="col-md-3">
-    <input type="date" class="form-control" name="from" value="<?php echo htmlspecialchars($from ?? ''); ?>">
-  </div>
-  <div class="col-md-3">
-    <input type="date" class="form-control" name="to" value="<?php echo htmlspecialchars($to ?? ''); ?>">
-  </div>
-  <div class="col-md-3">
-    <select class="form-select" name="branch_id">
-      <option value="0">All Branches</option>
-      <?php foreach (($branchesAll ?? []) as $b): ?>
-        <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($branchFilter ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
-      <?php endforeach; ?>
-    </select>
-  </div>
-  <div class="col-md-3">
-    <input type="text" class="form-control" name="notes" placeholder="Notes" value="<?php echo htmlspecialchars($notesFilter ?? ''); ?>">
-  </div>
-  <div class="col-md-3">
-    <select class="form-select" name="approved">
-      <?php $ap = $approved ?? ''; ?>
-      <option value="" <?php echo ($ap==='')?'selected':''; ?>>Approved (any)</option>
-      <option value="yes" <?php echo ($ap==='yes')?'selected':''; ?>>Yes</option>
-      <option value="no" <?php echo ($ap==='no')?'selected':''; ?>>No</option>
-    </select>
-  </div>
-  <div class="col-md-3">
-    <select class="form-select" name="type">
-      <?php $tf = $typeFilter ?? ''; ?>
-      <option value="" <?php echo ($tf==='')?'selected':''; ?>>Type (any)</option>
-      <?php foreach (($typesDynamic ?? []) as $t): $val = trim((string)$t['expense_type'] ?? ''); if ($val==='') continue; ?>
-        <option value="<?php echo htmlspecialchars($val); ?>" <?php echo ($tf===$val)?'selected':''; ?>><?php echo htmlspecialchars(ucwords(str_replace('_',' ', $val))); ?></option>
-      <?php endforeach; ?>
-    </select>
-  </div>
-  <div class="col-md-3">
-    <select class="form-select" name="mode">
-      <?php $mf = $modeFilter ?? ''; ?>
-      <option value="" <?php echo ($mf==='')?'selected':''; ?>>Payment (any)</option>
-      <option value="cash" <?php echo ($mf==='cash')?'selected':''; ?>>Cash</option>
-      <option value="credit" <?php echo ($mf==='credit')?'selected':''; ?>>Credit</option>
-    </select>
-  </div>
-  <div class="col-md-3">
-    <select class="form-select" name="credit_status">
-      <?php $cs = $creditStatus ?? ''; ?>
-      <option value="" <?php echo ($cs==='')?'selected':''; ?>>Credit Status (any)</option>
-      <option value="open" <?php echo ($cs==='open')?'selected':''; ?>>Open</option>
-      <option value="settled" <?php echo ($cs==='settled')?'selected':''; ?>>Settled</option>
-      <option value="overdue" <?php echo ($cs==='overdue')?'selected':''; ?>>Overdue</option>
-    </select>
-  </div>
-  <div class="col-12 col-sm-auto d-flex flex-wrap gap-2">
-    <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center gap-1"><i class="bi bi-search" aria-hidden="true"></i><span>Filter</span></button>
-    <a class="btn btn-outline-dark" href="<?php echo Helpers::baseUrl('index.php?page=expenses'); ?>">Clear</a>
-  </div>
-</form>
+<?php
+/** @var array $branchesAll */
+/** @var bool $isAdmin */
+/** @var int $branchId */
+/** @var int $editId */
+$expCssPath = dirname(__DIR__, 2) . '/public/assets/css/expenses-module.css';
+$expJsPath = dirname(__DIR__, 2) . '/public/assets/js/expenses-module.js';
+$expCssVer = is_file($expCssPath) ? (string) filemtime($expCssPath) : '1';
+$expJsVer = is_file($expJsPath) ? (string) filemtime($expJsPath) : '1';
+$base = Helpers::baseUrl('');
+$csrf = Helpers::csrfToken();
+$apiBase = $base . 'index.php?page=expenses';
+?>
+<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/expenses-module.css?v=' . rawurlencode($expCssVer)); ?>">
+
+<div class="exp-page container-fluid px-0 px-sm-1"
+     id="expensesApp"
+     data-api-base="<?php echo htmlspecialchars($apiBase); ?>"
+     data-csrf="<?php echo htmlspecialchars($csrf); ?>"
+     data-is-admin="<?php echo $isAdmin ? '1' : '0'; ?>"
+     data-default-branch="<?php echo (int) $branchId; ?>"
+     data-edit-id="<?php echo (int) ($editId ?? 0); ?>">
+
+  <header class="exp-page-head d-flex flex-column flex-lg-row align-items-stretch align-items-lg-start justify-content-between gap-3 mb-3">
+    <div class="min-w-0">
+      <h1 class="exp-title"><i class="bi bi-wallet2" aria-hidden="true"></i> Expenses</h1>
+      <p class="exp-subtitle text-muted mb-0">Record, approve, and analyse operating expenses with full accounting integration.</p>
+    </div>
+    <div class="d-flex flex-column flex-sm-row flex-wrap gap-2 align-items-stretch align-items-sm-center">
+      <button type="button" class="btn btn-outline-secondary" id="expBtnCategories" data-bs-toggle="modal" data-bs-target="#expCategoryModal">
+        <i class="bi bi-tags me-1"></i> Categories
+      </button>
+      <button type="button" class="btn btn-primary" id="expBtnNew" data-bs-toggle="modal" data-bs-target="#expenseModal">
+        <i class="bi bi-plus-lg me-1"></i> New Expense
+      </button>
+    </div>
+  </header>
+
+  <div id="expAlert" class="alert d-none" role="alert"></div>
+
+  <?php if (($_GET['saved'] ?? '') === '1'): ?>
+  <div class="alert alert-success alert-dismissible fade show"><span>Expense saved.</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  <?php elseif (($_GET['approved'] ?? '') === '1'): ?>
+  <div class="alert alert-success alert-dismissible fade show"><span>Expense approved.</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  <?php elseif (($_GET['deleted'] ?? '') === '1'): ?>
+  <div class="alert alert-success alert-dismissible fade show"><span>Expense deleted.</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  <?php elseif (($_GET['settled'] ?? '') === '1'): ?>
+  <div class="alert alert-success alert-dismissible fade show"><span>Payment recorded.</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  <?php endif; ?>
+
+  <section class="exp-card exp-filters-card mb-3" aria-label="Filter expenses">
+    <form id="expFilterForm" class="row g-3 align-items-end">
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expFrom">From Date</label>
+        <input type="date" class="form-control" id="expFrom" name="from" value="<?php echo date('Y-m-01'); ?>">
+      </div>
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expTo">To Date</label>
+        <input type="date" class="form-control" id="expTo" name="to" value="<?php echo date('Y-m-d'); ?>">
+      </div>
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expBranch">Branch</label>
+        <select class="form-select" id="expBranch" name="branch_id">
+          <option value="">All Branches</option>
+          <?php foreach ($branchesAll as $b): ?>
+          <option value="<?php echo (int) $b['id']; ?>" <?php echo ((int) $branchId === (int) $b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expCategory">Category</label>
+        <select class="form-select" id="expCategory" name="category_id"><option value="">All Categories</option></select>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expPayment">Payment Method</label>
+        <select class="form-select" id="expPayment" name="payment_method">
+          <option value="">All Methods</option>
+          <option value="cash">Cash</option>
+          <option value="bank">Bank</option>
+          <option value="cheque">Cheque</option>
+          <option value="credit">Credit</option>
+          <option value="transfer">Transfer</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expSupplier">Supplier</label>
+        <select class="form-select" id="expSupplier" name="supplier_id"><option value="">All Suppliers</option></select>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expApproval">Approval Status</label>
+        <select class="form-select" id="expApproval" name="approval">
+          <option value="">Any</option>
+          <option value="yes">Approved</option>
+          <option value="no">Pending</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+        <label class="form-label" for="expCredit">Credit Status</label>
+        <select class="form-select" id="expCredit" name="credit_status">
+          <option value="">Any</option>
+          <option value="open">Open</option>
+          <option value="settled">Settled</option>
+          <option value="overdue">Overdue</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <label class="form-label" for="expSearch">Search Notes / Ref</label>
+        <input type="search" class="form-control" id="expSearch" name="q" placeholder="Reference, notes, party…">
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i> Filter</button>
+        <button type="button" class="btn btn-outline-secondary" id="expBtnClear">Clear</button>
+        <button type="button" class="btn btn-outline-success" id="expBtnExportCsv"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Excel</button>
+        <button type="button" class="btn btn-outline-danger" id="expBtnPrint"><i class="bi bi-printer me-1"></i> Print</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="row g-3 mb-3" id="expStatsCards" aria-label="Expense statistics">
+    <?php
+    $cards = [
+      ['total_expenses', 'Total Expenses', 'bi-cash-stack'],
+      ['cash_expenses', 'Cash Expenses', 'bi-cash'],
+      ['credit_expenses', 'Credit Expenses', 'bi-credit-card'],
+      ['pending_payments', 'Pending Payments', 'bi-hourglass-split'],
+      ['approved_expenses', 'Approved', 'bi-check-circle'],
+      ['this_month', 'This Month', 'bi-calendar-month'],
+      ['today', 'Today', 'bi-calendar-day'],
+      ['outstanding_balance', 'Outstanding', 'bi-exclamation-circle'],
+    ];
+    foreach ($cards as [$key, $label, $icon]):
+    ?>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="exp-stat-card">
+        <div class="exp-stat-icon"><i class="bi <?php echo $icon; ?>"></i></div>
+        <div class="exp-stat-body">
+          <div class="exp-stat-label"><?php echo htmlspecialchars($label); ?></div>
+          <div class="exp-stat-value" data-stat="<?php echo $key; ?>">—</div>
         </div>
       </div>
     </div>
-    <div class="col-12">
-<div class="card shadow-sm rounded-3 border-0 mb-0">
-  <div class="card-body p-3">
-    <h6 class="card-title h6 mb-2">Branch-wise totals</h6>
-    <?php if (!$byBranch): ?>
-      <div class="text-muted">No expenses for selected period.</div>
-    <?php else: ?>
-      <ul class="mb-0">
-        <?php foreach ($byBranch as $r): ?>
-          <li>Branch ID <?php echo (int)$r['branch_id']; ?>: <strong><?php echo number_format((float)$r['total'], 2); ?></strong></li>
-        <?php endforeach; ?>
-      </ul>
-      <div class="mt-2">Overall: <strong><?php echo number_format($overall, 2); ?></strong></div>
-    <?php endif; ?>
-  </div>
-</div>
+    <?php endforeach; ?>
+  </section>
+
+  <section class="row g-3 mb-3">
+    <div class="col-lg-5">
+      <div class="exp-card h-100">
+        <div class="exp-card-head">Top Categories</div>
+        <div class="exp-card-body"><canvas id="expChartPie" height="220" aria-label="Category pie chart"></canvas></div>
+      </div>
     </div>
-<?php if (isset($cashTotal) && isset($creditTotal) && isset($settlementsTotal)): ?>
-    <div class="col-12">
-<div class="card shadow-sm rounded-3 border-0 mb-0">
-  <div class="card-body p-3">
-    <h6 class="card-title h6 mb-2">Totals (selected range)</h6>
-    <ul class="mb-0">
-      <li>Cash Purchases: <strong><?php echo number_format((float)$cashTotal, 2); ?></strong></li>
-      <li>Credit Purchases: <strong><?php echo number_format((float)$creditTotal, 2); ?></strong></li>
-      <li>Settlements Paid: <strong><?php echo number_format((float)$settlementsTotal, 2); ?></strong></li>
-    </ul>
-  </div>
-</div>
+    <div class="col-lg-7">
+      <div class="exp-card h-100">
+        <div class="exp-card-head">Monthly Trend</div>
+        <div class="exp-card-body"><canvas id="expChartTrend" height="220" aria-label="Monthly trend chart"></canvas></div>
+      </div>
     </div>
-<?php endif; ?>
-    <div class="col-12">
-<div class="card shadow-sm rounded-3 border-0 overflow-hidden">
-  <div class="card-body p-0">
-<div class="table-responsive">
-  <table class="table table-sm table-striped align-middle mb-0">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Date</th>
-        <th>Type</th>
-        <th>Amount</th>
-        <th>Branch</th>
-        <th>Notes</th>
-        <th>Payment</th>
-        <th>Paid</th>
-        <th>Balance</th>
-        <th>Due</th>
-        <th>Party</th>
-        <th>Approved</th>
-        <th class="text-end">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($expenses as $e): ?>
-        <tr>
-          <td><?php echo (int)$e['id']; ?></td>
-          <td><?php echo htmlspecialchars($e['expense_date']); ?></td>
-          <td>
-            <?php 
-              $t = trim((string)($e['expense_type'] ?? ''));
-              if ($t === '') { echo 'Other'; }
-              else { echo htmlspecialchars(ucwords(str_replace('_',' ', $t))); }
-            ?>
-          </td>
-          <td><?php echo number_format((float)$e['amount'], 2); ?></td>
-          <td><?php echo htmlspecialchars($e['branch_name'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($e['notes'] ?? ''); ?></td>
-          <td>
-            <?php 
-              $isCreditHint = !empty($e['credit_party'] ?? '') || !empty($e['credit_due_date'] ?? '');
-              $pm = $e['mode_effective'] ?? (($e['payment_mode'] ?? '') === 'credit' || $isCreditHint ? 'credit' : 'cash');
-              echo $pm==='credit' ? '<span class="badge bg-warning text-dark">Credit</span>' : '<span class="badge bg-info text-dark">Cash</span>';
-            ?>
-          </td>
-          <td><?php echo number_format((float)($e['paid_total'] ?? 0), 2); ?></td>
-          <td>
-            <?php 
-              $bal = (float)($e['balance'] ?? 0);
-              $pmEff = $e['mode_effective'] ?? ($pm ?? 'cash');
-              $isOver = $pmEff==='credit' && (int)($e['credit_settled'] ?? 0)===0 && !empty($e['credit_due_date']) && (strtotime((string)$e['credit_due_date']) < strtotime(date('Y-m-d')));
-              $cls = $bal <= 0.0001 ? 'badge bg-success' : ($isOver ? 'badge bg-danger' : 'badge bg-secondary');
-              echo '<span class="'.$cls.'">'.number_format(max(0,$bal),2).'</span>';
-            ?>
-          </td>
-          <td><?php echo htmlspecialchars($e['credit_due_date'] ?? ''); ?></td>
-          <td><?php echo htmlspecialchars($e['credit_party'] ?? ''); ?></td>
-          <td><?php echo $e['approved_by'] ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'; ?></td>
-          <td class="text-end">
-            <a class="btn btn-sm btn-outline-secondary" href="<?php echo Helpers::baseUrl('index.php?page=expenses&action=edit&id='.(int)$e['id']); ?>"><i class="bi bi-pencil-square"></i> Edit</a>
-            <?php if ($isAdmin): ?>
-            <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=expenses&action=approve'); ?>" class="d-inline">
-              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-              <input type="hidden" name="id" value="<?php echo (int)$e['id']; ?>">
-              <button class="btn btn-sm btn-outline-success"><i class="bi bi-check2-circle"></i> Approve</button>
-            </form>
-            <?php endif; ?>
-            <?php if (($e['mode_effective'] ?? ($e['payment_mode'] ?? 'cash'))==='credit' && (float)($e['balance'] ?? 0) > 0.0001): ?>
-            <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=expenses&action=settle'); ?>" class="d-inline">
-              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-              <input type="hidden" name="id" value="<?php echo (int)$e['id']; ?>">
-              <?php $balRaw = (float)max(0,$e['balance']); $balVal = number_format($balRaw, 2, '.', ''); ?>
-              <input type="number" name="pay_amount" step="0.01" min="0.01" max="<?php echo htmlspecialchars((string)$balVal); ?>" value="<?php echo htmlspecialchars((string)$balVal); ?>" class="form-control form-control-sm d-inline-block" style="width:110px" placeholder="Pay">
-              <input type="text" name="pay_notes" class="form-control form-control-sm d-inline-block" style="width:150px" placeholder="Notes">
-              <button class="btn btn-sm btn-outline-primary"><i class="bi bi-cash"></i> Settle</button>
-            </form>
-            <?php endif; ?>
-            <?php if (($e['mode_effective'] ?? ($e['payment_mode'] ?? 'cash'))==='cash' && (!empty($e['credit_party'] ?? '') || !empty($e['credit_due_date'] ?? ''))): ?>
-            <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=expenses&action=mark_credit'); ?>" class="d-inline" onsubmit="return confirm('Mark this expense as Credit?');">
-              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-              <input type="hidden" name="id" value="<?php echo (int)$e['id']; ?>">
-              <button class="btn btn-sm btn-outline-warning"><i class="bi bi-arrow-repeat"></i> Mark Credit</button>
-            </form>
-            <?php endif; ?>
-            <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=expenses&action=delete'); ?>" class="d-inline" onsubmit="return confirm('Delete this expense?');">
-              <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-              <input type="hidden" name="id" value="<?php echo (int)$e['id']; ?>">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
-            </form>
-          </td>
-        </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</div>
-  </div>
-</div>
+  </section>
+
+  <section class="exp-card mb-3" id="expTableSection">
+    <div class="exp-card-head d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span>Expense Register</span>
+      <div class="d-flex align-items-center gap-2">
+        <label class="small text-muted mb-0" for="expPageSize">Rows</label>
+        <select class="form-select form-select-sm w-auto" id="expPageSize">
+          <option value="10">10</option>
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
     </div>
-  </div>
+    <div class="exp-card-body p-0">
+      <div id="expLoading" class="text-center py-5 text-muted d-none"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</div>
+      <div id="expEmpty" class="exp-empty d-none">
+        <i class="bi bi-inbox"></i>
+        <p>No expenses match your filters.</p>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#expenseModal">Add first expense</button>
+      </div>
+
+      <div class="d-none d-lg-block table-responsive exp-table-wrap">
+        <table class="table table-hover table-sm align-middle mb-0 exp-table" id="expTableDesktop">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th>Expense No</th>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Supplier</th>
+              <th>Branch</th>
+              <th class="text-end">Amount</th>
+              <th class="text-end">Paid</th>
+              <th class="text-end">Balance</th>
+              <th>Payment</th>
+              <th>Status</th>
+              <th>Approved By</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="expTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="d-lg-none" id="expCardsMobile"></div>
+
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 p-3 border-top" id="expPaginationWrap">
+        <div class="small text-muted" id="expPaginationInfo"></div>
+        <nav aria-label="Expense pagination"><ul class="pagination pagination-sm mb-0" id="expPagination"></ul></nav>
+      </div>
+    </div>
+  </section>
 </div>
+
+<?php require __DIR__ . '/partials/expense_modal.php'; ?>
+<?php require __DIR__ . '/partials/category_modal.php'; ?>
+
+<div class="d-none" id="expPrintArea"></div>
+
+<script src="<?php echo Helpers::baseUrl('assets/js/expenses-module.js?v=' . rawurlencode($expJsVer)); ?>"></script>

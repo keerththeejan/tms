@@ -10,6 +10,49 @@ class Helpers
         return $config;
     }
 
+    /**
+     * Dot-notation config access, e.g. configGet('currency.symbol').
+     */
+    public static function configGet(string $key, mixed $default = null): mixed
+    {
+        $value = self::config();
+        foreach (explode('.', $key) as $part) {
+            if (!is_array($value) || !array_key_exists($part, $value)) {
+                return $default;
+            }
+            $value = $value[$part];
+        }
+
+        return $value;
+    }
+
+    public static function currencySymbol(): string
+    {
+        return (string) self::configGet('currency.symbol', 'LKR');
+    }
+
+    /** Format monetary amount as "LKR 1,000.00". */
+    public static function formatMoney(float|int|string $amount, bool $withSymbol = true): string
+    {
+        $decimals = (int) self::configGet('currency.decimals', 2);
+        $symbol = self::currencySymbol();
+        $formatted = number_format((float) $amount, $decimals, '.', ',');
+
+        return $withSymbol ? $symbol . ' ' . $formatted : $formatted;
+    }
+
+    /** JSON-safe currency settings for front-end scripts. */
+    public static function currencyJsConfig(): array
+    {
+        return [
+            'code' => (string) self::configGet('currency.code', 'LKR'),
+            'symbol' => self::currencySymbol(),
+            'format' => (string) self::configGet('currency.format', 'LKR'),
+            'locale' => (string) self::configGet('currency.locale', 'en-LK'),
+            'decimals' => (int) self::configGet('currency.decimals', 2),
+        ];
+    }
+
     public static function company(): array
     {
         $cfg = self::config();
@@ -274,5 +317,22 @@ class Helpers
         }
 
         return [$from, $to];
+    }
+}
+
+if (!function_exists('config')) {
+    /**
+     * Global configuration accessor.
+     * Examples: config('currency_symbol'), config('currency.format')
+     */
+    function config(string $key, mixed $default = null): mixed
+    {
+        return match ($key) {
+            'currency_symbol' => Helpers::currencySymbol(),
+            'currency_format' => (string) Helpers::configGet('currency.format', 'LKR'),
+            'currency_code' => (string) Helpers::configGet('currency.code', 'LKR'),
+            'currency_locale' => (string) Helpers::configGet('currency.locale', 'en-LK'),
+            default => Helpers::configGet($key, $default),
+        };
     }
 }

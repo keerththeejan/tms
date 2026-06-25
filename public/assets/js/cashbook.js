@@ -21,8 +21,11 @@
   }
 
   function money(n) {
+    if (window.TMS && typeof window.TMS.formatMoney === 'function') {
+      return window.TMS.formatMoney(n);
+    }
     var x = Number(n) || 0;
-    return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return 'LKR ' + x.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function parseMoney(s) {

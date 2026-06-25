@@ -219,12 +219,26 @@ SQL);
             $existingId = self::findGroupIdByCode($pdo, $code);
 
             if ($existingId) {
-                $update->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort, $existingId]);
+                try {
+                    $update->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort, $existingId]);
+                } catch (Throwable $e) {
+                    /* keep existing row if update fails */
+                }
                 continue;
             }
 
-            $insert->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort]);
-            $created++;
+            try {
+                $insert->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort]);
+                $created++;
+            } catch (Throwable $e) {
+                $retryId = self::findGroupIdByCode($pdo, $code);
+                if ($retryId) {
+                    try {
+                        $update->execute([$code, $name, $parentId, $type, $nature, $isPrimary, $sort, $retryId]);
+                    } catch (Throwable $ignored) {
+                    }
+                }
+            }
         }
 
         return $created;
@@ -282,6 +296,12 @@ SQL);
         }
         if (!self::columnExists($pdo, 'account_groups', 'deleted_at')) {
             self::exec($pdo, 'ALTER TABLE account_groups ADD COLUMN deleted_at timestamp NULL AFTER updated_at');
+        }
+        if (!self::columnExists($pdo, 'account_groups', 'description')) {
+            self::exec($pdo, 'ALTER TABLE account_groups ADD COLUMN description varchar(500) NULL AFTER sort_order');
+        }
+        if (!self::columnExists($pdo, 'account_groups', 'is_active')) {
+            self::exec($pdo, 'ALTER TABLE account_groups ADD COLUMN is_active tinyint(1) NOT NULL DEFAULT 1 AFTER description');
         }
         self::repairTruncatedAccountGroupCodes($pdo);
     }

@@ -207,6 +207,42 @@
   color: var(--acc-text);
 }
 
+.acc-coa-table-wrap .table-responsive {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.acc-coa-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--acc-surface);
+  box-shadow: inset 0 -1px 0 var(--acc-border);
+  white-space: nowrap;
+}
+
+.acc-coa-thead th.acc-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.acc-coa-thead th.acc-sortable:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.acc-coa-pagination {
+  background: var(--acc-surface);
+}
+
+#accAccountModal .form-label .text-danger,
+#accGroupModal .form-label .text-danger {
+  font-weight: 700;
+}
+
+.acc-accounts-master .input-group-text {
+  color: var(--acc-muted);
+}
+
 .acc-module .busy-voucher-wrap {
   margin: 0;
 }
@@ -259,5 +295,54 @@
   .acc-module {
     grid-template-columns: 1fr;
     border: none;
+  }
+}
+
+/* Chart of Accounts modals — single backdrop, correct stacking, always interactive */
+.acc-coa-modal {
+  z-index: 1055;
+}
+.acc-coa-modal.show {
+  display: block;
+}
+#accGroupModal.show {
+  z-index: 1065;
+}
+.modal-backdrop.show {
+  z-index: 1050;
+}
+body.modal-open .modal-backdrop ~ .modal-backdrop {
+  z-index: 1060;
+}
+body.modal-open {
+  overflow: hidden;
+  padding-right: 0 !important;
+}
+body.modal-open .acc-module {
+  overflow: visible;
+}
+body:not(.modal-open) .modal-backdrop {
+  display: none !important;
+}
+
+/* Chart of Accounts — account modal */
+#accAccountModal .modal-body {
+  padding-top: 1rem;
+  padding-bottom: 1.25rem;
+}
+#accAccountModal .acc-code-mode .btn {
+  flex: 1 1 50%;
+}
+#accAccountModal .form-label {
+  margin-bottom: 0.35rem;
+  font-weight: 500;
+}
+#accAccountModal .input-group-sm > .form-control,
+#accAccountModal .form-select-sm {
+  min-height: 2.125rem;
+}
+@media (max-width: 575.98px) {
+  #accAccountModal .modal-dialog {
+    margin: 0.5rem;
   }
 }
