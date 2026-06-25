@@ -68,6 +68,8 @@ require_once __DIR__ . '/ExpenseCategoryRepository.php';
 require_once __DIR__ . '/ExpenseRepository.php';
 require_once __DIR__ . '/ExpenseAccountingService.php';
 require_once __DIR__ . '/ExpenseApi.php';
+require_once __DIR__ . '/ReportsRepository.php';
+require_once __DIR__ . '/ReportsApi.php';
 require_once __DIR__ . '/CustomerLedgerRepository.php';
 require_once __DIR__ . '/AuditLogRepository.php';
 

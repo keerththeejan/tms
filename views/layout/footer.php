@@ -19,6 +19,7 @@
      if (typeof DataTable === 'undefined') return;
      document.querySelectorAll('table.datatable').forEach(function(tbl){
        if (tbl.id === 'accCoaTable') return;
+       if (tbl.closest('#reportsApp')) return;
        if (tbl.dataset.dtInit === '1') return;
        var body = tbl.tBodies[0];
        if (body) {
@@ -123,6 +124,14 @@ if (!empty($accAction)):
 <script src="<?php echo Helpers::baseUrl('assets/js/accounting-accounts.js?v=' . rawurlencode($accAccountsJsVer)); ?>"></script>
 <?php endif; ?>
 <?php endif; ?>
+<?php
+$repPageFooter = (($_GET['page'] ?? '') === 'reports');
+if ($repPageFooter):
+  $repJsPathFooter = dirname(__DIR__, 2) . '/public/assets/js/reports-module.js';
+  $repJsVerFooter = is_file($repJsPathFooter) ? (string) filemtime($repJsPathFooter) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/reports-module.js?v=' . rawurlencode($repJsVerFooter)); ?>"></script>
+<?php endif; ?>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
   // Enhance all Bootstrap selects with search using Choices.js
@@ -135,6 +144,7 @@ if (!empty($accAction)):
       if (sel.dataset.enhance === 'false') return;
       // Skip accounting module selects (managed by accounting-accounts.js)
       if (sel.closest('#accModule')) return;
+      if (sel.closest('#reportsApp')) return;
       var optionCount = sel.options ? sel.options.length : 0;
       var searchEnabled = sel.dataset.choicesSearch === 'true' || optionCount >= 5; // force search e.g. delivery route
       var cfg = {

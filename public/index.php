@@ -5393,113 +5393,12 @@ switch ($page) {
     case 'reports':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         if (!Auth::canViewReports()) { http_response_code(403); echo 'Forbidden'; break; }
-        $pdo = Database::pdo();
-        $from = $_GET['from'] ?? date('Y-m-01');
-        $to = $_GET['to'] ?? date('Y-m-d');
-        $branchId = (int)($_GET['branch_id'] ?? 0);
-        $supplierId = (int)($_GET['supplier_id'] ?? 0);
-        $export = $_GET['export'] ?? '';
-        $type = $_GET['type'] ?? '';
-
-        // Revenue by branch (include ALL branches even if no data)
-        $revSql = 'SELECT b.id AS branch_id, b.name AS branch_name, 
-                          COALESCE(SUM(CASE WHEN dn.delivery_date BETWEEN ? AND ? THEN dn.total_amount ELSE 0 END), 0) AS revenue
-                   FROM branches b
-                   LEFT JOIN delivery_notes dn ON dn.branch_id = b.id ';
-        $revWhere = [];
-        $revParams = [$from, $to];
-        if ($branchId > 0) { 
-            $revWhere[] = 'b.id = ?'; 
-            $revParams[] = $branchId; 
+        if (!empty($_GET['rep_action']) || !empty($_POST['rep_action'])) {
+            ReportsApi::dispatch(Database::pdo());
+            break;
         }
-        if (!empty($revWhere)) { 
-            $revSql .= ' WHERE ' . implode(' AND ', $revWhere); 
-        }
-        $revSql .= ' GROUP BY b.id, b.name ORDER BY b.name';
-        $revStmt = $pdo->prepare($revSql);
-        $revStmt->execute($revParams);
-        $revenueByBranch = $revStmt->fetchAll();
-        
-        // If no branch filter, ensure all branches are included (even with 0 revenue)
-        if ($branchId === 0) {
-            $allBranches = BranchRepository::forFilters($pdo);
-            $branchMap = [];
-            foreach ($revenueByBranch as $row) {
-                $branchMap[$row['branch_id']] = $row;
-            }
-            $revenueByBranch = [];
-            foreach ($allBranches as $branch) {
-                $revenueByBranch[] = [
-                    'branch_id' => $branch['id'],
-                    'branch_name' => $branch['name'],
-                    'revenue' => $branchMap[$branch['id']]['revenue'] ?? 0
-                ];
-            }
-        }
-
-        // Parcels by supplier
-        $whereP = ['p.created_at BETWEEN ? AND ?'];
-        $paramsP = [$from . ' 00:00:00', $to . ' 23:59:59'];
-        if ($supplierId > 0) { $whereP[] = 'p.supplier_id = ?'; $paramsP[] = $supplierId; }
-        if ($branchId > 0) { $whereP[] = 'p.to_branch_id = ?'; $paramsP[] = $branchId; }
-        $parcSql = 'SELECT s.name AS supplier_name, COUNT(*) AS parcels_count, SUM(p.price) AS total_price
-                    FROM parcels p LEFT JOIN suppliers s ON s.id=p.supplier_id
-                    WHERE ' . implode(' AND ', $whereP) . ' GROUP BY s.name ORDER BY parcels_count DESC';
-        $parcStmt = $pdo->prepare($parcSql);
-        $parcStmt->execute($paramsP);
-        $parcelsBySupplier = $parcStmt->fetchAll();
-
-        // Expenses summary
-        $whereE = ['expense_date BETWEEN ? AND ?'];
-        $paramsE = [$from, $to];
-        if ($branchId > 0) { $whereE[] = 'branch_id = ?'; $paramsE[] = $branchId; }
-        $expSql = 'SELECT expense_type, SUM(amount) AS total FROM expenses WHERE ' . implode(' AND ', $whereE) . ' GROUP BY expense_type ORDER BY total DESC';
-        $expStmt = $pdo->prepare($expSql);
-        $expStmt->execute($paramsE);
-        $expenseSummary = $expStmt->fetchAll();
-
-        // Due Collections summary (payments)
-        $wherePay = ['p.paid_at BETWEEN ? AND ?'];
-        $paramsPay = [$from . ' 00:00:00', $to . ' 23:59:59'];
-        if ($branchId > 0) { $wherePay[] = 'dn.branch_id = ?'; $paramsPay[] = $branchId; }
-        $paySql = 'SELECT DATE(p.paid_at) AS pay_date, SUM(p.amount) AS collected
-                   FROM payments p LEFT JOIN delivery_notes dn ON dn.id = p.delivery_note_id
-                   WHERE ' . implode(' AND ', $wherePay) . ' GROUP BY DATE(p.paid_at) ORDER BY pay_date';
-        $payStmt = $pdo->prepare($paySql);
-        $payStmt->execute($paramsPay);
-        $dueCollections = $payStmt->fetchAll();
-
-        // Suppliers for filter dropdown
-        $suppliers = $pdo->query('SELECT id, name FROM suppliers ORDER BY name')->fetchAll();
-        $branchesAll = BranchRepository::forFilters($pdo);
-
-        // CSV export
-        if ($export === 'csv') {
-            header('Content-Type: text/csv');
-            header('Content-Disposition: attachment; filename="report_' . $type . '_' . $from . '_to_' . $to . '.csv"');
-            $out = fopen('php://output', 'w');
-            if ($type === 'revenue') {
-                fputcsv($out, ['Branch', 'Revenue']);
-                foreach ($revenueByBranch as $r) {
-                    fputcsv($out, [$r['branch_name'], $r['revenue']]);
-                }
-            } elseif ($type === 'parcels') {
-                fputcsv($out, ['Supplier', 'Parcels Count', 'Total Price']);
-                foreach ($parcelsBySupplier as $r) {
-                    fputcsv($out, [$r['supplier_name'], $r['parcels_count'], $r['total_price']]);
-                }
-            } elseif ($type === 'expenses') {
-                fputcsv($out, ['Expense Type', 'Total Amount']);
-                foreach ($expenseSummary as $e) {
-                    fputcsv($out, [$e['expense_type'], $e['total']]);
-                }
-            } else {
-                fputcsv($out, ['No data']);
-            }
-            fclose($out);
-            exit;
-        }
-        Helpers::view('reports/index', compact('from','to','branchId','supplierId','revenueByBranch','parcelsBySupplier','expenseSummary','dueCollections','suppliers','branchesAll'));
+        $branchesAll = BranchRepository::forFilters(Database::pdo());
+        Helpers::view('reports/index', ['branchesAll' => $branchesAll]);
         break;
 
     case 'quick_add_customer':
