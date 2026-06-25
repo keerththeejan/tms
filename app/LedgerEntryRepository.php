@@ -240,7 +240,8 @@ class LedgerEntryRepository
              FROM accounts a
              INNER JOIN account_groups ag ON ag.id = a.account_group_id
              INNER JOIN ledger_entries le ON le.account_id = a.id
-             WHERE le.entry_date BETWEEN ? AND ? 
+             INNER JOIN vouchers v ON v.id = le.voucher_id AND v.deleted_at IS NULL
+             WHERE le.entry_date BETWEEN ? AND ?
              AND ag.group_type IN (?, ?)
              AND a.deleted_at IS NULL
              GROUP BY a.id, a.account_code, a.account_name, ag.group_name, ag.group_type

@@ -1,4 +1,8 @@
 <div class="acc-dashboard">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="small text-muted" id="accDashUpdated">Loading dashboard…</div>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="accDashRefresh"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+  </div>
   <div class="acc-kpi-grid mb-3" id="accDashKpis">
     <div class="acc-kpi"><div class="acc-kpi-label">Cash Balance</div><div class="acc-kpi-value" data-kpi="cash">—</div></div>
     <div class="acc-kpi"><div class="acc-kpi-label">Bank Balance</div><div class="acc-kpi-value" data-kpi="bank">—</div></div>
@@ -19,7 +23,7 @@
     </div>
     <div class="col-lg-4">
       <div class="acc-card h-100">
-        <div class="acc-card-header">Revenue vs Expenses</div>
+        <div class="acc-card-header">Revenue vs Expenses (MTD vs Last Month)</div>
         <div class="acc-card-body"><canvas id="accRevExpChart" height="180"></canvas></div>
       </div>
     </div>
@@ -34,7 +38,7 @@
         </div>
         <div class="acc-card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0 datatable" id="accRecentTxTable">
+            <table class="table table-sm table-hover align-middle mb-0" id="accRecentTxTable">
               <thead><tr><th>Date</th><th>Voucher</th><th>Type</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
               <tbody></tbody>
             </table>
@@ -65,4 +69,3 @@
     </div>
   </div>
 </div>
-<script src="<?php echo Helpers::baseUrl('assets/js/accounting-dashboard.js?v=1'); ?>"></script>

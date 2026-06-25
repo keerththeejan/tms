@@ -177,6 +177,7 @@
 
 .acc-kpi-value.positive { color: var(--acc-success); }
 .acc-kpi-value.negative { color: var(--acc-danger); }
+.acc-kpi-value.acc-kpi-loading { opacity: 0.45; }
 
 .acc-toolbar {
   display: flex;

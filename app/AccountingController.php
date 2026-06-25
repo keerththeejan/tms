@@ -53,6 +53,9 @@ class AccountingController
         }
 
         try {
+            AccountingVoucherRepository::ensureSchema($pdo);
+            AccountRepository::ensureSchema($pdo);
+
             switch ($action) {
                 case 'list_vouchers':
                     self::listVouchers($pdo);
@@ -670,56 +673,98 @@ class AccountingController
 
     private static function dashboard(PDO $pdo): void
     {
+        try {
+            AccountingDashboardSeedService::seedIfEmpty($pdo);
+        } catch (Throwable $e) {
+            /* demo seed is optional */
+        }
+
         $today = date('Y-m-d');
         $monthStart = date('Y-m-01');
         $monthEnd = date('Y-m-t');
+        $prevMonthStart = date('Y-m-01', strtotime('first day of last month'));
+        $prevMonthEnd = date('Y-m-t', strtotime('last day of last month'));
 
-        $cashBalance = self::accountCodeBalance($pdo, 'CASH_MAIN', $today);
-        $bankBalance = self::accountCodeBalance($pdo, 'BANK_MAIN', $today);
-        $receivable = self::groupTypeBalanceSum($pdo, 'SUNDRY_DEBTORS', $today);
-        $payable = self::groupTypeBalanceSum($pdo, 'SUNDRY_CREDITORS', $today);
+        $cashBalance = self::groupCodeBalanceSum($pdo, 'CASH', $today);
+        if (abs($cashBalance) < 0.0001) {
+            $cashBalance = self::accountCodeBalance($pdo, 'CASH_MAIN', $today);
+        }
+
+        $bankBalance = self::groupCodeBalanceSum($pdo, 'BANK', $today);
+        if (abs($bankBalance) < 0.0001) {
+            $bankBalance = self::accountCodeBalance($pdo, 'BANK_MAIN', $today);
+        }
+
+        $receivable = self::groupCodeBalanceSum($pdo, 'SUNDRY_DEBTORS', $today);
+        $payable = self::groupCodeBalanceSum($pdo, 'SUNDRY_CREDITORS', $today);
 
         $profitLoss = LedgerEntryRepository::getProfitLoss($pdo, $monthStart, $monthEnd);
+        $profitLossPrev = LedgerEntryRepository::getProfitLoss($pdo, $prevMonthStart, $prevMonthEnd);
 
-        $pendingSt = $pdo->query("SELECT COUNT(*) FROM vouchers WHERE status = 'DRAFT' AND deleted_at IS NULL");
-        $pendingDrafts = (int) ($pendingSt ? $pendingSt->fetchColumn() : 0);
+        $pendingSt = $pdo->prepare("SELECT COUNT(*) FROM vouchers WHERE status = 'DRAFT' AND deleted_at IS NULL");
+        $pendingSt->execute();
+        $pendingDrafts = (int) ($pendingSt->fetchColumn() ?: 0);
 
-        $recent = AccountingVoucherRepository::listVouchers($pdo, [], 1, 8);
+        $recent = AccountingVoucherRepository::listVouchers($pdo, [], 1, 20);
 
         self::json([
             'ok' => true,
+            'success' => true,
             'data' => [
                 'cash_balance' => $cashBalance,
                 'bank_balance' => $bankBalance,
-                'accounts_receivable' => $receivable,
-                'accounts_payable' => abs($payable),
+                'accounts_receivable' => max(0, $receivable),
+                'accounts_payable' => max(0, abs($payable)),
                 'revenue_mtd' => (float) ($profitLoss['total_income'] ?? 0),
                 'expenses_mtd' => (float) ($profitLoss['total_expenses'] ?? 0),
                 'net_profit_mtd' => (float) ($profitLoss['net_profit'] ?? 0),
+                'revenue_prev_month' => (float) ($profitLossPrev['total_income'] ?? 0),
+                'expenses_prev_month' => (float) ($profitLossPrev['total_expenses'] ?? 0),
                 'pending_drafts' => $pendingDrafts,
                 'recent_vouchers' => $recent['rows'] ?? [],
-                'monthly_trend' => self::monthlyTrend($pdo),
+                'monthly_trend' => self::monthlyTrend($pdo, 12),
+                'generated_at' => date('c'),
             ],
         ]);
     }
 
-    /** @return list<array{label:string,revenue:float,expenses:float}> */
-    private static function monthlyTrend(PDO $pdo): array
+    /** @return list<array{label:string,revenue:float,expenses:float,profit:float}> */
+    private static function monthlyTrend(PDO $pdo, int $months = 12): array
     {
         $points = [];
-        for ($i = 5; $i >= 0; $i--) {
+        $months = max(1, min(24, $months));
+        for ($i = $months - 1; $i >= 0; $i--) {
             $ts = strtotime(date('Y-m-01') . " -{$i} months");
             $from = date('Y-m-01', $ts);
             $to = date('Y-m-t', $ts);
             $pl = LedgerEntryRepository::getProfitLoss($pdo, $from, $to);
+            $revenue = (float) ($pl['total_income'] ?? 0);
+            $expenses = (float) ($pl['total_expenses'] ?? 0);
             $points[] = [
                 'label' => date('M Y', $ts),
-                'revenue' => (float) ($pl['total_income'] ?? 0),
-                'expenses' => (float) ($pl['total_expenses'] ?? 0),
+                'revenue' => $revenue,
+                'expenses' => $expenses,
+                'profit' => $revenue - $expenses,
             ];
         }
 
         return $points;
+    }
+
+    private static function groupCodeBalanceSum(PDO $pdo, string $groupCode, string $asOfDate): float
+    {
+        $group = AccountGroupRepository::getByCode($pdo, $groupCode);
+        if (!$group) {
+            return 0.0;
+        }
+
+        $accounts = AccountRepository::listByGroup($pdo, (int) $group['id']);
+        $sum = 0.0;
+        foreach ($accounts as $account) {
+            $sum += AccountRepository::getBalance($pdo, (int) $account['id'], $asOfDate);
+        }
+
+        return $sum;
     }
 
     private static function accountCodeBalance(PDO $pdo, string $code, string $asOfDate): float
@@ -734,18 +779,7 @@ class AccountingController
 
     private static function groupTypeBalanceSum(PDO $pdo, string $groupCode, string $asOfDate): float
     {
-        $group = AccountGroupRepository::getByCode($pdo, $groupCode);
-        if (!$group) {
-            return 0.0;
-        }
-
-        $accounts = AccountRepository::listByGroup($pdo, (int) $group['id']);
-        $sum = 0.0;
-        foreach ($accounts as $account) {
-            $sum += AccountRepository::getBalance($pdo, (int) $account['id'], $asOfDate);
-        }
-
-        return $sum;
+        return self::groupCodeBalanceSum($pdo, $groupCode, $asOfDate);
     }
 
     private static function getAccount(PDO $pdo): void

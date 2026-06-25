@@ -101,16 +101,27 @@
   })();
 </script>
 <script src="<?php echo Helpers::baseUrl('assets/js/tms-ui.js?v=1'); ?>"></script>
+<?php
+$accJsPathFooter = dirname(__DIR__, 2) . '/public/assets/js/accounting-module.js';
+$accJsVerFooter = is_file($accJsPathFooter) ? (string) filemtime($accJsPathFooter) : '6';
+if (!empty($accAction)):
+?>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="<?php echo Helpers::baseUrl('assets/js/accounting-module.js?v=' . rawurlencode($accJsVerFooter)); ?>"></script>
+<?php
+  if (($accAction ?? '') === 'dashboard'):
+    $accDashJsPath = dirname(__DIR__, 2) . '/public/assets/js/accounting-dashboard.js';
+    $accDashJsVer = is_file($accDashJsPath) ? (string) filemtime($accDashJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/accounting-dashboard.js?v=' . rawurlencode($accDashJsVer)); ?>"></script>
+<?php endif; ?>
 <?php if (!empty($accLoadAccountsJs)):
   $accAccountsJsPath = dirname(__DIR__, 2) . '/public/assets/js/accounting-accounts.js';
   $accAccountsJsVer = is_file($accAccountsJsPath) ? (string) filemtime($accAccountsJsPath) : '6';
-  $accJsPath = dirname(__DIR__, 2) . '/public/assets/js/accounting-module.js';
-  $accJsVerFooter = is_file($accJsPath) ? (string) filemtime($accJsPath) : '6';
 ?>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="<?php echo Helpers::baseUrl('assets/js/accounting-module.js?v=' . rawurlencode($accJsVerFooter)); ?>"></script>
 <script src="<?php echo Helpers::baseUrl('assets/js/accounting-accounts.js?v=' . rawurlencode($accAccountsJsVer)); ?>"></script>
+<?php endif; ?>
 <?php endif; ?>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
