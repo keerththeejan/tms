@@ -144,7 +144,9 @@ if ($page === 'login') {
             Helpers::view('auth/login', compact('error'));
         }
     } else {
-        $success = ($_GET['reset'] ?? '') === '1' ? 'All data has been reset. Run the seed script to create an admin user, then log in.' : null;
+        $success = ($_GET['reset'] ?? '') === '1'
+            ? 'Database reset completed successfully. All application records have been permanently removed. Run the seed script to create an admin user, then log in.'
+            : null;
 $seedUrl = ($_GET['reset'] ?? '') === '1' ? Helpers::baseUrl('seed_admin.php') : null;
         Helpers::view('auth/login', array_filter(compact('success', 'seedUrl')));
     }
@@ -228,9 +230,29 @@ switch ($page) {
             return;
         }
         if ($action === 'reset_data' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
+            $wantsJson = (
+                (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string)$_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+                || str_contains((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')
+            );
+            if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) {
+                if ($wantsJson) {
+                    header('Content-Type: application/json; charset=UTF-8');
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page and try again.']);
+                    break;
+                }
+                http_response_code(400);
+                echo 'Invalid CSRF';
+                break;
+            }
             $confirm = trim($_POST['confirm_reset'] ?? '');
             if ($confirm !== 'DELETE') {
+                if ($wantsJson) {
+                    header('Content-Type: application/json; charset=UTF-8');
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Type DELETE (all caps) to confirm reset.']);
+                    break;
+                }
                 $files = [];
                 foreach (glob($backupDir . DIRECTORY_SEPARATOR . 'tms_backup_*.sql') as $f) {
                     $files[] = ['name' => basename($f), 'size' => filesize($f), 'mtime' => filemtime($f)];
@@ -241,18 +263,56 @@ switch ($page) {
                 break;
             }
             $pdo = Database::pdo();
-            $result = DataReset::deleteAllRecords($pdo);
+            $result = DataReset::performFullDatabaseReset($pdo);
             if ($result['success']) {
                 Auth::logout();
+                if ($wantsJson) {
+                    header('Content-Type: application/json; charset=UTF-8');
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'Database reset completed successfully.',
+                        'cleared' => $result['cleared'],
+                        'tables_found' => $result['tables_found'],
+                        'phases' => $result['phases'],
+                        'redirect' => Helpers::baseUrl('index.php?page=login&reset=1'),
+                    ], JSON_UNESCAPED_UNICODE);
+                    break;
+                }
                 Helpers::redirect('index.php?page=login&reset=1');
                 return;
+            }
+            $errorMessages = array_merge(
+                $result['errors'],
+                array_map(
+                    static fn ($table, $count) => "Table {$table} still has {$count} row(s)",
+                    array_keys($result['verification_failures']),
+                    $result['verification_failures']
+                ),
+                array_map(
+                    static fn ($table, $count) => "Accounting table {$table} still has {$count} row(s)",
+                    array_keys($result['accounting_failures']),
+                    $result['accounting_failures']
+                )
+            );
+            if ($wantsJson) {
+                header('Content-Type: application/json; charset=UTF-8');
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Database reset failed. Some records could not be removed.',
+                    'errors' => $errorMessages,
+                    'verification_failures' => $result['verification_failures'],
+                    'accounting_failures' => $result['accounting_failures'],
+                    'cleared' => $result['cleared'],
+                ], JSON_UNESCAPED_UNICODE);
+                break;
             }
             $files = [];
             foreach (glob($backupDir . DIRECTORY_SEPARATOR . 'tms_backup_*.sql') as $f) {
                 $files[] = ['name' => basename($f), 'size' => filesize($f), 'mtime' => filemtime($f)];
             }
             usort($files, fn($a,$b)=>$b['mtime']<=>$a['mtime']);
-            $error = 'Reset failed: ' . implode('; ', $result['errors']);
+            $error = 'Reset failed: ' . implode('; ', $errorMessages);
             Helpers::view('admin/backup', compact('files', 'error', 'success'));
             break;
         }

@@ -705,12 +705,6 @@ class AccountingController
 
     private static function dashboard(PDO $pdo): void
     {
-        try {
-            AccountingDashboardSeedService::seedIfEmpty($pdo);
-        } catch (Throwable $e) {
-            /* demo seed is optional */
-        }
-
         $today = date('Y-m-d');
         $monthStart = date('Y-m-01');
         $monthEnd = date('Y-m-t');
