@@ -993,6 +993,7 @@ switch ($page) {
         $rolesCatalog = $roleData['catalog'];
         $rolesDynamic = $roleData['dynamic'];
         $branchesAll = BranchRepository::forDropdowns($pdo);
+        $existingUsernames = $pdo->query('SELECT username FROM users')->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
         if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!Helpers::verifyCsrf($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF'; break; }
@@ -1012,7 +1013,7 @@ switch ($page) {
                 $error = 'Username and Full Name are required.';
                 $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
                 break;
             }
             // Pre-check: unique username (case-insensitive, ignore leading/trailing spaces only)
@@ -1038,7 +1039,7 @@ switch ($page) {
                 $error = 'Username already exists: ' . htmlspecialchars($conflict) . '. Try: ' . htmlspecialchars($suggestedUsername);
                 $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','suggestedUsername','rolesDynamic','rolesCatalog','currentUserId'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','suggestedUsername','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
                 break;
             }
             // Empty role defaults to staff for DB compatibility
@@ -1047,7 +1048,7 @@ switch ($page) {
                 $error = 'You are the only active admin. Assign another admin before changing your role.';
                 $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
                 break;
             }
             if ($id > 0 && $active !== 1 && _users_is_last_active_admin($pdo, $id)) {
@@ -1055,14 +1056,14 @@ switch ($page) {
                 $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $userRow['active'] = 1;
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
                 break;
             }
             if ($id > 0 && $roleParam !== 'admin' && _users_is_last_active_admin($pdo, $id)) {
                 $error = 'Cannot change role of the only active admin. Promote another user to admin first.';
                 $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
                 break;
             }
             try {
@@ -1082,7 +1083,7 @@ switch ($page) {
                         $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                         $pdo->rollBack();
                         $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                        Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                        Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
                         break;
                     }
                     $hash = password_hash($password, PASSWORD_BCRYPT);
@@ -1108,7 +1109,7 @@ switch ($page) {
                 $error = $msg;
                 $userRow = _users_sanitize_row_for_form(compact('id','username','full_name','role','branch_id','active'));
                 $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId'));
+                Helpers::view('users/form', compact('userRow','branchesAll','error','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
                 break;
             }
             break;
@@ -1144,7 +1145,7 @@ switch ($page) {
         if ($action === 'new') {
             $userRow = ['id'=>0,'username'=>'','full_name'=>'','role'=>'staff','branch_id'=>0,'active'=>1];
             $branchesAll = BranchRepository::forDropdowns($pdo);
-            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic','rolesCatalog','currentUserId'));
+            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
             break;
         }
 
@@ -1159,7 +1160,7 @@ switch ($page) {
                 break;
             }
             $branchesAll = BranchRepository::forDropdowns($pdo, [(int)($userRow['branch_id'] ?? 0)]);
-            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic','rolesCatalog','currentUserId'));
+            Helpers::view('users/form', compact('userRow','branchesAll','rolesDynamic','rolesCatalog','currentUserId','existingUsernames'));
             break;
         }
 

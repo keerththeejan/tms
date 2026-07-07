@@ -2,36 +2,110 @@
 <?php
   $supplier = is_array($supplier ?? null) ? $supplier : [];
   $supplier += ['id' => 0, 'name' => '', 'phone' => '', 'branch_id' => 0, 'supplier_code' => ''];
+  $supCssPath = dirname(__DIR__, 2) . '/public/assets/css/suppliers-module.css';
+  $supCssVer = is_file($supCssPath) ? (string) filemtime($supCssPath) : '1';
 ?>
-<style>
-  .sup-form-page { --sf-radius: 14px; --sf-border: rgba(17,24,39,.08); }
-  .sup-form-page .sf-head { margin-bottom: 1rem; }
-  .sup-form-page .sf-title { font-size: 1.25rem; font-weight: 800; letter-spacing: -.02em; margin: 0; color: #0f172a; }
-  .sup-form-page .sf-card {
-    background: #fff;
-    border: 1px solid var(--sf-border);
-    border-radius: var(--sf-radius);
-    box-shadow: 0 1px 3px rgba(16,24,40,.06), 0 8px 24px rgba(15,23,42,.06);
-    overflow: hidden;
-  }
-  .sup-form-page .sf-card .card-body { padding: 1.15rem 1.25rem; }
-  .sup-form-page .sf-card .card-footer {
-    background: #f8fafc;
-    border-top: 1px solid var(--sf-border);
-    padding: 0.85rem 1.25rem;
-  }
-  .sup-form-page .form-label { font-size: 0.8rem; font-weight: 600; color: #475569; }
-  .sup-form-page .form-control, .sup-form-page .form-select { border-radius: 10px; border-color: rgba(15,23,42,.12); }
-  .sup-form-page .form-control:focus, .sup-form-page .form-select:focus {
-    border-color: #0d9488;
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
-  }
-</style>
+<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/suppliers-module.css?v=' . rawurlencode($supCssVer)); ?>">
 
-<div class="sup-form-page container-fluid px-0">
-  <div class="sf-head d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <h1 class="sf-title"><?php echo $supplier['id'] ? 'Edit supplier' : 'New supplier'; ?></h1>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>" class="btn btn-outline-secondary rounded-pill"><i class="bi bi-arrow-left me-1"></i> Back to list</a>
+<div id="suppliersApp" class="supm-app container-fluid px-0">
+  <section class="supm-hero mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h1 class="supm-title mb-0"><?php echo $supplier['id'] ? 'Edit Supplier' : 'New Supplier'; ?></h1>
+        <p class="supm-subtitle">Premium vendor profile setup with business, contact, and financial sections.</p>
+      </div>
+      <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+    </div>
+  </section>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <form id="supmForm" method="post" action="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=save'); ?>">
+        <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
+        <input type="hidden" name="id" value="<?php echo (int)$supplier['id']; ?>">
+
+        <div class="supm-card">
+          <div class="supm-form-section">
+            <div class="supm-form-title">Section 1 - Basic Information</div>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Supplier Name <span class="text-danger">*</span></label><input type="text" name="name" class="form-control" required value="<?php echo htmlspecialchars($supplier['name']); ?>"></div>
+              <div class="col-md-6"><label class="form-label">Company Name</label><input type="text" id="supmCompanyPreview" class="form-control" placeholder="Preview only"></div>
+              <div class="col-md-6"><label class="form-label">Supplier Code</label><input type="text" name="supplier_code" class="form-control" value="<?php echo htmlspecialchars($supplier['supplier_code']); ?>" maxlength="64"></div>
+              <div class="col-md-6"><label class="form-label">Business Registration No.</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Tax Number</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Supplier Category</label><input type="text" id="supmCategoryPreview" class="form-control" placeholder="General"></div>
+              <div class="col-md-6"><label class="form-label">Status</label><input type="text" id="supmStatusPreview" class="form-control" value="Active"></div>
+            </div>
+          </div>
+          <div class="supm-form-section">
+            <div class="supm-form-title">Section 2 - Contact Information</div>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Contact Person</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Phone</label><input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($supplier['phone']); ?>"></div>
+              <div class="col-md-6"><label class="form-label">Mobile</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">WhatsApp</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Website</label><input type="url" class="form-control"></div>
+            </div>
+          </div>
+          <div class="supm-form-section">
+            <div class="supm-form-title">Section 3 - Address</div>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Address Line 1</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Address Line 2</label><input type="text" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label">City</label><input type="text" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label">District</label><input type="text" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label">Province</label><input type="text" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label">Postal Code</label><input type="text" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label">Country</label><input type="text" class="form-control" value="Sri Lanka"></div>
+              <div class="col-md-4"><label class="form-label">Google Maps Link</label><input type="url" class="form-control"></div>
+            </div>
+          </div>
+          <div class="supm-form-section">
+            <div class="supm-form-title">Section 4 - Financial Information</div>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Opening Balance</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Credit Limit</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Payment Terms</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Bank Name</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Account Number</label><input type="text" class="form-control"></div>
+              <div class="col-md-6"><label class="form-label">Currency</label><input type="text" class="form-control" value="LKR"></div>
+              <div class="col-md-6"><label class="form-label">Branch <span class="text-danger">*</span></label>
+                <select name="branch_id" class="form-select" data-enhance="false" required>
+                  <option value="">— Select branch —</option>
+                  <?php foreach (($branchesAll ?? []) as $b): ?>
+                    <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($supplier['branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="supm-form-section">
+            <div class="supm-form-title">Section 5 - Additional Information</div>
+            <div class="row g-3">
+              <div class="col-12"><label class="form-label">Remarks</label><textarea class="form-control" rows="2"></textarea></div>
+              <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" rows="2"></textarea></div>
+            </div>
+          </div>
+          <div class="supm-form-section d-flex justify-content-end gap-2">
+            <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Save Supplier</button>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="col-lg-4">
+      <aside class="supm-card supm-summary p-3">
+        <h2 class="h6 fw-bold mb-2"><i class="bi bi-eye me-1 text-success"></i>Supplier Summary</h2>
+        <div class="supm-summary-row"><span>Supplier Name</span><strong id="supmSumName">—</strong></div>
+        <div class="supm-summary-row"><span>Supplier Code</span><strong id="supmSumCode">—</strong></div>
+        <div class="supm-summary-row"><span>Company</span><strong id="supmSumCompany">—</strong></div>
+        <div class="supm-summary-row"><span>Category</span><strong id="supmSumCategory">—</strong></div>
+        <div class="supm-summary-row"><span>Phone</span><strong id="supmSumPhone">—</strong></div>
+        <div class="supm-summary-row"><span>Status</span><strong id="supmSumStatus">Active</strong></div>
+        <div class="supm-summary-row"><span>Branch</span><strong id="supmSumBranch">—</strong></div>
+      </aside>
+    </div>
   </div>
 
   <?php if (!empty($error)): ?>
@@ -41,39 +115,4 @@
     </div>
   <?php endif; ?>
 
-  <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=save'); ?>">
-    <div class="sf-card">
-      <div class="card-body">
-        <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-        <input type="hidden" name="id" value="<?php echo (int)$supplier['id']; ?>">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label" for="supName">Supplier name</label>
-            <input type="text" name="name" id="supName" class="form-control" required value="<?php echo htmlspecialchars($supplier['name']); ?>" autocomplete="organization">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="supPhone">Phone</label>
-            <input type="text" name="phone" id="supPhone" class="form-control" value="<?php echo htmlspecialchars($supplier['phone']); ?>" inputmode="tel" autocomplete="tel">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="supBranch">Branch</label>
-            <select name="branch_id" id="supBranch" class="form-select" data-enhance="false" required>
-              <option value="">— Select branch —</option>
-              <?php foreach (($branchesAll ?? []) as $b): ?>
-                <option value="<?php echo (int)$b['id']; ?>" <?php echo ((int)($supplier['branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['name']); ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="supCode">Supplier code <span class="text-muted fw-normal">(optional)</span></label>
-            <input type="text" name="supplier_code" id="supCode" class="form-control" value="<?php echo htmlspecialchars($supplier['supplier_code']); ?>" maxlength="64">
-          </div>
-        </div>
-      </div>
-      <div class="card-footer d-flex justify-content-end gap-2">
-        <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>" class="btn btn-outline-secondary">Cancel</a>
-        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check2-circle me-1"></i> Save supplier</button>
-      </div>
-    </div>
-  </form>
 </div>

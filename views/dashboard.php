@@ -1,385 +1,9 @@
-<style>
-  /* Dashboard — responsive shell + SaaS polish (frontend only) */
-  main.content-wrapper > .container-fluid:has(.dashboard-page) {
-    max-width: none;
-    width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-  .dashboard-page {
-    --dash-space-1: 8px;
-    --dash-space-2: 12px;
-    --dash-space-3: 16px;
-    --dash-space-4: 24px;
-    --dash-radius: 12px;
-    --dash-border: rgba(17, 24, 39, 0.1);
-    --dash-shadow: 0 1px 3px rgba(16, 24, 40, 0.07), 0 1px 2px rgba(16, 24, 40, 0.04);
-    --dash-shadow-hover: 0 8px 24px rgba(16, 24, 40, 0.1);
-    --dash-table-min: 720px;
-    min-width: 0;
-    max-width: 100%;
-  }
-  .dashboard-page .section-title {
-    font-size: clamp(1.05rem, 0.95rem + 0.35vw, 1.2rem);
-    font-weight: 700;
-    color: #111827;
-    margin: 0 0 var(--dash-space-2);
-    letter-spacing: -0.02em;
-  }
-  .dashboard-page .section-subtitle {
-    font-size: clamp(0.8125rem, 0.78rem + 0.2vw, 0.875rem);
-    color: #6b7280;
-    margin: 0 0 var(--dash-space-3);
-    line-height: 1.45;
-  }
-  .dashboard-page .kpi-card {
-    border: 1px solid var(--dash-border);
-    border-radius: var(--dash-radius);
-    box-shadow: var(--dash-shadow);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-    background: #fff;
-    padding: var(--dash-space-3);
-    height: 100%;
-  }
-  .dashboard-page .kpi-card:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--dash-shadow-hover);
-  }
-  .dashboard-page .kpi-label {
-    font-size: clamp(0.75rem, 0.72rem + 0.12vw, 0.8125rem);
-    color: #6b7280;
-    font-weight: 600;
-  }
-  .dashboard-page .kpi-value {
-    font-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.45rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: #111827;
-  }
-  .dashboard-page .kpi-icon {
-    width: clamp(32px, 28px + 1.2vw, 36px);
-    height: clamp(32px, 28px + 1.2vw, 36px);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(13, 110, 253, 0.1);
-    color: #0d6efd;
-    flex: 0 0 auto;
-  }
-
-  .dashboard-page .quick-actions .action-card,
-  .dashboard-page section:not(.quick-actions) .action-card {
-    border: 1px solid var(--dash-border);
-    border-radius: var(--dash-radius);
-    box-shadow: var(--dash-shadow);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-    text-decoration: none;
-    color: inherit;
-    display: block;
-    height: 100%;
-    padding: var(--dash-space-3) !important;
-  }
-  .dashboard-page .action-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--dash-shadow-hover);
-    border-color: rgba(13, 110, 253, 0.22);
-    color: inherit;
-  }
-  .dashboard-page .action-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.15rem;
-    flex-shrink: 0;
-  }
-  .dashboard-page .action-card .action-title {
-    font-weight: 700;
-    font-size: clamp(0.875rem, 0.82rem + 0.15vw, 0.9375rem);
-    margin-bottom: 0.15rem;
-  }
-  .dashboard-page .action-card .action-desc {
-    font-size: clamp(0.75rem, 0.72rem + 0.1vw, 0.8125rem);
-    color: #6b7280;
-  }
-  .dashboard-page .card-dash {
-    border: 1px solid var(--dash-border);
-    border-radius: var(--dash-radius);
-    box-shadow: var(--dash-shadow);
-    background: #fff;
-    min-width: 0;
-  }
-  .dashboard-page .card-dash .card-header-dash {
-    font-weight: 600;
-    font-size: clamp(0.875rem, 0.82rem + 0.12vw, 0.9375rem);
-    color: var(--bs-body-color);
-    padding: var(--dash-space-2) var(--dash-space-3);
-    border-bottom: 1px solid var(--dash-border);
-    background: linear-gradient(180deg, #fbfcfe 0%, #f8fafc 100%);
-    border-radius: var(--dash-radius) var(--dash-radius) 0 0;
-  }
-  .dashboard-page .card-dash .card-body {
-    padding: var(--dash-space-3);
-  }
-  .dashboard-page .filters-card {
-    background: #fff;
-    border: 1px solid var(--dash-border);
-    border-radius: var(--dash-radius);
-    padding: var(--dash-space-3);
-    margin-bottom: var(--dash-space-3);
-    box-shadow: var(--dash-shadow);
-  }
-  .dashboard-page .filters-card .form-label {
-    font-size: clamp(0.75rem, 0.72rem + 0.08vw, 0.8125rem);
-    font-weight: 600;
-    color: var(--bs-secondary-color);
-    margin-bottom: var(--dash-space-1);
-  }
-  .dashboard-page .filters-card .form-control,
-  .dashboard-page .filters-card .form-select {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 10px;
-    font-size: clamp(0.875rem, 0.82rem + 0.1vw, 0.9375rem);
-  }
-  .dashboard-page .filters-card .btn {
-    border-radius: 10px;
-    font-weight: 600;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-  }
-  .dashboard-page .filters-card .btn-outline-secondary {
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-  }
-  .dashboard-page .filters-card .btn:active:not(:disabled) {
-    transform: translateY(1px);
-  }
-  .dashboard-page .stat-card {
-    border-radius: var(--dash-radius);
-    overflow: hidden;
-  }
-  .dashboard-page .stat-card .stat-value {
-    font-size: 1.35rem;
-    font-weight: 800;
-    letter-spacing: -0.01em;
-  }
-  .dashboard-page .table-dash thead th {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    font-weight: 600;
-    color: var(--bs-secondary-color);
-    border-bottom-width: 1px;
-    padding: 0.55rem 0.65rem;
-  }
-  .dashboard-page .table-dash tbody td {
-    padding: 0.55rem 0.65rem;
-    vertical-align: middle;
-    font-size: clamp(0.8125rem, 0.78rem + 0.1vw, 0.875rem);
-  }
-  .dashboard-page .table-dash.table-hover tbody tr:hover {
-    background-color: var(--bs-tertiary-bg);
-  }
-
-  /* Horizontal scroll regions — desktop unchanged; mobile scrolls inside wrapper only */
-  .dashboard-page .dash-table-x {
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-x: contain;
-    max-width: 100%;
-  }
-  .dashboard-page .dash-table-scroll-y {
-    max-height: 220px;
-    overflow-y: auto;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .dashboard-page .dash-table-scroll-y.table-responsive {
-    display: block;
-  }
-
-  .dashboard-page .badge-soft {
-    font-weight: 700;
-    border: 1px solid rgba(17, 24, 39, 0.1);
-  }
-  .dashboard-page .badge-soft-success {
-    background: rgba(25, 135, 84, 0.12);
-    color: #146c43;
-  }
-  .dashboard-page .badge-soft-warning {
-    background: rgba(255, 193, 7, 0.16);
-    color: #8a6d00;
-  }
-  .dashboard-page .badge-soft-info {
-    background: rgba(13, 202, 240, 0.16);
-    color: #055160;
-  }
-  .dashboard-page .badge-soft-secondary {
-    background: rgba(108, 117, 125, 0.14);
-    color: #495057;
-  }
-  .dashboard-page .badge-soft-danger {
-    background: rgba(220, 53, 69, 0.14);
-    color: #b02a37;
-  }
-  .dashboard-page .nav-tabs-dash {
-    flex-wrap: nowrap;
-    gap: var(--dash-space-1);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 4px;
-    scrollbar-width: thin;
-  }
-  .dashboard-page .nav-tabs-dash .nav-link {
-    border: none;
-    border-radius: 0.5rem;
-    font-weight: 500;
-    font-size: clamp(0.8125rem, 0.78rem + 0.1vw, 0.9rem);
-    padding: 0.45rem 0.85rem;
-    color: var(--bs-secondary-color);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .dashboard-page .nav-tabs-dash .nav-link:hover {
-    color: var(--bs-primary);
-    background: var(--bs-tertiary-bg);
-  }
-  .dashboard-page .nav-tabs-dash .nav-link.active {
-    color: var(--bs-primary);
-    background: var(--bs-primary-bg-subtle);
-  }
-
-  .dashboard-page .finance-card,
-  .dashboard-page .chart-card {
-    border: 1px solid var(--dash-border);
-    border-radius: var(--dash-radius);
-    box-shadow: var(--dash-shadow);
-    background: #fff;
-    min-width: 0;
-    height: 100%;
-  }
-
-  .dashboard-page .chart-wrap {
-    position: relative;
-    min-height: 320px;
-  }
-
-  .dashboard-page .mini-metric {
-    border-radius: 12px;
-    padding: 0.9rem 1rem;
-    background: linear-gradient(180deg, #fbfcfe 0%, #f8fafc 100%);
-    border: 1px solid rgba(15, 23, 42, 0.08);
-  }
-
-  .dashboard-page .mini-metric .mini-label {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--bs-secondary-color);
-    font-weight: 700;
-  }
-
-  .dashboard-page .mini-metric .mini-value {
-    font-size: clamp(1.05rem, 0.95rem + 0.28vw, 1.25rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-  }
-
-  .dashboard-page .mini-metric .mini-sub {
-    font-size: 0.75rem;
-    color: var(--bs-secondary-color);
-  }
-
-  /* Breakpoints: 480 / 768 / 1024 / 1280 */
-  @media (max-width: 1279.98px) {
-    .dashboard-page {
-      --dash-table-min: 680px;
-    }
-  }
-  @media (max-width: 1023.98px) {
-    main.content-wrapper > .container-fluid:has(.dashboard-page) {
-      padding-left: max(12px, env(safe-area-inset-left, 0px));
-      padding-right: max(12px, env(safe-area-inset-right, 0px));
-    }
-  }
-  @media (min-width: 768px) {
-    main.content-wrapper > .container-fluid:has(.dashboard-page) {
-      padding-left: 16px;
-      padding-right: 16px;
-    }
-  }
-  @media (max-width: 767.98px) {
-    main.content-wrapper > .container-fluid:has(.dashboard-page) {
-      max-width: none;
-      margin-top: 0.5rem !important;
-      padding-left: max(10px, env(safe-area-inset-left, 0px));
-      padding-right: max(10px, env(safe-area-inset-right, 0px));
-    }
-    .dashboard-page section {
-      margin-bottom: var(--dash-space-3) !important;
-    }
-    .dashboard-page .mb-4 {
-      margin-bottom: var(--dash-space-4) !important;
-    }
-    .dashboard-page .filters-card .form-control-sm,
-    .dashboard-page .filters-card .form-select-sm {
-      min-height: 44px;
-      padding-top: 0.5rem;
-      padding-bottom: 0.5rem;
-    }
-    .dashboard-page .filters-card .btn-sm {
-      min-height: 44px;
-      padding-left: 1rem;
-      padding-right: 1rem;
-    }
-    .dashboard-page .filters-card .dash-filter-actions {
-      flex-direction: column;
-      align-items: stretch !important;
-      justify-content: flex-start !important;
-    }
-    .dashboard-page .filters-card .dash-filter-actions .btn {
-      width: 100%;
-    }
-    /* Tables: horizontal scroll, preserve desktop table layout (no card stacking) */
-    .dashboard-page .dash-table-x .table-dash {
-      width: max-content;
-      min-width: var(--dash-table-min);
-      margin-bottom: 0;
-    }
-    .dashboard-page .dash-table-x .table-dash th,
-    .dashboard-page .dash-table-x .table-dash td {
-      white-space: nowrap;
-    }
-  }
-  @media (max-width: 479.98px) {
-    .dashboard-page {
-      --dash-space-3: 12px;
-      --dash-radius: 10px;
-    }
-    .dashboard-page .row.g-3 {
-      --bs-gutter-y: 0.65rem;
-      --bs-gutter-x: 0.65rem;
-    }
-  }
-  @media (min-width: 768px) {
-    .dashboard-page .dash-table-x .table-dash {
-      width: 100%;
-      min-width: 0;
-      max-width: 100%;
-    }
-    .dashboard-page .dash-table-x .table-dash th,
-    .dashboard-page .dash-table-x .table-dash td {
-      white-space: normal;
-    }
-  }
-</style>
-<div class="dashboard-page">
+<?php
+  $dashCssPath = dirname(__DIR__) . '/public/assets/css/dashboard-module.css';
+  $dashCssVer = is_file($dashCssPath) ? (string) filemtime($dashCssPath) : '1';
+?>
+<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/dashboard-module.css?v=' . rawurlencode($dashCssVer)); ?>">
+<div id="mainDashboardApp" class="dashboard-page erp-dashboard">
   <?php
     $kpiPending = (int)($pendingParcels ?? 0);
     $kpiTodayParcels = is_array($todayParcels ?? null) ? count($todayParcels) : 0;
@@ -400,6 +24,27 @@
       ? 'Expenses (' . htmlspecialchars($df) . '–' . htmlspecialchars($dt) . ')'
       : ($isTodayRange ? "Today's Expenses" : 'Expenses (' . htmlspecialchars($df) . ')');
   ?>
+
+  <section class="erp-topbar card-dash mb-3">
+    <div class="d-flex flex-column flex-xl-row justify-content-between gap-3 p-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="erp-topbar-icon"><i class="bi bi-speedometer2"></i></div>
+        <div>
+          <h1 class="erp-title mb-0">Transport Management System</h1>
+          <p class="erp-subtitle mb-0">Welcome back! Here's your operational overview.</p>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="badge text-bg-light border p-2"><i class="bi bi-calendar3 me-1"></i><?php echo htmlspecialchars(date('d M Y')); ?></span>
+        <span id="dashLiveClock" class="badge text-bg-light border p-2"><i class="bi bi-clock me-1"></i>--:--:--</span>
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-search me-1"></i>Global Search</button>
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-bell me-1"></i>Notifications</button>
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-chat-dots me-1"></i>Messages</button>
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-moon-stars me-1"></i>Dark Mode</button>
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrows-fullscreen me-1"></i>Fullscreen</button>
+      </div>
+    </div>
+  </section>
 
   <div class="filters-card mb-3">
     <form method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>" class="row g-3 align-items-end">
@@ -454,7 +99,7 @@
   </div>
 
   <section class="mb-3">
-    <p class="section-title">Overview</p>
+    <p class="section-title">Executive KPI Dashboard</p>
     <p class="section-subtitle">Key metrics for <?php echo $scopeAllBranches ? '<strong>all branches</strong>' : 'your branch filters'; ?> · <?php echo $isSingleDay ? 'Date: <strong>'.$rangeStr.'</strong>' : 'Range: <strong>'.$rangeStr.'</strong>'; ?>.</p>
     <div class="row g-3">
       <div class="col-6 col-md-4 col-xl">
@@ -517,6 +162,85 @@
           <div class="mt-2"><small class="text-muted">Unsettled delivery notes</small></div>
         </div>
       </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Completed Deliveries</div>
+              <div class="kpi-value"><?php echo (int)array_sum(array_map(static fn($b)=> (int)($b['delivered'] ?? 0), $statusStats['today'] ?? [])); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(25,135,84,.14); color:#198754;"><i class="bi bi-check2-circle"></i></div>
+          </div>
+          <div class="mt-2"><small class="text-muted">Today's branch totals</small></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Transfer Vouchers</div>
+              <div class="kpi-value"><?php echo (int)($transfersToday ?? 0); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(99,102,241,.14); color:#4338ca;"><i class="bi bi-arrow-left-right"></i></div>
+          </div>
+          <div class="mt-2"><small class="text-muted"><?php echo Helpers::formatMoney((float)($transfersAmount ?? 0)); ?></small></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="kpi-card">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <div class="kpi-label">Pending Transfers</div>
+              <div class="kpi-value"><?php echo (int)($transfersPending ?? 0); ?></div>
+            </div>
+            <div class="kpi-icon" aria-hidden="true" style="background: rgba(245,158,11,.16); color:#b45309;"><i class="bi bi-hourglass"></i></div>
+          </div>
+          <div class="mt-2"><small class="text-muted">Draft transfer vouchers</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mb-3">
+    <div class="row g-3">
+      <div class="col-12 col-lg-8">
+        <div class="chart-card p-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="section-title mb-0">Analytics & Trends</h2>
+            <span class="badge text-bg-light border">UI container only</span>
+          </div>
+          <p class="section-subtitle mb-3">Revenue, expense, parcel volume, cash flow, branch comparison, and delivery performance visual containers.</p>
+          <div class="row g-3">
+            <div class="col-md-6"><div class="mini-metric"><div class="mini-label">Revenue Trend</div><div class="chart-placeholder">Chart UI</div></div></div>
+            <div class="col-md-6"><div class="mini-metric"><div class="mini-label">Expense Trend</div><div class="chart-placeholder">Chart UI</div></div></div>
+            <div class="col-md-6"><div class="mini-metric"><div class="mini-label">Parcel Volume</div><div class="chart-placeholder">Chart UI</div></div></div>
+            <div class="col-md-6"><div class="mini-metric"><div class="mini-label">Vehicle Usage</div><div class="chart-placeholder">Chart UI</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="finance-card p-3 h-100">
+          <h2 class="section-title mb-2">Live Operations</h2>
+          <div class="timeline-list">
+            <div class="timeline-item"><span class="dot"></span><div><strong>Parcel Created</strong><div class="text-muted small">Recent booking captured</div></div></div>
+            <div class="timeline-item"><span class="dot"></span><div><strong>Payment Received</strong><div class="text-muted small">Collection posted</div></div></div>
+            <div class="timeline-item"><span class="dot"></span><div><strong>Delivery Completed</strong><div class="text-muted small">Route closed successfully</div></div></div>
+            <div class="timeline-item"><span class="dot"></span><div><strong>Voucher Posted</strong><div class="text-muted small">Accounting transfer entry</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="quick-actions mb-3">
+    <h2 class="section-title">Quick Action Center</h2>
+    <div class="row g-3">
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2"><a class="action-card" href="<?php echo Helpers::baseUrl('index.php?page=parcels&action=new'); ?>"><div class="action-icon bg-primary-subtle text-primary"><i class="bi bi-box-seam"></i></div><div class="action-title mt-2">New Parcel</div><div class="action-desc">Create shipment</div></a></div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2"><a class="action-card" href="<?php echo Helpers::baseUrl('index.php?page=customers&action=new'); ?>"><div class="action-icon bg-info-subtle text-info"><i class="bi bi-person-plus"></i></div><div class="action-title mt-2">New Customer</div><div class="action-desc">Add account</div></a></div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2"><a class="action-card" href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=new'); ?>"><div class="action-icon bg-warning-subtle text-warning"><i class="bi bi-truck"></i></div><div class="action-title mt-2">New Supplier</div><div class="action-desc">Vendor profile</div></a></div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2"><a class="action-card" href="<?php echo Helpers::baseUrl('index.php?page=delivery_notes'); ?>"><div class="action-icon bg-success-subtle text-success"><i class="bi bi-receipt"></i></div><div class="action-title mt-2">Delivery Note</div><div class="action-desc">Billing docs</div></a></div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2"><a class="action-card" href="<?php echo Helpers::baseUrl('index.php?page=reports'); ?>"><div class="action-icon bg-secondary-subtle text-secondary"><i class="bi bi-bar-chart"></i></div><div class="action-title mt-2">Reports</div><div class="action-desc">Insights</div></a></div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2"><a class="action-card" href="<?php echo Helpers::baseUrl('index.php?page=accounting&action=dashboard'); ?>"><div class="action-icon bg-danger-subtle text-danger"><i class="bi bi-calculator"></i></div><div class="action-title mt-2">Accounting</div><div class="action-desc">Finance hub</div></a></div>
     </div>
   </section>
 

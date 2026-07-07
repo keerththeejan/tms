@@ -19,7 +19,12 @@
      if (typeof DataTable === 'undefined') return;
      document.querySelectorAll('table.datatable').forEach(function(tbl){
        if (tbl.id === 'accCoaTable') return;
-       if (tbl.closest('#reportsApp')) return;
+      if (tbl.closest('#reportsApp')) return;
+      if (tbl.closest('#customersApp')) return;
+      if (tbl.closest('#deliveryRoutesApp')) return;
+      if (tbl.closest('#suppliersApp')) return;
+      if (tbl.closest('#routeVehiclesApp')) return;
+      if (tbl.closest('#advancesApp')) return;
        if (tbl.dataset.dtInit === '1') return;
        var body = tbl.tBodies[0];
        if (body) {
@@ -131,6 +136,86 @@ if ($repPageFooter):
   $repJsVerFooter = is_file($repJsPathFooter) ? (string) filemtime($repJsPathFooter) : '1';
 ?>
 <script src="<?php echo Helpers::baseUrl('assets/js/reports-module.js?v=' . rawurlencode($repJsVerFooter)); ?>"></script>
+<?php endif; ?>
+<?php
+$usrFormFooter = (($_GET['page'] ?? '') === 'users' && in_array(($_GET['action'] ?? ''), ['new', 'edit'], true));
+if ($usrFormFooter):
+  $usrFormJsPath = dirname(__DIR__, 2) . '/public/assets/js/users-form.js';
+  $usrFormJsVer = is_file($usrFormJsPath) ? (string) filemtime($usrFormJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/users-form.js?v=' . rawurlencode($usrFormJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$custPageFooter = (($_GET['page'] ?? '') === 'customers');
+if ($custPageFooter):
+  $custJsPath = dirname(__DIR__, 2) . '/public/assets/js/customers-module.js';
+  $custJsVer = is_file($custJsPath) ? (string) filemtime($custJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/customers-module.js?v=' . rawurlencode($custJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$custFormFooter = ($custPageFooter && in_array(($_GET['action'] ?? ''), ['new', 'edit'], true));
+if ($custFormFooter):
+  $custFormJsPath = dirname(__DIR__, 2) . '/public/assets/js/customers-form.js';
+  $custFormJsVer = is_file($custFormJsPath) ? (string) filemtime($custFormJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/customers-form.js?v=' . rawurlencode($custFormJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$drPageFooter = (($_GET['page'] ?? '') === 'delivery_routes');
+if ($drPageFooter):
+  $drJsPath = dirname(__DIR__, 2) . '/public/assets/js/delivery-routes-module.js';
+  $drJsVer = is_file($drJsPath) ? (string) filemtime($drJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/delivery-routes-module.js?v=' . rawurlencode($drJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$supPageFooter = (($_GET['page'] ?? '') === 'suppliers');
+if ($supPageFooter):
+  $supJsPath = dirname(__DIR__, 2) . '/public/assets/js/suppliers-module.js';
+  $supJsVer = is_file($supJsPath) ? (string) filemtime($supJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/suppliers-module.js?v=' . rawurlencode($supJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$rvmPageFooter = (($_GET['page'] ?? '') === 'delivery_notes' && (($_GET['action'] ?? '') === 'route_vehicles'));
+if ($rvmPageFooter):
+  $rvmJsPath = dirname(__DIR__, 2) . '/public/assets/js/route-vehicles-module.js';
+  $rvmJsVer = is_file($rvmJsPath) ? (string) filemtime($rvmJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/route-vehicles-module.js?v=' . rawurlencode($rvmJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$advPageFooter = (($_GET['page'] ?? '') === 'advances');
+if ($advPageFooter):
+  $advJsPath = dirname(__DIR__, 2) . '/public/assets/js/advances-module.js';
+  $advJsVer = is_file($advJsPath) ? (string) filemtime($advJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/advances-module.js?v=' . rawurlencode($advJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$gsmPageFooter = (($_GET['page'] ?? '') === 'search');
+if ($gsmPageFooter):
+  $gsmJsPath = dirname(__DIR__, 2) . '/public/assets/js/global-search-module.js';
+  $gsmJsVer = is_file($gsmJsPath) ? (string) filemtime($gsmJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/global-search-module.js?v=' . rawurlencode($gsmJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$rmdPageFooter = (($_GET['page'] ?? '') === 'reminders');
+if ($rmdPageFooter):
+  $rmdJsPath = dirname(__DIR__, 2) . '/public/assets/js/reminders-module.js';
+  $rmdJsVer = is_file($rmdJsPath) ? (string) filemtime($rmdJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/reminders-module.js?v=' . rawurlencode($rmdJsVer)); ?>"></script>
+<?php endif; ?>
+<?php
+$dashPageFooter = (($_GET['page'] ?? '') === 'dashboard');
+if ($dashPageFooter):
+  $dashJsPath = dirname(__DIR__, 2) . '/public/assets/js/dashboard-module.js';
+  $dashJsVer = is_file($dashJsPath) ? (string) filemtime($dashJsPath) : '1';
+?>
+<script src="<?php echo Helpers::baseUrl('assets/js/dashboard-module.js?v=' . rawurlencode($dashJsVer)); ?>"></script>
 <?php endif; ?>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>

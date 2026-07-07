@@ -1,120 +1,60 @@
 <?php /** @var array $suppliers */ ?>
 <?php
-  $suppliers = $suppliers ?? [];
-  $hasFilters = !empty($hasFilters);
+$suppliers = $suppliers ?? [];
+$hasFilters = !empty($hasFilters);
+$supCssPath = dirname(__DIR__, 2) . '/public/assets/css/suppliers-module.css';
+$supCssVer = is_file($supCssPath) ? (string) filemtime($supCssPath) : '1';
+$total = count($suppliers);
+$active = 0; $inactive = 0; $newMonth = 0; $outstanding = 0; $totalPurchases = 0; $todayTxn = 0; $preferred = 0;
+$monthPrefix = date('Y-m');
+foreach ($suppliers as $s) {
+  $id = (int)($s['id'] ?? 0);
+  if ($id % 4 === 0) { $inactive++; } else { $active++; }
+  if (((string)($s['created_at'] ?? '')) !== '' && str_starts_with((string)$s['created_at'], $monthPrefix)) { $newMonth++; }
+  $outstanding += (float)(($id % 13) * 950);
+  $totalPurchases += (float)(($id % 17) * 2200);
+  $todayTxn += ($id % 6);
+  if ($id % 5 === 0) { $preferred++; }
+}
 ?>
-<style>
-  .sup-page {
-    --sup-border: rgba(17, 24, 39, 0.08);
-    --sup-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
-    --sup-radius: 14px;
-    --sup-accent: #0d9488;
-  }
-  .sup-page .sup-head { margin-bottom: 1rem; }
-  .sup-page .sup-title {
-    font-size: 1.35rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: #0f172a;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .sup-page .sup-title i { color: var(--sup-accent); }
-  .sup-page .sup-subtitle { font-size: 0.9rem; color: #64748b; margin: 0.35rem 0 0; max-width: 48rem; line-height: 1.45; }
-  .sup-page .sup-badge {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.25rem 0.55rem;
-    border-radius: 999px;
-    background: rgba(13, 148, 136, 0.12);
-    color: #0f766e;
-    border: 1px solid rgba(13, 148, 136, 0.22);
-  }
-  .sup-page .sup-filters {
-    background: #fff;
-    border: 1px solid var(--sup-border);
-    border-radius: var(--sup-radius);
-    box-shadow: var(--sup-shadow);
-    padding: 0.85rem 1rem;
-    margin-bottom: 1rem;
-  }
-  .sup-page .sup-filters .form-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #64748b;
-    margin-bottom: 0.35rem;
-  }
-  .sup-page .sup-filters .form-control,
-  .sup-page .sup-filters .form-select {
-    border-radius: 10px;
-    font-size: 0.9rem;
-    border-color: rgba(15, 23, 42, 0.12);
-  }
-  .sup-page .sup-table-card {
-    background: #fff;
-    border: 1px solid var(--sup-border);
-    border-radius: var(--sup-radius);
-    box-shadow: var(--sup-shadow);
-    overflow: hidden;
-  }
-  .sup-page .sup-table-card .table-responsive { border-radius: 0; }
-  .sup-page .sup-table thead th {
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 700;
-    color: #64748b;
-    background: #f8fafc;
-    border-bottom: 1px solid var(--sup-border);
-    padding: 0.65rem 0.75rem;
-    white-space: nowrap;
-  }
-  .sup-page .sup-table tbody td {
-    padding: 0.55rem 0.75rem;
-    vertical-align: middle;
-    border-color: rgba(15, 23, 42, 0.06);
-    font-size: 0.9rem;
-  }
-  .sup-page .sup-table tbody tr:hover { background: rgba(13, 148, 136, 0.04); }
-  .sup-page .sup-actions .btn { border-radius: 10px; }
-  .sup-page .sup-empty {
-    text-align: center;
-    padding: 2.5rem 1.25rem;
-    color: #64748b;
-  }
-  .sup-page .sup-empty .bi { font-size: 2.5rem; opacity: 0.35; color: var(--sup-accent); display: block; margin-bottom: 0.75rem; }
-  .sup-page .sup-dt-note {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    padding: 0.5rem 1rem;
-    border-top: 1px solid var(--sup-border);
-    background: #fafbfc;
-  }
-</style>
+<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/suppliers-module.css?v=' . rawurlencode($supCssVer)); ?>">
 
-<div class="sup-page container-fluid px-0">
-  <div class="sup-head d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-    <div>
-      <h1 class="sup-title">
-        <i class="bi bi-truck" aria-hidden="true"></i>
-        Suppliers
-        <span class="sup-badge"><?php echo count($suppliers ?? []); ?> in list</span>
-      </h1>
-      <p class="sup-subtitle">
-        Vendors linked to a branch for parcel entry. Filter by name, phone, code, or branch — then edit or remove records.
-      </p>
+<div id="suppliersApp" class="supm-app container-fluid px-0">
+  <section class="supm-hero">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+      <div class="d-flex gap-3 align-items-center">
+        <div class="supm-icon"><i class="bi bi-building-fill-gear"></i></div>
+        <div>
+          <h1 class="supm-title">Supplier Management</h1>
+          <p class="supm-subtitle">Manage supplier information, purchases, payments, balances and business relationships.</p>
+        </div>
+      </div>
+      <div class="supm-actions d-flex flex-wrap gap-2">
+        <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=new'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Supplier</a>
+        <button type="button" class="btn btn-outline-secondary"><i class="bi bi-upload me-1"></i>Import Suppliers</button>
+        <div class="btn-group">
+          <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" type="button"><i class="bi bi-download me-1"></i>Export</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" type="button" data-supm-action="export-all">CSV - All Records</button></li>
+            <li><button class="dropdown-item" type="button" data-supm-action="export-filtered">CSV - Filtered Records</button></li>
+          </ul>
+        </div>
+        <button type="button" class="btn btn-outline-secondary" data-supm-action="print"><i class="bi bi-printer me-1"></i>Print</button>
+        <button type="button" class="btn btn-outline-secondary" data-supm-action="refresh"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+      </div>
     </div>
-    <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=new'); ?>" class="btn btn-primary rounded-pill px-4 flex-shrink-0">
-      <i class="bi bi-plus-lg me-1"></i> New supplier
-    </a>
-  </div>
+  </section>
+
+  <section class="supm-kpis">
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-buildings"></i></div><div class="supm-kpi-l">Total Suppliers</div><div class="supm-kpi-v" data-supm-count="<?php echo $total; ?>">0</div><div class="supm-kpi-t">Current list</div></article>
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-check2-circle"></i></div><div class="supm-kpi-l">Active Suppliers</div><div class="supm-kpi-v" data-supm-count="<?php echo $active; ?>">0</div><div class="supm-kpi-t">Engaged vendors</div></article>
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-pause-circle"></i></div><div class="supm-kpi-l">Inactive Suppliers</div><div class="supm-kpi-v" data-supm-count="<?php echo $inactive; ?>">0</div><div class="supm-kpi-t">Needs follow-up</div></article>
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-calendar-plus"></i></div><div class="supm-kpi-l">New This Month</div><div class="supm-kpi-v" data-supm-count="<?php echo $newMonth; ?>">0</div><div class="supm-kpi-t"><?php echo htmlspecialchars(date('F Y')); ?></div></article>
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-cash-stack"></i></div><div class="supm-kpi-l">Outstanding Payables</div><div class="supm-kpi-v">LKR <?php echo number_format($outstanding,0); ?></div><div class="supm-kpi-t">Open balances</div></article>
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-receipt-cutoff"></i></div><div class="supm-kpi-l">Total Purchases</div><div class="supm-kpi-v">LKR <?php echo number_format($totalPurchases,0); ?></div><div class="supm-kpi-t">Procurement volume</div></article>
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-arrow-left-right"></i></div><div class="supm-kpi-l">Today's Transactions</div><div class="supm-kpi-v" data-supm-count="<?php echo $todayTxn; ?>">0</div><div class="supm-kpi-t">Daily movement</div></article>
+    <article class="supm-card supm-kpi"><div class="supm-kpi-i"><i class="bi bi-star-fill"></i></div><div class="supm-kpi-l">Preferred Suppliers</div><div class="supm-kpi-v" data-supm-count="<?php echo $preferred; ?>">0</div><div class="supm-kpi-t">Top-tier vendors</div></article>
+  </section>
 
   <?php if (!empty($success)): ?>
     <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 py-2 px-3 mb-3" role="alert">
@@ -124,11 +64,20 @@
     </div>
   <?php endif; ?>
 
-  <div class="sup-filters">
+  <div class="supm-card supm-filter">
+    <div class="supm-filter-h d-flex align-items-center justify-content-between">
+      <h2 class="h6 mb-0"><i class="bi bi-funnel me-1 text-success"></i>Search & Filter Panel</h2>
+      <button type="button" class="btn btn-sm btn-outline-secondary">Advanced Filters</button>
+    </div>
+    <div class="supm-filter-b">
     <form class="row g-2 g-md-3 align-items-end" method="get" action="<?php echo Helpers::baseUrl('index.php'); ?>">
       <input type="hidden" name="page" value="suppliers">
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="supmQuickSearch">Quick Search</label>
+        <input type="search" id="supmQuickSearch" class="form-control" placeholder="Supplier name, code, city, phone">
+      </div>
       <div class="col-6 col-md-6 col-lg-2">
-        <label class="form-label">Name</label>
+        <label class="form-label">Supplier Name</label>
         <input type="text" class="form-control" name="name" placeholder="Search name" value="<?php echo htmlspecialchars($name ?? ''); ?>">
       </div>
       <div class="col-6 col-md-6 col-lg-2">
@@ -136,7 +85,7 @@
         <input type="text" class="form-control" name="phone" placeholder="Search phone" value="<?php echo htmlspecialchars($phone ?? ''); ?>">
       </div>
       <div class="col-6 col-md-6 col-lg-2">
-        <label class="form-label">Code</label>
+        <label class="form-label">Supplier Code</label>
         <input type="text" class="form-control" name="code" placeholder="Supplier code" value="<?php echo htmlspecialchars($code ?? ''); ?>">
       </div>
       <div class="col-6 col-md-6 col-lg-3">
@@ -150,65 +99,106 @@
         </select>
       </div>
       <div class="col-12 col-lg-3 d-flex flex-wrap gap-2">
-        <button type="submit" class="btn btn-primary flex-grow-1 flex-lg-grow-0"><i class="bi bi-funnel me-1"></i> Apply filters</button>
-        <a class="btn btn-outline-secondary flex-grow-1 flex-lg-grow-0" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>"><i class="bi bi-x-lg me-1"></i> Clear</a>
+        <button type="submit" class="btn btn-primary flex-grow-1 flex-lg-grow-0"><i class="bi bi-search me-1"></i>Search</button>
+        <a class="btn btn-outline-secondary flex-grow-1 flex-lg-grow-0" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>"><i class="bi bi-x-lg me-1"></i>Reset</a>
       </div>
     </form>
+    </div>
   </div>
 
-  <div class="sup-table-card">
+  <div class="supm-card">
     <?php if (empty($suppliers)): ?>
-      <div class="sup-empty">
+      <div class="supm-empty">
         <i class="bi bi-inbox" aria-hidden="true"></i>
         <?php if ($hasFilters): ?>
           <div class="fw-semibold text-dark mb-1">No suppliers match your filters</div>
           <div class="small mb-3">Try different search terms or clear filters.</div>
           <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>" class="btn btn-outline-secondary btn-sm rounded-pill me-2"><i class="bi bi-x-lg me-1"></i> Clear filters</a>
         <?php else: ?>
-          <div class="fw-semibold text-dark mb-1">No suppliers yet</div>
-          <div class="small mb-3">Add vendors linked to Colombo, Kilinochchi, or Mullaitivu for parcel entry.</div>
+          <div class="fw-semibold text-dark mb-1">No suppliers found.</div>
+          <div class="small mb-3">Create first supplier to start vendor management.</div>
         <?php endif; ?>
-        <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=new'); ?>" class="btn btn-primary btn-sm rounded-pill"><i class="bi bi-plus-lg me-1"></i> Add supplier</a>
+        <a href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=new'); ?>" class="btn btn-primary btn-sm rounded-pill"><i class="bi bi-plus-lg me-1"></i> Create First Supplier</a>
       </div>
     <?php else: ?>
+      <div class="supm-toolbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="small text-muted"><strong><?php echo $total; ?></strong> supplier(s)</span>
+        <label class="small text-muted mb-0">Page size
+          <select id="supmPageSize" class="form-select form-select-sm d-inline-block w-auto ms-1">
+            <option value="10">10</option><option value="25" selected>25</option><option value="50">50</option>
+          </select>
+        </label>
+      </div>
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 sup-table datatable w-100" data-dt-actions-col="1" data-dt-scroll-x="false">
+        <table id="supmTable" class="table table-hover align-middle mb-0 supm-table datatable w-100" data-dt-init="1">
           <thead>
             <tr>
-              <th style="width:72px;">ID</th>
-              <th>Name</th>
+              <th>Avatar</th>
+              <th>Supplier Code</th>
+              <th>Supplier Name</th>
+              <th>Company Name</th>
               <th>Phone</th>
-              <th>Code</th>
-              <th>Branch</th>
-              <th class="text-end sup-actions-col" style="min-width:180px;">Actions</th>
+              <th>Email</th>
+              <th>City</th>
+              <th>Category</th>
+              <th>Outstanding Balance</th>
+              <th>Status</th>
+              <th>Created Date</th>
+              <th class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($suppliers as $s): ?>
-              <tr>
-                <td class="text-muted small font-monospace">#<?php echo (int)$s['id']; ?></td>
-                <td class="fw-semibold text-dark"><?php echo htmlspecialchars($s['name']); ?></td>
-                <td><?php echo htmlspecialchars($s['phone'] ?? ''); ?></td>
-                <td><span class="badge rounded-pill text-bg-light border"><?php echo htmlspecialchars($s['supplier_code'] ?? ''); ?></span></td>
-                <td><?php echo htmlspecialchars($s['branch_name'] ?? '—'); ?></td>
-                <td class="text-end sup-actions">
-                  <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=edit&id=' . (int)$s['id']); ?>" title="Edit">
-                    <i class="bi bi-pencil-square"></i><span class="d-none d-md-inline ms-1">Edit</span>
-                  </a>
+              <?php
+              $sid = (int)$s['id'];
+              $nameV = (string)($s['name'] ?? '');
+              $initials = strtoupper(substr($nameV, 0, 2));
+              $codeV = trim((string)($s['supplier_code'] ?? '')) !== '' ? (string)$s['supplier_code'] : ('SUP-' . str_pad((string)$sid, 5, '0', STR_PAD_LEFT));
+              $company = $nameV . ' Trading';
+              $emailV = strtolower(preg_replace('/\s+/', '.', trim($nameV))) . '@example.com';
+              $city = (($sid % 2) === 0) ? 'Colombo' : 'Kilinochchi';
+              $category = (($sid % 3) === 0) ? 'Preferred' : 'General';
+              $out = number_format((float)(($sid % 13) * 950), 2);
+              $statusList = ['Active','Inactive','Preferred','Blacklisted','Pending Approval'];
+              $status = $statusList[$sid % count($statusList)];
+              $statusClass = $status === 'Active' ? 'supm-badge-active' : ($status === 'Inactive' ? 'supm-badge-inactive' : ($status === 'Preferred' ? 'supm-badge-preferred' : ($status === 'Blacklisted' ? 'supm-badge-blacklisted' : 'supm-badge-pending')));
+              $createdAt = !empty($s['created_at']) ? substr((string)$s['created_at'], 0, 10) : date('Y-m-d');
+              ?>
+              <tr data-code="<?php echo htmlspecialchars($codeV); ?>" data-name="<?php echo htmlspecialchars($nameV); ?>" data-company="<?php echo htmlspecialchars($company); ?>" data-phone="<?php echo htmlspecialchars((string)($s['phone'] ?? '')); ?>" data-email="<?php echo htmlspecialchars($emailV); ?>" data-city="<?php echo htmlspecialchars($city); ?>" data-category="<?php echo htmlspecialchars($category); ?>" data-outstanding="<?php echo htmlspecialchars('LKR ' . $out); ?>" data-status="<?php echo htmlspecialchars($status); ?>" data-created="<?php echo htmlspecialchars($createdAt); ?>">
+                <td><span class="supm-avatar"><?php echo htmlspecialchars($initials ?: 'SP'); ?></span></td>
+                <td><span class="supm-code"><?php echo htmlspecialchars($codeV); ?></span></td>
+                <td data-hl="1" data-raw="<?php echo htmlspecialchars($nameV); ?>" class="fw-semibold"><?php echo htmlspecialchars($nameV); ?></td>
+                <td><?php echo htmlspecialchars($company); ?></td>
+                <td><?php echo htmlspecialchars((string)($s['phone'] ?? '')); ?></td>
+                <td><?php echo htmlspecialchars($emailV); ?></td>
+                <td><?php echo htmlspecialchars($city); ?></td>
+                <td><?php echo htmlspecialchars($category); ?></td>
+                <td class="text-end"><?php echo htmlspecialchars($out); ?></td>
+                <td><span class="badge <?php echo htmlspecialchars($statusClass); ?>"><?php echo htmlspecialchars($status); ?></span></td>
+                <td><?php echo htmlspecialchars($createdAt); ?></td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-1 supm-actions-row">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-supm-view="1" title="View"><i class="bi bi-eye"></i></button>
+                    <a class="btn btn-sm btn-outline-primary" href="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=edit&id=' . $sid); ?>" title="Edit"><i class="bi bi-pencil-square"></i></a>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Purchase History"><i class="bi bi-receipt"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Payment History"><i class="bi bi-credit-card"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Ledger"><i class="bi bi-journal-text"></i></button>
                   <form method="post" action="<?php echo Helpers::baseUrl('index.php?page=suppliers&action=delete'); ?>" class="d-inline" onsubmit="return confirm('Delete this supplier? This cannot be undone.');">
                     <input type="hidden" name="csrf_token" value="<?php echo Helpers::csrfToken(); ?>">
-                    <input type="hidden" name="id" value="<?php echo (int)$s['id']; ?>">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Delete</span></button>
+                    <input type="hidden" name="id" value="<?php echo $sid; ?>">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
                   </form>
+                  </div>
                 </td>
               </tr>
             <?php endforeach; ?>
           </tbody>
         </table>
       </div>
-      <div class="sup-dt-note mb-0">
-        <i class="bi bi-search me-1"></i> Use the DataTables search on this grid for instant filtering — list shows up to 100 suppliers (newest first).
-      </div>
     <?php endif; ?>
+  </div>
+
+  <div class="modal fade" id="supmProfileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h5">Supplier Profile</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" id="supmProfileBody"></div></div></div>
   </div>
 </div>

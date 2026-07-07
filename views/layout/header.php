@@ -23,6 +23,9 @@ $user = Auth::user();
   if ($hdrPage === 'employees'): ?>
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/employees-page.css'); ?>">
   <?php endif; ?>
+  <?php if ($hdrPage === 'users' && in_array($hdrEmpAction, ['new', 'edit'], true)): ?>
+  <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/users-form.css'); ?>">
+  <?php endif; ?>
   <script>
     window.TMS_CURRENCY = <?php echo json_encode(Helpers::currencyJsConfig(), JSON_UNESCAPED_UNICODE); ?>;
   </script>
