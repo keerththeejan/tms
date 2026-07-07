@@ -10,16 +10,8 @@
     const defaultPaymentMode = (cfg.paymentMode || 'CASH').toUpperCase();
     const ROW_COUNT = 16;
 
-    const PAYMENT_ACCOUNT_MAP = {
-        CASH: 'CASH_MAIN',
-        BANK: 'BANK_MAIN',
-        CHEQUE: 'BANK_MAIN',
-        ONLINE: 'BANK_MAIN',
-        PETTY_CASH: 'CASH_PETTY',
-    };
-
     let accounts = [];
-    let accountsByCode = {};
+    let paymentModeSettings = {};
     let activeRow = null;
     let searchTargetInput = null;
     let searchSelectedIndex = 0;
@@ -32,13 +24,14 @@
         bindSearchModal();
         bindKeyboardShortcuts();
         buildGridRows(ROW_COUNT);
-        loadAccounts().then(() => {
+        Promise.all([loadAccounts(), loadPaymentModeSettings()]).then(function () {
             const modeEl = document.getElementById('busyPaymentMode');
             if (modeEl && defaultPaymentMode) {
                 modeEl.value = defaultPaymentMode;
             }
             loadExistingVoucher();
             focusFirstAccount();
+            updateAutoLinePreview();
         });
         setTodayDate();
     }
@@ -62,6 +55,13 @@
         const dateEl = document.getElementById('busyVoucherDate');
         if (dateEl) {
             dateEl.addEventListener('change', updateDateDisplay);
+        }
+
+        const modeEl = document.getElementById('busyPaymentMode');
+        if (modeEl) {
+            modeEl.addEventListener('change', function () {
+                updateAutoLinePreview();
+            });
         }
     }
 
@@ -185,14 +185,60 @@
             const data = await res.json();
             if (data.ok && Array.isArray(data.data)) {
                 accounts = data.data;
-                accountsByCode = {};
-                accounts.forEach(function (a) {
-                    accountsByCode[a.account_code] = a;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function loadPaymentModeSettings() {
+        try {
+            const res = await fetch(apiUrl({ acc_action: 'payment_mode_settings' }));
+            const data = await res.json();
+            if (data.ok && Array.isArray(data.data)) {
+                paymentModeSettings = {};
+                data.data.forEach(function (row) {
+                    paymentModeSettings[row.payment_mode] = row;
                 });
             }
         } catch (e) {
             console.error(e);
         }
+    }
+
+    function resolveSettingsMode(mode) {
+        let resolved = (mode || 'CASH').toUpperCase();
+        if (resolved === 'PETTY_CASH') {
+            resolved = 'CASH';
+        }
+        if (resolved === 'ONLINE' || resolved === 'OTHER') {
+            resolved = 'BANK';
+        }
+        return resolved;
+    }
+
+    function getPaymentModeAccount(mode) {
+        const settingsMode = resolveSettingsMode(mode || document.getElementById('busyPaymentMode')?.value);
+        const setting = paymentModeSettings[settingsMode];
+        if (!setting) {
+            return null;
+        }
+        return accounts.find(function (a) {
+            return String(a.id) === String(setting.account_id);
+        }) || {
+            id: setting.account_id,
+            account_code: setting.account_code,
+            account_name: setting.account_name,
+        };
+    }
+
+    function getExcludedAccountIds() {
+        if (voucherType === 'RECEIPT' || voucherType === 'PAYMENT' || voucherType === 'CONTRA') {
+            return Object.keys(paymentModeSettings).map(function (key) {
+                return parseInt(paymentModeSettings[key].account_id, 10);
+            });
+        }
+        return [];
     }
 
     function resolveAccountFromText(input) {
@@ -206,6 +252,12 @@
                 a.account_code.toLowerCase() === text.toLowerCase();
         });
         if (match) {
+            if (getExcludedAccountIds().indexOf(parseInt(match.id, 10)) >= 0) {
+                alert('This main account is posted automatically. Enter the transaction account only.');
+                clearAccountOnRow(input.closest('tr'));
+                input.value = '';
+                return;
+            }
             setAccountOnRow(input.closest('tr'), match);
         }
     }
@@ -285,22 +337,81 @@
         });
     }
 
-    function recalcTotal() {
+    function getGridTotal() {
         let total = 0;
         document.querySelectorAll('#busyGridBody .amount-input').forEach(function (input) {
             total += parseAmount(input.value);
         });
+        return total;
+    }
+
+    function recalcTotal() {
+        const total = getGridTotal();
         const totalEl = document.getElementById('busyTotalAmount');
         if (totalEl) {
             totalEl.textContent = formatAmount(total);
         }
+        updateAutoLinePreview();
+    }
+
+    function updateAutoLinePreview() {
+        const panel = document.getElementById('busyAutoLinePanel');
+        const textEl = document.getElementById('busyAutoLineText');
+        if (!panel || !textEl) {
+            return;
+        }
+
+        const total = getGridTotal();
+        const isPayment = voucherType === 'PAYMENT';
+        const isReceipt = voucherType === 'RECEIPT';
+        const isContra = voucherType === 'CONTRA';
+
+        if ((isPayment || isReceipt) && total > 0) {
+            const modeAccount = getPaymentModeAccount();
+            if (!modeAccount) {
+                panel.hidden = false;
+                textEl.textContent = 'Configure default account in Accounting Settings';
+                return;
+            }
+            const side = isPayment ? 'Cr' : 'Dr';
+            panel.hidden = false;
+            textEl.textContent = modeAccount.account_name + '  ' + side + '  ' + formatAmount(total);
+            return;
+        }
+
+        if (isContra && total > 0) {
+            const cashAcc = getPaymentModeAccount('CASH');
+            const bankAcc = getPaymentModeAccount('BANK');
+            const mode = document.getElementById('busyPaymentMode')?.value || 'CASH';
+            if (!cashAcc || !bankAcc) {
+                panel.hidden = false;
+                textEl.textContent = 'Configure Cash and Bank accounts in Accounting Settings';
+                return;
+            }
+            let line1;
+            let line2;
+            if (mode === 'BANK') {
+                line1 = cashAcc.account_name + '  Dr  ' + formatAmount(total);
+                line2 = bankAcc.account_name + '  Cr  ' + formatAmount(total);
+            } else {
+                line1 = bankAcc.account_name + '  Dr  ' + formatAmount(total);
+                line2 = cashAcc.account_name + '  Cr  ' + formatAmount(total);
+            }
+            panel.hidden = false;
+            textEl.textContent = line1 + '  |  ' + line2;
+            return;
+        }
+
+        panel.hidden = true;
+        textEl.textContent = '';
     }
 
     function collectLineItems() {
         const items = [];
         const isPayment = voucherType === 'PAYMENT';
         const isReceipt = voucherType === 'RECEIPT';
-        const isTransfer = voucherType === 'TRANSFER' || voucherType === 'CONTRA';
+        const isTransfer = voucherType === 'TRANSFER';
+        const isContra = voucherType === 'CONTRA';
         const isJournal = voucherType === 'JOURNAL';
         let lineIndex = 0;
 
@@ -309,9 +420,24 @@
             const accountName = row.querySelector('.account-input').value.trim();
             const amount = parseAmount(row.querySelector('.amount-input').value);
             const narration = row.querySelector('.short-narr-input').value.trim();
+
+            if (isContra) {
+                if (amount <= 0) {
+                    return;
+                }
+                items.push({
+                    amount: amount,
+                    debit_amount: 0,
+                    credit_amount: 0,
+                    narration: narration,
+                });
+                return;
+            }
+
             if (!accountName || amount <= 0) {
                 return;
             }
+
             let resolvedId = accountId;
             if (!resolvedId) {
                 const match = accounts.find(function (a) {
@@ -321,6 +447,10 @@
             }
             if (!resolvedId) {
                 throw new Error('Invalid account: ' + accountName);
+            }
+
+            if (getExcludedAccountIds().indexOf(parseInt(resolvedId, 10)) >= 0) {
+                throw new Error('Main account lines are posted automatically. Remove: ' + accountName);
             }
 
             let debitAmount = 0;
@@ -336,7 +466,7 @@
                 } else if (lineIndex === 1) {
                     debitAmount = amount;
                 } else {
-                    throw new Error('Transfer/Contra vouchers support exactly two account lines.');
+                    throw new Error('Transfer vouchers support exactly two account lines.');
                 }
             } else if (isJournal) {
                 if (lineIndex % 2 === 0) {
@@ -359,7 +489,7 @@
         });
 
         if (isTransfer && items.length !== 2) {
-            throw new Error('Transfer/Contra vouchers require exactly two accounts (From and To).');
+            throw new Error('Transfer vouchers require exactly two accounts (From and To).');
         }
 
         if (isTransfer && Math.abs(items[0].credit_amount - items[1].debit_amount) > 0.01) {
@@ -369,51 +499,13 @@
         return items;
     }
 
-    function getPaymentModeAccount() {
-        const mode = document.getElementById('busyPaymentMode')?.value || 'CASH';
-        const code = PAYMENT_ACCOUNT_MAP[mode] || 'CASH_MAIN';
-        return accountsByCode[code] || accounts.find(function (a) {
-            return a.account_code === code;
-        }) || null;
-    }
-
     function buildVoucherPayload() {
         const lines = collectLineItems();
         if (lines.length === 0) {
+            if (voucherType === 'CONTRA') {
+                throw new Error('Enter the contra transfer amount.');
+            }
             throw new Error('Enter at least one account with amount.');
-        }
-
-        const isPayment = voucherType === 'PAYMENT';
-        const isReceipt = voucherType === 'RECEIPT';
-
-        if (isPayment || isReceipt) {
-            let total = 0;
-            lines.forEach(function (l) {
-                total += parseFloat(l.debit_amount || l.credit_amount || 0);
-            });
-
-            const modeAccount = getPaymentModeAccount();
-            if (!modeAccount) {
-                throw new Error('Payment mode account not found in chart of accounts.');
-            }
-
-            if (isPayment) {
-                lines.push({
-                    account_id: modeAccount.id,
-                    account_name: modeAccount.account_name,
-                    debit_amount: 0,
-                    credit_amount: total,
-                    narration: document.getElementById('busyHeaderNarration')?.value || '',
-                });
-            } else {
-                lines.push({
-                    account_id: modeAccount.id,
-                    account_name: modeAccount.account_name,
-                    debit_amount: total,
-                    credit_amount: 0,
-                    narration: document.getElementById('busyHeaderNarration')?.value || '',
-                });
-            }
         }
 
         let rawMode = document.getElementById('busyPaymentMode')?.value || 'CASH';
@@ -427,6 +519,7 @@
             voucher_date: document.getElementById('busyVoucherDate')?.value || '',
             reference_number: document.getElementById('busyVoucherTypeField')?.value || '',
             payment_mode: rawMode,
+            header_narration: document.getElementById('busyHeaderNarration')?.value || '',
             narration: document.getElementById('busyLongNarration')?.value || '',
             details: lines,
         };
@@ -582,10 +675,17 @@
 
     function filterAccounts(query) {
         const q = (query || '').toLowerCase().trim();
-        if (!q) {
-            return accounts.slice(0, 30);
+        const excluded = getExcludedAccountIds();
+        let list = accounts;
+        if (excluded.length) {
+            list = accounts.filter(function (a) {
+                return excluded.indexOf(parseInt(a.id, 10)) < 0;
+            });
         }
-        return accounts.filter(function (a) {
+        if (!q) {
+            return list.slice(0, 30);
+        }
+        return list.filter(function (a) {
             return a.account_name.toLowerCase().includes(q) ||
                 a.account_code.toLowerCase().includes(q);
         }).slice(0, 30);
@@ -648,10 +748,18 @@
         document.getElementById('busyLongNarration').value = voucher.narration || '';
         updateDateDisplay();
 
-        const details = (voucher.details || []).filter(function (d) {
-            const modeAcc = getPaymentModeAccount();
-            return !modeAcc || String(d.account_id) !== String(modeAcc.id);
+        let details = (voucher.details || []).filter(function (d) {
+            return !d.is_auto_generated;
         });
+
+        if (voucherType === 'CONTRA' && details.length === 0 && (voucher.details || []).length > 0) {
+            const autoDetails = voucher.details.filter(function (d) { return d.is_auto_generated; });
+            const amount = autoDetails.reduce(function (max, d) {
+                const val = parseFloat(d.debit_amount || d.credit_amount || 0);
+                return val > max ? val : max;
+            }, 0);
+            details = [{ amount: amount }];
+        }
 
         const tbody = document.getElementById('busyGridBody');
         tbody.innerHTML = '';
@@ -665,9 +773,11 @@
             if (!row) {
                 return;
             }
-            row.querySelector('.account-input').value = d.account_name || '';
-            row.querySelector('.account-id').value = d.account_id || '';
-            const amt = parseFloat(d.debit_amount || d.credit_amount || 0);
+            if (d.account_name) {
+                row.querySelector('.account-input').value = d.account_name || '';
+                row.querySelector('.account-id').value = d.account_id || '';
+            }
+            const amt = parseFloat(d.amount || d.debit_amount || d.credit_amount || 0);
             row.querySelector('.amount-input').value = amt > 0 ? formatAmount(amt) : '';
             row.querySelector('.short-narr-input').value = d.narration || '';
         });

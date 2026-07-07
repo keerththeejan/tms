@@ -59,6 +59,8 @@ require_once __DIR__ . '/AccountRepository.php';
 require_once __DIR__ . '/AccountingVoucherRepository.php';
 require_once __DIR__ . '/VoucherDetailRepository.php';
 require_once __DIR__ . '/LedgerEntryRepository.php';
+require_once __DIR__ . '/AccountingPaymentModeSettingsRepository.php';
+require_once __DIR__ . '/VoucherAutoLedgerService.php';
 require_once __DIR__ . '/AccountingController.php';
 require_once __DIR__ . '/AccountingDashboardSeedService.php';
 require_once __DIR__ . '/AccountingModule.php';

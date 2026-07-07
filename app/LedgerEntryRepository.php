@@ -117,24 +117,135 @@ class LedgerEntryRepository
     /** @return list<array<string,mixed>> */
     public static function getDayBook(PDO $pdo, string $fromDate, string $toDate, ?string $voucherType = null): array
     {
-        $sql = 'SELECT le.entry_date, le.voucher_number, le.voucher_type, a.account_name, 
-                       le.narration, le.debit_amount, le.credit_amount
+        AccountingPaymentModeSettingsRepository::ensureSchema($pdo);
+        $defaultAccountIds = AccountingPaymentModeSettingsRepository::getAllDefaultAccountIds($pdo);
+
+        $sql = 'SELECT le.id, le.voucher_id, le.entry_date, le.voucher_number, le.voucher_type,
+                       le.account_id, le.narration AS line_narration,
+                       le.debit_amount, le.credit_amount,
+                       a.account_name,
+                       v.narration AS voucher_narration, v.payment_mode
                 FROM ledger_entries le
                 INNER JOIN accounts a ON a.id = le.account_id
+                INNER JOIN vouchers v ON v.id = le.voucher_id
                 WHERE le.entry_date BETWEEN ? AND ?';
-        
+
         $params = [$fromDate, $toDate];
-        
+
         if ($voucherType) {
             $sql .= ' AND le.voucher_type = ?';
             $params[] = $voucherType;
         }
-        
+
         $sql .= ' ORDER BY le.entry_date ASC, le.voucher_number ASC, le.id ASC';
-        
+
         $st = $pdo->prepare($sql);
         $st->execute($params);
-        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return self::formatDayBookRows($rows, $defaultAccountIds);
+    }
+
+    /**
+     * Collapse auto-posted main-account lines into one row per voucher for Receipt/Payment/Contra.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @param list<int> $defaultAccountIds
+     * @return list<array<string,mixed>>
+     */
+    private static function formatDayBookRows(array $rows, array $defaultAccountIds): array
+    {
+        $grouped = [];
+        $expanded = [];
+
+        foreach ($rows as $row) {
+            $type = (string) ($row['voucher_type'] ?? '');
+            if (in_array($type, ['RECEIPT', 'PAYMENT', 'CONTRA'], true)) {
+                $voucherId = (int) ($row['voucher_id'] ?? 0);
+                if (!isset($grouped[$voucherId])) {
+                    $grouped[$voucherId] = [
+                        'entry_date' => $row['entry_date'],
+                        'voucher_number' => $row['voucher_number'],
+                        'voucher_type' => $type,
+                        'voucher_narration' => (string) ($row['voucher_narration'] ?? ''),
+                        'payment_mode' => (string) ($row['payment_mode'] ?? 'CASH'),
+                        'transaction_accounts' => [],
+                        'line_narrations' => [],
+                        'amount' => 0.0,
+                        'sort_id' => (int) ($row['id'] ?? 0),
+                    ];
+                }
+
+                $lineAmount = max((float) ($row['debit_amount'] ?? 0), (float) ($row['credit_amount'] ?? 0));
+                $isAuto = in_array((int) ($row['account_id'] ?? 0), $defaultAccountIds, true);
+
+                if (!$isAuto) {
+                    $grouped[$voucherId]['transaction_accounts'][] = (string) ($row['account_name'] ?? '');
+                    if (!empty($row['line_narration'])) {
+                        $grouped[$voucherId]['line_narrations'][] = (string) $row['line_narration'];
+                    }
+                    $grouped[$voucherId]['amount'] += $lineAmount;
+                } elseif ($grouped[$voucherId]['amount'] <= 0) {
+                    $grouped[$voucherId]['amount'] = $lineAmount;
+                }
+
+                continue;
+            }
+
+            $expanded[] = [
+                'entry_date' => $row['entry_date'],
+                'voucher_number' => $row['voucher_number'],
+                'voucher_type' => $type,
+                'account_name' => $row['account_name'],
+                'narration' => $row['line_narration'] ?? $row['voucher_narration'] ?? '',
+                'debit_amount' => (float) ($row['debit_amount'] ?? 0),
+                'credit_amount' => (float) ($row['credit_amount'] ?? 0),
+                'sort_key' => self::dayBookSortKey($row),
+            ];
+        }
+
+        $result = [];
+        foreach ($grouped as $group) {
+            $accountName = implode(', ', array_values(array_unique(array_filter($group['transaction_accounts']))));
+            if ($accountName === '' && $group['voucher_type'] === 'CONTRA') {
+                $accountName = ($group['payment_mode'] === 'BANK') ? 'Bank to Cash' : 'Cash to Bank';
+            }
+
+            $narration = trim($group['voucher_narration']);
+            if ($narration === '' && !empty($group['line_narrations'])) {
+                $narration = implode('; ', array_values(array_unique($group['line_narrations'])));
+            }
+
+            $amount = round((float) $group['amount'], 2);
+            $result[] = [
+                'entry_date' => $group['entry_date'],
+                'voucher_number' => $group['voucher_number'],
+                'voucher_type' => $group['voucher_type'],
+                'account_name' => $accountName,
+                'narration' => $narration,
+                'debit_amount' => $amount,
+                'credit_amount' => $amount,
+                'sort_key' => ($group['entry_date'] ?? '') . '|' . ($group['voucher_number'] ?? '') . '|' . sprintf('%010d', $group['sort_id']),
+            ];
+        }
+
+        $result = array_merge($result, $expanded);
+        usort($result, static function (array $a, array $b): int {
+            return strcmp((string) ($a['sort_key'] ?? ''), (string) ($b['sort_key'] ?? ''));
+        });
+
+        foreach ($result as &$row) {
+            unset($row['sort_key']);
+        }
+        unset($row);
+
+        return $result;
+    }
+
+    /** @param array<string,mixed> $row */
+    private static function dayBookSortKey(array $row): string
+    {
+        return ($row['entry_date'] ?? '') . '|' . ($row['voucher_number'] ?? '') . '|' . sprintf('%010d', (int) ($row['id'] ?? 0));
     }
 
     /** @return list<array<string,mixed>> */

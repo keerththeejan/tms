@@ -24,6 +24,7 @@ class AccountingSchemaRepository
         self::createAuditLogTable($pdo);
         self::createTransportMappingTable($pdo);
         self::ensureCustomerLedgerTable($pdo);
+        AccountingPaymentModeSettingsRepository::ensureSchema($pdo);
     }
 
     public static function ensureCustomerLedgerTable(PDO $pdo): void

@@ -197,6 +197,24 @@
     color: #000080;
 }
 
+.busy-auto-line-panel {
+    font-size: 11px;
+    color: #333;
+    text-align: right;
+    max-width: 65%;
+}
+
+.busy-auto-label {
+    font-weight: bold;
+    color: #666;
+    margin-right: 4px;
+}
+
+.busy-auto-text {
+    font-weight: bold;
+    color: #214e9a;
+}
+
 .busy-bottom-panel {
     border-top: 1px solid #808080;
     padding: 6px 8px 8px;

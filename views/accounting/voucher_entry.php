@@ -93,6 +93,10 @@ $jsVer = is_file($jsPath) ? (string) filemtime($jsPath) : '1';
 
         <div class="busy-status-bar">
             <span class="busy-cur-bal" id="busyCurBal">( Cur. Bal. : <?php echo Helpers::formatMoney(0); ?> )</span>
+            <span class="busy-auto-line-panel" id="busyAutoLinePanel" hidden>
+                <span class="busy-auto-label">System Entry:</span>
+                <span class="busy-auto-text" id="busyAutoLineText"></span>
+            </span>
         </div>
 
         <div class="busy-bottom-panel">

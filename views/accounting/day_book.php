@@ -216,7 +216,7 @@ $voucherType = $_GET['voucher_type'] ?? '';
             <tbody id="accDayBookBody">
                 <tr>
                     <td colspan="7" class="text-center" style="padding: 20px; color: #999;">
-                        Click "Load" to view Day Book entries
+                        Loading Day Book entries…
                     </td>
                 </tr>
             </tbody>
@@ -242,6 +242,29 @@ $voucherType = $_GET['voucher_type'] ?? '';
 
 <script>
 const accBaseUrl = '<?php echo htmlspecialchars($baseUrl); ?>';
+
+document.addEventListener('DOMContentLoaded', function () {
+    accLoadDayBook();
+});
+
+function accFormatAmount(n) {
+    return (parseFloat(n) || 0).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
+
+function accEscapeHtml(s) {
+    if (window.AccModule && AccModule.escapeHtml) {
+        return AccModule.escapeHtml(s);
+    }
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 async function accLoadDayBook() {
     const fromDate = document.getElementById('accFromDate').value;
@@ -279,23 +302,22 @@ function accRenderDayBook(entries) {
     tbody.innerHTML = entries.map(entry => {
         totalDebit += parseFloat(entry.debit_amount || 0);
         totalCredit += parseFloat(entry.credit_amount || 0);
-        const esc = (window.AccModule && AccModule.escapeHtml) ? AccModule.escapeHtml : (s => String(s ?? ''));
         return `
             <tr>
-                <td>${esc(entry.entry_date)}</td>
-                <td>${esc(entry.voucher_number)}</td>
-                <td>${esc(entry.voucher_type)}</td>
-                <td>${esc(entry.account_name)}</td>
-                <td>${esc(entry.narration)}</td>
-                <td class="text-right">${parseFloat(entry.debit_amount || 0).toFixed(2)}</td>
-                <td class="text-right">${parseFloat(entry.credit_amount || 0).toFixed(2)}</td>
+                <td>${accEscapeHtml(entry.entry_date)}</td>
+                <td>${accEscapeHtml(entry.voucher_number)}</td>
+                <td>${accEscapeHtml(entry.voucher_type)}</td>
+                <td>${accEscapeHtml(entry.account_name)}</td>
+                <td>${accEscapeHtml(entry.narration)}</td>
+                <td class="text-right">${accFormatAmount(entry.debit_amount || 0)}</td>
+                <td class="text-right">${accFormatAmount(entry.credit_amount || 0)}</td>
             </tr>
         `;
     }).join('');
 
-    document.getElementById('accTotalDebit').textContent = totalDebit.toFixed(2);
-    document.getElementById('accTotalCredit').textContent = totalCredit.toFixed(2);
-    document.getElementById('accNet').textContent = (totalDebit - totalCredit).toFixed(2);
+    document.getElementById('accTotalDebit').textContent = accFormatAmount(totalDebit);
+    document.getElementById('accTotalCredit').textContent = accFormatAmount(totalCredit);
+    document.getElementById('accNet').textContent = accFormatAmount(totalDebit - totalCredit);
 }
 
 function accExportExcel() {
