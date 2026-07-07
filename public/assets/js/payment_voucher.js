@@ -263,16 +263,10 @@ class PaymentVoucherModule {
         const creditInput = row.querySelector('.credit-amount');
 
         debitInput.addEventListener('change', () => {
-            if (parseFloat(debitInput.value) > 0) {
-                creditInput.value = '0.00';
-            }
             this.calculateTotals();
         });
 
         creditInput.addEventListener('change', () => {
-            if (parseFloat(creditInput.value) > 0) {
-                debitInput.value = '0.00';
-            }
             this.calculateTotals();
         });
 

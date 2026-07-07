@@ -260,45 +260,41 @@ class AccountingController
             return;
         }
 
-        try {
-            $details = VoucherAutoLedgerService::buildCompleteDetails(
-                $pdo,
-                $voucherType,
-                $paymentMode,
-                $rawDetails,
-                (string) ($payload['header_narration'] ?? $payload['reference_narration'] ?? '')
-            );
-        } catch (InvalidArgumentException $e) {
-            self::json(['ok' => false, 'error' => $e->getMessage()], 400);
-            return;
+        $normalizedDetails = [];
+        foreach ((array) $rawDetails as $line) {
+            if (!is_array($line)) {
+                continue;
+            }
+            $accountId = (int) ($line['account_id'] ?? 0);
+            $debit = (float) ($line['debit_amount'] ?? 0);
+            $credit = (float) ($line['credit_amount'] ?? 0);
+            if ($accountId <= 0) {
+                continue;
+            }
+            if ($debit <= 0 && $credit <= 0) {
+                continue;
+            }
+            $normalizedDetails[] = [
+                'account_id' => $accountId,
+                'debit_amount' => $debit,
+                'credit_amount' => $credit,
+                'narration' => $line['narration'] ?? null,
+                'cost_center_id' => $line['cost_center_id'] ?? null,
+            ];
         }
 
-        $details = VoucherAutoLedgerService::detailsForStorage($details);
+        $details = VoucherAutoLedgerService::detailsForStorage($normalizedDetails);
 
-        if (count($details) < 2) {
-            self::json(['ok' => false, 'error' => 'At least two line items are required for double-entry'], 400);
+        if ($details === []) {
+            self::json(['ok' => false, 'error' => 'At least one line item is required'], 400);
             return;
         }
 
         $totalDebit = 0;
         $totalCredit = 0;
         foreach ($details as $detail) {
-            $debit = (float) ($detail['debit_amount'] ?? 0);
-            $credit = (float) ($detail['credit_amount'] ?? 0);
-            if ($debit > 0 && $credit > 0) {
-                self::json(['ok' => false, 'error' => 'Each line must have either debit or credit, not both'], 400);
-                return;
-            }
-            if ($debit <= 0 && $credit <= 0) {
-                self::json(['ok' => false, 'error' => 'Each line must have a debit or credit amount'], 400);
-                return;
-            }
-            if (empty($detail['account_id'])) {
-                self::json(['ok' => false, 'error' => 'Each line must have a valid account'], 400);
-                return;
-            }
-            $totalDebit += $debit;
-            $totalCredit += $credit;
+            $totalDebit += (float) ($detail['debit_amount'] ?? 0);
+            $totalCredit += (float) ($detail['credit_amount'] ?? 0);
         }
 
         $voucherDate = (string) ($payload['voucher_date'] ?? date('Y-m-d'));
@@ -309,11 +305,6 @@ class AccountingController
         if (!isset($payload['id']) || (int) $payload['id'] <= 0) {
             $payload['created_by'] = $user['id'] ?? null;
             $payload['branch_id'] = $user['branch_id'] ?? null;
-        }
-
-        if (abs($totalDebit - $totalCredit) > 0.01) {
-            self::json(['ok' => false, 'error' => 'Voucher must be balanced (Debit = Credit)'], 400);
-            return;
         }
 
         $pdo->beginTransaction();
@@ -328,6 +319,8 @@ class AccountingController
 
             // Save details
             VoucherDetailRepository::createBatch($pdo, $voucherId, $details);
+
+            self::postVoucherLedger($pdo, $voucherId);
 
             $pdo->commit();
             self::json(['ok' => true, 'data' => AccountingVoucherRepository::getById($pdo, $voucherId)]);
@@ -371,39 +364,9 @@ class AccountingController
             return;
         }
 
-        // Validate balance
-        $totals = VoucherDetailRepository::getTotals($pdo, $id);
-        if (abs($totals['difference']) > 0.01) {
-            self::json(['ok' => false, 'error' => 'Voucher must be balanced (Debit = Credit)'], 400);
-            return;
-        }
-
         $pdo->beginTransaction();
         try {
-            // Create ledger entries
-            $ledgerEntries = [];
-            foreach ($details as $detail) {
-                $ledgerEntries[] = [
-                    'voucher_detail_id' => $detail['id'],
-                    'account_id' => $detail['account_id'],
-                    'entry_date' => $voucher['voucher_date'],
-                    'voucher_type' => $voucher['voucher_type'],
-                    'voucher_number' => $voucher['voucher_number'],
-                    'debit_amount' => $detail['debit_amount'],
-                    'credit_amount' => $detail['credit_amount'],
-                    'balance_type' => ((float) ($detail['debit_amount'] ?? 0) > 0) ? 'DEBIT' : 'CREDIT',
-                    'narration' => $detail['narration'] ?? $voucher['narration'],
-                    'branch_id' => $voucher['branch_id'],
-                ];
-            }
-
-            LedgerEntryRepository::createBatch($pdo, $id, $ledgerEntries);
-
-            // Update voucher status
-            $st = $pdo->prepare(
-                'UPDATE vouchers SET status = ?, posted_at = CURRENT_TIMESTAMP, posted_by = ? WHERE id = ?'
-            );
-            $st->execute(['POSTED', Auth::user()['id'] ?? null, $id]);
+            self::postVoucherLedger($pdo, $id);
 
             $pdo->commit();
             self::json(['ok' => true, 'data' => AccountingVoucherRepository::getById($pdo, $id)]);
@@ -413,6 +376,46 @@ class AccountingController
             }
             throw $e;
         }
+    }
+
+    private static function postVoucherLedger(PDO $pdo, int $voucherId): void
+    {
+        $voucher = AccountingVoucherRepository::getById($pdo, $voucherId);
+        if (!$voucher) {
+            throw new RuntimeException('Voucher not found');
+        }
+
+        if (($voucher['status'] ?? '') === 'POSTED') {
+            return;
+        }
+
+        $details = VoucherDetailRepository::getByVoucherId($pdo, $voucherId);
+        if ($details === []) {
+            throw new RuntimeException('No line items found');
+        }
+
+        $ledgerEntries = [];
+        foreach ($details as $detail) {
+            $ledgerEntries[] = [
+                'voucher_detail_id' => $detail['id'],
+                'account_id' => $detail['account_id'],
+                'entry_date' => $voucher['voucher_date'],
+                'voucher_type' => $voucher['voucher_type'],
+                'voucher_number' => $voucher['voucher_number'],
+                'debit_amount' => $detail['debit_amount'],
+                'credit_amount' => $detail['credit_amount'],
+                'balance_type' => ((float) ($detail['debit_amount'] ?? 0) > 0) ? 'DEBIT' : 'CREDIT',
+                'narration' => $detail['narration'] ?? $voucher['narration'],
+                'branch_id' => $voucher['branch_id'],
+            ];
+        }
+
+        LedgerEntryRepository::createBatch($pdo, $voucherId, $ledgerEntries);
+
+        $st = $pdo->prepare(
+            'UPDATE vouchers SET status = ?, posted_at = CURRENT_TIMESTAMP, posted_by = ? WHERE id = ?'
+        );
+        $st->execute(['POSTED', Auth::user()['id'] ?? null, $voucherId]);
     }
 
     private static function cancelVoucher(PDO $pdo, bool $isPost): void

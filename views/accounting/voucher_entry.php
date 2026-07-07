@@ -71,21 +71,28 @@ $jsVer = is_file($jsPath) ? (string) filemtime($jsPath) : '1';
         </div>
 
         <div class="busy-grid-panel">
+            <div id="busyAlertHost" class="mb-2"></div>
             <table class="busy-grid" id="busyGridTable">
                 <thead>
                     <tr>
                         <th class="col-sno">S.No</th>
                         <th class="col-account">Account</th>
-                        <th class="col-amount">Amount (<?php echo htmlspecialchars(Helpers::currencySymbol()); ?>)</th>
-                        <th class="col-narr">Short Narration</th>
+                        <th class="col-narr">Description</th>
+                        <th class="col-ref">Reference</th>
+                        <th class="col-amount">Debit</th>
+                        <th class="col-amount">Credit</th>
+                        <th class="col-branch">Branch</th>
+                        <th class="col-actions">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="busyGridBody"></tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="2" class="total-label">Total</td>
-                        <td class="total-amount" id="busyTotalAmount">0.00</td>
-                        <td></td>
+                        <td colspan="4" class="total-label">Totals</td>
+                        <td class="total-amount" id="busyTotalDebit">0.00</td>
+                        <td class="total-amount" id="busyTotalCredit">0.00</td>
+                        <td class="total-amount" id="busyTotalDiff">0.00</td>
+                        <td class="total-status-cell"><span id="busyBalanceStatus" class="busy-status-badge">Entry Total</span></td>
                     </tr>
                 </tfoot>
             </table>
@@ -93,9 +100,9 @@ $jsVer = is_file($jsPath) ? (string) filemtime($jsPath) : '1';
 
         <div class="busy-status-bar">
             <span class="busy-cur-bal" id="busyCurBal">( Cur. Bal. : <?php echo Helpers::formatMoney(0); ?> )</span>
-            <span class="busy-auto-line-panel" id="busyAutoLinePanel" hidden>
-                <span class="busy-auto-label">System Entry:</span>
-                <span class="busy-auto-text" id="busyAutoLineText"></span>
+            <span class="busy-auto-line-panel" id="busyAutoLinePanel">
+                <span class="busy-auto-label">Status:</span>
+                <span class="busy-auto-text" id="busyAutoLineText">Simple single-entry voucher mode</span>
             </span>
         </div>
 
@@ -140,7 +147,8 @@ $jsVer = is_file($jsPath) ? (string) filemtime($jsPath) : '1';
 window.BUSY_VOUCHER = {
     baseUrl: <?php echo json_encode($baseUrl, JSON_UNESCAPED_SLASHES); ?>,
     voucherType: <?php echo json_encode($voucherType); ?>,
-    paymentMode: <?php echo json_encode($paymentMode); ?>
+    paymentMode: <?php echo json_encode($paymentMode); ?>,
+    uiVersion: 'simple-single-entry-v1'
 };
 </script>
-<script src="<?php echo Helpers::baseUrl('assets/js/busy-voucher.js?v=' . rawurlencode($jsVer)); ?>"></script>
+<script src="<?php echo Helpers::baseUrl('assets/js/busy-voucher.js?v=' . rawurlencode($jsVer) . '-simple-v2'); ?>"></script>

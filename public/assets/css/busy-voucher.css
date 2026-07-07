@@ -141,11 +141,23 @@
 }
 
 .busy-grid .col-amount {
-    width: 14%;
+    width: 11%;
 }
 
 .busy-grid .col-narr {
-    width: auto;
+    width: 18%;
+}
+
+.busy-grid .col-ref {
+    width: 14%;
+}
+
+.busy-grid .col-branch {
+    width: 12%;
+}
+
+.busy-grid .col-actions {
+    width: 160px;
 }
 
 .busy-grid input {
@@ -159,6 +171,12 @@
 }
 
 .busy-grid input.amount-input {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+}
+
+.busy-grid input.debit-input,
+.busy-grid input.credit-input {
     text-align: right;
     font-family: 'Courier New', monospace;
 }
@@ -213,6 +231,49 @@
 .busy-auto-text {
     font-weight: bold;
     color: #214e9a;
+}
+
+.busy-row-btn {
+    border: 1px solid #808080;
+    background: linear-gradient(180deg, #fff 0%, #ece9d8 100%);
+    min-width: 24px;
+    height: 22px;
+    cursor: pointer;
+    margin-right: 2px;
+}
+
+.busy-row-btn.danger {
+    color: #a11;
+    border-color: #a11;
+}
+
+.busy-grid tbody tr.editing-row td {
+    background: #fef3c7;
+}
+
+.total-status-cell {
+    text-align: center;
+}
+
+.busy-status-badge {
+    display: inline-block;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: bold;
+    border: 1px solid #808080;
+}
+
+.busy-status-badge.is-balanced {
+    background: #d1fae5;
+    border-color: #059669;
+    color: #065f46;
+}
+
+.busy-status-badge.is-unbalanced {
+    background: #fee2e2;
+    border-color: #dc2626;
+    color: #991b1b;
 }
 
 .busy-bottom-panel {
