@@ -963,7 +963,26 @@
   }
   .parcel-form-page .pf-visually-hidden-select { position:absolute !important; left:-9999px !important; width:1px !important; height:1px !important; opacity:0 !important; }
   .parcel-form-page .customer-search-results { position: relative; }
-  .parcel-form-page .customer-search-results .list-group { position:absolute; z-index: 1050; width:100%; max-height: 260px; overflow:auto; }
+  .parcel-form-page .customer-search-results .list-group { position:absolute; z-index: 1050; width:100%; max-height: 320px; overflow:auto; background:#fff; }
+  .parcel-form-page .pf-customer-dd-item {
+    cursor: pointer;
+    display: block;
+    width: 100%;
+    text-align: left;
+    border-left: 0;
+    border-right: 0;
+  }
+  .parcel-form-page .pf-customer-dd-item:first-of-type { border-top-left-radius: 0; border-top-right-radius: 0; }
+  .parcel-form-page .pf-customer-dd-item:hover,
+  .parcel-form-page .pf-customer-dd-item:focus { background: rgba(37, 99, 235, 0.06); }
+  .parcel-form-page .pf-customer-dd-header { font-size: 0.75rem; font-weight: 600; color: #64748b; letter-spacing: 0.02em; text-transform: uppercase; }
+  .parcel-form-page .pf-customer-dd-code { font-size: 0.75rem; font-weight: 600; color: #64748b; }
+  .parcel-form-page .pf-customer-dd-name { font-weight: 600; color: #0f172a; line-height: 1.25; }
+  .parcel-form-page .pf-customer-dd-phone { font-size: 0.8125rem; color: #475569; }
+  .parcel-form-page .pf-customer-dd-company { font-size: 0.8125rem; color: #334155; }
+  .parcel-form-page .pf-customer-dd-address { font-size: 0.75rem; color: #94a3b8; }
+  .parcel-form-page .pf-customer-dd-item.active { background: rgba(37, 99, 235, 0.08); border-color: rgba(37, 99, 235, 0.2); }
+  .parcel-form-page .pf-customer-dd-footer { font-size: 0.8125rem; border-top: 1px dashed #e2e8f0 !important; }
   .parcel-form-page #customerInvalidFeedback { display: none; }
   .parcel-form-page .customer-search-results:has(#customerSearch.is-invalid) #customerInvalidFeedback { display: block; }
   .parcel-form-page .pf-breadcrumb { font-size: 0.9rem; }
@@ -2066,10 +2085,10 @@
             <div class="customer-search-results mb-2">
               <div class="input-group input-group-sm pf-input-group">
                 <span class="input-group-text bg-white border-end-0 text-secondary"><i class="bi bi-search" aria-hidden="true"></i></span>
-                <input type="text" id="customerSearch" class="form-control form-control-sm border-start-0" placeholder="Search by name or phone…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Search and select customer" aria-describedby="customerSummary customerInvalidFeedback" aria-required="true">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#quickAddCustomer" title="Quick add customer" aria-label="Quick add customer"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
+                <input type="text" id="customerSearch" class="form-control form-control-sm border-start-0" placeholder="Search customers…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="customerSearchResults" <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> aria-label="Search and select customer" aria-describedby="customerSummary customerInvalidFeedback" aria-required="true">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="customerBrowseBtn" title="Browse customers" aria-label="Browse customers" aria-haspopup="listbox" aria-expanded="false"><i class="bi bi-person-plus" aria-hidden="true"></i></button>
               </div>
-              <div id="customerSearchResults" class="list-group list-group-flush shadow-sm rounded mt-1 border pf-search-results"></div>
+              <div id="customerSearchResults" class="list-group list-group-flush shadow-sm rounded mt-1 border pf-search-results" role="listbox" aria-label="Customer search results"></div>
               <div class="invalid-feedback" id="customerInvalidFeedback">Please choose a customer from the search results.</div>
             </div>
             <select name="customer_id" id="customerSelectHidden" class="form-select form-select-sm pf-visually-hidden-select" required <?php echo ($lockAll || $priceOnly) ? 'disabled' : ''; ?> data-enhance="false" aria-hidden="true" tabindex="-1" aria-invalid="false">
@@ -2679,7 +2698,30 @@
   const priceOnly = <?php echo $priceOnly ? 'true' : 'false'; ?>;
   const lockAll = <?php echo $lockAll ? 'true' : 'false'; ?>;
   const canEnterItemAmounts = <?php echo $canEnterItemAmounts ? 'true' : 'false'; ?>;
-  const customersSearchData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)($c['id'] ?? 0),'name'=>(string)($c['name'] ?? ''),'phone'=>(string)($c['phone'] ?? '')]; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+  const customersSearchData = <?php echo json_encode(array_map(function($c){
+    $id = (int)($c['id'] ?? 0);
+    $type = strtolower(trim((string)($c['customer_type'] ?? '')));
+    $name = (string)($c['name'] ?? '');
+    $phone = (string)($c['phone'] ?? '');
+    $address = (string)($c['address'] ?? '');
+    $delivery = (string)($c['delivery_location'] ?? '');
+    return [
+      'id' => $id,
+      'customer_id' => $id,
+      'name' => $name,
+      'customer_name' => $name,
+      'phone' => $phone,
+      'mobile' => $phone,
+      'telephone' => $phone,
+      'email' => (string)($c['email'] ?? ''),
+      'address' => $address,
+      'delivery_location' => $delivery,
+      'delivery_address' => $delivery !== '' ? $delivery : $address,
+      'customer_code' => 'CUS-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT),
+      'company_name' => $type === 'corporate' ? $name : '',
+      'nic' => '',
+    ];
+  }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   const table = document.getElementById('itemsTable');
   const addBtn = document.getElementById('addRow');
   const totalDisplay = document.getElementById('totalDisplay');
@@ -3175,13 +3217,168 @@
   const customerSearchInput = document.getElementById('customerSearch');
   const customerSelectMain = document.getElementById('customerSelectHidden') || document.querySelector('select[name="customer_id"]');
   const customerSearchResults = document.getElementById('customerSearchResults');
+  const customerSearchUrl = <?php echo json_encode(Helpers::baseUrl('index.php?page=customers&action=search'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_UNESCAPED_SLASHES); ?>;
+  let customerSearchTimer = null;
+  let customerSearchSeq = 0;
+  const customerSearchCache = {};
   function normalize(s){ return String(s || '').toLowerCase().replace(/\s+/g,' ').trim(); }
   function digits(s){ return String(s || '').replace(/\D+/g,''); }
+  function escapeHtml(s){
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function normalizeCustomerResult(c){
+    const id = parseInt(c.id || c.customer_id || 0, 10);
+    const name = String(c.name || c.customer_name || '').trim();
+    const phone = String(c.phone || c.mobile || c.telephone || '').trim();
+    const mobile = String(c.mobile || c.phone || '').trim();
+    const telephone = String(c.telephone || c.phone || '').trim();
+    let customerCode = String(c.customer_code || c.ledger_code || '').trim();
+    if (!customerCode && id > 0) customerCode = 'CUS-' + String(id).padStart(5, '0');
+    let companyName = String(c.company_name || '').trim();
+    if (!companyName && String(c.customer_type || '').toLowerCase() === 'corporate') companyName = name;
+    const address = String(c.address || '').trim();
+    const deliveryLocation = String(c.delivery_location || c.delivery_address || '').trim();
+    const deliveryAddress = String(c.delivery_address || c.delivery_location || address || '').trim();
+    return {
+      id: id,
+      customer_id: id,
+      name: name,
+      customer_name: name,
+      phone: phone,
+      mobile: mobile,
+      telephone: telephone,
+      email: String(c.email || '').trim(),
+      address: address,
+      delivery_location: deliveryLocation,
+      delivery_address: deliveryAddress,
+      customer_code: customerCode,
+      company_name: companyName,
+      nic: String(c.nic || '').trim(),
+      customer_type: String(c.customer_type || '').trim()
+    };
+  }
   function formatCustomerLabel(c){
-    const nm = String(c.name || '').trim();
-    const ph = String(c.phone || '').trim();
+    const nm = String(c.name || c.customer_name || '').trim();
+    const ph = String(c.phone || c.mobile || c.telephone || '').trim();
     if (nm && ph) return nm + ' (' + ph + ')';
     return nm || ph || ('Customer #' + String(c.id || ''));
+  }
+  function ensureCustomerOption(c){
+    if (!customerSelectMain || !c || !c.id) return;
+    const rec = normalizeCustomerResult(c);
+    const idStr = String(rec.id);
+    const label = formatCustomerLabel(rec);
+    let found = false;
+    Array.from(customerSelectMain.options).forEach(function(o){
+      if (String(o.value) === idStr) {
+        o.textContent = label;
+        o.dataset.customerCode = rec.customer_code || '';
+        o.dataset.customerName = rec.customer_name || rec.name || '';
+        o.dataset.customerPhone = rec.phone || '';
+        o.dataset.customerMobile = rec.mobile || '';
+        o.dataset.customerEmail = rec.email || '';
+        o.dataset.customerAddress = rec.address || '';
+        o.dataset.customerDelivery = rec.delivery_address || rec.delivery_location || '';
+        o.dataset.customerCompany = rec.company_name || '';
+        o.dataset.customerNic = rec.nic || '';
+        found = true;
+      }
+    });
+    if (!found) {
+      const opt = document.createElement('option');
+      opt.value = idStr;
+      opt.textContent = label;
+      opt.dataset.customerCode = rec.customer_code || '';
+      opt.dataset.customerName = rec.customer_name || rec.name || '';
+      opt.dataset.customerPhone = rec.phone || '';
+      opt.dataset.customerMobile = rec.mobile || '';
+      opt.dataset.customerEmail = rec.email || '';
+      opt.dataset.customerAddress = rec.address || '';
+      opt.dataset.customerDelivery = rec.delivery_address || rec.delivery_location || '';
+      opt.dataset.customerCompany = rec.company_name || '';
+      opt.dataset.customerNic = rec.nic || '';
+      customerSelectMain.appendChild(opt);
+    }
+  }
+  function registerCustomerRecord(c){
+    if (!c || !c.id) return;
+    const rec = normalizeCustomerResult(c);
+    const id = rec.id;
+    if (id <= 0) return;
+    customerSearchCache[id] = rec;
+    const existingIdx = customersSearchData.findIndex(function(x){ return parseInt(x.id || 0, 10) === id; });
+    if (existingIdx < 0) {
+      customersSearchData.push(rec);
+    } else {
+      customersSearchData[existingIdx] = Object.assign({}, customersSearchData[existingIdx], rec);
+    }
+    if (typeof customersData !== 'undefined' && Array.isArray(customersData)) {
+      const existing = customersData.find(function(x){ return x.id === id; });
+      const row = {
+        id: id,
+        name: rec.name,
+        customer_name: rec.customer_name,
+        phone: rec.phone,
+        mobile: rec.mobile,
+        telephone: rec.telephone,
+        email: rec.email,
+        address: rec.address,
+        delivery_location: rec.delivery_location,
+        delivery_address: rec.delivery_address,
+        customer_code: rec.customer_code,
+        company_name: rec.company_name,
+        nic: rec.nic
+      };
+      if (!existing) {
+        customersData.push(row);
+      } else {
+        Object.assign(existing, row);
+      }
+    }
+  }
+  function applyCustomerFields(c){
+    const rec = normalizeCustomerResult(c);
+    if (typeof window !== 'undefined') window._pfDeliveryLocationTouched = false;
+    const deliveryAddr = rec.delivery_address || rec.delivery_location || '';
+    const dlInput = document.getElementById('deliveryLocationInput');
+    if (dlInput && !dlInput.disabled) {
+      dlInput.value = deliveryAddr;
+    }
+    const custDisplay = document.getElementById('customerDisplay');
+    if (custDisplay) {
+      const label = rec.customer_name || rec.name || '';
+      const phone = rec.phone || rec.mobile || '';
+      custDisplay.textContent = label ? (phone ? (label + ' (' + phone + ')') : label) : '—';
+    }
+    const custLoc = document.getElementById('customerLocDisplay');
+    if (custLoc) custLoc.textContent = deliveryAddr || rec.address || '—';
+    ensureCustomerOption(rec);
+    try { if (typeof syncEnterpriseUi === 'function') syncEnterpriseUi(); } catch (_) {}
+  }
+  function applyCustomerDeliveryLocation(c){
+    const rec = normalizeCustomerResult(c);
+    const dl = String(rec.delivery_address || rec.delivery_location || '').trim();
+    if (!dl) return;
+    const dlInput = document.getElementById('deliveryLocationInput');
+    if (dlInput && !dlInput.disabled) dlInput.value = dl;
+  }
+  function pickCustomer(c, opts){
+    opts = opts || {};
+    if (!c || !c.id) return;
+    const rec = normalizeCustomerResult(c);
+    registerCustomerRecord(rec);
+    ensureCustomerOption(rec);
+    hideCustomerResults();
+    if (forceLastBillFlow && !isEdit && !opts.skipLastBill) {
+      if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(rec);
+      showLastBillThenSelect(rec);
+      return;
+    }
+    setCustomer(rec.id);
+    if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(rec);
+    applyCustomerFields(rec);
+    try { if (typeof updateMeta === 'function') updateMeta(); } catch (_) {}
+    try { if (typeof fetchCustomerSummary === 'function') fetchCustomerSummary(); } catch (_) {}
   }
   function setCustomer(id){
     if (!customerSelectMain) return;
@@ -3198,7 +3395,7 @@
     if (!customerSelectMain || !customerSearchInput) return;
     const id = parseInt(customerSelectMain.value || '0', 10);
     if (id <= 0) return;
-    const c = customersSearchData.find(function(x){ return parseInt(x.id || '0', 10) === id; });
+    const c = customerSearchCache[id] || customersSearchData.find(function(x){ return parseInt(x.id || '0', 10) === id; });
     if (c) {
       customerSearchInput.value = formatCustomerLabel(c);
       return;
@@ -3207,29 +3404,92 @@
     if (opt && opt.value) customerSearchInput.value = (opt.textContent || '').trim();
   }
   syncCustomerSearchFromSelect();
+  function setCustomerDropdownOpen(isOpen){
+    const browseBtn = document.getElementById('customerBrowseBtn');
+    if (browseBtn) browseBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    if (customerSearchInput) customerSearchInput.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+  let customerDropdownActiveIndex = -1;
+  function highlightCustomerDropdownItem(index){
+    if (!customerSearchResults) return;
+    const items = customerSearchResults.querySelectorAll('[data-customer-id]');
+    items.forEach(function(el, i){
+      el.classList.toggle('active', i === index);
+    });
+    customerDropdownActiveIndex = index;
+    if (index >= 0 && items[index]) {
+      try { items[index].scrollIntoView({ block: 'nearest' }); } catch (_) {}
+    }
+  }
+  function renderCustomerResultItem(c){
+    const rec = normalizeCustomerResult(c);
+    const code = escapeHtml(rec.customer_code || ('CUS-' + String(rec.id || '').padStart(5, '0')));
+    const name = escapeHtml(rec.customer_name || rec.name || ('Customer #' + String(rec.id || '')));
+    const phone = escapeHtml(rec.phone || rec.mobile || rec.telephone || '');
+    const company = escapeHtml(rec.company_name || '');
+    const addr = escapeHtml(rec.address || rec.delivery_address || rec.delivery_location || '');
+    return '<div class="list-group-item list-group-item-action py-2 pf-customer-dd-item" role="option" data-customer-id="' + rec.id + '" tabindex="-1">'
+      + '<div class="pf-customer-dd-code">' + code + '</div>'
+      + '<div class="pf-customer-dd-name">' + name + '</div>'
+      + (phone ? '<div class="pf-customer-dd-phone">&#128222; ' + phone + '</div>' : '')
+      + (company ? '<div class="pf-customer-dd-company">' + company + '</div>' : '')
+      + (addr ? '<div class="pf-customer-dd-address">' + addr + '</div>' : '')
+      + '</div>';
+  }
+  function renderCustomerDropdownFooter(){
+    return '<div class="list-group-item list-group-item-action py-2 pf-customer-dd-footer text-primary" role="option" data-action="quick-add-customer" tabindex="-1">'
+      + '<i class="bi bi-person-plus me-1" aria-hidden="true"></i>Quick add customer'
+      + '</div>';
+  }
+  function showCustomerResults(items, opts){
+    opts = opts || {};
+    if (!customerSearchResults) return;
+    if (!items || items.length === 0) {
+      customerSearchResults.innerHTML = (opts.showHeader ? '<div class="list-group-item list-group-item-light py-1 pf-customer-dd-header">Customers</div>' : '')
+        + '<div class="list-group-item py-2 small text-muted">No customers found.</div>'
+        + renderCustomerDropdownFooter();
+      customerSearchResults.style.display = 'block';
+      setCustomerDropdownOpen(true);
+      customerDropdownActiveIndex = -1;
+      return;
+    }
+    let html = '';
+    if (opts.showHeader) {
+      html += '<div class="list-group-item list-group-item-light py-1 pf-customer-dd-header">'
+        + escapeHtml(opts.headerLabel || 'All Customers')
+        + '</div>';
+    }
+    html += items.map(renderCustomerResultItem).join('');
+    html += renderCustomerDropdownFooter();
+    customerSearchResults.innerHTML = html;
+    customerSearchResults.style.display = 'block';
+    setCustomerDropdownOpen(true);
+    customerDropdownActiveIndex = -1;
+  }
   function hideCustomerResults(){
     if (customerSearchResults) customerSearchResults.style.display = 'none';
     if (customerSearchResults) customerSearchResults.innerHTML = '';
-  }
-  function showCustomerResults(items){
-    if (!customerSearchResults) return;
-    if (!items || items.length === 0) { hideCustomerResults(); return; }
-    customerSearchResults.innerHTML = items.map(function(c){
-      const label = formatCustomerLabel(c);
-      return `<button type="button" class="list-group-item list-group-item-action" data-customer-id="${c.id}">${label}</button>`;
-    }).join('');
-    customerSearchResults.style.display = '';
+    setCustomerDropdownOpen(false);
+    customerDropdownActiveIndex = -1;
   }
   function findMatches(qRaw){
     const q = normalize(qRaw);
     const qd = digits(qRaw);
-    if (!q && !qd) return [];
+    if (!q && !qd) {
+      return customersSearchData.slice().sort(function(a, b){
+        return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+      });
+    }
     const scored = [];
     customersSearchData.forEach(function(c){
       if (!c || !c.id) return;
       const n = normalize(c.name);
       const p = String(c.phone || '').trim();
       const pd = digits(p);
+      const code = normalize(c.customer_code || '');
+      const company = normalize(c.company_name || '');
+      const addr = normalize(c.address || c.delivery_location || '');
+      const email = normalize(c.email || '');
       let score = 0;
       if (qd && pd && (pd === qd)) score += 100;
       if (qd && pd && (pd.endsWith(qd) || qd.endsWith(pd))) score += 60;
@@ -3237,34 +3497,137 @@
       if (q && n.startsWith(q)) score += 40;
       if (q && n.includes(q)) score += 20;
       if (q && normalize(p).includes(q)) score += 10;
+      if (q && code.includes(q)) score += 30;
+      if (q && company.includes(q)) score += 25;
+      if (q && addr.includes(q)) score += 8;
+      if (q && email.includes(q)) score += 8;
       if (score > 0) scored.push({c, score});
     });
     scored.sort(function(a,b){ return b.score - a.score; });
     return scored.map(x=>x.c);
   }
+  async function ajaxCustomerSearch(qRaw, opts){
+    opts = opts || {};
+    const q = String(qRaw || '').trim();
+    const seq = ++customerSearchSeq;
+    const showHeader = opts.showHeader !== false;
+    const headerLabel = q ? 'Search results' : 'All Customers';
+    if (customerSearchResults && seq === customerSearchSeq) {
+      customerSearchResults.innerHTML = '<div class="list-group-item py-2 small text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Loading customers...</div>';
+      customerSearchResults.style.display = 'block';
+      setCustomerDropdownOpen(true);
+    }
+    try {
+      const url = customerSearchUrl
+        + '&q=' + encodeURIComponent(q)
+        + '&limit=100'
+        + '&sort=' + encodeURIComponent(opts.sort || 'name');
+      const res = await fetch(url, { method: 'GET', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = parseJsonResponse(await res.text());
+      if (seq !== customerSearchSeq) return;
+      if (!data || data.ok !== true) {
+        showCustomerResults(findMatches(q).slice(0, 100), { showHeader: showHeader, headerLabel: headerLabel });
+        return;
+      }
+      const results = (data.results || []).map(normalizeCustomerResult);
+      results.forEach(registerCustomerRecord);
+      showCustomerResults(results, { showHeader: showHeader, headerLabel: headerLabel });
+    } catch (err) {
+      if (seq !== customerSearchSeq) return;
+      const fallback = findMatches(q).slice(0, 100);
+      if (fallback.length > 0) {
+        showCustomerResults(fallback, { showHeader: showHeader, headerLabel: headerLabel });
+      } else {
+        showCustomerResults([], { showHeader: showHeader, headerLabel: headerLabel });
+      }
+    }
+  }
+  function openCustomerDropdown(){
+    if (lockAll || priceOnly) return;
+    let qRaw = String(customerSearchInput?.value || '').trim();
+    const selectedId = parseInt(customerSelectMain?.value || '0', 10);
+    if (selectedId > 0) {
+      const selected = customerSearchCache[selectedId] || customersSearchData.find(function(x){ return parseInt(x.id || 0, 10) === selectedId; });
+      if (selected && qRaw === formatCustomerLabel(selected)) {
+        qRaw = '';
+      }
+    }
+    // Show local data immediately while AJAX loads
+    const localMatches = findMatches(qRaw).slice(0, 100);
+    if (localMatches.length > 0) {
+      showCustomerResults(localMatches, {
+        showHeader: true,
+        headerLabel: qRaw ? 'Search results' : 'All Customers'
+      });
+    }
+    clearTimeout(customerSearchTimer);
+    const delay = qRaw ? 200 : 0;
+    customerSearchTimer = setTimeout(function(){
+      ajaxCustomerSearch(qRaw, { showHeader: true, sort: 'name' });
+    }, delay);
+  }
   function onCustomerSearch(){
     if (lockAll || priceOnly) return;
-    const qRaw = String(customerSearchInput?.value || '').trim();
-    const matches = findMatches(qRaw).slice(0, 15);
-    showCustomerResults(matches);
+    openCustomerDropdown();
   }
   customerSearchInput?.addEventListener('input', onCustomerSearch);
-  customerSearchInput?.addEventListener('focus', onCustomerSearch);
+  customerSearchInput?.addEventListener('focus', openCustomerDropdown);
+  customerSearchInput?.addEventListener('click', openCustomerDropdown);
+  document.querySelector('.customer-search-results .input-group-text')?.addEventListener('click', function(){
+    if (lockAll || priceOnly) return;
+    customerSearchInput?.focus();
+    openCustomerDropdown();
+  });
+  document.getElementById('customerBrowseBtn')?.addEventListener('click', function(e){
+    e.preventDefault();
+    if (lockAll || priceOnly) return;
+    customerSearchInput?.focus();
+    if (customerSearchInput) {
+      customerSearchInput.select();
+    }
+    openCustomerDropdown();
+  });
   customerSearchInput?.addEventListener('keydown', function(e){
-    if (e.key === 'Escape') { hideCustomerResults(); }
+    const items = customerSearchResults ? customerSearchResults.querySelectorAll('[data-customer-id]') : [];
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!items.length) return;
+      const next = customerDropdownActiveIndex < items.length - 1 ? customerDropdownActiveIndex + 1 : 0;
+      highlightCustomerDropdownItem(next);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!items.length) return;
+      const prev = customerDropdownActiveIndex > 0 ? customerDropdownActiveIndex - 1 : items.length - 1;
+      highlightCustomerDropdownItem(prev);
+      return;
+    }
+    if (e.key === 'Escape') { hideCustomerResults(); return; }
     if (e.key === 'Enter') {
       const qRaw = String(customerSearchInput?.value || '').trim();
-      const matches = findMatches(qRaw);
+      let matches = [];
+      if (customerDropdownActiveIndex >= 0 && items[customerDropdownActiveIndex]) {
+        const id = parseInt(items[customerDropdownActiveIndex].getAttribute('data-customer-id') || '0', 10);
+        const cached = customerSearchCache[id] || customersSearchData.find(function(x){ return parseInt(x.id || 0, 10) === id; });
+        if (cached) matches = [cached];
+      }
+      if (!matches.length) {
+        const visibleId = customerSearchResults?.querySelector('[data-customer-id]')?.getAttribute('data-customer-id');
+        if (visibleId) {
+          const id = parseInt(visibleId, 10);
+          const cached = customerSearchCache[id] || customersSearchData.find(function(x){ return parseInt(x.id || 0, 10) === id; });
+          if (cached) matches = [cached];
+        }
+      }
+      if (!matches.length) matches = findMatches(qRaw);
       if (matches.length === 1) {
         e.preventDefault();
-        hideCustomerResults();
-        if (forceLastBillFlow && !isEdit) {
-          showLastBillThenSelect(matches[0]);
-          customerSearchInput.value = formatCustomerLabel(matches[0]);
-        } else {
-          setCustomer(matches[0].id);
-          customerSearchInput.value = formatCustomerLabel(matches[0]);
-        }
+        pickCustomer(matches[0]);
+      } else if (matches.length > 1 && customerDropdownActiveIndex < 0) {
+        e.preventDefault();
+        pickCustomer(matches[0]);
       }
     }
   });
@@ -3343,23 +3706,32 @@
   }
 
   customerSearchResults?.addEventListener('click', function(e){
+    const quickAddBtn = e.target.closest('[data-action="quick-add-customer"]');
+    if (quickAddBtn) {
+      hideCustomerResults();
+      const m = document.getElementById('quickAddCustomer');
+      if (m && window.bootstrap && window.bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(m).show();
+      }
+      return;
+    }
     const btn = e.target.closest('[data-customer-id]');
     if (!btn) return;
-    const id = parseInt(btn.getAttribute('data-customer-id') || '0');
-    const c = customersSearchData.find(x => parseInt(x.id||0) === id) || { id };
-    hideCustomerResults();
-    if (forceLastBillFlow && !isEdit) {
-      showLastBillThenSelect(c);
-    } else {
-      setCustomer(id);
-      if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(c);
-    }
+    const id = parseInt(btn.getAttribute('data-customer-id') || '0', 10);
+    const c = customerSearchCache[id] || customersSearchData.find(function(x){ return parseInt(x.id||0, 10) === id; }) || { id: id };
+    pickCustomer(c);
+  });
+  customerSearchResults?.addEventListener('mousemove', function(e){
+    const btn = e.target.closest('[data-customer-id]');
+    if (!btn || !customerSearchResults) return;
+    const items = customerSearchResults.querySelectorAll('[data-customer-id]');
+    const index = Array.prototype.indexOf.call(items, btn);
+    if (index >= 0) highlightCustomerDropdownItem(index);
   });
 
   clbSelectBtn?.addEventListener('click', function(){
     if (!pendingCustomerPick) return;
-    setCustomer(pendingCustomerPick.id);
-    if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(pendingCustomerPick);
+    pickCustomer(pendingCustomerPick, { skipLastBill: true });
     pendingCustomerPick = null;
     try {
       if (clbModalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(clbModalEl).hide();
@@ -3368,7 +3740,9 @@
   document.addEventListener('click', function(e){
     if (!customerSearchResults || !customerSearchInput) return;
     if (e.target === customerSearchInput) return;
-    if (customerSearchResults.contains(e.target)) return;
+    if (e.target.closest('#customerBrowseBtn')) return;
+    if (e.target.closest('.customer-search-results .input-group-text')) return;
+    if (e.target.closest('.customer-search-results')) return;
     hideCustomerResults();
   });
 
@@ -3942,9 +4316,31 @@
   const customerLocDisplay = document.getElementById('customerLocDisplay');
   const deliveryLocationInput = document.getElementById('deliveryLocationInput');
   let deliveryLocationTouched = false;
-  deliveryLocationInput?.addEventListener('input', function(){ deliveryLocationTouched = true; });
+  deliveryLocationInput?.addEventListener('input', function(){ deliveryLocationTouched = true; window._pfDeliveryLocationTouched = true; });
   const toBranchSuggest = document.getElementById('toBranchSuggest');
-  const customersData = <?php echo json_encode(array_map(function($c){ return ['id'=>(int)$c['id'],'delivery_location'=>$c['delivery_location'] ?? '']; }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+  const customersData = <?php echo json_encode(array_map(function($c){
+    $id = (int)($c['id'] ?? 0);
+    $name = (string)($c['name'] ?? '');
+    $phone = (string)($c['phone'] ?? '');
+    $address = (string)($c['address'] ?? '');
+    $delivery = (string)($c['delivery_location'] ?? '');
+    return [
+      'id' => $id,
+      'customer_id' => $id,
+      'name' => $name,
+      'customer_name' => $name,
+      'phone' => $phone,
+      'mobile' => $phone,
+      'telephone' => $phone,
+      'email' => (string)($c['email'] ?? ''),
+      'address' => $address,
+      'delivery_location' => $delivery,
+      'delivery_address' => $delivery !== '' ? $delivery : $address,
+      'customer_code' => 'CUS-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT),
+      'company_name' => strtolower(trim((string)($c['customer_type'] ?? ''))) === 'corporate' ? $name : '',
+      'nic' => '',
+    ];
+  }, $customersAll ?? []), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   /** Label for receipt summary — use value lookup (Choices.js can leave selectedIndex on placeholder while value is set) */
   function branchSelectLabel(sel) {
     if (!sel) return '—';
@@ -4012,19 +4408,21 @@
   }
   function updateMeta(){
     const selIdx = customerSelect?.selectedIndex ?? -1;
-    const custText = customerSelect?.options[selIdx]?.text || '-- Select Customer --';
+    const custId = parseInt(customerSelect?.value || '0');
+    const cRow = (custId > 0 && typeof customerSearchCache !== 'undefined' && customerSearchCache[custId])
+      ? customerSearchCache[custId]
+      : customersData.find(function(c){ return c.id === custId; });
+    const custText = cRow
+      ? formatCustomerLabel(cRow)
+      : (customerSelect?.options[selIdx]?.text || '-- Select Customer --');
     const fromText = branchSelectLabel(fromBranchSelect);
     const toText = branchSelectLabel(toBranchSelect);
     if (customerDisplay) customerDisplay.textContent = custText;
     if (fromBranchDisplay) fromBranchDisplay.textContent = fromText;
     if (toBranchDisplay) toBranchDisplay.textContent = toText;
-    // Receipt summary uses customerDisplay / fromBranchDisplay / toBranchDisplay (single row)
-    // Customer delivery location
-    const custId = parseInt(customerSelect?.value || '0');
-    const cRow = customersData.find(c => c.id === custId);
-    const loc = (cRow?.delivery_location || '').trim();
-    if (customerLocDisplay) customerLocDisplay.textContent = loc || '—';
-    if (deliveryLocationInput && !deliveryLocationTouched) {
+    const loc = String(cRow?.delivery_address || cRow?.delivery_location || '').trim();
+    if (customerLocDisplay) customerLocDisplay.textContent = loc || String(cRow?.address || '').trim() || '—';
+    if (deliveryLocationInput && !deliveryLocationTouched && !window._pfDeliveryLocationTouched) {
       deliveryLocationInput.value = loc || '';
     }
     // Suggest To Branch by matching branch name in location
@@ -4279,14 +4677,8 @@
     const btn = e.target.closest('[data-pick]');
     if (btn) {
       const id = parseInt(btn.getAttribute('data-pick') || '0', 10);
-      const c = (allCustomers || []).find(x => parseInt(x.id||0) === id) || { id };
-      if (forceLastBillFlow && !isEdit) {
-        if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(c);
-        showLastBillThenSelect({ id: c.id, name: c.name || '', phone: c.phone || '' });
-      } else if (customerSelect2) {
-        customerSelect2.value = String(id);
-        customerSelect2.dispatchEvent(new Event('change'));
-      }
+      const c = customerSearchCache[id] || (allCustomers || []).find(function(x){ return parseInt(x.id||0, 10) === id; }) || { id: id };
+      pickCustomer(c);
     }
   });
 
@@ -4349,59 +4741,27 @@
       }
       // Ensure it shows up in the Customer dropdown immediately
       const sel = document.querySelector('select[name="customer_id"]');
+      const savedCustomer = normalizeCustomerResult({
+        id: data.id,
+        name: data.name || name,
+        phone: data.phone || phone,
+        email: data.email || email,
+        address: data.address || address,
+        delivery_location: data.delivery_location || delivery_location,
+        customer_type: data.customer_type || type
+      });
       if (sel) {
-        const idStr = String(data.id);
-        const phonePart = (data.phone ? ' (' + String(data.phone).trim() + ')' : '');
-        const emailPart = (data.email ? ' [' + String(data.email).trim() + ']' : '');
-        const label = String(data.name || '').trim() + phonePart + emailPart;
-        // Avoid duplicate options; update text if exists
-        let found = false;
-        Array.from(sel.options).forEach(o => {
-          if (String(o.value) === idStr) { o.textContent = label; found = true; }
-        });
-        if (!found) {
-          const opt = document.createElement('option');
-          opt.value = idStr;
-          opt.textContent = label;
-          sel.appendChild(opt);
-        }
-        if (Array.isArray(customersSearchData)) {
-          const cid = parseInt(idStr, 10);
-          if (!customersSearchData.find(x => parseInt(x.id||0) === cid)) {
-            customersSearchData.push({ id: cid, name: String(data.name||'').trim(), phone: String(data.phone||'').trim() });
-          }
-        }
+        ensureCustomerOption(savedCustomer);
+        registerCustomerRecord(savedCustomer);
         if (forceLastBillFlow && !isEdit) {
-          if (customerSearchInput) customerSearchInput.value = label;
-          showLastBillThenSelect({ id: parseInt(idStr,10), name: String(data.name||'').trim(), phone: String(data.phone||'').trim() });
+          if (customerSearchInput) customerSearchInput.value = formatCustomerLabel(savedCustomer);
+          showLastBillThenSelect(savedCustomer);
         } else {
-          // If select is disabled, temporarily enable to set value so UI reflects change
           const wasDisabled = sel.disabled;
           if (wasDisabled) sel.disabled = false;
-          sel.value = idStr;
-          // If enhanced by Choices.js, sync and select via API
-          try {
-            if (sel._choices) {
-              const choices = Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, selected: o.selected, disabled: o.disabled }));
-              sel._choices.setChoices(choices, 'value', 'label', true);
-              sel._choices.setChoiceByValue(idStr);
-            }
-          } catch(_) { /* ignore */ }
-          sel.dispatchEvent(new Event('change'));
-          sel.dispatchEvent(new Event('input'));
-          sel.dispatchEvent(new Event('refresh-choices'));
+          pickCustomer(savedCustomer);
           if (wasDisabled) sel.disabled = true;
-          try { if (typeof updateMeta === 'function') updateMeta(); } catch(_) {}
-          try { if (typeof fetchCustomerSummary === 'function') fetchCustomerSummary(); } catch(_) {}
         }
-        // Update in-memory customersData so delivery location and suggestions work without refresh
-        try {
-          if (Array.isArray(customersData)) {
-            const cid = parseInt(idStr, 10);
-            const existing = customersData.find(c => c.id === cid);
-            if (!existing) customersData.push({ id: cid, delivery_location: (data.delivery_location || '').trim() });
-          }
-        } catch(_) { /* ignore */ }
       }
       // Close the modal
       const m = document.getElementById('quickAddCustomer');

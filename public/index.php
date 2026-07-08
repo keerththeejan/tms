@@ -1357,6 +1357,106 @@ switch ($page) {
             break;
         }
 
+        // JSON customer search (parcel form autocomplete)
+        if ($action === 'search' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+            header('Content-Type: application/json; charset=utf-8');
+            $q = trim((string)($_GET['q'] ?? ''));
+            $limit = (int)($_GET['limit'] ?? 100);
+            if ($limit < 1) {
+                $limit = 100;
+            }
+            if ($limit > 100) {
+                $limit = 100;
+            }
+            $sort = strtolower(trim((string)($_GET['sort'] ?? 'name')));
+            $orderBy = ($sort === 'recent') ? 'c.created_at DESC, c.name ASC' : 'c.name ASC';
+            try {
+                CustomerLedgerRepository::ensureSchema($pdo);
+            } catch (Throwable $e) { /* optional */ }
+            try {
+                if ($q === '') {
+                    $sql = 'SELECT c.id, c.name, c.phone, c.email, c.address, c.delivery_location, c.customer_type, c.created_at,
+                                   cl.ledger_code
+                            FROM customers c
+                            LEFT JOIN customer_ledger cl ON cl.customer_id = c.id
+                            ORDER BY ' . $orderBy . '
+                            LIMIT ' . $limit;
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute();
+                } else {
+                    $like = '%' . $q . '%';
+                    $sql = 'SELECT c.id, c.name, c.phone, c.email, c.address, c.delivery_location, c.customer_type, c.created_at,
+                                   cl.ledger_code
+                            FROM customers c
+                            LEFT JOIN customer_ledger cl ON cl.customer_id = c.id
+                            WHERE (
+                                c.name LIKE ?
+                                OR c.phone LIKE ?
+                                OR c.email LIKE ?
+                                OR c.address LIKE ?
+                                OR c.delivery_location LIKE ?
+                                OR COALESCE(cl.ledger_code, \'\') LIKE ?
+                                OR CONCAT(\'CUS-\', LPAD(c.id, 5, \'0\')) LIKE ?
+                                OR (c.customer_type = \'corporate\' AND c.name LIKE ?)
+                            )
+                            ORDER BY ' . $orderBy . '
+                            LIMIT ' . $limit;
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([$like, $like, $like, $like, $like, $like, $like, $like]);
+                }
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            } catch (Throwable $e) {
+                echo json_encode([
+                    'ok' => false,
+                    'error' => 'Search failed',
+                    'results' => [],
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                return;
+            }
+            $results = [];
+            foreach ($rows as $row) {
+                $id = (int)($row['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $name = trim((string)($row['name'] ?? ''));
+                $phone = trim((string)($row['phone'] ?? ''));
+                $customerType = strtolower(trim((string)($row['customer_type'] ?? '')));
+                $ledgerCode = trim((string)($row['ledger_code'] ?? ''));
+                $customerCode = $ledgerCode !== '' ? $ledgerCode : ('CUS-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT));
+                $companyName = $customerType === 'corporate' ? $name : '';
+                $address = trim((string)($row['address'] ?? ''));
+                $deliveryLocation = trim((string)($row['delivery_location'] ?? ''));
+                $email = trim((string)($row['email'] ?? ''));
+                $results[] = [
+                    'id' => $id,
+                    'customer_id' => $id,
+                    'name' => $name,
+                    'customer_name' => $name,
+                    'phone' => $phone,
+                    'mobile' => $phone,
+                    'telephone' => $phone,
+                    'email' => $email,
+                    'address' => $address,
+                    'delivery_location' => $deliveryLocation,
+                    'delivery_address' => $deliveryLocation !== '' ? $deliveryLocation : $address,
+                    'customer_code' => $customerCode,
+                    'ledger_code' => $ledgerCode,
+                    'nic' => '',
+                    'company_name' => $companyName,
+                    'customer_type' => $customerType,
+                    'created_at' => (string)($row['created_at'] ?? ''),
+                ];
+            }
+            echo json_encode([
+                'ok' => true,
+                'results' => $results,
+                'total' => count($results),
+                'has_query' => ($q !== ''),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return;
+        }
+
         // JSON summary for a customer (used by parcel form notification)
         if ($action === 'summary' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             header('Content-Type: application/json');
@@ -1910,7 +2010,7 @@ switch ($page) {
 
         // data for forms
         $branchesAll = BranchRepository::forDropdowns($pdo);
-        $customersAll = $pdo->query('SELECT id, name, phone, delivery_location, lat, lng FROM customers ORDER BY created_at DESC LIMIT 500')->fetchAll();
+        $customersAll = $pdo->query('SELECT id, name, phone, email, address, delivery_location, customer_type, lat, lng FROM customers ORDER BY name ASC LIMIT 500')->fetchAll();
         $suppliersAll = $pdo->query('SELECT id, name, phone FROM suppliers ORDER BY name')->fetchAll();
         // Ensure email log table exists
         try {
