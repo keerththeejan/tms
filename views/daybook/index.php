@@ -1,4 +1,9 @@
 <?php /** @var string $date */ /** @var array $payments */ /** @var array $expenses */ ?>
+<?php
+$reportTitle = 'Day Book';
+$reportPeriod = (string)($date ?? '');
+include __DIR__ . '/../partials/report/embed_block.php';
+?>
 <div class="container-fluid px-0">
   <div class="row g-2 mb-2">
     <div class="col-12">

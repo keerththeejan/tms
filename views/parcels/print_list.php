@@ -3,6 +3,9 @@
 /** @var array $parcelItemsById */
 $rowNum = (int)($parcelRowStart ?? 0);
 $parcelItemsById = $parcelItemsById ?? [];
+$reportTitle = 'Parcels List';
+$reportPeriod = trim((string)($from ?? '') . ' — ' . (string)($to ?? ''));
+include __DIR__ . '/../partials/report/embed_block.php';
 ?>
 <style>
   @media print {

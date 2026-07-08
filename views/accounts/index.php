@@ -9,6 +9,9 @@ $df = Helpers::parseDateOr((string)($_GET['df'] ?? ''), date('Y-m-01'));
 $dt = Helpers::parseDateOr((string)($_GET['dt'] ?? ''), $today);
 [$df, $dt] = Helpers::orderDateRange($df, $dt);
 $csrf = Helpers::csrfToken();
+$reportTitle = 'Customer Statement';
+$reportPeriod = $df . ' — ' . $dt;
+include __DIR__ . '/../partials/report/embed_block.php';
 ?>
 
 <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/accounts-module.css?v=1'); ?>">

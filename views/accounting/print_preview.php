@@ -5,6 +5,8 @@
  */
 $reportType = $_GET['report_type'] ?? '';
 $reportData = $_GET['report_data'] ?? [];
+$reportTitle = trim((string)$reportType) !== '' ? ucwords(str_replace('_', ' ', (string)$reportType)) : 'Accounting Report';
+include __DIR__ . '/../partials/report/embed_block.php';
 ?>
 <style>
 .acc-print-preview {

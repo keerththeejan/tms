@@ -1,23 +1,28 @@
 <?php /** @var array $employee */ ?>
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Payroll - <?php echo htmlspecialchars($employee['emp_code'] ?? 'Employee'); ?></title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    @media print {
-      .no-print { display:none !important; }
-      body { margin: 0.5in; }
-      .table td, .table th { padding: .35rem .5rem; }
-    }
-    @media print {
-      .print-header-card { border: 0 !important; background: transparent !important; padding: 0 !important; }
-      .print-header-card .text-muted { color: #444 !important; }
-    }
-  </style>
-</head>
-<body>
+<?php
+$reportDocTitle = 'Payroll - ' . ($employee['emp_code'] ?? 'Employee');
+$reportTitle = 'Employee Payroll';
+$reportSubtitle = 'Transport and Parcel Services';
+$reportMetaItems = [
+    ['label' => 'Report', 'value' => 'Employee Payroll'],
+    ['label' => 'Print Date', 'value' => date('d/m/Y H:i')],
+    ['label' => 'Employee', 'value' => (string)($employee['emp_code'] ?? '')],
+    ['label' => 'Month', 'value' => (string)($employee['month_year'] ?? '')],
+];
+$reportInfoItems = [
+    ['label' => 'Report Name', 'value' => 'Employee Payroll'],
+    ['label' => 'Employee Code', 'value' => (string)($employee['emp_code'] ?? '')],
+    ['label' => 'Name', 'value' => (string)($employee['name'] ?? '')],
+    ['label' => 'Branch', 'value' => (string)($employee['branch_name'] ?? '')],
+    ['label' => 'Month-Year', 'value' => (string)($employee['month_year'] ?? '')],
+    ['label' => 'Printed Date', 'value' => date('d/m/Y H:i')],
+];
+$reportShowInfoPanel = true;
+$addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 3);
+$reportShowAddresses = true;
+$reportAddressLines = $addresses;
+include __DIR__ . '/../partials/report/print_document_open.php';
+?>
 <div class="no-print mb-3">
   <div class="d-flex flex-wrap gap-2 mb-2">
     <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
@@ -34,26 +39,11 @@
     </div>
   </div>
 </div>
-<?php $brand = Helpers::company(); $addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 3); ?>
-<div class="container">
-  <div class="mb-3 p-2 border rounded print-header-card">
-    <div class="d-flex align-items-center gap-2">
-      <?php $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']); ?>
-      <?php if ($useLogoImage): ?>
-        <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
-        <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo" style="height:38px">
-      <?php endif; ?>
-      <div>
-        <div class="fw-bold"><?php echo htmlspecialchars($brand['name'] ?? ''); ?></div>
-        <div class="small text-muted">Transport and Parcel Services</div>
-      </div>
-    </div>
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-1 mt-1 small text-muted" id="addrContainer">
-      <?php foreach ($addresses as $addr): ?>
-        <div class="addr-line"><?php echo nl2br(htmlspecialchars($addr)); ?></div>
-      <?php endforeach; ?>
-    </div>
-  </div>
+
+<div class="rpt-root rpt-root--b5">
+  <article class="rpt-sheet container">
+    <?php include __DIR__ . '/../partials/report/letterhead.php'; ?>
+
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Employee Payroll</h4>
     <button class="btn btn-primary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
@@ -72,7 +62,7 @@
     </div>
   </div>
 
-  <table class="table table-bordered">
+  <table class="table table-bordered rpt-table">
     <tbody>
       <tr>
         <th style="width:30%">Basic Salary</th>
@@ -105,10 +95,9 @@
     </tbody>
   </table>
 
-  <div class="mt-4 small text-muted">Generated on <?php echo date('Y-m-d H:i'); ?></div>
+    <?php include __DIR__ . '/../partials/report/footer.php'; ?>
+  </article>
 </div>
-
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <script>
   (function(){
     var toggleBtn = document.getElementById('toggleAddrEditor');
@@ -124,15 +113,21 @@
     ta.value = getCurrentLines().join('\n');
     toggleBtn.addEventListener('click', function(){ ed.style.display = (ed.style.display==='none' || ed.style.display==='') ? 'block' : 'none'; });
     function applyAddrs(){
-      var cont = document.getElementById('addrContainer'); if (!cont) return;
-      var parts = ta.value.replace(/\r/g,'').split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+      var cont = document.getElementById('addrContainer');
+      if (!cont) return;
+      var val = ta.value.replace(/\r/g,'');
+      var parts = val.split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s.length>0; });
       cont.innerHTML = '';
-      parts.forEach(function(line){ var d=document.createElement('div'); d.className='addr-line'; d.textContent=line; cont.appendChild(d); });
+      parts.forEach(function(line){
+        var d = document.createElement('div');
+        d.className = 'addr-line col';
+        d.textContent = line;
+        cont.appendChild(d);
+      });
     }
     document.getElementById('applyAddr').addEventListener('click', function(){ applyAddrs(); });
     document.getElementById('applyAndPrint').addEventListener('click', function(){ applyAddrs(); window.print(); });
   })();
   window.addEventListener('load', function(){ setTimeout(function(){ if (window.matchMedia) { window.print(); } }, 300); });
 </script>
-</body>
-</html>
+<?php include __DIR__ . '/../partials/report/print_document_close.php'; ?>

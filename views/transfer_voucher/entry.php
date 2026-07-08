@@ -740,6 +740,11 @@ $voucherId = (int) ($_GET['vid'] ?? 0);
 }
 </style>
 
+<?php
+$reportTitle = 'Transfer Voucher';
+include __DIR__ . '/../partials/report/embed_block.php';
+?>
+
 <div class="tv-module">
     <!-- Header -->
     <div class="tv-header">

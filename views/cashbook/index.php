@@ -15,6 +15,8 @@ try {
 } catch (Throwable $e) {
   // ignore
 }
+$reportTitle = 'Cash Book';
+include __DIR__ . '/../partials/report/embed_block.php';
 ?>
 <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/cashbook.css?v=' . rawurlencode($cbCssVer)); ?>">
 

@@ -1,4 +1,9 @@
 <?php /** @var string $from */ /** @var string $to */ /** @var string $account */ /** @var array $pSeries */ /** @var array $eSeries */ /** @var float $openingBalance */ /** @var float $netMovement */ /** @var float $closingBalance */ /** @var float $totalPayments */ /** @var float $totalExpenses */ ?>
+<?php
+$reportTitle = 'Account Ledger';
+$reportPeriod = trim((string)($from ?? '') . ' — ' . (string)($to ?? ''));
+include __DIR__ . '/../partials/report/embed_block.php';
+?>
 <div class="container-fluid px-0">
   <div class="row g-2 mb-2">
     <div class="col-12">

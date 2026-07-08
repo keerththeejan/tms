@@ -7,11 +7,12 @@ $user = Auth::user();
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Transport Management System</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables.net-bs5@2.1.8/css/dataTables.bootstrap5.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+  <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/report-master.css?v=1'); ?>">
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/tms-design-system.css'); ?>">
   <link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/app-layout-rebuild.css'); ?>">
   <?php if (in_array($_GET['page'] ?? '', ['employees', 'advances'], true)): ?>

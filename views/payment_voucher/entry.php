@@ -753,6 +753,11 @@ $voucherId = (int) ($_GET['vid'] ?? 0);
 }
 </style>
 
+<?php
+$reportTitle = 'Payment Voucher';
+include __DIR__ . '/../partials/report/embed_block.php';
+?>
+
 <div class="pv-module">
     <!-- Header -->
     <div class="pv-header">

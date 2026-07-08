@@ -1,45 +1,49 @@
 <?php /** @var array $dn */ /** @var array $items */ $isEmbed = (($_GET['embed'] ?? '') === '1'); ?>
-<!doctype html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Delivery Note #<?php echo (int)$dn['id']; ?></title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-  <style>
-    /* Minimal Bootstrap fallbacks for embedded print.
-       Some hosts block external CSS; these ensure alignment and typography stay correct. */
-    .text-end { text-align: right !important; }
-    .text-muted { color: #6c757d !important; }
-    .fw-bold { font-weight: 700 !important; }
-    .small { font-size: 0.875em !important; }
-
-    @media print { .no-print { display: none !important; } }
-    body { padding: <?php echo $isEmbed ? '8px' : '20px'; ?>; font-family: 'Noto Sans Tamil', Arial, sans-serif; }
-    .doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .75rem; }
-    .doc-title { font-weight: 700; font-size: 1.25rem; }
-    .muted { color: #6c757d; }
-    .amount { text-align: right; }
-    .table-sm th, .table-sm td { padding-top: .35rem; padding-bottom: .35rem; }
-    @media (max-width: 576px) {
-      .doc-header { flex-direction: column; gap: .5rem; }
-      .table { font-size: .9rem; }
-    }
-    <?php if ($isEmbed): ?>
-    /* Tighter tables when embedded */
-    .table { margin-bottom: .75rem; }
-    h4, .doc-title { margin-bottom: .25rem; }
-    <?php endif; ?>
-    @media print {
-      .print-header-card { border: 0 !important; background: transparent !important; padding: 0 !important; }
-      .print-header-card .text-muted { color: #444 !important; }
-    }
-  </style>
-</head>
+<?php
+$reportEmbed = $isEmbed;
+$reportDocTitle = 'Delivery Note #' . (int)$dn['id'];
+$reportTitle = 'Delivery Note';
+$reportSubtitle = 'Transport and Parcel Services';
+$addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 50, 'all');
+$reportShowAddresses = true;
+$reportAddressLines = $addresses;
+$reportMetaItems = [
+    ['label' => 'Document No', 'value' => '#' . (int)$dn['id']],
+    ['label' => 'Print Date', 'value' => date('d/m/Y H:i')],
+    ['label' => 'Date', 'value' => (string)($dn['delivery_date'] ?? '')],
+    ['label' => 'Branch', 'value' => (string)($dn['branch_name'] ?? '')],
+];
+$vehSet = [];
+foreach (($items ?? []) as $it) {
+    $v = trim((string)($it['vehicle_no'] ?? ''));
+    if ($v !== '') { $vehSet[$v] = true; }
+}
+$vehList = implode(', ', array_keys($vehSet));
+$reportInfoItems = [
+    ['label' => 'Report Name', 'value' => 'Delivery Note'],
+    ['label' => 'Customer', 'value' => (string)($dn['customer_name'] ?? '')],
+    ['label' => 'Phone', 'value' => (string)($dn['customer_phone'] ?? '')],
+    ['label' => 'Branch', 'value' => (string)($dn['branch_name'] ?? '')],
+    ['label' => 'Date', 'value' => (string)($dn['delivery_date'] ?? '')],
+    ['label' => 'Printed Date', 'value' => date('d/m/Y H:i')],
+];
+if ($vehList !== '') {
+    $reportInfoItems[] = ['label' => 'Vehicle(s)', 'value' => $vehList];
+}
+$reportShowInfoPanel = true;
+include __DIR__ . '/../partials/report/print_document_open.php';
+?>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<style>
+  .text-end { text-align: right !important; }
+  .text-muted { color: #6c757d !important; }
+  .fw-bold { font-weight: 700 !important; }
+  .small { font-size: 0.875em !important; }
+  .doc-header { display: none; }
+  .amount { text-align: right; }
+  .table-sm th, .table-sm td { padding-top: .35rem; padding-bottom: .35rem; }
+  @media (max-width: 576px) { .table { font-size: .9rem; } }
+</style>
 <?php if (!$isEmbed): ?>
   <div class="no-print mb-3">
     <div class="d-flex flex-wrap gap-2 mb-2">
@@ -58,52 +62,13 @@
     </div>
   </div>
 <?php endif; ?>
-<?php 
-  // Company branding for print header
-  $brand = Helpers::company();
-  $addresses = Helpers::companyHeaderAddressLines((string)($_GET['addr'] ?? ''), 50, 'all');
-?>
-<div class="mb-2 p-2 border rounded print-header-card">
-  <div class="d-flex align-items-center gap-2">
-    <?php $useLogoImage = (($brand['logo_display'] ?? 'builtin') === 'image') && !empty($brand['logo_url']); ?>
-    <?php if ($useLogoImage): ?>
-      <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
-      <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo" style="height:38px">
-    <?php endif; ?>
-    <div>
-      <div class="fw-bold"><?php echo htmlspecialchars($brand['name'] ?? ''); ?></div>
-      <div class="small text-muted">Transport and Parcel Services</div>
-    </div>
-  </div>
-  <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-1 mt-1 small text-muted" id="addrContainer">
-    <?php foreach ($addresses as $addr): ?>
-      <div class="addr-line"><?php echo nl2br(htmlspecialchars($addr)); ?></div>
-    <?php endforeach; ?>
-  </div>
-</div>
-<?php 
-  // Build distinct vehicle list if present on items
-  $vehSet = [];
-  foreach (($items ?? []) as $it) {
-    $v = trim((string)($it['vehicle_no'] ?? ''));
-    if ($v !== '') { $vehSet[$v] = true; }
-  }
-  $vehList = implode(', ', array_keys($vehSet));
-?>
-<div class="doc-header">
-  <div>
-    <div class="doc-title">Delivery Note #<?php echo (int)$dn['id']; ?></div>
-    <div class="muted">Date: <?php echo htmlspecialchars($dn['delivery_date'] ?? ''); ?></div>
-  </div>
-  <div class="text-end">
-    <div><strong>Customer:</strong> <?php echo htmlspecialchars($dn['customer_name'] ?? ''); ?></div>
-    <div class="muted"><strong>Phone:</strong> &lrm;<?php echo htmlspecialchars($dn['customer_phone'] ?? ''); ?></div>
-    <div class="muted"><strong>Branch:</strong> <?php echo htmlspecialchars($dn['branch_name'] ?? ''); ?></div>
-    <?php if ($vehList !== ''): ?><div class="muted"><strong>Vehicle(s):</strong> <?php echo htmlspecialchars($vehList); ?></div><?php endif; ?>
-  </div>
-</div>
-<div class="table-responsive">
-<table class="table table-sm table-bordered align-middle mb-0">
+
+<div class="rpt-root rpt-root--b5">
+  <article class="rpt-sheet">
+    <?php include __DIR__ . '/../partials/report/letterhead.php'; ?>
+
+    <div class="rpt-table-wrap table-responsive">
+<table class="table table-sm table-bordered align-middle mb-0 rpt-table">
   <thead>
     <tr>
       <th>#</th>
@@ -157,19 +122,19 @@
     </tr>
   </tfoot>
 </table>
+    </div>
+
+    <?php include __DIR__ . '/../partials/report/footer.php'; ?>
+  </article>
 </div>
 <?php if (!$isEmbed): ?>
 <script>
-  // Auto-trigger print on load for faster workflow (disabled when embedded)
   window.addEventListener('load', function(){
     setTimeout(function(){
       if (window.matchMedia) { window.print(); }
     }, 50);
   });
-  // Optional: close the tab after printing if the browser supports it
   window.addEventListener('afterprint', function(){ /* window.close(); */ });
-
-  // Address editor logic
   (function(){
     var toggleBtn = document.getElementById('toggleAddrEditor');
     var ed = document.getElementById('addrEditor');
@@ -181,7 +146,6 @@
       for (var i=0;i<nodes.length;i++){ var t = nodes[i].textContent.trim(); if(t) arr.push(t); }
       return arr;
     }
-    // Prefill
     ta.value = getCurrentLines().join('\n');
     toggleBtn.addEventListener('click', function(){ ed.style.display = (ed.style.display==='none' || ed.style.display==='') ? 'block' : 'none'; });
     function applyAddrs(){
@@ -192,7 +156,7 @@
       cont.innerHTML = '';
       parts.forEach(function(line){
         var d = document.createElement('div');
-        d.className = 'addr-line';
+        d.className = 'addr-line col';
         d.textContent = line;
         cont.appendChild(d);
       });
@@ -202,5 +166,4 @@
   })();
 </script>
 <?php endif; ?>
-</body>
-</html>
+<?php include __DIR__ . '/../partials/report/print_document_close.php'; ?>

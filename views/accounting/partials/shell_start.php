@@ -92,3 +92,9 @@ $accJsVer = is_file($accJsPath) ? (string) filemtime($accJsPath) : '1';
       </div>
     </header>
     <div class="acc-content">
+    <?php
+      if (!isset($reportTitle) || trim((string)$reportTitle) === '') {
+          $reportTitle = $accTitle ?? 'Accounting Report';
+      }
+      include __DIR__ . '/../../partials/report/embed_block.php';
+    ?>
