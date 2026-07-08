@@ -60,6 +60,7 @@ if ($items && count($items) > 0) {
 $useParcelPriceOnFirstRow = ($items && count($items) > 0 && !$hasAnyItemRate && $parcelPrice > 0);
 $firstRowDone = false;
 $tableBodyHtml = '';
+$rowNo = 0;
 if ($items && count($items) > 0) {
   foreach ($items as $i) {
     $qty = (float)$i['qty'];
@@ -73,10 +74,14 @@ if ($items && count($items) > 0) {
     }
     $total += $amt;
     $rs = floor($amt);
+    $rowNo++;
     $tableBodyHtml .= '<tr>'
-      . '<td class="text-end">' . ($qty > 0 ? htmlspecialchars(number_format($qty, 2)) : '') . '</td>'
+      . '<td class="text-center">' . (int)$rowNo . '</td>'
       . '<td>' . htmlspecialchars((string)$i['description']) . '</td>'
+      . '<td class="text-end">' . ($qty > 0 ? htmlspecialchars(number_format($qty, 2)) : '') . '</td>'
       . '<td class="text-end">' . ($rate > 0 ? htmlspecialchars(number_format($rate, 2)) : '') . '</td>'
+      . '<td class="text-end">0.00</td>'
+      . '<td class="text-end">0.00</td>'
       . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
       . '</tr>';
   }
@@ -84,9 +89,12 @@ if ($items && count($items) > 0) {
   $amt = (float)($parcel['price'] ?? 0);
   $rs = floor($amt);
   $tableBodyHtml = '<tr>'
-    . '<td class="text-end">' . htmlspecialchars(number_format((float)($parcel['weight'] ?? 0), 2)) . '</td>'
+    . '<td class="text-center">1</td>'
     . '<td>' . htmlspecialchars((string)($parcel['tracking_number'] ?? '')) . '</td>'
+    . '<td class="text-end">' . htmlspecialchars(number_format((float)($parcel['weight'] ?? 0), 2)) . '</td>'
     . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($amt, 2)) : '') . '</td>'
+    . '<td class="text-end">0.00</td>'
+    . '<td class="text-end">0.00</td>'
     . '<td class="text-end">' . ($amt > 0 ? htmlspecialchars(number_format($rs)) : '') . '</td>'
     . '</tr>';
   $total = $amt;
@@ -115,469 +123,963 @@ $logoInitials = $logoInitials ?: 'TS';
   <title>Invoice #<?php echo (int)$parcel['id']; ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    /* Minimal Bootstrap fallbacks for iframe previews.
-       If external CSS (Bootstrap) is blocked on cPanel, these keep alignment consistent. */
     .text-end { text-align: right !important; }
-    .text-muted { color: #6c757d !important; }
+    .text-center { text-align: center !important; }
+    .text-muted { color: #6b7280 !important; }
     .fw-bold { font-weight: 700 !important; }
     .small { font-size: 0.875em !important; }
 
     :root {
       --brand: <?php echo $logoTitleColor; ?>;
+      --primary-red: #C62828;
+      --corp-blue: #1E4FA8;
+      --cn-bg: #F8F9FB;
+      --cn-border: #E3E6EB;
+      --cn-ink: #333333;
+      --cn-muted: #5c6370;
+      --cn-surface: #F8F9FB;
+      --cn-radius: 8px;
+      --cn-gap: 6px;
+      --cn-pad: 8px;
       --logo-arch: <?php echo $logoArch; ?>;
       --logo-bar-bg: <?php echo $logoBarBg; ?>;
       --logo-bar-color: <?php echo $logoBarColor; ?>;
-      --inv-pad: 6px;
-      --inv-gap: 4px;
     }
+
     * { box-sizing: border-box; }
     html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body.parcel-print-embed {
-      padding: 4px;
-    }
+
     body {
       margin: 0;
       padding: 8px;
-      font-family: system-ui, "Segoe UI", Roboto, "Noto Sans Tamil", "Noto Sans", "Latha", Tahoma, sans-serif;
-      font-size: 11px;
+      font-family: Poppins, Inter, "Segoe UI", "Noto Sans Tamil", system-ui, sans-serif;
+      font-size: 12px;
       line-height: 1.25;
-      color: #111;
+      color: var(--cn-ink);
+      background: #e8ecf2;
+    }
+    body.parcel-print-embed {
+      padding: 4px;
       background: #fff;
     }
-    .a4-root {
+
+    .a4-root,
+    .invoice-container {
       width: 100%;
-      max-width: min(210mm, 100%);
+      max-width: 176mm;
       margin: 0 auto;
-      padding: 0 4px;
     }
+
     .invoice-sheet {
-      border: 1px solid #000;
-      padding: var(--inv-pad);
-      margin-bottom: 12px;
+      background: #fff;
+      border: 1px solid var(--cn-border);
+      border-radius: var(--cn-radius);
+      padding: var(--cn-pad);
+      margin-bottom: 0;
+      box-shadow: 0 1px 6px rgba(15, 23, 42, 0.04);
+      overflow: hidden;
       page-break-inside: avoid;
       break-inside: avoid;
     }
-    .inv-header {
-      display: grid;
-      grid-template-columns: 44px 1fr auto;
-      align-items: center;
-      gap: 6px 8px;
-      padding-bottom: var(--inv-gap);
-      border-bottom: 1px solid #000;
+
+    .inv-print-header-block {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
-    .inv-logo-img { max-height: 36px; width: auto; display: block; }
+
+    /* 1. Company Header */
+    .inv-header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px 10px;
+      height: 60px;
+      min-height: 60px;
+      max-height: 60px;
+      padding: 0 2px;
+      margin: 0 0 var(--cn-gap);
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .inv-logo-cell {
+      position: relative;
+      z-index: 1;
+      flex: 0 0 60px;
+      width: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .inv-logo-img {
+      max-height: 48px;
+      max-width: 60px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
     .logo-unit { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-unit .logo-wrap {
-      width: 40px; height: 32px;
+      width: 38px; height: 32px;
       display: flex; align-items: center; justify-content: center;
       background: var(--logo-arch);
       border-radius: 50% 50% 0 0;
-      font-weight: 800; font-size: 13px;
+      font-weight: 800; font-size: 11px;
       color: var(--logo-bar-color);
-      border: 1px solid #000;
+      border: 1px solid var(--cn-border);
     }
     .logo-unit .bar-small {
       background: var(--logo-bar-bg);
       color: var(--logo-bar-color);
-      padding: 1px 5px;
-      font-size: 7px;
+      padding: 1px 4px;
+      font-size: 6.5px;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
       margin-top: 1px;
       max-width: 44px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      border-radius: 0 0 3px 3px;
+    }
+
+    .inv-company-block {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      height: auto;
+      width: max-content;
+      max-width: calc(100% - 240px);
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      gap: 2px;
+      pointer-events: none;
     }
     .inv-company {
-      text-align: center;
-      font-weight: 800;
-      font-size: 15px;
-      line-height: 1.15;
-      color: var(--brand);
+      margin: 0;
+      padding: 0;
+      font-family: Poppins, Inter, "Segoe UI", sans-serif;
+      font-weight: 700;
+      font-size: 26px;
+      line-height: 1.05;
+      color: #C62828;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .inv-regdate {
-      text-align: right;
-      font-size: 10px;
-      font-weight: 600;
-      line-height: 1.2;
+      letter-spacing: 0.8px;
+      text-align: center;
       white-space: nowrap;
     }
-    .inv-print-header-block {
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-    .inv-route {
+    .inv-tagline {
+      margin: 0;
+      padding: 0;
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
       text-align: center;
-      font-size: 11px;
-      line-height: 1.2;
-      padding: 2px 0;
-      border-bottom: 1px solid #ccc;
+      white-space: nowrap;
+      line-height: 1.15;
     }
-    .inv-route span.sep { color: #555; margin: 0 3px; }
-    .inv-branches-3 {
+
+    .inv-regdate {
+      position: relative;
+      z-index: 1;
+      flex: 0 0 auto;
+      align-self: center;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      margin: 0 0 0 32px;
+      padding: 0;
+      width: max-content;
+      min-width: 0;
+      max-width: none;
+      box-sizing: border-box;
+    }
+    .inv-regdate .cn-meta-item {
+      display: grid;
+      grid-template-columns: 95px 8px auto;
+      column-gap: 4px;
+      align-items: baseline;
+      justify-content: start;
+      margin: 0;
+      padding: 0;
       width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      padding: 3px 0 4px;
-      border-bottom: 1px solid #ccc;
+      min-width: 100%;
+      box-sizing: border-box;
+    }
+    .inv-regdate .cn-meta-item + .cn-meta-item {
+      margin-top: 2px;
+    }
+    .inv-regdate .cn-meta-label {
+      grid-column: 1;
+      grid-row: 1;
+      display: block;
+      box-sizing: border-box;
+      width: 95px;
+      max-width: 95px;
+      margin: 0;
+      padding: 0;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #666;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-align: left;
+      justify-self: start;
+    }
+    .inv-regdate .cn-meta-label::after {
+      content: none !important;
+    }
+    .inv-regdate .cn-meta-item::after {
+      content: ":";
+      grid-column: 2;
+      grid-row: 1;
+      box-sizing: border-box;
+      width: 8px;
+      margin: 0;
+      padding: 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      line-height: 1.15;
+      text-align: center;
+      justify-self: center;
+      align-self: baseline;
+    }
+    .inv-regdate .cn-meta-value {
+      grid-column: 3;
+      grid-row: 1;
+      display: block;
+      margin: 0;
+      padding: 0;
       font-size: 13px;
       font-weight: 700;
-      line-height: 1.4;
-    }
-    .inv-branches-3 td {
-      vertical-align: top;
+      color: #222;
+      line-height: 1.15;
+      white-space: nowrap;
       text-align: left;
-      padding: 0;
+      justify-self: start;
     }
-    .inv-invoice-row {
+
+    .cn-separator {
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary-red) 0%, var(--corp-blue) 50%, var(--primary-red) 100%);
+      border-radius: 1px;
+      margin: 0 0 var(--cn-gap);
+    }
+
+    /* 2. Route */
+    .inv-route {
       display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 8px;
-      padding: 2px 0 3px;
-      line-height: 1.2;
-    }
-    .inv-customer-row,
-    .customer-row {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      flex-direction: column;
       align-items: center;
-      column-gap: 8px;
-      padding: 2px 0 3px;
-      border-bottom: 1px solid #ccc;
-      font-size: 14px;
-      font-weight: 700;
+      justify-content: center;
+      text-align: center;
+      min-height: 42px;
+      max-height: 42px;
+      padding: 6px;
+      margin: 0 0 var(--cn-gap);
+      background: var(--cn-surface);
+      border: 1px solid var(--cn-border);
+      border-radius: var(--cn-radius);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+      page-break-inside: avoid;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    .inv-route-ta {
+      font-family: "Noto Sans Tamil", Poppins, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cn-ink);
+      line-height: 1.15;
+      margin: 0;
+    }
+    .inv-route-en {
+      margin: 1px 0 0;
+      font-size: 8.5px;
+      font-weight: 500;
+      color: var(--cn-muted);
+      line-height: 1.15;
+    }
+
+    /* 3. Branch cards — equal height */
+    .cn-branches {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 6px;
+      margin: 0 0 var(--cn-gap);
+    }
+    .cn-branch-card {
+      flex: 1 1 calc(33.333% - 4px);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--cn-surface);
+      border: 1px solid var(--cn-border);
+      border-radius: var(--cn-radius);
+      padding: 8px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+      page-break-inside: avoid;
+      break-inside: avoid;
+      font-size: 11px;
       line-height: 1.2;
     }
-    .inv-customer-row > div,
-    .customer-row > div {
+    .cn-branch-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary-red);
+      margin: 0 0 2px;
+      padding: 0 0 2px;
+      border-bottom: 1px solid var(--cn-border);
+    }
+    .cn-branch-ta {
+      font-family: "Noto Sans Tamil", sans-serif;
+      font-size: 9px;
+      line-height: 1.2;
+      color: var(--cn-ink);
+    }
+    .cn-branch-en {
+      font-size: 8.5px;
+      line-height: 1.2;
+      color: var(--cn-muted);
+      margin-top: 1px;
+    }
+    .cn-branch-phone {
+      margin-top: auto;
+      padding-top: 2px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--cn-ink);
+    }
+
+    /* 4. Consignment Details — 3×2 Bootstrap grid (B5 card width) */
+    .cn-consignment-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--corp-blue);
+      margin: 0 0 4px;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+    .inv-customer-row.customer-row {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 12px;
+      background: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+      page-break-inside: avoid;
+      break-inside: avoid;
+      box-sizing: border-box;
+    }
+    .inv-customer-row .cn-consignment-row {
+      --bs-gutter-x: 16px;
+      --bs-gutter-y: 0;
+      display: flex;
+      flex-wrap: wrap;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+    }
+    .inv-customer-row .cn-consignment-row + .cn-consignment-row {
+      margin-top: 10px;
+    }
+    .inv-customer-row .cn-consignment-row > [class*="col-"] {
+      flex: 0 0 33.33333333%;
+      max-width: 33.33333333%;
+      width: 33.33333333%;
+      padding-left: calc(var(--bs-gutter-x) * 0.5);
+      padding-right: calc(var(--bs-gutter-x) * 0.5);
+    }
+    .inv-customer-row .cn-consignment-row > .cn-field,
+    .customer-row .cn-consignment-row > .cn-field {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
       min-width: 0;
+      margin: 0;
+      box-sizing: border-box;
+    }
+    .inv-customer-row .cn-field-label,
+    .customer-row .cn-field-label {
+      display: block;
+      flex: 0 0 auto;
+      margin: 0 0 2px;
+      padding: 0;
+      font-size: 10px;
+      font-weight: 600;
+      color: #6B7280;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .inv-customer-left { text-align: left; }
-    .inv-customer-center { text-align: center; }
-    .inv-customer-right { text-align: right; }
-    .inv-invoice-title {
+    .inv-customer-row .cn-field-value,
+    .customer-row .cn-field-value {
+      display: block;
+      flex: 0 0 auto;
       margin: 0;
-      text-align: left;
+      padding: 0;
+      font-size: 15px;
       font-weight: 700;
-      font-size: 13px;
-      color: #b00;
-    }
-    .inv-invoice-date {
-      text-align: right;
-      font-size: 10px;
-      font-weight: 600;
-      color: #111;
+      color: #222222;
+      line-height: 1.2;
       white-space: nowrap;
-      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
+    .inv-invoice-row { display: none; }
+    .inv-invoice-title,
+    .inv-invoice-date { display: none; }
+
+    /* 5. Items table — keep column order; ~28px rows; blue header */
     .inv-body { display: block; }
+    .inv-table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: var(--cn-gap);
+      border-radius: var(--cn-radius);
+    }
     table.inv-tbl {
       width: 100%;
-      border-collapse: collapse;
-      font-size: 10px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 11px;
       line-height: 1.2;
       table-layout: fixed;
+      border: 1px solid var(--cn-border);
+      border-radius: var(--cn-radius);
+      overflow: hidden;
+      margin-bottom: 0;
     }
-    table.inv-tbl th, table.inv-tbl td {
-      border: 1px solid #000;
-      padding: 3px 5px;
-      vertical-align: top;
+    table.inv-tbl th,
+    table.inv-tbl td {
+      border-bottom: 1px solid var(--cn-border);
+      border-right: 1px solid var(--cn-border);
+      padding: 5px;
+      vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 11px;
+      line-height: 1.15;
     }
-    table.inv-tbl th {
-      background: #eee;
-      font-weight: 700;
+    table.inv-tbl th:last-child,
+    table.inv-tbl td:last-child { border-right: none; }
+    table.inv-tbl tbody tr:last-child td { border-bottom: none; }
+    table.inv-tbl thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--corp-blue);
+      color: #fff;
+      font-weight: 600;
       text-transform: uppercase;
       font-size: 9px;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
+      padding: 5px;
+      height: 30px;
     }
-    table.inv-tbl col.qty { width: 11%; }
+    table.inv-tbl tbody td {
+      height: 28px;
+    }
+    table.inv-tbl tbody tr:nth-child(even) td { background: #f4f6f9; }
+    table.inv-tbl tbody tr:nth-child(odd) td { background: #fff; }
+    table.inv-tbl .text-end,
+    table.inv-tbl td.text-end,
+    table.inv-tbl th.text-end { text-align: right !important; }
+    table.inv-tbl .text-center,
+    table.inv-tbl td.text-center,
+    table.inv-tbl th.text-center { text-align: center !important; }
+    table.inv-tbl col.col-no { width: 5%; }
     table.inv-tbl col.desc { width: auto; }
-    table.inv-tbl col.rate { width: 14%; }
-    table.inv-tbl col.amt { width: 14%; }
+    table.inv-tbl col.qty { width: 10%; }
+    table.inv-tbl col.rate { width: 12%; }
+    table.inv-tbl col.disc { width: 11%; }
+    table.inv-tbl col.tax { width: 10%; }
+    table.inv-tbl col.amt { width: 12%; }
+    table.inv-tbl tfoot { display: none; }
+
+    /* 6. Total summary — right */
     .inv-total-row {
       display: flex;
       justify-content: flex-end;
-      align-items: baseline;
+      margin-bottom: var(--cn-gap);
+    }
+    .cn-totals-box {
+      width: 260px;
+      max-width: 260px;
+      min-width: 200px;
+      border: 1px solid var(--cn-border);
+      border-radius: var(--cn-radius);
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .cn-totals-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       gap: 8px;
-      padding-top: 6px;
-      padding-bottom: 10px;
+      padding: 6px;
+      font-size: 11px;
+      min-height: 0;
+      border-bottom: 1px solid var(--cn-border);
+    }
+    .cn-totals-row:last-child { border-bottom: none; }
+    .cn-totals-row.cn-grand {
+      background: #fff5f5;
+      padding: 6px;
       font-size: 12px;
       font-weight: 700;
+      color: var(--primary-red);
     }
+    .cn-totals-row.cn-grand .cn-totals-label,
+    .cn-totals-row.cn-grand .cn-totals-value {
+      color: var(--primary-red);
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .cn-totals-label { color: var(--cn-muted); font-weight: 500; font-size: 10px; }
+    .cn-totals-value { font-weight: 700; text-align: right; font-size: 11px; color: var(--cn-ink); }
+
+    /* 7–8. Notes & signatures */
     .inv-footer {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      align-items: stretch;
-      margin-top: 6px;
-      padding-top: 8px;
-      padding-bottom: 6px;
-      font-size: 9px;
-      line-height: 1.2;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .inv-footer .note {
-      color: #444;
-      font-size: 10px;
-      line-height: 1.45;
-      max-width: 100%;
       margin: 0;
-      padding-bottom: 4px;
+      padding: 6px;
+      font-family: "Noto Sans Tamil", Inter, "Segoe UI", sans-serif;
+      font-size: 10px;
+      line-height: 1.2;
+      color: var(--cn-muted);
+      background: #f0f2f5;
+      border: 1px solid var(--cn-border);
+      border-radius: var(--cn-radius);
       word-break: break-word;
       overflow-wrap: anywhere;
     }
     .inv-sigs {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: flex-end;
-      width: 100%;
-      column-gap: 20px;
-      padding: 4px 4px 2px;
-      margin-top: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding: 0;
+      margin: 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .inv-footer .sig {
-      flex: 0 1 38%;
-      min-width: 7.5rem;
-      max-width: 42%;
-      border-top: 1px dashed #333;
-      padding-top: 3px;
-      padding-bottom: 2px;
       text-align: center;
-      font-weight: 600;
       font-size: 9px;
+      font-weight: 600;
+      color: var(--cn-muted);
+      padding-top: 12px;
+      border-top: 1px solid var(--cn-ink);
+      min-height: 22px;
+      line-height: 1.15;
     }
-    @media screen and (max-width: 640px) {
-      body { padding: 6px; }
-      .a4-root { padding: 0 2px; }
+
+    /* 9. Footer */
+    .cn-page-footer {
+      margin: var(--cn-gap) 0 0;
+      padding: 4px 0 0;
+      border-top: 1px solid var(--cn-border);
+      text-align: center;
+      font-size: 10px;
+      line-height: 1.2;
+      color: #8b919a;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .cn-page-footer .cn-thanks {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--cn-muted);
+      margin: 0 0 1px;
+    }
+    .cn-page-footer .cn-contact {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2px 8px;
+      margin-bottom: 1px;
+    }
+
+    /* Tablet — consignment 2 columns */
+    @media screen and (max-width: 991.98px) and (min-width: 576px) {
+      .inv-customer-row .cn-consignment-row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+        width: 50%;
+      }
+      .cn-branch-card { flex: 1 1 calc(50% - 6px); }
+    }
+
+    /* Mobile — same section order; keep header right-panel alignment */
+    @media screen and (max-width: 576px) {
+      body { padding: 4px; }
+      .invoice-sheet { padding: 8px; }
       .inv-header {
-        grid-template-columns: 36px 1fr;
-        grid-template-rows: auto auto;
+        position: relative;
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 70px;
+        height: auto;
+        max-height: none;
+        gap: 6px 8px;
       }
-      .inv-logo-cell { grid-column: 1; grid-row: 1; }
-      .inv-company { grid-column: 2; grid-row: 1; font-size: 13px; }
-      .inv-regdate { grid-column: 1 / -1; grid-row: 2; text-align: right; }
-      .inv-branches-3 td { display: block; width: 100% !important; padding-bottom: 6px; }
-      .inv-branches-3 td:last-child { padding-bottom: 0; }
-      .inv-invoice-row { flex-wrap: wrap; gap: 4px; }
-      .inv-sigs {
-        column-gap: 12px;
-        padding: 0;
-      }
-      .inv-footer .sig {
-        flex: 1 1 0;
-        min-width: 0;
-        max-width: none;
-        font-size: 8.5px;
-        padding-top: 3px;
-      }
-    }
-    @media print {
-      .no-print { display: none !important; }
-      @page { size: A4; margin: 8mm; }
-      /* Dot matrix / impact: monospace, black ink, no faint grays or screen-only red */
-      body {
-        padding: 0;
+      .inv-company-block {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        width: max-content;
+        max-width: calc(100% - 220px);
         margin: 0;
-        font-family: "Courier New", monospace;
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 1.4;
-        color: #000 !important;
-        background: #fff !important;
-        zoom: 1;
-        -webkit-font-smoothing: auto;
-        -moz-osx-font-smoothing: auto;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      table {
-        font-family: "Courier New", monospace !important;
-        font-size: 12px !important;
-        font-weight: 700 !important;
-      }
-      * {
-        color: #000 !important;
-        background: #fff !important;
-        box-shadow: none !important;
-        text-shadow: none !important;
-        background-image: none !important;
-        opacity: 1 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-        transform: none !important;
+        padding: 0;
+        gap: 4px;
       }
       .inv-company {
-        color: #000 !important;
+        font-size: 16px;
+        letter-spacing: 1px;
+        color: #C62828;
+        text-align: center;
       }
-      .inv-route {
-        border-bottom: 1px solid #000 !important;
-      }
-      .inv-route .sep {
-        color: #000 !important;
-      }
-      .inv-branches-3 {
-        border-bottom: 1px solid #000 !important;
-        font-size: 13px !important;
-        line-height: 1.4 !important;
-        font-weight: 700 !important;
-      }
-      .inv-customer-row,
-      .customer-row {
-        border-bottom: 1px solid #000 !important;
-        font-size: 14px;
-        font-weight: 700;
-        display: table !important;
-        width: 100% !important;
-        table-layout: fixed !important;
-      }
-      .inv-customer-row > div,
-      .customer-row > div {
-        display: table-cell !important;
-        width: 33.33% !important;
-        white-space: nowrap !important;
-        vertical-align: middle !important;
-      }
-      .inv-invoice-title {
-        color: #000 !important;
-        font-size: 14px !important;
-      }
-      .inv-invoice-date {
-        color: #000 !important;
-        font-size: 11px !important;
-      }
-      .inv-invoice-row {
-        display: table !important;
-        width: 100% !important;
-        table-layout: fixed !important;
-      }
-      .inv-invoice-row > div {
-        display: table-cell !important;
-        width: 50% !important;
-        white-space: nowrap !important;
-        vertical-align: baseline !important;
-      }
-      .inv-invoice-row > div:last-child {
-        text-align: right !important;
+      .inv-tagline {
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        color: #666;
+        text-align: center;
       }
       .inv-regdate {
-        color: #000 !important;
-        font-size: 11px !important;
-      }
-      table.inv-tbl {
-        border-collapse: collapse !important;
-        width: 100% !important;
-        font-size: 11px;
-      }
-      table.inv-tbl,
-      table.inv-tbl th,
-      table.inv-tbl td {
-        border: 1px solid #000 !important;
-      }
-      table.inv-tbl th,
-      table.inv-tbl td {
-        padding: 4px 6px !important;
-      }
-      table.inv-tbl th {
-        background: #fff !important;
-        color: #000 !important;
-        font-size: 10px !important;
-        font-weight: 800 !important;
-        border-bottom: 1px solid #000 !important;
-        text-transform: uppercase;
-      }
-      .inv-total-row {
-        font-size: 13px !important;
-        display: table !important;
-        width: 100% !important;
-        table-layout: fixed !important;
-      }
-      .inv-total-row > span {
-        display: table-cell !important;
-        width: 50% !important;
-      }
-      .inv-total-row > span:last-child {
-        text-align: right !important;
-      }
-      .inv-footer .note {
-        color: #000 !important;
-        font-size: 11px !important;
-      }
-      .invoice-sheet,
-      .inv-header,
-      .inv-footer,
-      .inv-sigs,
-      .inv-footer .sig {
-        border-color: #000 !important;
-      }
-      .inv-footer .sig {
-        border-top: 1px solid #000 !important;
-        border-top-style: solid !important;
-        font-size: 10px !important;
-        font-weight: 700 !important;
-      }
-      .logo-unit .logo-wrap {
-        border-color: #000 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .logo-unit .bar-small {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .inv-logo-img {
-        height: 50px !important;
-        width: auto !important;
-        image-rendering: crisp-edges;
-      }
-      .a4-root {
-        width: 100%;
-        max-width: 210mm;
-        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        align-self: center;
+        flex: 0 0 auto;
+        width: max-content;
+        min-width: 0;
+        max-width: none;
+        margin: 0 0 0 40px;
         padding: 0;
-        display: block;
+        gap: 0;
+      }
+      .inv-regdate .cn-meta-item {
+        display: grid;
+        grid-template-columns: 95px 8px auto;
+        column-gap: 4px;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      .inv-regdate .cn-meta-item + .cn-meta-item {
+        margin-top: 2px !important;
+      }
+      .inv-regdate .cn-meta-label {
+        width: 95px;
+        max-width: 95px;
+        font-size: 11px;
+        white-space: nowrap;
+        text-align: left;
+        line-height: 1.15;
+        margin: 0;
+        padding: 0;
+      }
+      .inv-regdate .cn-meta-label::after {
+        content: none !important;
+      }
+      .inv-regdate .cn-meta-item::after {
+        content: ":";
+        grid-column: 2;
+        grid-row: 1;
+        width: 8px;
+        text-align: center;
+        font-size: 11px;
+        line-height: 1.15;
+        margin: 0;
+        padding: 0;
+      }
+      .inv-regdate .cn-meta-value {
+        font-size: 13px;
+        white-space: nowrap;
+        text-align: left;
+        line-height: 1.15;
+        margin: 0;
+        padding: 0;
+      }
+      .cn-branch-card { flex: 1 1 100%; }
+      .inv-customer-row.customer-row {
+        padding: 12px;
+      }
+      .inv-customer-row .cn-consignment-row > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+        width: 100%;
+      }
+      .inv-customer-row .cn-field-value,
+      .customer-row .cn-field-value {
+        font-size: 14px;
+      }
+      .inv-sigs { grid-template-columns: 1fr; gap: 12px; }
+      .cn-totals-box { max-width: 100%; }
+    }
+
+    /* Print — B5 portrait single-page */
+    @media print {
+      .no-print { display: none !important; }
+      @page {
+        size: B5 portrait;
+        margin: 6mm;
+      }
+      html, body {
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #fff !important;
+        font-size: 10px;
+        width: 100%;
+        height: auto;
+        overflow: hidden;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .a4-root,
+      .invoice-container {
+        width: 100%;
+        max-width: 176mm;
+        margin: 0 auto;
+        padding: 4mm;
       }
       .invoice-sheet {
-        margin-bottom: 0;
-        overflow: visible;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        max-height: 238mm;
+        min-height: 0;
+        overflow: hidden;
         page-break-inside: avoid;
         break-inside: avoid;
-        box-shadow: none !important;
-        border-color: #000 !important;
+        page-break-after: avoid;
+        page-break-before: avoid;
       }
+      .inv-print-header-block,
+      .inv-route,
+      .cn-branches,
+      .cn-branch-card,
+      .inv-customer-row,
+      .customer-row,
+      .inv-table-wrap,
+      .inv-total-row,
+      .inv-footer,
+      .inv-sigs,
+      .cn-totals-box,
+      .cn-page-footer {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .cn-separator { margin-bottom: 4px; }
       .inv-header {
-        border-bottom: 1px solid #000 !important;
+        height: 60px;
+        min-height: 60px;
+        max-height: 60px;
+        margin-bottom: 4px;
+        padding: 0;
       }
-      .inv-print-header-block {
+      .inv-logo-cell { flex: 0 0 60px; width: 60px; }
+      .inv-logo-img { max-height: 44px; max-width: 60px; }
+      .inv-company {
+        font-size: 26px !important;
+        letter-spacing: 0.8px;
+        color: #C62828 !important;
+        line-height: 1.05;
+      }
+      .inv-tagline {
+        font-size: 12px !important;
+        letter-spacing: 1.2px;
+        color: #666 !important;
+        line-height: 1.15;
+      }
+      .inv-regdate { margin-left: 28px; }
+      .inv-regdate .cn-meta-label { font-size: 9px; }
+      .inv-regdate .cn-meta-value { font-size: 11px; }
+      .inv-route {
+        min-height: 42px;
+        max-height: 42px;
+        padding: 6px;
+        margin-bottom: 4px;
+      }
+      .inv-route-ta { font-size: 10px; line-height: 1.15; }
+      .inv-route-en { font-size: 8px; margin-top: 0; }
+      .cn-branches { gap: 4px; margin-bottom: 4px; }
+      .cn-branch-card {
+        padding: 8px;
+        font-size: 10px;
+        margin: 0;
+        box-shadow: none;
+      }
+      .cn-branch-name { font-size: 10px; margin-bottom: 1px; padding-bottom: 1px; }
+      .cn-branch-ta { font-size: 8px; line-height: 1.15; }
+      .cn-branch-en { font-size: 7.5px; line-height: 1.15; }
+      .cn-branch-phone { font-size: 12px; font-weight: 700; padding-top: 1px; }
+      .cn-consignment-title { font-size: 9px; margin: 0 0 2px; }
+      .inv-customer-row.customer-row {
+        width: 100%;
+        max-width: 100%;
+        padding: 6px 8px;
+        margin: 0 0 4px;
+        box-shadow: none;
         page-break-inside: avoid;
         break-inside: avoid;
       }
-      .inv-footer { gap: 12px; padding-top: 6px; padding-bottom: 6px; }
-      .inv-sigs { padding-top: 2px; }
-      .inv-footer .sig { padding-top: 4px; }
+      .inv-customer-row .cn-consignment-row {
+        --bs-gutter-x: 12px;
+      }
+      .inv-customer-row .cn-consignment-row + .cn-consignment-row {
+        margin-top: 6px;
+      }
+      .inv-customer-row .cn-consignment-row > [class*="col-"] {
+        flex: 0 0 33.33333333% !important;
+        max-width: 33.33333333% !important;
+        width: 33.33333333% !important;
+      }
+      .inv-customer-row .cn-field-label,
+      .customer-row .cn-field-label {
+        font-size: 8px;
+        margin: 0 0 1px;
+        letter-spacing: 0.3px;
+        line-height: 1.2;
+        color: #6B7280 !important;
+      }
+      .inv-customer-row .cn-field-value,
+      .customer-row .cn-field-value {
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #222222 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .inv-table-wrap { margin-bottom: 4px; }
+      table.inv-tbl {
+        font-size: 11px;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      table.inv-tbl tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      table.inv-tbl thead th {
+        background: var(--corp-blue) !important;
+        color: #fff !important;
+        height: 30px;
+        padding: 5px;
+        font-size: 8px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      table.inv-tbl tbody td {
+        height: 28px;
+        padding: 5px;
+        font-size: 11px;
+      }
+      .inv-total-row { margin-bottom: 4px; }
+      .cn-totals-box {
+        width: 260px;
+        max-width: 260px;
+        box-shadow: none;
+      }
+      .cn-totals-row { padding: 6px; min-height: 0; }
+      .cn-totals-row.cn-grand,
+      .cn-totals-row.cn-grand .cn-totals-label,
+      .cn-totals-row.cn-grand .cn-totals-value {
+        color: var(--primary-red) !important;
+        font-size: 11px;
+        padding: 6px;
+      }
+      .cn-branch-name { color: var(--primary-red) !important; }
+      .inv-footer { gap: 4px; }
+      .inv-footer .note {
+        padding: 6px;
+        font-size: 10px;
+        line-height: 1.2;
+        margin: 0;
+        box-shadow: none;
+      }
+      .inv-sigs { gap: 4px; }
+      .inv-footer .sig {
+        padding-top: 10px;
+        min-height: 18px;
+        font-size: 8px;
+        line-height: 1.15;
+      }
+      .cn-page-footer {
+        margin: 4px 0 0;
+        padding: 2px 0 0;
+        font-size: 10px;
+        line-height: 1.2;
+      }
+      .cn-page-footer .cn-thanks { font-size: 10px; margin: 0; }
     }
   </style>
 </head>
 <body<?php echo $printEmbed ? ' class="parcel-print-embed"' : ''; ?>>
 <?php if (!$printEmbed): ?>
-<div class="no-print mb-2 d-flex flex-wrap gap-2">
+<div class="no-print mb-2 d-flex flex-wrap gap-2 align-items-center">
   <a class="btn btn-secondary btn-sm" href="<?php echo htmlspecialchars(Helpers::baseUrl('index.php?page=parcels')); ?>">Back</a>
   <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
   <?php if (!$hasInvoiceCols): ?>
   <button type="button" id="toggleAddrEditor" class="btn btn-outline-secondary btn-sm">Edit header addresses</button>
   <?php endif; ?>
+  <span class="small text-muted">Print: B5 Portrait · Margins 6mm · Scale Default</span>
 </div>
 <?php if (!$hasInvoiceCols): ?>
-<div id="addrEditor" class="no-print card card-body p-2 mb-2" style="display:none; max-width:210mm; margin:0 auto;">
+<div id="addrEditor" class="no-print card card-body p-2 mb-2" style="display:none; max-width:176mm; margin:0 auto;">
   <div class="small text-muted mb-1">One address per line. Applies to this invoice only.</div>
   <textarea id="addrTextarea" class="form-control form-control-sm" rows="4"></textarea>
   <div class="mt-2 d-flex gap-2">
@@ -588,101 +1090,206 @@ $logoInitials = $logoInitials ?: 'TS';
 <?php endif; ?>
 <?php endif; ?>
 
-<div class="a4-root">
+<?php
+  $routeTaDisplay = implode(' ⟷ ', array_filter(array_map('trim', $routeTamilParts), static function ($p) {
+    return $p !== '';
+  }));
+  if ($routeTaDisplay === '') {
+    $routeTaDisplay = 'கொழும்பு ⟷ கிளிநொச்சி ⟷ முல்லைத்தீவு';
+  }
+  $routeEnParts = [];
+  foreach ($invoiceHeaderBranches as $brColRoute) {
+    if (!is_array($brColRoute)) { continue; }
+    $bn = trim((string)($brColRoute['name'] ?? ''));
+    if ($bn !== '') { $routeEnParts[] = $bn; }
+  }
+  $routeEnDisplay = count($routeEnParts) >= 2
+    ? implode(' ↔ ', $routeEnParts)
+    : 'Colombo ↔ Kilinochchi ↔ Mullaitivu';
+  $footerPhones = [];
+  foreach ($invoiceHeaderBranches as $brColFoot) {
+    if (!is_array($brColFoot)) { continue; }
+    $ph = trim((string)($brColFoot['phones'] ?? ''));
+    if ($ph !== '') { $footerPhones[] = str_replace('|', ' | ', $ph); }
+  }
+  $footerPhoneDisplay = $footerPhones !== [] ? implode(' · ', array_slice($footerPhones, 0, 2)) : '';
+?>
+
+<div class="a4-root invoice-container">
   <article class="invoice-sheet">
     <div class="inv-print-header-block">
-    <header class="inv-header">
-      <div class="inv-logo-cell">
-        <?php if ($useLogoImage): ?>
-          <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
-          <img class="inv-logo-img" src="<?php echo htmlspecialchars($logoUrl); ?>" alt="">
-        <?php else: ?>
-          <div class="logo-unit">
-            <div class="logo-wrap"><?php echo htmlspecialchars(strtoupper($logoInitials)); ?></div>
-            <?php
-              $__bn = strtoupper((string)($brand['name'] ?? 'TS'));
-              $__bn = function_exists('mb_substr') ? mb_substr($__bn, 0, 8) : substr($__bn, 0, 8);
-            ?>
-            <span class="bar-small"><?php echo htmlspecialchars($__bn); ?></span>
+      <header class="inv-header">
+        <div class="inv-logo-cell">
+          <?php if ($useLogoImage): ?>
+            <?php $logoUrl = $brand['logo_url']; $logoUrl = (strpos($logoUrl, 'http') === 0 || strpos($logoUrl, '//') === 0) ? $logoUrl : Helpers::baseUrl($logoUrl); ?>
+            <img class="inv-logo-img" src="<?php echo htmlspecialchars($logoUrl); ?>" alt="">
+          <?php else: ?>
+            <div class="logo-unit">
+              <div class="logo-wrap"><?php echo htmlspecialchars(strtoupper($logoInitials)); ?></div>
+              <?php
+                $__bn = strtoupper((string)($brand['name'] ?? 'TS'));
+                $__bn = function_exists('mb_substr') ? mb_substr($__bn, 0, 8) : substr($__bn, 0, 8);
+              ?>
+              <span class="bar-small"><?php echo htmlspecialchars($__bn); ?></span>
+            </div>
+          <?php endif; ?>
+        </div>
+        <div class="inv-company-block">
+          <h1 class="inv-company"><?php echo htmlspecialchars($brand['name'] ?? 'TS Transport'); ?></h1>
+          <p class="inv-tagline">Courier &amp; Parcel Service</p>
+        </div>
+        <div class="inv-regdate">
+          <?php if ($regNo !== ''): ?>
+          <div class="cn-meta-item">
+            <span class="cn-meta-label">Registration No</span>
+            <span class="cn-meta-value"><?php echo htmlspecialchars($regNo); ?></span>
           </div>
-        <?php endif; ?>
+          <?php endif; ?>
+          <div class="cn-meta-item">
+            <span class="cn-meta-label">Invoice Date</span>
+            <span class="cn-meta-value"><?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></span>
+          </div>
+          <div class="cn-meta-item">
+            <span class="cn-meta-label">Invoice No</span>
+            <span class="cn-meta-value">#<?php echo (int)$invoiceNo; ?></span>
+          </div>
+        </div>
+      </header>
+
+      <div class="cn-separator" aria-hidden="true"></div>
+
+      <div class="inv-route">
+        <div class="inv-route-ta"><?php echo htmlspecialchars($routeTaDisplay); ?></div>
+        <div class="inv-route-en"><?php echo htmlspecialchars($routeEnDisplay); ?></div>
       </div>
-      <div class="inv-company"><?php echo htmlspecialchars($brand['name'] ?? 'TS Transport'); ?></div>
-      <div class="inv-regdate">
-        <?php if ($regNo !== ''): ?><div>Reg: <?php echo htmlspecialchars($regNo); ?></div><?php endif; ?>
-      </div>
-    </header>
-    <table class="inv-route" style="width:100%; border-collapse:collapse; margin:0;">
-      <tr>
-        <td colspan="3" align="center" style="font-size:13px; font-weight:bold; padding:3px; border-top:1px solid #000; border-bottom:1px solid #000;">
-          கொழும்பு ⟷ கிளிநொச்சி ⟷ முல்லைத்தீவு
-        </td>
-      </tr>
-    </table>
-    <table class="inv-branches-3" aria-label="Branch addresses">
-      <tr style="font-size:13px; line-height:1.4; font-weight:bold;">
+
+      <div class="cn-branches" aria-label="Branch addresses">
         <?php for ($col = 0; $col < 3; $col++):
             $brCol = $invoiceHeaderBranches[$col] ?? null;
-            $pct = $col < 2 ? '33%' : '34%';
             ?>
-        <td width="<?php echo $pct; ?>" align="left" valign="top">
+        <div class="cn-branch-card">
           <?php if (is_array($brCol)): ?>
-            <strong><?php echo htmlspecialchars((string)($brCol['name'] ?? '')); ?></strong><br>
+            <div class="cn-branch-name"><?php echo htmlspecialchars((string)($brCol['name'] ?? '')); ?></div>
             <?php if (trim((string)($brCol['address_ta'] ?? '')) !== ''): ?>
-              <?php echo nl2br(htmlspecialchars((string)$brCol['address_ta'])); ?><br>
+              <div class="cn-branch-ta"><?php echo nl2br(htmlspecialchars((string)$brCol['address_ta'])); ?></div>
             <?php endif; ?>
             <?php if (trim((string)($brCol['address_en'] ?? '')) !== ''): ?>
-              <?php echo nl2br(htmlspecialchars((string)$brCol['address_en'])); ?><br>
+              <div class="cn-branch-en"><?php echo nl2br(htmlspecialchars((string)$brCol['address_en'])); ?></div>
             <?php endif; ?>
             <?php if (trim((string)($brCol['phones'] ?? '')) !== ''): ?>
-              <?php echo htmlspecialchars(str_replace('|', ' | ', (string)$brCol['phones'])); ?>
+              <div class="cn-branch-phone"><?php echo htmlspecialchars(str_replace('|', ' | ', (string)$brCol['phones'])); ?></div>
             <?php endif; ?>
           <?php endif; ?>
-        </td>
+        </div>
         <?php endfor; ?>
-      </tr>
-    </table>
+      </div>
     </div>
+
+    <p class="cn-consignment-title">Consignment Details</p>
     <div class="inv-customer-row customer-row" aria-label="Customer details">
-      <div class="inv-customer-left left">Customer: <?php echo htmlspecialchars(trim((string)($parcel['customer_name'] ?? ''))); ?></div>
-      <div class="inv-customer-center center">Phone: <?php echo htmlspecialchars(trim((string)($parcel['customer_phone'] ?? ''))); ?></div>
-      <div class="inv-customer-right right">Delivery: <?php echo htmlspecialchars(trim((string)($parcel['delivery_location'] ?? ''))); ?></div>
+      <div class="row cn-consignment-row">
+        <div class="col-lg-4 col-md-6 col-12 cn-field inv-customer-left left">
+          <span class="cn-field-label">Customer</span>
+          <span class="cn-field-value"><?php echo htmlspecialchars(trim((string)($parcel['customer_name'] ?? ''))); ?></span>
+        </div>
+        <div class="col-lg-4 col-md-6 col-12 cn-field inv-customer-center center">
+          <span class="cn-field-label">Phone</span>
+          <span class="cn-field-value"><?php echo htmlspecialchars(trim((string)($parcel['customer_phone'] ?? ''))); ?></span>
+        </div>
+        <div class="col-lg-4 col-md-6 col-12 cn-field inv-customer-right right">
+          <span class="cn-field-label">Delivery Branch</span>
+          <span class="cn-field-value"><?php echo htmlspecialchars(trim((string)($parcel['delivery_location'] ?? ''))); ?></span>
+        </div>
+      </div>
+      <div class="row cn-consignment-row">
+        <div class="col-lg-4 col-md-6 col-12 cn-field">
+          <span class="cn-field-label">Reference</span>
+          <span class="cn-field-value"><?php echo htmlspecialchars(trim((string)($parcel['tracking_number'] ?? ''))); ?></span>
+        </div>
+        <div class="col-lg-4 col-md-6 col-12 cn-field">
+          <span class="cn-field-label">Booking Date</span>
+          <span class="cn-field-value"><?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></span>
+        </div>
+        <div class="col-lg-4 col-md-6 col-12 cn-field">
+          <span class="cn-field-label">Booked By</span>
+          <span class="cn-field-value"><?php echo htmlspecialchars(trim((string)($parcel['supplier_name'] ?? ''))); ?></span>
+        </div>
+      </div>
     </div>
-    <div class="inv-invoice-row">
+
+    <div class="inv-invoice-row" aria-hidden="true">
       <div class="inv-invoice-title">Invoice No. #<?php echo (int)$invoiceNo; ?></div>
       <div class="inv-invoice-date">Date: <?php echo htmlspecialchars($dateInline !== '' ? $dateInline : $parcelDate); ?></div>
     </div>
 
     <div class="inv-body">
-      <table class="inv-tbl">
-        <colgroup>
-          <col class="qty"><col class="desc"><col class="rate"><col class="amt">
-        </colgroup>
-        <thead>
-          <tr>
-            <th class="text-end">Qty</th>
-            <th>Description</th>
-            <th class="text-end">Rate</th>
-            <th class="text-end">Amount</th>
-          </tr>
-        </thead>
-        <tbody><?php echo $tableBodyHtml; ?></tbody>
-        <tfoot>
-          <tr>
-            <td colspan="3"></td>
-            <td class="text-end fw-bold" style="font-size:13px;">Total (Rs): <?php echo htmlspecialchars(number_format($grs)); ?></td>
-          </tr>
-        </tfoot>
-      </table>
+      <div class="inv-table-wrap">
+        <table class="inv-tbl table mb-0">
+          <colgroup>
+            <col class="col-no"><col class="desc"><col class="qty"><col class="rate"><col class="disc"><col class="tax"><col class="amt">
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="text-center">#</th>
+              <th>Description</th>
+              <th class="text-end">Qty</th>
+              <th class="text-end">Unit Price</th>
+              <th class="text-end">Discount</th>
+              <th class="text-end">Tax</th>
+              <th class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody><?php echo $tableBodyHtml; ?></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6"></td>
+              <td class="text-end fw-bold">Total (Rs): <?php echo htmlspecialchars(number_format($grs)); ?></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="inv-total-row">
+        <div class="cn-totals-box">
+          <div class="cn-totals-row">
+            <span class="cn-totals-label">Subtotal (Rs)</span>
+            <span class="cn-totals-value"><?php echo htmlspecialchars(number_format($grs)); ?></span>
+          </div>
+          <div class="cn-totals-row">
+            <span class="cn-totals-label">Discount (Rs)</span>
+            <span class="cn-totals-value"><?php echo htmlspecialchars(number_format((float)($parcel['discount'] ?? 0))); ?></span>
+          </div>
+          <div class="cn-totals-row">
+            <span class="cn-totals-label">Tax (Rs)</span>
+            <span class="cn-totals-value"><?php echo htmlspecialchars(number_format((float)($parcel['tax_amount'] ?? 0))); ?></span>
+          </div>
+          <div class="cn-totals-row cn-grand">
+            <span class="cn-totals-label">Grand Total (Rs)</span>
+            <span class="cn-totals-value"><?php echo htmlspecialchars(number_format($grs)); ?></span>
+          </div>
+        </div>
+      </div>
+
       <div class="inv-footer">
         <?php if ($footerNoteDisplay !== ''): ?>
         <p class="note"><?php echo htmlspecialchars($footerNoteDisplay, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
         <div class="inv-sigs">
+          <div class="sig">Prepared By</div>
           <div class="sig">Handed Over</div>
-          <div class="sig">Receiver</div>
+          <div class="sig">Receiver Signature</div>
         </div>
       </div>
+
+      <footer class="cn-page-footer">
+        <div class="cn-thanks">Thank you for choosing <?php echo htmlspecialchars($brand['name'] ?? 'TS Transport'); ?></div>
+        <?php if ($footerPhoneDisplay !== ''): ?>
+        <div class="cn-contact">
+          <span>Tel: <?php echo htmlspecialchars($footerPhoneDisplay); ?></span>
+        </div>
+        <?php endif; ?>
+        <div>Printed: <?php echo date('d/m/Y H:i'); ?> · Generated by System</div>
+      </footer>
     </div>
   </article>
 </div>
