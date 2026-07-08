@@ -694,23 +694,47 @@ $logoInitials = $logoInitials ?: 'TS';
       overflow-wrap: anywhere;
     }
     .inv-sigs {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
+      --bs-gutter-x: 12px;
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: flex-end;
+      width: 100%;
+      max-width: 100%;
+      margin: 10px 0 8px;
       padding: 0;
-      margin: 0;
       page-break-inside: avoid;
       break-inside: avoid;
     }
+    .inv-sigs > [class*="col-"] {
+      flex: 0 0 33.33333333%;
+      max-width: 33.33333333%;
+      width: 33.33333333%;
+      padding-left: calc(var(--bs-gutter-x) * 0.5);
+      padding-right: calc(var(--bs-gutter-x) * 0.5);
+    }
     .inv-footer .sig {
-      text-align: center;
-      font-size: 9px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      width: 100%;
+      margin: 0;
+      padding: 8px 0 0;
+      border: none;
+      min-height: 0;
+      font-size: 11px;
       font-weight: 600;
-      color: var(--cn-muted);
-      padding-top: 12px;
-      border-top: 1px solid var(--cn-ink);
-      min-height: 22px;
-      line-height: 1.15;
+      color: #555;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .inv-footer .sig::before {
+      content: '';
+      display: block;
+      width: 90%;
+      border-top: 1px solid #333;
+      margin-bottom: 8px;
+      flex-shrink: 0;
     }
 
     /* 9. Footer */
@@ -862,7 +886,10 @@ $logoInitials = $logoInitials ?: 'TS';
       .customer-row .cn-field-value {
         font-size: 14px;
       }
-      .inv-sigs { grid-template-columns: 1fr; gap: 12px; }
+      .inv-sigs {
+        --bs-gutter-x: 8px;
+        margin: 10px 0 8px;
+      }
       .cn-totals-box { max-width: 100%; }
     }
 
@@ -1051,12 +1078,29 @@ $logoInitials = $logoInitials ?: 'TS';
         margin: 0;
         box-shadow: none;
       }
-      .inv-sigs { gap: 4px; }
+      .inv-sigs {
+        --bs-gutter-x: 10px;
+        flex-wrap: nowrap !important;
+        width: 100%;
+        margin: 8px 0 6px;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .inv-sigs > [class*="col-"] {
+        flex: 0 0 33.33333333% !important;
+        max-width: 33.33333333% !important;
+        width: 33.33333333% !important;
+      }
       .inv-footer .sig {
-        padding-top: 10px;
-        min-height: 18px;
-        font-size: 8px;
-        line-height: 1.15;
+        padding: 6px 0 0;
+        font-size: 9px;
+        line-height: 1.2;
+        color: #555 !important;
+      }
+      .inv-footer .sig::before {
+        width: 90%;
+        border-top: 1px solid #333 !important;
+        margin-bottom: 6px;
       }
       .cn-page-footer {
         margin: 4px 0 0;
@@ -1274,10 +1318,10 @@ $logoInitials = $logoInitials ?: 'TS';
         <?php if ($footerNoteDisplay !== ''): ?>
         <p class="note"><?php echo htmlspecialchars($footerNoteDisplay, ENT_QUOTES, 'UTF-8'); ?></p>
         <?php endif; ?>
-        <div class="inv-sigs">
-          <div class="sig">Prepared By</div>
-          <div class="sig">Handed Over</div>
-          <div class="sig">Receiver Signature</div>
+        <div class="inv-sigs row">
+          <div class="col-4 sig">Prepared By</div>
+          <div class="col-4 sig">Handed Over</div>
+          <div class="col-4 sig">Receiver Signature</div>
         </div>
       </div>
 
