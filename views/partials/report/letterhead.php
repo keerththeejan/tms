@@ -34,7 +34,7 @@ require __DIR__ . '/setup.php';
       ?>
       <div class="cn-meta-item">
         <span class="cn-meta-label"><?php echo htmlspecialchars($__ml); ?></span>
-        <span class="cn-meta-value"><?php echo htmlspecialchars($__mv); ?></span>
+        <span class="cn-meta-value"<?php if (!empty($__meta['id'])): ?> id="<?php echo htmlspecialchars((string)$__meta['id']); ?>"<?php endif; ?>><?php echo htmlspecialchars($__mv); ?></span>
       </div>
       <?php endforeach; ?>
     </div>

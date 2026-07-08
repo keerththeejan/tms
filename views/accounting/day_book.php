@@ -7,7 +7,10 @@ $baseUrl = Helpers::baseUrl('');
 $fromDate = $_GET['from_date'] ?? date('Y-m-01');
 $toDate = $_GET['to_date'] ?? date('Y-m-t');
 $voucherType = $_GET['voucher_type'] ?? '';
+$dbPrintCssPath = dirname(__DIR__, 2) . '/public/assets/css/day-book-print.css';
+$dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) : '1';
 ?>
+<link rel="stylesheet" href="<?php echo Helpers::baseUrl('assets/css/day-book-print.css?v=' . rawurlencode($dbPrintCssVer)); ?>">
 <style>
 .acc-daybook-module {
     background-color: #F5F5DC;
@@ -161,14 +164,14 @@ $voucherType = $_GET['voucher_type'] ?? '';
 
 <div class="acc-daybook-module">
     <!-- Header -->
-    <div class="acc-daybook-header">
+    <div class="acc-daybook-header no-print">
         <span class="acc-daybook-header-title">
             <i class="bi bi-book"></i> Day Book
         </span>
     </div>
 
     <!-- Toolbar -->
-    <div class="acc-daybook-toolbar">
+    <div class="acc-daybook-toolbar no-print">
         <div class="acc-daybook-form-group">
             <label>From Date</label>
             <input type="date" id="accFromDate" value="<?php echo htmlspecialchars($fromDate); ?>">
@@ -194,10 +197,13 @@ $voucherType = $_GET['voucher_type'] ?? '';
         <button type="button" class="acc-daybook-btn" onclick="accExportExcel()">
             Export Excel
         </button>
-        <button type="button" class="acc-daybook-btn" onclick="accPrintDayBook()">
-            Print
+        <button type="button" class="acc-daybook-btn" onclick="printReport()">
+            Print Report
         </button>
     </div>
+
+    <div id="report-print-area" class="report-print-area">
+        <?php include __DIR__ . '/../partials/report/day_book_print_header.php'; ?>
 
     <!-- Table Section -->
     <div class="acc-daybook-table-section">
@@ -213,7 +219,7 @@ $voucherType = $_GET['voucher_type'] ?? '';
                     <th class="text-right" style="width: 90px;">Debit</th>
                     <th class="text-right" style="width: 90px;">Credit</th>
                     <th style="width: 10%;">Branch</th>
-                    <th style="width: 10%;">Created By</th>
+                    <th class="db-col-created-by" style="width: 10%;">Created By</th>
                 </tr>
             </thead>
             <tbody id="accDayBookBody">
@@ -225,9 +231,10 @@ $voucherType = $_GET['voucher_type'] ?? '';
             </tbody>
         </table>
     </div>
+    </div>
 
     <!-- Summary -->
-    <div class="acc-daybook-summary">
+    <div class="acc-daybook-summary no-print">
         <div class="acc-daybook-summary-item">
             <label>Total Records:</label>
             <span id="accTotalRecords">0</span>
@@ -307,7 +314,7 @@ function accRenderDayBook(entries) {
             '<td class="text-right">' + accFormatAmount(entry.debit_amount || 0) + '</td>' +
             '<td class="text-right">' + accFormatAmount(entry.credit_amount || 0) + '</td>' +
             '<td>' + accEscapeHtml(entry.branch || '') + '</td>' +
-            '<td>' + accEscapeHtml(entry.created_by || '') + '</td>' +
+            '<td class="db-col-created-by">' + accEscapeHtml(entry.created_by || '') + '</td>' +
             '</tr>';
     }).join('');
 
@@ -321,7 +328,18 @@ function accExportExcel() {
     alert('Excel export functionality - to be implemented');
 }
 
-function accPrintDayBook() {
+function accFormatPrintDateTime() {
+    const now = new Date();
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    return pad(now.getDate()) + '/' + pad(now.getMonth() + 1) + '/' + now.getFullYear() + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+}
+
+function printReport() {
+    const printed = accFormatPrintDateTime();
+    const printDateEl = document.getElementById('dbPrintDate');
+    const infoPrintDateEl = document.getElementById('dbInfoPrintDate');
+    if (printDateEl) printDateEl.textContent = printed;
+    if (infoPrintDateEl) infoPrintDateEl.textContent = printed;
     window.print();
 }
 </script>

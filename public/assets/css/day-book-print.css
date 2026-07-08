@@ -1,0 +1,171 @@
+/**
+ * Day Book — dedicated print stylesheet
+ * Prints only #report-print-area (header + info + table).
+ */
+
+/* Screen: hide print-only chrome inside the print area */
+.report-print-area .db-print-only {
+  display: none;
+}
+
+/* ── Print: isolate report area only ── */
+@media print {
+  @page {
+    size: auto;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide global embed footer/header from accounting shell */
+  .acc-content > .rpt-embed-block,
+  .acc-content > .rpt-embed-footer,
+  .rpt-embed-block,
+  .rpt-embed-footer,
+  .no-print,
+  .acc-sidebar,
+  .acc-topbar,
+  .tms-sidebar,
+  .app-sidebar,
+  #sidebar,
+  .topbar,
+  .sidebar-overlay,
+  .sidebar-toggle-floating,
+  .skip-link,
+  .navbar,
+  .cn-page-footer,
+  .rpt-page-footer {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Visibility isolation — print only #report-print-area */
+  body * {
+    visibility: hidden;
+  }
+
+  #report-print-area,
+  #report-print-area * {
+    visibility: visible;
+  }
+
+  #report-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
+  .report-print-area .db-print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .acc-content,
+  .acc-main,
+  .acc-module,
+  .acc-daybook-module,
+  .content-wrapper,
+  .app-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .acc-daybook-table-section {
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Table — professional accounting style */
+  #report-print-area .acc-daybook-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    line-height: 1.2;
+    page-break-inside: auto;
+  }
+
+  #report-print-area .acc-daybook-table thead {
+    display: table-header-group;
+    background: #1E4FA8 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #report-print-area .acc-daybook-table th {
+    background: #1E4FA8 !important;
+    color: #fff !important;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 4px 5px;
+    border: 1px solid #163d85;
+    text-align: left;
+  }
+
+  #report-print-area .acc-daybook-table td {
+    padding: 3px 5px;
+    border: 1px solid #E5E7EB;
+    vertical-align: top;
+    font-size: 10px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  #report-print-area .acc-daybook-table tbody tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  #report-print-area .acc-daybook-table tbody tr:nth-child(even) td {
+    background: #F8F9FB !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #report-print-area .acc-daybook-table .text-right {
+    text-align: right !important;
+  }
+
+  /* Hide Created By column in print (9 columns only) */
+  #report-print-area .acc-daybook-table .db-col-created-by {
+    display: none !important;
+  }
+
+  .db-print-header-wrap {
+    margin-bottom: 6px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .db-print-header-wrap .rpt-print-header-block {
+    margin-bottom: 4px;
+    box-shadow: none !important;
+  }
+
+  .db-print-header-wrap .rpt-info-panel {
+    margin-bottom: 6px;
+    padding: 6px 8px;
+  }
+}
