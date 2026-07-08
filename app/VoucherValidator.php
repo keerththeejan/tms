@@ -3,9 +3,8 @@ declare(strict_types=1);
 
 /**
  * VoucherValidator - Business Logic Validation for Payment Vouchers
- * 
- * Validates all accounting rules and business requirements
- * Ensures double-entry integrity and balancing
+ *
+ * Simple voucher entry: each line is saved independently.
  */
 class VoucherValidator
 {
@@ -31,16 +30,6 @@ class VoucherValidator
 
         // Items validation
         if (!$this->validateLineItems($items)) {
-            return false;
-        }
-
-        // Double-entry validation
-        if (!$this->validateDoubleEntry($items)) {
-            return false;
-        }
-
-        // Balance validation
-        if (!$this->validateBalance($items)) {
             return false;
         }
 
@@ -94,100 +83,54 @@ class VoucherValidator
     private function validateLineItems(array $items): bool
     {
         if (empty($items)) {
-            $this->errors[] = 'At least 2 line items are required (Debit and Credit)';
+            $this->errors[] = 'At least one voucher line is required';
             return false;
         }
 
-        if (count($items) < 2) {
-            $this->errors[] = 'Minimum 2 line items required for double-entry accounting';
-            return false;
-        }
-
+        $validCount = 0;
         foreach ($items as $index => $item) {
+            $debit = (float) ($item['debit_amount'] ?? 0);
+            $credit = (float) ($item['credit_amount'] ?? 0);
+
+            if (empty($item['account_code']) && empty($item['account_name']) && $debit <= 0 && $credit <= 0) {
+                continue;
+            }
+
             if (empty($item['account_code'])) {
-                $this->errors[] = "Line " . ($index + 1) . ": Account code is required";
+                $this->errors[] = 'Line ' . ($index + 1) . ': Account code is required';
                 return false;
             }
 
             if (empty($item['account_name'])) {
-                $this->errors[] = "Line " . ($index + 1) . ": Account name is required";
+                $this->errors[] = 'Line ' . ($index + 1) . ': Account name is required';
                 return false;
             }
 
-            // Check if account exists
             $account = $this->repository->getLedgerAccountByCode($item['account_code']);
             if (!$account) {
                 $this->errors[] = "Line " . ($index + 1) . ": Invalid account code '{$item['account_code']}'";
                 return false;
             }
 
-            // At least one amount must be present
-            $debit = (float) ($item['debit_amount'] ?? 0);
-            $credit = (float) ($item['credit_amount'] ?? 0);
-
-            if ($debit == 0 && $credit == 0) {
-                $this->errors[] = "Line " . ($index + 1) . ": Both debit and credit cannot be zero";
-                return false;
-            }
-
-            // Both cannot be non-zero (single entry per line)
-            if ($debit > 0 && $credit > 0) {
-                $this->errors[] = "Line " . ($index + 1) . ": Cannot have both debit and credit in same line";
-                return false;
-            }
-
-            // Amount must be positive
             if ($debit < 0 || $credit < 0) {
-                $this->errors[] = "Line " . ($index + 1) . ": Amounts must be positive";
+                $this->errors[] = 'Line ' . ($index + 1) . ': Amounts cannot be negative';
                 return false;
             }
+
+            if ($debit <= 0 && $credit <= 0) {
+                $this->errors[] = 'Line ' . ($index + 1) . ': Enter a debit or credit amount';
+                return false;
+            }
+
+            $validCount++;
         }
 
-        return true;
-    }
-
-    /**
-     * Validate double-entry accounting: Total Debit = Total Credit
-     */
-    private function validateDoubleEntry(array $items): bool
-    {
-        $totalDebit = 0;
-        $totalCredit = 0;
-
-        foreach ($items as $item) {
-            $totalDebit += (float) ($item['debit_amount'] ?? 0);
-            $totalCredit += (float) ($item['credit_amount'] ?? 0);
-        }
-
-        // Allow small rounding differences
-        $difference = abs($totalDebit - $totalCredit);
-        if ($difference > 0.01) {
-            $this->errors[] = sprintf(
-                'Debit (%s) and Credit (%s) must match. Difference: %s',
-                $this->formatMoney($totalDebit),
-                $this->formatMoney($totalCredit),
-                $this->formatMoney($difference)
-            );
+        if ($validCount < 1) {
+            $this->errors[] = 'At least one voucher line is required';
             return false;
         }
 
         return true;
-    }
-
-    /**
-     * Validate balance (already covered by double-entry, but explicit check)
-     */
-    private function validateBalance(array $items): bool
-    {
-        $totalDebit = 0;
-        $totalCredit = 0;
-
-        foreach ($items as $item) {
-            $totalDebit += (float) ($item['debit_amount'] ?? 0);
-            $totalCredit += (float) ($item['credit_amount'] ?? 0);
-        }
-
-        return abs($totalDebit - $totalCredit) < 0.01;
     }
 
     /**

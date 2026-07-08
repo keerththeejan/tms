@@ -252,11 +252,6 @@
     }
 
     function getExcludedAccountIds() {
-        if (voucherType === 'RECEIPT' || voucherType === 'PAYMENT' || voucherType === 'CONTRA') {
-            return Object.keys(paymentModeSettings).map(function (key) {
-                return parseInt(paymentModeSettings[key].account_id, 10);
-            });
-        }
         return [];
     }
 
@@ -268,12 +263,6 @@
         }
         const match = resolveAccountMatch(text);
         if (match) {
-            if (getExcludedAccountIds().indexOf(parseInt(match.id, 10)) >= 0) {
-                alert('This main account is posted automatically. Enter the transaction account only.');
-                clearAccountOnRow(input.closest('tr'));
-                input.value = '';
-                return;
-            }
             setAccountOnRow(input.closest('tr'), match);
         }
     }
@@ -419,8 +408,12 @@
                 if (!opts.silent) throw new Error('Account is required.');
                 return;
             }
+            if (debit < 0 || credit < 0) {
+                if (!opts.silent) throw new Error('Amounts cannot be negative.');
+                return;
+            }
             if (debit <= 0 && credit <= 0) {
-                if (!opts.silent) throw new Error('Amount cannot be zero.');
+                if (!opts.silent) throw new Error('Enter a debit or credit amount.');
                 return;
             }
             items.push({
@@ -455,7 +448,9 @@
             const account = parseInt(line.account_id || 0, 10);
             const debit = parseAmount(line.debit_amount);
             const credit = parseAmount(line.credit_amount);
-            return account > 0 && (debit > 0 || credit > 0);
+            if (account <= 0) return false;
+            if (debit < 0 || credit < 0) return false;
+            return debit > 0 || credit > 0;
         });
         if (validLines.length < 1) {
             throw new Error('At least one valid voucher line is required.');
@@ -726,18 +721,7 @@
         document.getElementById('busyLongNarration').value = voucher.narration || '';
         updateDateDisplay();
 
-        let details = (voucher.details || []).filter(function (d) {
-            return !d.is_auto_generated;
-        });
-
-        if (voucherType === 'CONTRA' && details.length === 0 && (voucher.details || []).length > 0) {
-            const autoDetails = voucher.details.filter(function (d) { return d.is_auto_generated; });
-            const amount = autoDetails.reduce(function (max, d) {
-                const val = parseFloat(d.debit_amount || d.credit_amount || 0);
-                return val > max ? val : max;
-            }, 0);
-            details = [{ amount: amount }];
-        }
+        let details = voucher.details || [];
 
         const tbody = document.getElementById('busyGridBody');
         tbody.innerHTML = '';
@@ -768,7 +752,7 @@
     function updateStatusText() {
         const text = document.getElementById('busyAutoLineText');
         if (!text) return;
-        text.textContent = 'Simple manual voucher entry mode';
+        text.textContent = 'Simple voucher entry mode';
     }
 
     function showAlert(message, type) {

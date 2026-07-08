@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 /**
- * Generates automatic opposite-ledger lines for voucher entry (Main Cash/Bank accounts).
+ * Simple voucher entry — stores user lines exactly as entered (no auto-ledger lines).
  */
 class VoucherAutoLedgerService
 {
     public static function supportsAutoLedger(string $voucherType): bool
     {
-        return in_array(strtoupper($voucherType), ['RECEIPT', 'PAYMENT', 'CONTRA'], true);
+        return false;
     }
 
     public static function normalizePaymentMode(string $paymentMode): string
@@ -28,28 +28,6 @@ class VoucherAutoLedgerService
         array $rawDetails,
         ?string $headerNarration = null
     ): array {
-        $voucherType = strtoupper(trim($voucherType));
-        $paymentMode = self::normalizePaymentMode($paymentMode);
-
-        if ($voucherType === 'JOURNAL') {
-            return self::stripMeta($rawDetails);
-        }
-
-        if ($voucherType === 'TRANSFER') {
-            return self::buildTransferDetails($rawDetails);
-        }
-
-        $defaultAccountIds = AccountingPaymentModeSettingsRepository::getAllDefaultAccountIds($pdo);
-        $userLines = self::filterUserLines($rawDetails, $defaultAccountIds);
-
-        if ($voucherType === 'CONTRA') {
-            return self::buildContraDetails($pdo, $paymentMode, $userLines, $headerNarration);
-        }
-
-        if ($voucherType === 'RECEIPT' || $voucherType === 'PAYMENT') {
-            return self::buildReceiptPaymentDetails($pdo, $voucherType, $paymentMode, $userLines, $headerNarration);
-        }
-
         return self::stripMeta($rawDetails);
     }
 
@@ -63,40 +41,6 @@ class VoucherAutoLedgerService
         string $paymentMode,
         array $details
     ): array {
-        $voucherType = strtoupper(trim($voucherType));
-        $paymentMode = self::normalizePaymentMode($paymentMode);
-
-        if ($voucherType === 'JOURNAL' || $voucherType === 'TRANSFER') {
-            foreach ($details as &$line) {
-                $line['is_auto_generated'] = false;
-            }
-            unset($line);
-
-            return $details;
-        }
-
-        $defaultAccountIds = AccountingPaymentModeSettingsRepository::getAllDefaultAccountIds($pdo);
-
-        if ($voucherType === 'CONTRA') {
-            foreach ($details as &$line) {
-                $line['is_auto_generated'] = in_array((int) ($line['account_id'] ?? 0), $defaultAccountIds, true);
-            }
-            unset($line);
-
-            return $details;
-        }
-
-        if ($voucherType === 'RECEIPT' || $voucherType === 'PAYMENT') {
-            $modeAccountId = AccountingPaymentModeSettingsRepository::getAccountIdForMode($pdo, $paymentMode);
-            foreach ($details as &$line) {
-                $line['is_auto_generated'] = $modeAccountId !== null
-                    && (int) ($line['account_id'] ?? 0) === $modeAccountId;
-            }
-            unset($line);
-
-            return $details;
-        }
-
         foreach ($details as &$line) {
             $line['is_auto_generated'] = false;
         }
@@ -109,240 +53,43 @@ class VoucherAutoLedgerService
      * @param list<array<string, mixed>> $rawDetails
      * @return list<array<string, mixed>>
      */
-    private static function buildReceiptPaymentDetails(
-        PDO $pdo,
-        string $voucherType,
-        string $paymentMode,
-        array $userLines,
-        ?string $headerNarration
-    ): array {
-        if (empty($userLines)) {
-            throw new InvalidArgumentException('Enter at least one transaction account with amount.');
-        }
-
-        $modeAccountId = AccountingPaymentModeSettingsRepository::getAccountIdForMode($pdo, $paymentMode);
-        if ($modeAccountId === null) {
-            $resolved = AccountingPaymentModeSettingsRepository::resolveConfigurableMode($paymentMode);
-            throw new InvalidArgumentException(
-                'No default account configured for payment mode ' . $resolved . '. Configure it in Accounting Settings.'
-            );
-        }
-
-        $result = [];
-        $total = 0.0;
-
-        foreach ($userLines as $line) {
-            $normalized = self::normalizeUserLine($line, $voucherType);
-            $total += max($normalized['debit_amount'], $normalized['credit_amount']);
-            $normalized['is_auto_generated'] = false;
-            $result[] = $normalized;
-        }
-
-        if ($total <= 0) {
-            throw new InvalidArgumentException('Enter at least one amount greater than zero.');
-        }
-
-        if ($voucherType === 'RECEIPT') {
-            $result[] = [
-                'account_id' => $modeAccountId,
-                'debit_amount' => $total,
-                'credit_amount' => 0.0,
-                'narration' => $headerNarration,
-                'is_auto_generated' => true,
-            ];
-        } else {
-            $result[] = [
-                'account_id' => $modeAccountId,
-                'debit_amount' => 0.0,
-                'credit_amount' => $total,
-                'narration' => $headerNarration,
-                'is_auto_generated' => true,
-            ];
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $userLines
-     * @return list<array<string, mixed>>
-     */
-    private static function buildContraDetails(
-        PDO $pdo,
-        string $paymentMode,
-        array $userLines,
-        ?string $headerNarration
-    ): array {
-        $amount = 0.0;
-        foreach ($userLines as $line) {
-            $debit = (float) ($line['debit_amount'] ?? 0);
-            $credit = (float) ($line['credit_amount'] ?? 0);
-            if ($debit > 0 && $credit > 0) {
-                throw new InvalidArgumentException('Each line must have either debit or credit, not both.');
+    public static function validateSimpleLines(array $rawDetails): void
+    {
+        $validCount = 0;
+        foreach ($rawDetails as $index => $line) {
+            if (!is_array($line)) {
+                continue;
             }
-            $amount += max($debit, $credit, (float) ($line['amount'] ?? 0));
-        }
-
-        if ($amount <= 0) {
-            throw new InvalidArgumentException('Enter the contra transfer amount.');
-        }
-
-        $cashAccountId = AccountingPaymentModeSettingsRepository::getAccountIdForMode($pdo, 'CASH');
-        $bankAccountId = AccountingPaymentModeSettingsRepository::getAccountIdForMode($pdo, 'BANK');
-
-        if ($cashAccountId === null) {
-            throw new InvalidArgumentException('No default account configured for CASH. Configure it in Accounting Settings.');
-        }
-        if ($bankAccountId === null) {
-            throw new InvalidArgumentException('No default account configured for BANK. Configure it in Accounting Settings.');
-        }
-
-        $narration = $headerNarration;
-
-        // BANK payment mode = Bank → Cash; otherwise Cash → Bank.
-        if ($paymentMode === 'BANK') {
-            return [
-                [
-                    'account_id' => $cashAccountId,
-                    'debit_amount' => $amount,
-                    'credit_amount' => 0.0,
-                    'narration' => $narration,
-                    'is_auto_generated' => true,
-                ],
-                [
-                    'account_id' => $bankAccountId,
-                    'debit_amount' => 0.0,
-                    'credit_amount' => $amount,
-                    'narration' => $narration,
-                    'is_auto_generated' => true,
-                ],
-            ];
-        }
-
-        return [
-            [
-                'account_id' => $bankAccountId,
-                'debit_amount' => $amount,
-                'credit_amount' => 0.0,
-                'narration' => $narration,
-                'is_auto_generated' => true,
-            ],
-            [
-                'account_id' => $cashAccountId,
-                'debit_amount' => 0.0,
-                'credit_amount' => $amount,
-                'narration' => $narration,
-                'is_auto_generated' => true,
-            ],
-        ];
-    }
-
-    /**
-     * @param list<array<string, mixed>> $rawDetails
-     * @return list<array<string, mixed>>
-     */
-    private static function buildTransferDetails(array $rawDetails): array
-    {
-        $lines = self::stripMeta($rawDetails);
-        if (count($lines) !== 2) {
-            throw new InvalidArgumentException('Transfer vouchers require exactly two account lines.');
-        }
-
-        $first = self::normalizeTransferLine($lines[0], true);
-        $second = self::normalizeTransferLine($lines[1], false);
-
-        if (abs($first['credit_amount'] - $second['debit_amount']) > 0.01) {
-            throw new InvalidArgumentException('Transfer amounts must match on both accounts.');
-        }
-
-        $first['is_auto_generated'] = false;
-        $second['is_auto_generated'] = false;
-
-        return [$first, $second];
-    }
-
-    /** @param array<string, mixed> $line */
-    private static function normalizeTransferLine(array $line, bool $isCreditLine): array
-    {
-        $debit = (float) ($line['debit_amount'] ?? 0);
-        $credit = (float) ($line['credit_amount'] ?? 0);
-        $amount = max($debit, $credit, (float) ($line['amount'] ?? 0));
-
-        if (empty($line['account_id'])) {
-            throw new InvalidArgumentException('Each transfer line must have a valid account.');
-        }
-        if ($amount <= 0) {
-            throw new InvalidArgumentException('Each transfer line must have an amount.');
-        }
-
-        return [
-            'account_id' => (int) $line['account_id'],
-            'debit_amount' => $isCreditLine ? 0.0 : $amount,
-            'credit_amount' => $isCreditLine ? $amount : 0.0,
-            'narration' => $line['narration'] ?? null,
-        ];
-    }
-
-    /**
-     * @param list<array<string, mixed>> $rawDetails
-     * @param list<int> $defaultAccountIds
-     * @return list<array<string, mixed>>
-     */
-    private static function filterUserLines(array $rawDetails, array $defaultAccountIds): array
-    {
-        $filtered = [];
-        foreach ($rawDetails as $line) {
             $accountId = (int) ($line['account_id'] ?? 0);
-            if ($accountId > 0 && in_array($accountId, $defaultAccountIds, true)) {
-                continue;
-            }
-
             $debit = (float) ($line['debit_amount'] ?? 0);
             $credit = (float) ($line['credit_amount'] ?? 0);
-            $amount = max($debit, $credit, (float) ($line['amount'] ?? 0));
-            if ($amount <= 0 && empty($line['account_id'])) {
+
+            if ($accountId <= 0 && $debit <= 0 && $credit <= 0) {
                 continue;
             }
 
-            $filtered[] = $line;
-        }
-
-        return $filtered;
-    }
-
-    /** @param array<string, mixed> $line */
-    private static function normalizeUserLine(array $line, string $voucherType): array
-    {
-        if (empty($line['account_id'])) {
-            throw new InvalidArgumentException('Each transaction line must have a valid account.');
-        }
-
-        $debit = (float) ($line['debit_amount'] ?? 0);
-        $credit = (float) ($line['credit_amount'] ?? 0);
-        $amount = max($debit, $credit, (float) ($line['amount'] ?? 0));
-
-        if ($amount <= 0) {
-            throw new InvalidArgumentException('Each transaction line must have an amount greater than zero.');
-        }
-
-        if ($debit > 0 && $credit > 0) {
-            throw new InvalidArgumentException('Each line must have either debit or credit, not both.');
-        }
-
-        if ($debit <= 0 && $credit <= 0) {
-            if ($voucherType === 'PAYMENT') {
-                $debit = $amount;
-            } elseif ($voucherType === 'RECEIPT') {
-                $credit = $amount;
+            if ($accountId <= 0) {
+                throw new InvalidArgumentException('Account is required on line ' . ($index + 1) . '.');
             }
+
+            if ($debit < 0 || $credit < 0) {
+                throw new InvalidArgumentException('Amounts cannot be negative on line ' . ($index + 1) . '.');
+            }
+
+            if (!is_finite($debit) || !is_finite($credit)) {
+                throw new InvalidArgumentException('Invalid amount on line ' . ($index + 1) . '.');
+            }
+
+            if ($debit <= 0 && $credit <= 0) {
+                throw new InvalidArgumentException('Enter a debit or credit amount on line ' . ($index + 1) . '.');
+            }
+
+            $validCount++;
         }
 
-        return [
-            'account_id' => (int) $line['account_id'],
-            'debit_amount' => $debit,
-            'credit_amount' => $credit,
-            'narration' => $line['narration'] ?? null,
-        ];
+        if ($validCount < 1) {
+            throw new InvalidArgumentException('At least one voucher line is required.');
+        }
     }
 
     /** @param list<array<string, mixed>> $details */

@@ -196,7 +196,7 @@ function accLoadReportContent() {
 
 function accLoadDayBook(data) {
     const entries = data.entries || [];
-    let html = '<table class="acc-print-table"><thead><tr><th>Date</th><th>Voucher No</th><th>Type</th><th>Account</th><th>Narration</th><th class="text-right">Debit</th><th class="text-right">Credit</th></tr></thead><tbody>';
+    let html = '<table class="acc-print-table"><thead><tr><th>Date</th><th>Voucher No</th><th>Type</th><th>Account</th><th>Reference</th><th>Narration</th><th class="text-right">Debit</th><th class="text-right">Credit</th><th>Branch</th><th>Created By</th></tr></thead><tbody>';
     
     entries.forEach(entry => {
         html += `<tr>
@@ -204,13 +204,17 @@ function accLoadDayBook(data) {
             <td>${entry.voucher_number || ''}</td>
             <td>${entry.voucher_type || ''}</td>
             <td>${entry.account_name || ''}</td>
+            <td>${entry.reference || ''}</td>
             <td>${entry.narration || ''}</td>
             <td class="text-right">${parseFloat(entry.debit_amount || 0).toFixed(2)}</td>
             <td class="text-right">${parseFloat(entry.credit_amount || 0).toFixed(2)}</td>
+            <td>${entry.branch || ''}</td>
+            <td>${entry.created_by || ''}</td>
         </tr>`;
     });
     
     html += '</tbody></table>';
+    html += `<div class="acc-print-summary"><div class="acc-print-summary-item"><label>Total Records:</label><span>${entries.length}</span></div></div>`;
     document.getElementById('accPrintContent').innerHTML = html;
 }
 

@@ -85,32 +85,27 @@ class AccountingExcelExport
         $lines[] = '';
         
         // Column headers
-        $lines[] = 'Date,Voucher No,Type,Account,Narration,Debit,Credit';
+        $lines[] = 'Date,Voucher No,Type,Account,Reference,Narration,Debit,Credit,Branch,Created By';
         
         // Data rows
         foreach ($entries as $entry) {
             $lines[] = sprintf(
-                '%s,%s,%s,%s,%s,%s,%s',
+                '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s',
                 self::escapeCsv($entry['entry_date'] ?? ''),
                 self::escapeCsv($entry['voucher_number'] ?? ''),
                 self::escapeCsv($entry['voucher_type'] ?? ''),
                 self::escapeCsv($entry['account_name'] ?? ''),
+                self::escapeCsv($entry['reference'] ?? ''),
                 self::escapeCsv($entry['narration'] ?? ''),
                 self::fmtMoney($entry['debit_amount'] ?? 0),
-                self::fmtMoney($entry['credit_amount'] ?? 0)
+                self::fmtMoney($entry['credit_amount'] ?? 0),
+                self::escapeCsv($entry['branch'] ?? ''),
+                self::escapeCsv($entry['created_by'] ?? '')
             );
         }
         
-        // Totals
-        $totalDebit = 0;
-        $totalCredit = 0;
-        foreach ($entries as $entry) {
-            $totalDebit += (float) ($entry['debit_amount'] ?? 0);
-            $totalCredit += (float) ($entry['credit_amount'] ?? 0);
-        }
-        
         $lines[] = '';
-        $lines[] = 'Total,' . self::fmtMoney($totalDebit) . ',' . self::fmtMoney($totalCredit);
+        $lines[] = 'Total Records,' . count($entries);
         
         return implode("\n", $lines);
     }

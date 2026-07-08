@@ -122,83 +122,14 @@ class VoucherService
     }
 
     /**
-     * Automatically calculate and insert remaining balance line item
+     * Auto balance disabled — simple voucher entry stores lines as entered.
      */
     public function autoBalanceVoucher(int $voucherId): array
     {
-        try {
-            $this->repository->beginTransaction();
-
-            $voucher = $this->repository->getVoucher($voucherId);
-            if (!$voucher) {
-                return ['success' => false, 'error' => 'Voucher not found'];
-            }
-
-            $items = $this->repository->getLineItems($voucherId);
-
-            $totalDebit = 0;
-            $totalCredit = 0;
-
-            foreach ($items as $item) {
-                $totalDebit += (float) ($item['debit_amount'] ?? 0);
-                $totalCredit += (float) ($item['credit_amount'] ?? 0);
-            }
-
-            // Calculate remaining balance
-            $difference = $totalDebit - $totalCredit;
-
-            if (abs($difference) < 0.01) {
-                // Already balanced
-                $this->repository->commit();
-                return [
-                    'success' => true,
-                    'balanced' => true,
-                    'message' => 'Voucher is already balanced'
-                ];
-            }
-
-            // Determine balance account and type
-            $balanceAccount = $this->getDefaultBalanceAccount();
-            if (!$balanceAccount) {
-                return ['success' => false, 'error' => 'No default balance account configured'];
-            }
-
-            // Add balance line
-            $lineNumber = count($items) + 1;
-            $balanceItem = [
-                'line_number' => $lineNumber,
-                'account_code' => $balanceAccount['account_code'],
-                'account_name' => $balanceAccount['account_name'],
-                'ledger_account_id' => $balanceAccount['id']
-            ];
-
-            // Add balance as credit if difference is positive (debit > credit)
-            if ($difference > 0) {
-                $balanceItem['credit_amount'] = abs($difference);
-                $balanceItem['debit_amount'] = 0;
-            } else {
-                $balanceItem['debit_amount'] = abs($difference);
-                $balanceItem['credit_amount'] = 0;
-            }
-
-            $this->repository->addLineItem($voucherId, $balanceItem);
-
-            // Update totals
-            $this->updateVoucherTotals($voucherId);
-
-            $this->repository->commit();
-
-            return [
-                'success' => true,
-                'balanced' => true,
-                'balance_account' => $balanceAccount['account_name'],
-                'balance_amount' => abs($difference),
-                'message' => 'Voucher auto-balanced successfully'
-            ];
-        } catch (\Exception $e) {
-            $this->repository->rollback();
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
+        return [
+            'success' => false,
+            'error' => 'Auto balance is disabled for simple voucher entry.',
+        ];
     }
 
     /**

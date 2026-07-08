@@ -74,14 +74,6 @@ class AccountingPdfExport
      */
     private static function generateDayBookHtml(array $entries, string $fromDate, string $toDate, ?string $voucherType): string
     {
-        $totalDebit = 0;
-        $totalCredit = 0;
-        
-        foreach ($entries as $entry) {
-            $totalDebit += (float) ($entry['debit_amount'] ?? 0);
-            $totalCredit += (float) ($entry['credit_amount'] ?? 0);
-        }
-
         $rows = '';
         foreach ($entries as $entry) {
             $rows .= sprintf(
@@ -91,18 +83,26 @@ class AccountingPdfExport
                     <td>%s</td>
                     <td>%s</td>
                     <td>%s</td>
+                    <td>%s</td>
                     <td style="text-align: right;">%s</td>
                     <td style="text-align: right;">%s</td>
+                    <td>%s</td>
+                    <td>%s</td>
                 </tr>',
                 htmlspecialchars($entry['entry_date'] ?? ''),
                 htmlspecialchars($entry['voucher_number'] ?? ''),
                 htmlspecialchars($entry['voucher_type'] ?? ''),
                 htmlspecialchars($entry['account_name'] ?? ''),
+                htmlspecialchars($entry['reference'] ?? ''),
                 htmlspecialchars($entry['narration'] ?? ''),
                 self::fmtMoney($entry['debit_amount'] ?? 0),
-                self::fmtMoney($entry['credit_amount'] ?? 0)
+                self::fmtMoney($entry['credit_amount'] ?? 0),
+                htmlspecialchars($entry['branch'] ?? ''),
+                htmlspecialchars($entry['created_by'] ?? '')
             );
         }
+
+        $recordCount = count($entries);
 
         return self::getPdfTemplate('Day Book', $fromDate, $toDate, $voucherType, sprintf(
             '<table border="1" cellpadding="5" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 11px;">
@@ -112,23 +112,25 @@ class AccountingPdfExport
                         <th>Voucher No</th>
                         <th>Type</th>
                         <th>Account</th>
+                        <th>Reference</th>
                         <th>Narration</th>
                         <th style="text-align: right;">Debit</th>
                         <th style="text-align: right;">Credit</th>
+                        <th>Branch</th>
+                        <th>Created By</th>
                     </tr>
                 </thead>
                 <tbody>%s</tbody>
                 <tfoot>
                     <tr style="font-weight: bold; background-color: #E0E0E0;">
-                        <td colspan="5" style="text-align: right;">Total:</td>
-                        <td style="text-align: right;">%s</td>
-                        <td style="text-align: right;">%s</td>
+                        <td colspan="10">Showing %d Voucher Entr%s (Total Records: %d)</td>
                     </tr>
                 </tfoot>
             </table>',
             $rows,
-            self::fmtMoney($totalDebit),
-            self::fmtMoney($totalCredit)
+            $recordCount,
+            $recordCount === 1 ? 'y' : 'ies',
+            $recordCount
         ));
     }
 

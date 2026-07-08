@@ -207,15 +207,18 @@ $voucherType = $_GET['voucher_type'] ?? '';
                     <th style="width: 80px;">Date</th>
                     <th style="width: 100px;">Voucher No</th>
                     <th style="width: 80px;">Type</th>
-                    <th style="width: 30%;">Account Name</th>
-                    <th style="width: 35%;">Narration</th>
-                    <th class="text-right" style="width: 100px;">Debit</th>
-                    <th class="text-right" style="width: 100px;">Credit</th>
+                    <th style="width: 16%;">Account Name</th>
+                    <th style="width: 10%;">Reference</th>
+                    <th style="width: 18%;">Narration</th>
+                    <th class="text-right" style="width: 90px;">Debit</th>
+                    <th class="text-right" style="width: 90px;">Credit</th>
+                    <th style="width: 10%;">Branch</th>
+                    <th style="width: 10%;">Created By</th>
                 </tr>
             </thead>
             <tbody id="accDayBookBody">
                 <tr>
-                    <td colspan="7" class="text-center" style="padding: 20px; color: #999;">
+                    <td colspan="10" class="text-center" style="padding: 20px; color: #999;">
                         Loading Day Book entries…
                     </td>
                 </tr>
@@ -226,16 +229,11 @@ $voucherType = $_GET['voucher_type'] ?? '';
     <!-- Summary -->
     <div class="acc-daybook-summary">
         <div class="acc-daybook-summary-item">
-            <label>Total Debit:</label>
-            <span id="accTotalDebit" class="debit">0.00</span>
+            <label>Total Records:</label>
+            <span id="accTotalRecords">0</span>
         </div>
         <div class="acc-daybook-summary-item">
-            <label>Total Credit:</label>
-            <span id="accTotalCredit" class="credit">0.00</span>
-        </div>
-        <div class="acc-daybook-summary-item">
-            <label>Net:</label>
-            <span id="accNet">0.00</span>
+            <span id="accRecordSummary" style="min-width: auto; font-family: Tahoma, Arial, sans-serif; font-weight: normal;">Showing 0 Voucher Entries</span>
         </div>
     </div>
 </div>
@@ -287,37 +285,36 @@ async function accLoadDayBook() {
 
 function accRenderDayBook(entries) {
     const tbody = document.getElementById('accDayBookBody');
-    
-    if (entries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
-        document.getElementById('accTotalDebit').textContent = '0.00';
-        document.getElementById('accTotalCredit').textContent = '0.00';
-        document.getElementById('accNet').textContent = '0.00';
+    const totalEl = document.getElementById('accTotalRecords');
+    const summaryEl = document.getElementById('accRecordSummary');
+    const count = entries.length;
+
+    if (count === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
+        if (totalEl) totalEl.textContent = '0';
+        if (summaryEl) summaryEl.textContent = 'Showing 0 Voucher Entries';
         return;
     }
 
-    let totalDebit = 0;
-    let totalCredit = 0;
-
-    tbody.innerHTML = entries.map(entry => {
-        totalDebit += parseFloat(entry.debit_amount || 0);
-        totalCredit += parseFloat(entry.credit_amount || 0);
-        return `
-            <tr>
-                <td>${accEscapeHtml(entry.entry_date)}</td>
-                <td>${accEscapeHtml(entry.voucher_number)}</td>
-                <td>${accEscapeHtml(entry.voucher_type)}</td>
-                <td>${accEscapeHtml(entry.account_name)}</td>
-                <td>${accEscapeHtml(entry.narration)}</td>
-                <td class="text-right">${accFormatAmount(entry.debit_amount || 0)}</td>
-                <td class="text-right">${accFormatAmount(entry.credit_amount || 0)}</td>
-            </tr>
-        `;
+    tbody.innerHTML = entries.map(function (entry) {
+        return '<tr>' +
+            '<td>' + accEscapeHtml(entry.entry_date) + '</td>' +
+            '<td>' + accEscapeHtml(entry.voucher_number) + '</td>' +
+            '<td>' + accEscapeHtml(entry.voucher_type) + '</td>' +
+            '<td>' + accEscapeHtml(entry.account_name) + '</td>' +
+            '<td>' + accEscapeHtml(entry.reference || '') + '</td>' +
+            '<td>' + accEscapeHtml(entry.narration || '') + '</td>' +
+            '<td class="text-right">' + accFormatAmount(entry.debit_amount || 0) + '</td>' +
+            '<td class="text-right">' + accFormatAmount(entry.credit_amount || 0) + '</td>' +
+            '<td>' + accEscapeHtml(entry.branch || '') + '</td>' +
+            '<td>' + accEscapeHtml(entry.created_by || '') + '</td>' +
+            '</tr>';
     }).join('');
 
-    document.getElementById('accTotalDebit').textContent = accFormatAmount(totalDebit);
-    document.getElementById('accTotalCredit').textContent = accFormatAmount(totalCredit);
-    document.getElementById('accNet').textContent = accFormatAmount(totalDebit - totalCredit);
+    if (totalEl) totalEl.textContent = String(count);
+    if (summaryEl) {
+        summaryEl.textContent = 'Showing ' + count + ' Voucher Entr' + (count === 1 ? 'y' : 'ies');
+    }
 }
 
 function accExportExcel() {
