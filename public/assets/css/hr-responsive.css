@@ -1,0 +1,120 @@
+/* HR module (employees, salaries, advances) — mobile-first tweaks */
+
+.hr-page {
+  --hr-radius: 12px;
+}
+
+.hr-page .hr-toolbar {
+  gap: 0.5rem;
+}
+
+.hr-page .hr-toolbar h3 {
+  font-size: clamp(1.15rem, 4vw, 1.5rem);
+  line-height: 1.2;
+}
+
+.hr-page .hr-toolbar .btn {
+  white-space: nowrap;
+}
+
+/* Horizontal scroll areas: smooth touch + no layout blowout */
+.hr-page .hr-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--hr-radius);
+}
+
+.hr-page .hr-table-wrap table {
+  margin-bottom: 0;
+}
+
+/* Employees table min-width lives in employees-page.css (900px); payroll kept here */
+@media (max-width: 991.98px) {
+  .hr-page #employeesTable {
+    min-width: 900px;
+  }
+  .hr-page #employeesPayrollTable {
+    min-width: 640px !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .hr-page .display-6 {
+    font-size: 1.75rem;
+  }
+  .hr-page .salaries-gen-form .input-group {
+    flex-wrap: wrap;
+  }
+  .hr-page .salaries-gen-form .input-group > * {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+/* Advances: stack action controls on narrow screens */
+.hr-page .hr-adv-actions {
+  min-width: 0;
+}
+
+.hr-page .hr-adv-actions .hr-adv-actions-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+@media (min-width: 992px) {
+  .hr-page .hr-adv-actions .hr-adv-actions-inner {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+  }
+}
+
+.hr-page .hr-adv-actions .form-control-sm {
+  min-width: 0;
+  width: 100% !important;
+  max-width: 100%;
+}
+
+@media (min-width: 576px) {
+  .hr-page .hr-adv-actions .adv-pay-amt {
+    width: 110px !important;
+    max-width: 110px;
+  }
+  .hr-page .hr-adv-actions .adv-pay-notes {
+    width: 150px !important;
+    max-width: 150px;
+  }
+}
+
+/* Salaries: mark paid row */
+.hr-page .hr-salary-pay {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+@media (min-width: 576px) {
+  .hr-page .hr-salary-pay {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+  }
+}
+
+.hr-page .hr-salary-pay .form-control-sm {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+@media (min-width: 576px) {
+  .hr-page .hr-salary-pay .form-control-sm {
+    width: 160px !important;
+    max-width: 160px;
+  }
+}

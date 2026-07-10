@@ -1,0 +1,29 @@
+<?php
+require_once __DIR__ . '/../app/bootstrap.php';
+
+$config = Helpers::config();
+if (($config['env'] ?? 'local') !== 'local' || !Auth::check() || !Auth::hasRole('admin')) {
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+}
+
+$pdo = Database::pdo();
+
+try {
+    // Update existing delivery note to have an amount
+    $pdo->prepare("UPDATE delivery_notes SET total_amount = 15000.00 WHERE id = 1")->execute();
+    
+    // Create additional delivery notes with dues
+    $pdo->prepare("INSERT INTO delivery_notes (customer_id, branch_id, delivery_date, total_amount) VALUES (1, 1, '2025-09-14', 8500.50)")->execute();
+    $pdo->prepare("INSERT INTO delivery_notes (customer_id, branch_id, delivery_date, total_amount) VALUES (1, 1, '2025-09-15', 12000.00)")->execute();
+    
+    echo "Sample delivery notes with dues created successfully!\n";
+    echo "- DN #1: " . Helpers::formatMoney(15000) . " (2025-09-13)\n";
+    echo "- DN #2: " . Helpers::formatMoney(8500.50) . " (2025-09-14)\n";
+    echo "- DN #3: " . Helpers::formatMoney(12000) . " (2025-09-15)\n";
+    
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+?>

@@ -1,0 +1,19 @@
+Module,Status (PASS/FAIL/MIXED),Notes (short),Last Tested,Tester
+Dashboard,,,,
+Branches,,,,
+Users,,,,
+Change Password,,,,
+Customers,,,,
+Vehicles (API),,,,
+Suppliers,,,,
+Parcels,,,,
+Parcel Print,,,,
+Delivery Notes,,,,
+Payments,,,,
+Expenses,,,,
+Employees,,,,
+Salaries,,,,
+Search,,,,
+Reports,,,,
+
+Overall,<<PASS/FAIL/MIXED>>,"<short summary e.g., Core flows pass; 2 minor failures>",<date>,<name>

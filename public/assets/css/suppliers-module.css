@@ -1,0 +1,55 @@
+.supm-app {
+  --supm-radius: 15px;
+  --supm-border: rgba(15, 23, 42, 0.09);
+  --supm-shadow: 0 8px 25px rgba(15, 23, 42, 0.07);
+  --supm-muted: #64748b;
+  --supm-primary: #0d9488;
+  animation: supmFadeIn .35s ease;
+}
+@keyframes supmFadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: translateY(0);} }
+
+.supm-card,.supm-hero { background: #fff; border: 1px solid var(--supm-border); border-radius: var(--supm-radius); box-shadow: var(--supm-shadow); }
+.supm-hero { padding: 1.2rem 1.3rem; margin-bottom: 1rem; }
+.supm-title { font-size: clamp(1.2rem,1rem + .7vw,1.55rem); font-weight: 700; margin: 0; }
+.supm-subtitle { color: var(--supm-muted); margin: .2rem 0 0; font-size: .89rem; }
+.supm-icon { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg,#ccfbf1,#f0fdfa); color: #0f766e; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+.supm-actions .btn { border-radius: 10px; }
+
+.supm-kpis { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: .8rem; margin-bottom: 1rem; }
+.supm-kpi { padding: .9rem; border-left: 4px solid #cbd5e1; transition: transform .2s ease, box-shadow .2s ease; }
+.supm-kpi:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(15,23,42,.11); }
+.supm-kpi:nth-child(1){border-left-color:#0d9488}.supm-kpi:nth-child(2){border-left-color:#16a34a}.supm-kpi:nth-child(3){border-left-color:#64748b}.supm-kpi:nth-child(4){border-left-color:#0ea5e9}.supm-kpi:nth-child(5){border-left-color:#d97706}.supm-kpi:nth-child(6){border-left-color:#7c3aed}.supm-kpi:nth-child(7){border-left-color:#0891b2}.supm-kpi:nth-child(8){border-left-color:#ef4444}
+.supm-kpi-i { width: 38px; height: 38px; border-radius: 10px; background: #f1f5f9; display: inline-flex; align-items: center; justify-content: center; }
+.supm-kpi-l { margin-top: .35rem; text-transform: uppercase; letter-spacing: .05em; font-size: .68rem; font-weight: 700; color: var(--supm-muted); }
+.supm-kpi-v { font-size: 1.25rem; font-weight: 700; }
+.supm-kpi-t { font-size: .72rem; color: var(--supm-muted); }
+
+.supm-filter { position: sticky; top: .5rem; z-index: 20; margin-bottom: 1rem; }
+.supm-filter-h { padding: .85rem 1rem; border-bottom: 1px solid var(--supm-border); background: #f8fafc; border-radius: var(--supm-radius) var(--supm-radius) 0 0; }
+.supm-filter-b { padding: .9rem 1rem; }
+.supm-filter .form-label { font-size: .74rem; font-weight: 600; color: #475569; }
+.supm-filter .form-control,.supm-filter .form-select { border-radius: 10px; }
+
+.supm-toolbar { padding: .65rem 1rem; border-bottom: 1px solid var(--supm-border); background: #f8fafc; }
+.supm-table thead th { font-size: .69rem; text-transform: uppercase; letter-spacing: .05em; background: #f8fafc; color: #475569; position: sticky; top: 0; z-index: 2; white-space: nowrap; }
+.supm-table tbody td { font-size: .82rem; vertical-align: middle; }
+.supm-table tbody tr:hover { background: rgba(240, 253, 250, .9); }
+.supm-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#99f6e4,#ccfbf1); color: #0f766e; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: .72rem; }
+.supm-actions-row .btn { width: 30px; height: 30px; padding: 0; border-radius: 8px; }
+.supm-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .73rem; }
+
+.supm-badge-active{background:#dcfce7;color:#166534}.supm-badge-inactive{background:#e2e8f0;color:#334155}.supm-badge-preferred{background:#fef3c7;color:#92400e}.supm-badge-blacklisted{background:#fee2e2;color:#991b1b}.supm-badge-pending{background:#dbeafe;color:#1d4ed8}
+.supm-mark { background: #fde68a; border-radius: 3px; padding: 0 2px; }
+.supm-empty { text-align: center; padding: 3rem 1.5rem; color: var(--supm-muted); }
+.supm-empty i { font-size: 3rem; opacity: .5; display: block; margin-bottom: .8rem; }
+
+.supm-form-section { padding: 1rem; border-top: 1px solid var(--supm-border); }
+.supm-form-section:first-child { border-top: 0; }
+.supm-form-title { font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; color: #475569; font-weight: 700; margin-bottom: .75rem; }
+.supm-summary { position: sticky; top: 4.8rem; }
+.supm-summary-row { display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding: .45rem 0; font-size: .82rem; }
+
+@media (max-width: 767.98px) {
+  .supm-actions .btn { flex: 1 1 calc(50% - .4rem); }
+  .supm-filter { position: static; }
+}

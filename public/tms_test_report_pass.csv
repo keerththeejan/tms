@@ -1,0 +1,69 @@
+Section,Module,URL,Action,Expected,Status,Notes
+Authentication,Login,?page=login,Submit valid credentials,Redirects to ?page=dashboard,Pass,
+Authentication,Login (invalid),?page=login,Submit wrong password,"Shows ""Invalid credentials.""",Pass,
+Authentication,Logout,?page=logout,Click logout,Redirects to login,Pass,
+
+Dashboard,Dashboard load,?page=dashboard,Open page,"Shows pending parcels, dues, collections, expenses, recent lists",Pass,
+Dashboard,Filters,?page=dashboard,Change filters,"Counts/lists update",Pass,
+
+Branches,List,?page=branches,Open page,Branch table loads,Pass,
+Branches,Create,?page=branches&action=new,Create new branch,Branch appears,Pass,
+Branches,Edit,?page=branches&action=edit&id=ID,Update branch,Changes saved,Pass,
+Branches,Delete,?page=branches,Delete non-main,Removed if allowed,Pass,
+Branches,Main rule,?page=branches,Set one main,"Only one main branch remains",Pass,
+
+Users,List,?page=users,Open page,Users listed,Pass,
+Users,Create,?page=users&action=new,Create user with role/branch,User appears,Pass,
+Users,Edit,?page=users&action=edit&id=ID,Update fields,Changes saved,Pass,
+Users,Duplicate username,?page=users&action=save,Try duplicate username,Friendly duplicate message,Pass,
+Users,Activate/Deactivate,?page=users,Toggle active,State saved,Pass,
+
+Customers,List,?page=customers,Open page,Customers listed,Pass,
+Customers,Create,?page=customers&action=new,Create customer,Customer appears,Pass,
+Customers,Edit,?page=customers&action=edit&id=ID,Update customer,Changes saved,Pass,
+Customers,Delete,?page=customers,Delete customer,Removed if no constraints,Pass,
+Customers,Quick Add,?page=quick_add_customer (POST),Create via quick flow,Redirects and exists,Pass,
+
+Suppliers,List,?page=suppliers,Open page,Suppliers listed,Pass,
+Suppliers,Create/Edit/Delete,?page=suppliers,CRUD supplier,Works and persists,Pass,
+
+Vehicles,Save (AJAX),?page=vehicles&action=save (POST),Save vehicle_no,Returns JSON with id reused/created,Pass,
+
+Parcels,New,?page=parcels&action=new,Open form,Form loads,Pass,
+Parcels,Create,?page=parcels&action=save,Create parcel,"Saved, items saved",Pass,
+Parcels,Edit (Kilinochchi),?page=parcels&action=edit&id=ID,Adjust price at Kilinochchi,Price saved per policy,Pass,
+Parcels,Edit (Other branches),?page=parcels&action=edit&id=ID,Edit non-price fields,Price locked; other fields update,Pass,
+Parcels,Delete,?page=parcels,Delete parcel,"Removed, DN totals recalculated",Pass,
+
+Payments,Due list,?page=payments,Open page,DNs with due listed,Pass,
+Payments,New payment,?page=payments&action=new&id=DN_ID,Load DN,Shows due and form,Pass,
+Payments,Block before delivery,?page=payments&action=new&id=DN_ID,Try when parcels not delivered,"Error ""only after delivery""",Pass,
+Payments,Prevent overpay,?page=payments&action=save,Enter amount > due,Error exceeds due,Pass,
+Payments,Save payment,?page=payments&action=save,Valid payment,"Saved, due reduced",Pass,
+
+Expenses,List,?page=expenses,Open page,Expenses listed,Pass,
+Expenses,Create/Edit/Delete,?page=expenses,CRUD expense,Works and persists,Pass,
+Expenses,Approve (Admin),?page=expenses,Approve entry,Status updated,Pass,
+Expenses,Filters/Summaries,?page=expenses,Apply filters,Totals reflect filters,Pass,
+
+Employees,List,?page=employees,Open page,Employees listed,Pass,
+Employees,Create/Edit/Delete,?page=employees,Save employee,"Saved; invalid vehicle_id -> NULL",Pass,
+Employees,Unique Code,?page=employees,Blank/duplicate emp_code,Auto-generates EMP###,Pass,
+Payroll,Latest list,?page=employees&action=payroll,Open page,Latest payroll per employee,Pass,
+Payroll,New/save/edit/delete,?page=employees&action=new_payroll,CRUD payroll rows,Works,Pass,
+Payroll,Print,?page=employees&action=payroll_print&id=PID,Open print view,Printable page,Pass,
+
+Salaries,Generate,?page=salaries&action=generate (POST),Generate for Year/Month,Pending rows for all employees,Pass,
+Salaries,Pay,?page=salaries&action=pay (POST),Mark paid,Status becomes paid,Pass,
+Salaries,Filters,?page=salaries,Apply filters,"Rows, totals reflect filters",Pass,
+Salaries,Totals/Trend,?page=salaries,View summary,"Totals by branch, last 6 months trend",Pass,
+
+Reports,Reports,?page=reports,Open page,"Revenue by branch, parcels by supplier, expenses, collections",Pass,
+Reports,CSV export,?page=reports&export=csv&type=revenue,Download CSV,File downloaded,Pass,
+
+Search,By phone,?page=search&phone=07xxxx,Search,"Shows customer, parcels, notes, due",Pass,
+Search,By name,?page=search&name=John,Search,Shows matches or exact,Pass,
+
+Email,Send email,/public/email.php,Send test email,"Success banner; mail delivered",Pass,
+Email,Config check,config/mail.php,Verify settings,"use_smtp=true, host smtp.gmail.com, 465+ssl or 587+tls, username==from_email, App Password",Pass,
+Email,Unlock session,Gmail DisplayUnlockCaptcha,Click Continue,Retry send immediately,Pass,

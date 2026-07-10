@@ -1,0 +1,51 @@
+TestID,Module,Route/Page,Action,Test Case,Preconditions,Steps,Expected Result,Role,Test Data,Priority
+TC-001,Auth,login,Positive,Valid admin login,"Admin user exists (admin/admin123)","1. Open /public/index.php?page=login\n2. Enter admin/admin123\n3. Submit",Redirect to dashboard and session set,admin,,High
+TC-002,Auth,login,Negative,Invalid credentials rejected,None,"1. Open login\n2. Enter bad creds\n3. Submit",Error "Invalid credentials." shown; stay on login,any,,High
+TC-003,Auth,logout,Positive,Logout clears session,Logged in,"1. Click Logout",Redirect to login; session cleared,any,,Medium
+TC-004,Security,Any POST,CSRF,Reject invalid CSRF token,Logged in,"1. POST to any save with bad/missing csrf_token",HTTP 400 or error message,any,,High
+TC-005,Dashboard,dashboard,Filters,Today default metrics show,None,"1. Login\n2. Go to dashboard",Counts visible; no errors,any,,Medium
+TC-006,Dashboard,dashboard,Filters,Filter by date range and branches,Branches exist,"1. Set df/dt/fb/tb/cust and apply",Lists and totals reflect filters,any,"df,dt,fb,tb,cust",High
+TC-007,Branches,branches,Access,Only admin can access branches,Logged in as staff,"1. Open ?page=branches",403 Forbidden,staff,,High
+TC-008,Branches,branches,new/Create,Create branch with unique code,Admin logged in,"1. New\n2. Enter name, unique code\n3. Save",Branch created; appears in list,admin,"name,code",High
+TC-009,Branches,branches,Validation,Duplicate code blocked,Admin logged in with existing code,"1. New with existing code\n2. Save",DB error handled; user-friendly message,admin,existing code,High
+TC-010,Branches,branches,Toggle main,Set only one main branch,Multiple branches exist,"1. Edit branch A -> set main\n2. Edit branch B -> set main",Only last set is_main=1; others set to 0; users updated,admin,,High
+TC-011,Users,users,Access,Only admin can access users,Logged in as staff,"1. Open ?page=users",403 Forbidden,staff,,High
+TC-012,Users,users,new/Create,Create user with unique username,Admin logged in,Create with role and branch,User created; password hashed,admin,"username,full_name,role,branch,password",High
+TC-013,Users,users,Validation,Duplicate username suggests next,Admin logged in,Try duplicate username,Form shows suggestion and error,admin,duplicate username,High
+TC-014,Users,users,Edit,Edit user without changing password,Admin logged in,Update fields with empty password,User updated; password unchanged,admin,,Medium
+TC-015,Change Password,change_password,Positive,Change current password,User logged in,"1. Go change_password\n2. Enter current/new/confirm\n3. Save",Success message shown; hash updated,any,,High
+TC-016,Customers,customers,new/Create,Create customer with unique phone,Logged in,Enter name+phone,Customer created,staff,"name,phone",High
+TC-017,Customers,customers,Validation,Duplicate phone blocked,Existing customer with same phone,Try duplicate phone,Error message shown,staff,existing phone,High
+TC-018,Customers,customers,Edit,Edit optional fields and type,Customer exists,Update address/location/type,Data saved; type in ['regular','corporate'] or null,staff,,Medium
+TC-019,Customers,customers,Delete,Delete customer not referenced,Customer not referenced by parcels,Delete success; redirect,list updated,staff,,Medium
+TC-020,Customers,customers,Search,Search by q,Customers exist,Search with q returns matches,staff,q term,Medium
+TC-021,Customers,customers?action=summary,API,Summary JSON returns due and ids,Customer exists,GET with id returns JSON,staff,customer_id,Medium
+TC-022,Vehicles,vehicles,API,Save returns id for new reg_number,Logged in,POST vehicle_no JSON,JSON {id,vehicle_no} returned,staff,vehicle_no,Low
+TC-023,Suppliers,suppliers,new/Create,Create supplier with branch,Logged in,Save with name+branch,Created and listed,staff,,Medium
+TC-024,Suppliers,suppliers,Edit,Edit supplier fields,Supplier exists,Update phone/code,Updated,staff,,Low
+TC-025,Suppliers,suppliers,Delete,Delete supplier without refs,Not referenced,Deleted,staff,,Low
+TC-026,Parcels,parcels,new/Create,Create parcel (non-Kilinochchi),Logged in as non-KIL,Enter mandatory fields; price not allowed,Parcel created; price null,staff,,High
+TC-027,Parcels,parcels,new/Create,Create parcel (Kilinochchi with items),Logged in as KIL,Enter items and discount; leave price blank,Price computed; parcel created,staff-KIL,items+discount,High
+TC-028,Parcels,parcels,Edit,Edit non-priced fields (non-KIL),Parcel exists (no price),Update to_branch etc.,Updated; price unchanged,staff,,High
+TC-029,Parcels,parcels,Edit,Edit price-only (Kilinochchi),Parcel exists (not billed),Set price,Price updated,staff-KIL,,High
+TC-030,Parcels,parcels,Validation,Editing billed parcel blocked,Parcel with price>0,Try edit,Error shown and form re-rendered,staff,,High
+TC-031,Parcels,parcels,Delete,Delete parcel detaches DNs and recalculates,Parcel in DN,Delete,DN totals recalculated; parcel deleted,staff,,High
+TC-032,Parcels,parcels,Filters,Index filters (q,status,vehicle,dates),Parcels exist,Search by filters,Filtered list shown,staff,filter set,Medium
+TC-033,Parcels,parcel_print,Print,Parcel print loads,Parcel exists,Open parcel_print?id=,Print page shows details,staff,,Low
+TC-034,Delivery Notes,delivery_notes,Generate,Generate for customer with pending parcels,Eligible parcels exist,POST customer+date,DN created with parcels; unique constraint obeyed,staff,,High
+TC-035,Delivery Notes,delivery_notes,Index,Filter by date and search,DN exist,Apply filters and search,Filtered list,staff,from,to,q,Medium
+TC-036,Payments,payments,Access,Only roles with collect permission allowed,Logged in as staff without permission,Open payments,403 Forbidden,staff,,High
+TC-037,Payments,payments,Create,Add payment for DN,DN exists,Save amount+datetime,Payment saved; lists update,collector,,High
+TC-038,Payments,payments,Filters,Filter by date range and branch,Payments exist,Apply filters,Correct totals and rows,collector,from,to,Medium
+TC-039,Expenses,expenses,Access,Only expense managers allowed,Unauthorized user,Open expenses,403 Forbidden,user,,High
+TC-040,Expenses,expenses,Create,Create expense with type and branch,Authorized,Save expense,Created and listed,manager,,High
+TC-041,Expenses,expenses,Filters,Filter by date/branch/type/approved,Expenses exist,Apply filters,Summaries/overall reflect filters,manager,,Medium
+TC-042,Employees,employees,Create,Create employee with branch,Logged in,Save employee,Created and listed,staff,,Medium
+TC-043,Employees,employees,Filters,Filter by attributes (name/role/vehicle),Employees exist,Apply filters,List filtered,staff,,Low
+TC-044,Salaries,salaries,Generate/Upsert,Create or update salary rows per month,Employees exist,Generate for year+month,Rows created; uniq per emp/month,staff,,High
+TC-045,Salaries,salaries,Pay,Mark salary paid,Rows exist,Set payment_date/status paid,Totals and counts update,staff,,High
+TC-046,Search,search,Query,Search by phone and name,Data exists,Enter phone/name,Customer + parcels + notes + due shown,staff,phone/name,Medium
+TC-047,Reports,reports,Aggregate,Revenue by branch,Data exists,Select date range,Chart/table shows totals,admin,,Medium
+TC-048,Reports,reports,Aggregate,Parcels by supplier,Data exists,Select date range,Chart/table shows counts,admin,,Medium
+TC-049,Reports,reports,Aggregate,Expense summary & due collections,Data exists,Select date range,Summaries visible,admin,,Medium
+TC-050,Quick Add,quick_add_customer,API,Quick add validates CSRF and name,Logged in,POST name+csrf,Returns JSON or error; customer created,staff,,Medium

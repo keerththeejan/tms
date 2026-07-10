@@ -1,0 +1,599 @@
+/* Cash Book — SaaS-style dashboard */
+
+/* Accounts panel: hide transaction chrome; show compact top title */
+.cashbook-app.cashbook-mode-accounts .cashbook-hide-for-accounts-mgmt {
+  display: none !important;
+}
+
+.cashbook-app.cashbook-mode-accounts .cashbook-show-for-accounts-mgmt {
+  display: flex !important;
+}
+
+.cashbook-mgmt-mobile-bar {
+  display: none !important;
+}
+
+.cashbook-app.cashbook-mode-accounts .cashbook-mgmt-mobile-bar {
+  display: block !important;
+}
+
+@media (min-width: 992px) {
+  .cashbook-mgmt-mobile-bar {
+    display: none !important;
+  }
+}
+
+.cashbook-app.cashbook-mode-accounts {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 992px) {
+  .cashbook-app.cashbook-mode-accounts {
+    padding-bottom: 1.5rem;
+  }
+}
+
+.cashbook-app.cashbook-mode-accounts .cashbook-main {
+  /* Match the “soft dashboard” look from your screenshot */
+  background:
+    radial-gradient(1200px 500px at 70% 0%, rgba(13, 110, 253, 0.10), transparent 55%),
+    radial-gradient(900px 400px at 20% 20%, rgba(25, 135, 84, 0.08), transparent 55%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 45%, #f8fafc 100%);
+}
+
+.cashbook-app.cashbook-mode-accounts .cashbook-topbar {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.cashbook-app {
+  --cb-green: #198754;
+  --cb-red: #dc3545;
+  --cb-blue: #0d6efd;
+  --cb-sticky-h: 52px;
+  --cb-bottom-h: 56px;
+  padding-bottom: calc(var(--cb-bottom-h) + env(safe-area-inset-bottom, 0px));
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* Accounts list badges (required colors) */
+.cb-badge-type-main {
+  background: #0d6efd !important;
+  color: #fff !important;
+}
+
+.cb-badge-type-customer {
+  background: #6f42c1 !important;
+  color: #fff !important;
+}
+
+.cb-badge-type-bank {
+  background: #fd7e14 !important;
+  color: #fff !important;
+}
+
+.letter-spacing-sm {
+  letter-spacing: 0.06em;
+}
+
+.cashbook-sidebar {
+  min-height: calc(100vh - 1rem);
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+}
+
+.cashbook-sidebar .nav-link {
+  color: var(--bs-body-color);
+  border: 0;
+  font-weight: 500;
+}
+
+.cashbook-sidebar .nav-link:hover {
+  background: rgba(13, 110, 253, 0.08);
+}
+
+.cashbook-sidebar .nav-link.active,
+.cashbook-offcanvas .cb-nav-panel.active {
+  background: rgba(13, 110, 253, 0.12);
+  color: var(--bs-primary);
+  font-weight: 600;
+}
+
+.cashbook-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+}
+
+.cashbook-stat-card {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Bootstrap .card sets --bs-card-bg and wins over plain .cashbook-stat-*; force gradient + readable text */
+.cashbook-app .card.cashbook-stat-income,
+.cashbook-app .card.cashbook-stat-expense,
+.cashbook-app .card.cashbook-stat-balance {
+  --bs-card-bg: transparent;
+  color: #fff;
+  border: 0;
+}
+
+.cashbook-app .card.cashbook-stat-income {
+  background: linear-gradient(135deg, #198754 0%, #157347 100%) !important;
+}
+
+.cashbook-app .card.cashbook-stat-expense {
+  background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%) !important;
+}
+
+.cashbook-app .card.cashbook-stat-balance {
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%) !important;
+}
+
+.cashbook-app .card.cashbook-stat-card .text-white-50 {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Account filters: avoid form-floating + flex overlap on selects */
+.cashbook-acc-filters .form-label {
+  margin-bottom: 0.25rem;
+}
+
+.cashbook-acc-filters .form-select,
+.cashbook-acc-filters .form-control {
+  min-height: 38px;
+}
+
+.cashbook-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(2px);
+}
+
+.cashbook-table {
+  font-size: 0.9rem;
+}
+
+.cashbook-table thead th {
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bs-secondary);
+}
+
+.cashbook-table-row {
+  transition: background-color 0.15s ease;
+}
+
+.cashbook-filter-strip {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.cashbook-summary-card,
+.cashbook-chart-card,
+.cashbook-summary-panel {
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border-radius: 16px;
+}
+
+.cashbook-chart-wrap {
+  position: relative;
+  min-height: 280px;
+}
+
+.cashbook-summary-card .card-body,
+.cashbook-summary-panel .card-body {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.cashbook-summary-panel .badge {
+  font-weight: 700;
+}
+
+.cashbook-audit-table .table,
+.cashbook-summary-panel .table {
+  margin-bottom: 0;
+}
+
+.cashbook-audit-table thead th,
+.cashbook-summary-panel thead th {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bs-secondary-color);
+}
+
+.cashbook-summary-card .fs-5,
+.cashbook-summary-card .fs-4 {
+  letter-spacing: -0.02em;
+}
+
+body[data-theme="dark"] .cashbook-summary-card,
+body[data-theme="dark"] .cashbook-chart-card,
+body[data-theme="dark"] .cashbook-summary-panel,
+body[data-theme="dark"] .cashbook-filter-strip,
+body[data-theme="dark"] .cashbook-audit-table {
+  background: rgba(15, 23, 42, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+body[data-theme="dark"] .cashbook-summary-card .card-body,
+body[data-theme="dark"] .cashbook-summary-panel .card-body,
+body[data-theme="dark"] .cashbook-chart-card .card-body,
+body[data-theme="dark"] .cashbook-audit-table .table {
+  background: transparent !important;
+  color: var(--tms-text);
+}
+
+body[data-theme="dark"] .cashbook-filter-strip,
+body[data-theme="dark"] .cashbook-filter-strip .text-muted,
+body[data-theme="dark"] .cashbook-summary-panel .text-muted,
+body[data-theme="dark"] .cashbook-summary-card .text-muted {
+  color: var(--tms-muted) !important;
+}
+
+.cashbook-acc-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cashbook-acc-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0.5rem 1rem rgba(15, 23, 42, 0.08) !important;
+}
+
+.cashbook-page {
+  --cb-green: #198754;
+  --cb-red: #dc3545;
+  --cb-blue: #0d6efd;
+  --cb-sticky-h: 52px;
+  --cb-bottom-h: 56px;
+  padding-bottom: calc(var(--cb-bottom-h) + env(safe-area-inset-bottom, 0px));
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cashbook-appbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 0.35rem 0.25rem;
+  margin: -0.5rem -0.5rem 0.5rem;
+}
+
+@media (min-width: 992px) {
+  .cashbook-appbar {
+    margin: -0.25rem 0 0.75rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  }
+}
+
+.cashbook-tabs .nav-link {
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+}
+.cashbook-tabs .nav-link.active {
+  background: var(--cb-blue);
+  color: #fff !important;
+}
+
+.cashbook-entry-card {
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.15s ease;
+}
+.cashbook-entry-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.cashbook-amt-in {
+  color: var(--cb-green);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cashbook-amt-ex {
+  color: var(--cb-red);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cashbook-amt-tr {
+  color: #0f172a;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashbook-summary-strip {
+  position: sticky;
+  bottom: var(--cb-bottom-h);
+  z-index: 1015;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px 12px 0 0;
+  padding: 0.5rem 0.75rem;
+  margin: 0 -0.5rem;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+}
+
+@media (min-width: 992px) {
+  .cashbook-summary-strip {
+    bottom: 0;
+    margin: 0;
+  }
+}
+
+.cashbook-bottom-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1025;
+  padding: 0.35rem 0.75rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(15, 23, 42, 0.1);
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (min-width: 992px) {
+  .cashbook-bottom-actions {
+    left: var(--sidebar-width, 260px);
+    max-width: none;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  body.sidebar-collapsed .cashbook-bottom-actions {
+    left: 0;
+  }
+}
+
+.cashbook-bottom-actions .btn {
+  flex: 1;
+  max-width: 200px;
+  border-radius: 12px;
+  font-weight: 700;
+  padding: 0.65rem 0.75rem;
+}
+
+.cashbook-panel-hidden {
+  display: none !important;
+}
+
+.cashbook-offcanvas .nav-link {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+#cashbookTxnModal .form-control-lg,
+#cashbookTransferModal .form-control-lg {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Manage accounts — split panel + mobile list/form toggle */
+@media (max-width: 991.98px) {
+  .cb-mgmt-split.cb-mgmt-mobile-list .cb-mgmt-col-form {
+    display: none !important;
+  }
+
+  .cb-mgmt-split.cb-mgmt-mobile-form .cb-mgmt-col-list {
+    display: none !important;
+  }
+}
+
+.cb-mgmt-dashboard-strip .cb-mgmt-dash-card {
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+
+.cb-mgmt-dash-balance {
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.08) 0%, rgba(25, 135, 84, 0.06) 100%);
+}
+
+.cb-mgmt-dash-income {
+  background: linear-gradient(135deg, rgba(25, 135, 84, 0.12) 0%, rgba(25, 135, 84, 0.04) 100%);
+}
+
+.cb-mgmt-dash-expense {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.12) 0%, rgba(220, 53, 69, 0.04) 100%);
+}
+
+.cb-mgmt-dash-value {
+  transition: transform 0.25s ease, color 0.25s ease;
+}
+
+.cb-mgmt-value-flash {
+  animation: cb-mgmt-value-flash 0.7s ease-out 1;
+}
+
+@keyframes cb-mgmt-value-flash {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+    color: var(--bs-primary);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cb-mgmt-list-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.65);
+  border-radius: 0.5rem;
+  backdrop-filter: blur(2px);
+}
+
+.cb-mgmt-cards {
+  display: flex;
+  flex-direction: column;
+}
+
+.cb-mgmt-acc-card {
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.cb-mgmt-acc-card:active {
+  transform: scale(0.99);
+}
+
+.cb-mgmt-acc-card-active {
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.35) !important;
+}
+
+.cb-mgmt-flash {
+  animation: cb-mgmt-flash-pulse 1.2s ease-in-out 2;
+  box-shadow: 0 0 0 3px rgba(var(--bs-primary-rgb, 13, 110, 253), 0.45) !important;
+}
+
+@keyframes cb-mgmt-flash-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--bs-primary-rgb, 13, 110, 253), 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(var(--bs-primary-rgb, 13, 110, 253), 0.2);
+  }
+}
+
+.cashbook-mgmt-table tbody tr.cb-mgmt-row.cb-mgmt-flash {
+  outline: 2px solid rgba(var(--bs-primary-rgb, 13, 110, 253), 0.65);
+  outline-offset: -2px;
+}
+
+.cb-mgmt-balance-neg {
+  color: var(--bs-danger) !important;
+}
+
+.cb-mgmt-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(var(--cb-bottom-h) + 0.75rem + env(safe-area-inset-bottom, 0px));
+  z-index: 1030;
+  width: 3.25rem;
+  height: 3.25rem;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(13, 110, 253, 0.35);
+}
+
+/* Screenshot target UI does not use the floating "+" button. Keep New button in header only. */
+.cashbook-app.cashbook-mode-accounts .cb-mgmt-fab {
+  display: none !important;
+}
+
+#cbRangeHint {
+  display: none !important;
+}
+
+.cb-mgmt-table-wrap {
+  /* No internal scrollbars; page should scroll naturally */
+  max-height: none;
+  overflow: visible;
+}
+
+.cashbook-mgmt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--bs-tertiary-bg) !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.cashbook-mgmt-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.cashbook-mgmt-table tbody td,
+.cashbook-mgmt-table thead th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.cashbook-mgmt-table .col-num {
+  width: 36px;
+}
+
+/* Truncate long cell contents cleanly */
+.cb-mgmt-cell-truncate {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Make header sticky only when table grows tall on desktop */
+@media (min-width: 768px) {
+  .cashbook-mgmt-table thead th {
+    position: sticky;
+    top: 0;
+  }
+}
+
+.cb-mgmt-col-list .card,
+.cb-mgmt-form-card {
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+
+.cb-mgmt-col-list .card-header,
+.cb-mgmt-form-card .card-header {
+  padding-bottom: .25rem !important;
+}
+
+.cb-mgmt-col-list .card-body,
+.cb-mgmt-form-card .card-body {
+  padding-top: .85rem !important;
+}
+
+@media (max-width: 380px) {
+  .cb-mobile-action-label {
+    display: none;
+  }
+}
+
+.cashbook-mgmt-table tbody tr.cb-mgmt-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cashbook-mgmt-table tbody tr.cb-mgmt-row:hover {
+  background-color: rgba(13, 110, 253, 0.06);
+}
+
+#cbMgmtMobileListBtn.active,
+#cbMgmtMobileFormBtn.active {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: #fff;
+}

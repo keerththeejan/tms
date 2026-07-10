@@ -1,0 +1,25 @@
+Section,Metric,Value,Notes
+Summary,Total Test Cases,<enter>,
+Summary,Passed,<enter>,
+Summary,Failed,<enter>,
+Summary,Blocked/NA,<enter>,
+Summary,Pass Rate %,<enter>,
+
+Module Status,Dashboard,<PASS/FAIL/MIXED>,
+Module Status,Branches,<PASS/FAIL/MIXED>,
+Module Status,Users,<PASS/FAIL/MIXED>,
+Module Status,Customers,<PASS/FAIL/MIXED>,
+Module Status,Vehicles,<PASS/FAIL/MIXED>,
+Module Status,Suppliers,<PASS/FAIL/MIXED>,
+Module Status,Parcels,<PASS/FAIL/MIXED>,
+Module Status,Delivery Notes,<PASS/FAIL/MIXED>,
+Module Status,Payments,<PASS/FAIL/MIXED>,
+Module Status,Expenses,<PASS/FAIL/MIXED>,
+Module Status,Employees,<PASS/FAIL/MIXED>,
+Module Status,Salaries,<PASS/FAIL/MIXED>,
+Module Status,Search,<PASS/FAIL/MIXED>,
+Module Status,Reports,<PASS/FAIL/MIXED>,
+
+Failures,TestID,<enter>,Short failure summary
+Failures,TestID,<enter>,Short failure summary
+Failures,TestID,<enter>,Short failure summary

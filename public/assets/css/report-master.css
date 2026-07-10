@@ -1,0 +1,609 @@
+/**
+ * TMS Master Report Template
+ * Shared header, footer, tables, print rules for all reports & vouchers.
+ */
+
+:root {
+  --primary-red: #C62828;
+  --corp-blue: #1E4FA8;
+  --rpt-border: #E5E7EB;
+  --rpt-bg: #FFFFFF;
+  --rpt-ink: #333333;
+  --rpt-muted: #6B7280;
+  --rpt-radius: 8px;
+  --rpt-gap: 6px;
+  --rpt-pad: 8px;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── Page settings ── */
+@page {
+  size: auto;
+  margin: 6mm;
+}
+
+@page :first {
+  margin-top: 6mm;
+}
+
+/* ── Document shell ── */
+.rpt-body {
+  margin: 0;
+  padding: 8px;
+  font-family: Poppins, Inter, "Segoe UI", "Noto Sans Tamil", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--rpt-ink);
+  background: #e8ecf2;
+}
+
+.rpt-body.rpt-embed-body {
+  padding: 4px;
+  background: #fff;
+}
+
+.rpt-root,
+.a4-root,
+.invoice-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.rpt-sheet,
+.invoice-sheet {
+  background: var(--rpt-bg);
+  border: 1px solid var(--rpt-border);
+  border-radius: var(--rpt-radius);
+  padding: var(--rpt-pad);
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+/* ── Embed block (screen-hidden, print-visible) ── */
+.rpt-embed-block,
+.rpt-embed-footer {
+  display: none;
+}
+
+.no-screen {
+  display: none;
+}
+
+/* ── Header block ── */
+.rpt-print-header-block,
+.inv-print-header-block {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  margin-bottom: var(--rpt-gap);
+}
+
+.rpt-header,
+.inv-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  min-height: 60px;
+  height: 60px;
+  max-height: 60px;
+  padding: 0 2px;
+  margin: 0 0 var(--rpt-gap);
+  overflow: hidden;
+}
+
+.rpt-logo-cell,
+.inv-logo-cell {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 60px;
+  width: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.rpt-logo-img,
+.inv-logo-img {
+  max-height: 48px;
+  max-width: 60px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.logo-unit .logo-wrap {
+  width: 38px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--logo-arch, #c00);
+  border-radius: 50% 50% 0 0;
+  font-weight: 800;
+  font-size: 11px;
+  color: var(--logo-bar-color, #fff);
+  border: 1px solid var(--rpt-border);
+}
+
+.logo-unit .bar-small {
+  background: var(--logo-bar-bg, #000);
+  color: var(--logo-bar-color, #fff);
+  padding: 1px 4px;
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-top: 1px;
+  max-width: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 0 0 3px 3px;
+}
+
+.rpt-company-block,
+.inv-company-block {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  width: max-content;
+  max-width: calc(100% - 240px);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.rpt-company,
+.inv-company {
+  margin: 0;
+  padding: 0;
+  font-family: Poppins, Inter, "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.05;
+  color: var(--primary-red);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.rpt-tagline,
+.inv-tagline {
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+.rpt-meta-panel,
+.inv-regdate {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  margin: 0 0 0 32px;
+  padding: 0;
+  width: max-content;
+  min-width: 0;
+  max-width: none;
+}
+
+.rpt-meta-panel .cn-meta-item,
+.inv-regdate .cn-meta-item {
+  display: grid;
+  grid-template-columns: 95px 8px auto;
+  column-gap: 4px;
+  align-items: baseline;
+  justify-content: start;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.rpt-meta-panel .cn-meta-item + .cn-meta-item,
+.inv-regdate .cn-meta-item + .cn-meta-item {
+  margin-top: 2px;
+}
+
+.rpt-meta-panel .cn-meta-label,
+.inv-regdate .cn-meta-label {
+  grid-column: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--rpt-muted);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+}
+
+.rpt-meta-panel .cn-meta-item::after,
+.inv-regdate .cn-meta-item::after {
+  content: ":";
+  grid-column: 2;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rpt-muted);
+  text-align: center;
+}
+
+.rpt-meta-panel .cn-meta-value,
+.inv-regdate .cn-meta-value {
+  grid-column: 3;
+  font-size: 13px;
+  font-weight: 700;
+  color: #222;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.rpt-separator,
+.cn-separator {
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary-red) 0%, var(--corp-blue) 50%, var(--primary-red) 100%);
+  border-radius: 1px;
+  margin: 0 0 var(--rpt-gap);
+}
+
+/* ── Info panel ── */
+.rpt-info-panel {
+  margin: 0 0 var(--rpt-gap);
+  padding: 8px 10px;
+  background: #F8F9FB;
+  border: 1px solid var(--rpt-border);
+  border-radius: var(--rpt-radius);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.rpt-info-row {
+  --bs-gutter-x: 12px;
+  --bs-gutter-y: 6px;
+  margin: 0;
+}
+
+.rpt-info-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+
+.rpt-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--rpt-muted);
+  letter-spacing: 0.4px;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.rpt-info-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #222;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.rpt-addresses {
+  margin: 0 0 var(--rpt-gap);
+  padding: 0 2px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* ── Standard tables ── */
+.rpt-table-wrap,
+.inv-table-wrap {
+  overflow-x: auto;
+  margin-bottom: var(--rpt-gap);
+  border-radius: var(--rpt-radius);
+}
+
+table.rpt-table,
+table.inv-tbl,
+.table.rpt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+table.rpt-table thead th,
+table.inv-tbl thead th,
+.table.rpt-table thead th {
+  background: var(--corp-blue) !important;
+  color: #fff !important;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 5px 6px;
+  border: 1px solid #163d85;
+  vertical-align: middle;
+}
+
+table.rpt-table tbody td,
+table.inv-tbl tbody td,
+.table.rpt-table tbody td {
+  padding: 4px 6px;
+  border: 1px solid var(--rpt-border);
+  vertical-align: middle;
+}
+
+table.rpt-table tbody tr:nth-child(even) td,
+table.inv-tbl tbody tr:nth-child(even) td {
+  background: #F8F9FB;
+}
+
+table.rpt-table .text-end,
+table.rpt-table td.num,
+table.inv-tbl .text-end {
+  text-align: right !important;
+}
+
+/* ── Footer ── */
+.rpt-page-footer,
+.cn-page-footer {
+  margin: var(--rpt-gap) 0 0;
+  padding: 4px 0 0;
+  border-top: 1px solid var(--rpt-border);
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--rpt-muted);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.rpt-thanks,
+.cn-thanks {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--corp-blue);
+  margin: 0 0 2px;
+}
+
+.rpt-contact,
+.cn-contact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 8px;
+  margin-bottom: 2px;
+}
+
+.rpt-footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  font-size: 9px;
+}
+
+/* ── Print optimization ── */
+@media print {
+  .no-print { display: none !important; }
+
+  html, body {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+    width: 100%;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rpt-embed-block,
+  .rpt-embed-footer,
+  .no-screen {
+    display: block !important;
+  }
+
+  .rpt-embed-block {
+    margin-bottom: 6px;
+  }
+
+  .rpt-embed-footer {
+    margin-top: 8px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .rpt-print-header-block,
+  .inv-print-header-block,
+  .rpt-info-panel,
+  .rpt-page-footer,
+  .cn-page-footer,
+  .rpt-sheet,
+  .invoice-sheet {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  .rpt-header,
+  .inv-header {
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+    margin-bottom: 4px;
+  }
+
+  .rpt-company,
+  .inv-company {
+    font-size: 26px !important;
+    color: var(--primary-red) !important;
+  }
+
+  .rpt-tagline,
+  .inv-tagline {
+    font-size: 12px !important;
+  }
+
+  table.rpt-table thead,
+  table.inv-tbl thead {
+    display: table-header-group;
+  }
+
+  table.rpt-table tr,
+  table.inv-tbl tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Hide app chrome */
+  .topbar,
+  .tms-sidebar,
+  .app-sidebar,
+  #sidebar,
+  .sidebar-overlay,
+  .sidebar-toggle-floating,
+  .skip-link,
+  .acc-sidebar,
+  .acc-topbar,
+  .navbar {
+    display: none !important;
+  }
+
+  .content-wrapper,
+  .app-content,
+  .acc-main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Accounting module chrome */
+  .acc-ledger-header,
+  .acc-ledger-toolbar,
+  .acc-daybook-header,
+  .acc-daybook-toolbar,
+  .acc-tb-header,
+  .acc-tb-toolbar,
+  .acc-pl-header,
+  .acc-pl-toolbar,
+  .acc-bs-header,
+  .acc-bs-toolbar,
+  .acc-cb-header,
+  .acc-cb-toolbar,
+  .acc-bb-header,
+  .acc-bb-toolbar,
+  .pv-header,
+  .pv-toolbar,
+  .tv-header,
+  .tv-toolbar,
+  .rep-hero,
+  .rep-toolbar,
+  .rep-filters {
+    display: none !important;
+  }
+
+  .acc-ledger-module,
+  .acc-daybook-module,
+  .acc-tb-module,
+  .acc-pl-module,
+  .acc-bs-module,
+  .acc-cb-module,
+  .acc-bb-module {
+    background: #fff !important;
+    min-height: 0 !important;
+  }
+
+  .acc-ledger-table thead,
+  .acc-daybook-table thead,
+  .acc-tb-table thead {
+    background: var(--corp-blue) !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rpt-page-num::before {
+    content: " · Page ";
+  }
+
+  .rpt-page-num::after {
+    content: counter(page);
+  }
+}
+
+/* B5 optimized container */
+@media print {
+  .rpt-root--b5,
+  .a4-root,
+  .invoice-container {
+    max-width: 176mm;
+    margin: 0 auto;
+  }
+}
+
+/* A4 */
+@media print and (min-width: 210mm) {
+  .rpt-root--a4 {
+    max-width: 198mm;
+  }
+}
+
+/* Responsive header */
+@media screen and (max-width: 576px) {
+  .rpt-header,
+  .inv-header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 70px;
+    max-height: none;
+  }
+
+  .rpt-company-block,
+  .inv-company-block {
+    position: static;
+    transform: none;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .rpt-meta-panel,
+  .inv-regdate {
+    margin: 4px 0 0 auto;
+  }
+}

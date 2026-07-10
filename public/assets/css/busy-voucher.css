@@ -1,0 +1,434 @@
+/* BUSY 17 style voucher entry */
+.busy-voucher-wrap {
+    background: #d4d0c8;
+    margin: -1rem -0.75rem 0;
+    padding: 0;
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 11px;
+    color: #000;
+}
+
+.busy-voucher {
+    background: #ece9d8;
+    border: 1px solid #808080;
+    min-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+}
+
+.busy-title-bar {
+    background: linear-gradient(180deg, #316ac5 0%, #214e9a 100%);
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-bottom: 1px solid #214e9a;
+}
+
+.busy-header-panel {
+    background: #ece9d8;
+    border-bottom: 1px solid #808080;
+    padding: 6px 8px;
+}
+
+.busy-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px 16px;
+}
+
+.busy-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.busy-field label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #000;
+    white-space: nowrap;
+}
+
+.busy-field input,
+.busy-field select {
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 11px;
+    padding: 2px 4px;
+    border: 1px solid #808080;
+    background: #fff;
+    min-height: 20px;
+}
+
+.busy-field input:focus,
+.busy-field select:focus,
+.busy-grid input:focus {
+    outline: none;
+    background: #ffffe0;
+    border-color: #000;
+}
+
+.busy-field input[readonly] {
+    background: #f0f0f0;
+}
+
+.busy-field-wide {
+    flex: 1 1 180px;
+    min-width: 140px;
+}
+
+.busy-date-display {
+    font-size: 11px;
+    color: #333;
+    margin-top: 2px;
+}
+
+.busy-grid-panel {
+    flex: 1 1 auto;
+    padding: 4px 8px 0;
+    overflow: auto;
+}
+
+.busy-grid {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    table-layout: fixed;
+}
+
+.busy-grid thead th {
+    background: linear-gradient(180deg, #316ac5 0%, #214e9a 100%);
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 3px 6px;
+    border: 1px solid #214e9a;
+    text-align: left;
+}
+
+.busy-grid tbody td {
+    border: 1px solid #c0c0c0;
+    padding: 0;
+    height: 22px;
+    vertical-align: middle;
+}
+
+.busy-grid tbody tr.active-row td {
+    background: #000;
+}
+
+.busy-grid tbody tr.active-row input {
+    background: #000;
+    color: #fff;
+    border-color: #666;
+}
+
+.busy-grid tbody tr.active-row input::placeholder {
+    color: #aaa;
+}
+
+.busy-grid .col-sno {
+    width: 36px;
+    text-align: center;
+    background: #f0f0f0;
+    font-weight: bold;
+    padding: 0 4px;
+}
+
+.busy-grid .col-account {
+    width: 42%;
+}
+
+.busy-grid .col-amount {
+    width: 11%;
+}
+
+.busy-grid .col-narr {
+    width: 18%;
+}
+
+.busy-grid .col-ref {
+    width: 14%;
+}
+
+.busy-grid .col-branch {
+    width: 12%;
+}
+
+.busy-grid .col-actions {
+    width: 160px;
+}
+
+.busy-grid input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 11px;
+    padding: 2px 4px;
+    box-sizing: border-box;
+}
+
+.busy-grid input.amount-input {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+}
+
+.busy-grid input.debit-input,
+.busy-grid input.credit-input {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+}
+
+.busy-grid tfoot td {
+    border: 1px solid #808080;
+    background: #f0f0f0;
+    padding: 2px 4px;
+    font-weight: bold;
+}
+
+.busy-grid tfoot .total-label {
+    text-align: right;
+    padding-right: 8px;
+}
+
+.busy-grid tfoot .total-amount {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.busy-status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    background: #ece9d8;
+    border-top: 1px solid #808080;
+    min-height: 24px;
+}
+
+.busy-cur-bal {
+    font-size: 11px;
+    font-weight: bold;
+    color: #000080;
+}
+
+.busy-auto-line-panel {
+    font-size: 11px;
+    color: #333;
+    text-align: right;
+    max-width: 65%;
+}
+
+.busy-auto-label {
+    font-weight: bold;
+    color: #666;
+    margin-right: 4px;
+}
+
+.busy-auto-text {
+    font-weight: bold;
+    color: #214e9a;
+}
+
+.busy-row-btn {
+    border: 1px solid #808080;
+    background: linear-gradient(180deg, #fff 0%, #ece9d8 100%);
+    min-width: 24px;
+    height: 22px;
+    cursor: pointer;
+    margin-right: 2px;
+}
+
+.busy-row-btn.danger {
+    color: #a11;
+    border-color: #a11;
+}
+
+.busy-grid tbody tr.editing-row td {
+    background: #fef3c7;
+}
+
+.total-status-cell {
+    text-align: center;
+}
+
+.busy-status-badge {
+    display: inline-block;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: bold;
+    border: 1px solid #808080;
+}
+
+.busy-status-badge.is-balanced {
+    background: #d1fae5;
+    border-color: #059669;
+    color: #065f46;
+}
+
+.busy-status-badge.is-unbalanced {
+    background: #fee2e2;
+    border-color: #dc2626;
+    color: #991b1b;
+}
+
+.busy-bottom-panel {
+    border-top: 1px solid #808080;
+    padding: 6px 8px 8px;
+    background: #ece9d8;
+}
+
+.busy-long-narration label {
+    display: block;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.busy-long-narration textarea {
+    width: 100%;
+    min-height: 52px;
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 11px;
+    padding: 4px;
+    border: 1px solid #808080;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.busy-long-narration textarea:focus {
+    outline: none;
+    background: #ffffe0;
+}
+
+.busy-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+    justify-content: space-between;
+}
+
+.busy-actions-left,
+.busy-actions-right {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.busy-btn {
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 4px 14px;
+    border: 1px solid #808080;
+    background: linear-gradient(180deg, #fff 0%, #ece9d8 100%);
+    cursor: pointer;
+    min-width: 72px;
+}
+
+.busy-btn:hover {
+    background: linear-gradient(180deg, #fffff0 0%, #f0ede0 100%);
+}
+
+.busy-btn-primary {
+    background: linear-gradient(180deg, #316ac5 0%, #214e9a 100%);
+    color: #fff;
+    border-color: #214e9a;
+}
+
+.busy-btn-primary:hover {
+    background: linear-gradient(180deg, #417ad5 0%, #315ea9 100%);
+}
+
+.busy-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Account search popup */
+.busy-search-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.busy-search-modal.open {
+    display: flex;
+}
+
+.busy-search-box {
+    width: min(520px, 94vw);
+    max-height: 70vh;
+    background: #ece9d8;
+    border: 2px solid #808080;
+    display: flex;
+    flex-direction: column;
+}
+
+.busy-search-head {
+    background: linear-gradient(180deg, #316ac5 0%, #214e9a 100%);
+    color: #fff;
+    padding: 4px 8px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.busy-search-head button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.busy-search-input-wrap {
+    padding: 6px;
+    border-bottom: 1px solid #808080;
+}
+
+.busy-search-input-wrap input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #808080;
+    font-size: 11px;
+}
+
+.busy-search-results {
+    overflow-y: auto;
+    max-height: 320px;
+}
+
+.busy-search-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #ddd;
+}
+
+.busy-search-item:hover,
+.busy-search-item.selected {
+    background: #316ac5;
+    color: #fff;
+}
+
+.busy-search-item .code {
+    font-size: 10px;
+    opacity: 0.85;
+}
+
+@media print {
+    .busy-actions,
+    .busy-search-modal {
+        display: none !important;
+    }
+}
