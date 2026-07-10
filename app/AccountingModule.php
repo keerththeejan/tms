@@ -33,7 +33,6 @@ class AccountingModule
                 'items' => [
                     ['action' => 'entry', 'label' => 'Journal Entry', 'icon' => 'bi-journal-text', 'params' => ['voucher_type' => 'JOURNAL']],
                     ['action' => 'entry', 'label' => 'Cash Payment', 'icon' => 'bi-cash-coin', 'params' => ['voucher_type' => 'PAYMENT', 'payment_mode' => 'CASH']],
-                    ['action' => 'entry', 'label' => 'Cash Receipt', 'icon' => 'bi-cash-stack', 'params' => ['voucher_type' => 'RECEIPT', 'payment_mode' => 'CASH']],
                     ['action' => 'entry', 'label' => 'Bank Payment', 'icon' => 'bi-bank', 'params' => ['voucher_type' => 'PAYMENT', 'payment_mode' => 'BANK']],
                     ['action' => 'entry', 'label' => 'Bank Receipt', 'icon' => 'bi-bank2', 'params' => ['voucher_type' => 'RECEIPT', 'payment_mode' => 'BANK']],
                     ['action' => 'entry', 'label' => 'Contra Voucher', 'icon' => 'bi-arrow-left-right', 'params' => ['voucher_type' => 'CONTRA']],

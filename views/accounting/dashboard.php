@@ -51,7 +51,6 @@
         <div class="acc-card-header">Quick Actions</div>
         <div class="acc-card-body d-grid gap-2">
           <a class="btn btn-outline-primary btn-sm text-start" href="<?php echo htmlspecialchars(AccountingModule::url('entry', ['voucher_type' => 'PAYMENT', 'payment_mode' => 'CASH'])); ?>"><i class="bi bi-cash me-2"></i>Cash Payment Voucher</a>
-          <a class="btn btn-outline-primary btn-sm text-start" href="<?php echo htmlspecialchars(AccountingModule::url('entry', ['voucher_type' => 'RECEIPT', 'payment_mode' => 'CASH'])); ?>"><i class="bi bi-cash-stack me-2"></i>Cash Receipt Voucher</a>
           <a class="btn btn-outline-primary btn-sm text-start" href="<?php echo htmlspecialchars(AccountingModule::url('entry', ['voucher_type' => 'JOURNAL'])); ?>"><i class="bi bi-journal-text me-2"></i>Journal Entry</a>
           <a class="btn btn-outline-secondary btn-sm text-start" href="<?php echo htmlspecialchars(AccountingModule::url('chart')); ?>"><i class="bi bi-list-nested me-2"></i>Chart of Accounts</a>
           <a class="btn btn-outline-secondary btn-sm text-start" href="<?php echo htmlspecialchars(AccountingModule::url('trial_balance')); ?>"><i class="bi bi-balance-scale me-2"></i>Trial Balance</a>
