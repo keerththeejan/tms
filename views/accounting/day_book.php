@@ -123,6 +123,7 @@ $dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) :
     text-align: center;
 }
 
+<<<<<<< HEAD
 /* Premium Summary Bar */
 .acc-daybook-summary-bar {
     margin: 8px 4px 0;
@@ -206,6 +207,44 @@ $dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) :
     .acc-db-summary-value {
         font-size: 14px;
     }
+=======
+.acc-daybook-summary {
+    background-color: #FFF;
+    border: 1px solid #999;
+    margin: 4px;
+    padding: 6px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.acc-daybook-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.acc-daybook-summary-item label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #333;
+}
+
+.acc-daybook-summary-item span {
+    font-size: 12px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    min-width: 120px;
+    text-align: right;
+}
+
+.acc-daybook-summary-item span.debit {
+    color: #CC0000;
+}
+
+.acc-daybook-summary-item span.credit {
+    color: #006600;
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
 }
 </style>
 
@@ -249,6 +288,7 @@ $dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) :
         </button>
     </div>
 
+<<<<<<< HEAD
     <!-- Summary Bar -->
     <div class="acc-daybook-summary-bar no-print" id="accDayBookSummaryBar" aria-live="polite">
         <div class="container-fluid px-0">
@@ -302,6 +342,8 @@ $dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) :
         </div>
     </div>
 
+=======
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
     <div id="report-print-area" class="report-print-area">
         <?php include __DIR__ . '/../partials/report/day_book_print_header.php'; ?>
 
@@ -332,16 +374,34 @@ $dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) :
         </table>
     </div>
     </div>
+<<<<<<< HEAD
+=======
+
+    <!-- Summary -->
+    <div class="acc-daybook-summary no-print">
+        <div class="acc-daybook-summary-item">
+            <label>Total Records:</label>
+            <span id="accTotalRecords">0</span>
+        </div>
+        <div class="acc-daybook-summary-item">
+            <span id="accRecordSummary" style="min-width: auto; font-family: Tahoma, Arial, sans-serif; font-weight: normal;">Showing 0 Voucher Entries</span>
+        </div>
+    </div>
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
 </div>
 
 <script>
 const accBaseUrl = '<?php echo htmlspecialchars($baseUrl); ?>';
+<<<<<<< HEAD
 const accDayBookSystemStartDate = '1970-01-01';
+=======
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
 
 document.addEventListener('DOMContentLoaded', function () {
     accLoadDayBook();
 });
 
+<<<<<<< HEAD
 function accPreviousDate(isoDate) {
     if (!isoDate) {
         return '';
@@ -397,6 +457,8 @@ function accComputeDayBookSummary(periodEntries, priorEntries) {
     };
 }
 
+=======
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
 function accFormatAmount(n) {
     return (parseFloat(n) || 0).toLocaleString('en-IN', {
         minimumFractionDigits: 2,
@@ -404,6 +466,7 @@ function accFormatAmount(n) {
     });
 }
 
+<<<<<<< HEAD
 function accFormatCurrency(n) {
     return 'Rs. ' + accFormatAmount(n);
 }
@@ -437,6 +500,8 @@ function accUpdateSummaryBar(summary) {
     if (closingEl) closingEl.textContent = accFormatCurrency(summary.closing_balance ?? 0);
 }
 
+=======
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
 function accEscapeHtml(s) {
     if (window.AccModule && AccModule.escapeHtml) {
         return AccModule.escapeHtml(s);
@@ -453,6 +518,7 @@ async function accLoadDayBook() {
     const fromDate = document.getElementById('accFromDate').value;
     const toDate = document.getElementById('accToDate').value;
     const voucherType = document.getElementById('accVoucherTypeFilter').value;
+<<<<<<< HEAD
     const previousDate = accPreviousDate(fromDate);
 
     accSetSummaryLoading(true);
@@ -499,6 +565,33 @@ function accRenderDayBook(entries, summary) {
 
     if (count === 0) {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
+=======
+
+    try {
+        const response = await fetch(accBaseUrl + 'index.php?page=api_accounting&acc_action=day_book&from_date=' + encodeURIComponent(fromDate) + '&to_date=' + encodeURIComponent(toDate) + '&voucher_type=' + encodeURIComponent(voucherType));
+        const data = await response.json();
+        
+        if (data.ok && data.data) {
+            accRenderDayBook(data.data);
+        } else {
+            alert('Error loading Day Book: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error loading Day Book: ' + error.message);
+    }
+}
+
+function accRenderDayBook(entries) {
+    const tbody = document.getElementById('accDayBookBody');
+    const totalEl = document.getElementById('accTotalRecords');
+    const summaryEl = document.getElementById('accRecordSummary');
+    const count = entries.length;
+
+    if (count === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
+        if (totalEl) totalEl.textContent = '0';
+        if (summaryEl) summaryEl.textContent = 'Showing 0 Voucher Entries';
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
         return;
     }
 
@@ -516,6 +609,14 @@ function accRenderDayBook(entries, summary) {
             '<td class="db-col-created-by">' + accEscapeHtml(entry.created_by || '') + '</td>' +
             '</tr>';
     }).join('');
+<<<<<<< HEAD
+=======
+
+    if (totalEl) totalEl.textContent = String(count);
+    if (summaryEl) {
+        summaryEl.textContent = 'Showing ' + count + ' Voucher Entr' + (count === 1 ? 'y' : 'ies');
+    }
+>>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
 }
 
 function accExportExcel() {
