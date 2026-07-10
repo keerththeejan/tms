@@ -166,7 +166,6 @@ class LedgerEntryRepository
         }, $rows);
     }
 
-<<<<<<< HEAD
     /** @return array{total_records: int, opening_balance: float, total_debit: float, total_credit: float, closing_balance: float} */
     public static function getDayBookSummary(PDO $pdo, string $fromDate, string $toDate, ?string $voucherType = null): array
     {
@@ -213,8 +212,6 @@ class LedgerEntryRepository
         ];
     }
 
-=======
->>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
     /** @return list<array<string,mixed>> */
     public static function getCashBook(PDO $pdo, string $fromDate, string $toDate, int $cashAccountId): array
     {

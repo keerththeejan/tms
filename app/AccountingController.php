@@ -630,12 +630,8 @@ class AccountingController
         $voucherType = $_GET['voucher_type'] ?? null;
 
         $entries = LedgerEntryRepository::getDayBook($pdo, $fromDate, $toDate, $voucherType);
-<<<<<<< HEAD
         $summary = LedgerEntryRepository::getDayBookSummary($pdo, $fromDate, $toDate, $voucherType);
         self::json(['ok' => true, 'data' => $entries, 'summary' => $summary]);
-=======
-        self::json(['ok' => true, 'data' => $entries]);
->>>>>>> dc21f8bb723e0a4ca5ce083e8c8d33eaaf2af947
     }
 
     private static function ledger(PDO $pdo): void
