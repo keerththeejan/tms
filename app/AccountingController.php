@@ -117,6 +117,10 @@ class AccountingController
                     self::dayBook($pdo);
                     return;
 
+                case 'export_day_book':
+                    self::exportDayBook($pdo);
+                    return;
+
                 case 'ledger':
                     self::ledger($pdo);
                     return;
@@ -434,20 +438,51 @@ class AccountingController
     private static function deleteVoucher(PDO $pdo, bool $isPost): void
     {
         if (!$isPost) {
-            self::json(['ok' => false, 'error' => 'POST required'], 405);
+            self::json(['success' => false, 'ok' => false, 'message' => 'POST required'], 405);
+            return;
+        }
+
+        if (!Auth::canDeleteAccountingVouchers()) {
+            self::json([
+                'success' => false,
+                'ok' => false,
+                'message' => 'You do not have permission to delete vouchers.',
+            ], 403);
             return;
         }
 
         $payload = $_POST;
-        $id = (int) ($payload['id'] ?? 0);
+        $id = (int) ($payload['id'] ?? $payload['voucher_id'] ?? 0);
+        $reason = trim((string) ($payload['reason'] ?? ''));
 
         if ($id <= 0) {
-            self::json(['ok' => false, 'error' => 'Invalid voucher id'], 400);
+            self::json(['success' => false, 'ok' => false, 'message' => 'Invalid voucher id.'], 400);
             return;
         }
 
-        AccountingVoucherRepository::delete($pdo, $id, Auth::user()['id'] ?? null);
-        self::json(['ok' => true]);
+        try {
+            AccountingVoucherDeleteService::deleteVoucher(
+                $pdo,
+                $id,
+                Auth::user()['id'] ?? null,
+                $reason
+            );
+            self::json([
+                'success' => true,
+                'ok' => true,
+                'message' => 'Voucher deleted successfully.',
+            ]);
+        } catch (Throwable $e) {
+            $message = trim($e->getMessage());
+            if ($message === '') {
+                $message = 'Unable to delete voucher.';
+            }
+            self::json([
+                'success' => false,
+                'ok' => false,
+                'message' => $message,
+            ], 400);
+        }
     }
 
     private static function listAccounts(PDO $pdo): void
@@ -632,6 +667,18 @@ class AccountingController
         $entries = LedgerEntryRepository::getDayBook($pdo, $fromDate, $toDate, $voucherType);
         $summary = LedgerEntryRepository::getDayBookSummary($pdo, $fromDate, $toDate, $voucherType);
         self::json(['ok' => true, 'data' => $entries, 'summary' => $summary]);
+    }
+
+    private static function exportDayBook(PDO $pdo): void
+    {
+        $fromDate = (string) ($_GET['from_date'] ?? date('Y-m-01'));
+        $toDate = (string) ($_GET['to_date'] ?? date('Y-m-t'));
+        $voucherType = $_GET['voucher_type'] ?? null;
+        if ($voucherType === '') {
+            $voucherType = null;
+        }
+
+        AccountingExcelExport::exportDayBook($pdo, $fromDate, $toDate, $voucherType);
     }
 
     private static function ledger(PDO $pdo): void

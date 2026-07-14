@@ -203,41 +203,9 @@ class AccountingVoucherRepository
         return self::getById($pdo, $id) ?: [];
     }
 
-    public static function delete(PDO $pdo, int $id, ?int $userId = null): bool
+    public static function delete(PDO $pdo, int $id, ?int $userId = null, string $reason = ''): bool
     {
-        $voucher = self::getById($pdo, $id);
-        if (!$voucher) {
-            throw new RuntimeException('Voucher not found.');
-        }
-
-        if (($voucher['status'] ?? '') === 'POSTED') {
-            throw new RuntimeException('Posted vouchers cannot be deleted. Cancel them instead.');
-        }
-
-        $ownTxn = !$pdo->inTransaction();
-        if ($ownTxn) {
-            $pdo->beginTransaction();
-        }
-        try {
-            $st = $pdo->prepare('DELETE FROM voucher_details WHERE voucher_id = ?');
-            $st->execute([$id]);
-
-            $st = $pdo->prepare('DELETE FROM ledger_entries WHERE voucher_id = ?');
-            $st->execute([$id]);
-
-            $st = $pdo->prepare('UPDATE vouchers SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?');
-            $st->execute([$id]);
-
-            if ($ownTxn) {
-                $pdo->commit();
-            }
-            return true;
-        } catch (Throwable $e) {
-            if ($ownTxn && $pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            throw $e;
-        }
+        return AccountingVoucherDeleteService::deleteVoucher($pdo, $id, $userId, $reason);
     }
 
     public static function cancel(PDO $pdo, int $id, string $reason, ?int $userId = null): bool
@@ -332,15 +300,15 @@ class AccountingVoucherRepository
         $st = $pdo->prepare(
             'SELECT 
                 COUNT(*) AS total_vouchers,
-                SUM(total_debit) AS total_debit,
-                SUM(total_credit) AS total_credit,
+                SUM(CASE WHEN status = ? THEN total_debit ELSE 0 END) AS total_debit,
+                SUM(CASE WHEN status = ? THEN total_credit ELSE 0 END) AS total_credit,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS draft_count,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS posted_count,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS cancelled_count
              FROM vouchers
              WHERE voucher_date BETWEEN ? AND ? AND deleted_at IS NULL'
         );
-        $st->execute(['DRAFT', 'POSTED', 'CANCELLED', $fromDate, $toDate]);
+        $st->execute(['POSTED', 'POSTED', 'DRAFT', 'POSTED', 'CANCELLED', $fromDate, $toDate]);
         $result = $st->fetch(PDO::FETCH_ASSOC) ?: [];
         
         return [

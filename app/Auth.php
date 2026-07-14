@@ -92,4 +92,10 @@ class Auth
     {
         return self::hasAnyRole(['admin','accountant']);
     }
+
+    /** Accounting Voucher Register: permanent delete is admin-only. */
+    public static function canDeleteAccountingVouchers(): bool
+    {
+        return self::isAdmin();
+    }
 }

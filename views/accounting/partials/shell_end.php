@@ -8,7 +8,8 @@
 window.TMS_ACCOUNTING = {
   baseUrl: <?php echo json_encode($accBaseUrl, JSON_UNESCAPED_SLASHES); ?>,
   csrf: <?php echo json_encode($accCsrf, JSON_UNESCAPED_UNICODE); ?>,
-  action: <?php echo json_encode($accAction, JSON_UNESCAPED_UNICODE); ?>
+  action: <?php echo json_encode($accAction, JSON_UNESCAPED_UNICODE); ?>,
+  canDeleteVouchers: <?php echo Auth::canDeleteAccountingVouchers() ? 'true' : 'false'; ?>
 };
 <?php if (!empty($accLoadAccountsJs)): ?>
 window.TMS_ACCOUNTS_MASTER = {

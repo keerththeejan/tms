@@ -336,65 +336,16 @@ $dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) :
 
 <script>
 const accBaseUrl = '<?php echo htmlspecialchars($baseUrl); ?>';
-const accDayBookSystemStartDate = '1970-01-01';
 
 document.addEventListener('DOMContentLoaded', function () {
     accLoadDayBook();
 });
-
-function accPreviousDate(isoDate) {
-    if (!isoDate) {
-        return '';
-    }
-    const parts = isoDate.split('-').map(function (p) { return parseInt(p, 10); });
-    if (parts.length !== 3 || parts.some(function (n) { return isNaN(n); })) {
-        return '';
-    }
-    const d = new Date(parts[0], parts[1] - 1, parts[2]);
-    d.setDate(d.getDate() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + day;
-}
 
 function accDayBookFetchUrl(fromDate, toDate, voucherType) {
     return accBaseUrl + 'index.php?page=api_accounting&acc_action=day_book'
         + '&from_date=' + encodeURIComponent(fromDate)
         + '&to_date=' + encodeURIComponent(toDate)
         + '&voucher_type=' + encodeURIComponent(voucherType || '');
-}
-
-function accSumDebitCredit(entries) {
-    let totalDebit = 0;
-    let totalCredit = 0;
-    (entries || []).forEach(function (entry) {
-        totalDebit += parseFloat(entry.debit_amount || 0);
-        totalCredit += parseFloat(entry.credit_amount || 0);
-    });
-    return { totalDebit: totalDebit, totalCredit: totalCredit };
-}
-
-/**
- * Opening Balance = previous day's closing balance
- * (total debit through previous date − total credit through previous date).
- */
-function accComputeDayBookSummary(periodEntries, priorEntries) {
-    const prior = accSumDebitCredit(priorEntries);
-    const openingBalance = prior.totalDebit - prior.totalCredit;
-
-    const period = accSumDebitCredit(periodEntries);
-    const totalDebit = period.totalDebit;
-    const totalCredit = period.totalCredit;
-    const closingBalance = openingBalance + totalDebit - totalCredit;
-
-    return {
-        total_records: (periodEntries || []).length,
-        opening_balance: openingBalance,
-        total_debit: totalDebit,
-        total_credit: totalCredit,
-        closing_balance: closingBalance,
-    };
 }
 
 function accFormatAmount(n) {
@@ -449,21 +400,20 @@ function accEscapeHtml(s) {
         .replace(/'/g, '&#39;');
 }
 
+/**
+ * Load Day Book rows + summary from the server.
+ * Summary uses AccountingBalanceService:
+ *   Closing = Opening + Credit − Debit  (Credit = Cash In, Debit = Cash Out)
+ */
 async function accLoadDayBook() {
     const fromDate = document.getElementById('accFromDate').value;
     const toDate = document.getElementById('accToDate').value;
     const voucherType = document.getElementById('accVoucherTypeFilter').value;
-    const previousDate = accPreviousDate(fromDate);
 
     accSetSummaryLoading(true);
 
     try {
-        const periodPromise = fetch(accDayBookFetchUrl(fromDate, toDate, voucherType));
-        const priorPromise = (fromDate && previousDate)
-            ? fetch(accDayBookFetchUrl(accDayBookSystemStartDate, previousDate, voucherType))
-            : Promise.resolve(null);
-
-        const [periodResponse, priorResponse] = await Promise.all([periodPromise, priorPromise]);
+        const periodResponse = await fetch(accDayBookFetchUrl(fromDate, toDate, voucherType));
         const periodData = await periodResponse.json();
 
         if (!periodData.ok || !periodData.data) {
@@ -472,16 +422,7 @@ async function accLoadDayBook() {
             return;
         }
 
-        let priorEntries = [];
-        if (priorResponse) {
-            const priorData = await priorResponse.json();
-            if (priorData.ok && priorData.data) {
-                priorEntries = priorData.data;
-            }
-        }
-
-        const summary = accComputeDayBookSummary(periodData.data, priorEntries);
-        accRenderDayBook(periodData.data, summary);
+        accRenderDayBook(periodData.data, periodData.summary || null);
     } catch (error) {
         accUpdateSummaryBar(null);
         alert('Error loading Day Book: ' + error.message);
@@ -493,9 +434,8 @@ async function accLoadDayBook() {
 function accRenderDayBook(entries, summary) {
     const tbody = document.getElementById('accDayBookBody');
     const count = entries.length;
-    const resolvedSummary = summary || accComputeDayBookSummary(entries, []);
 
-    accUpdateSummaryBar(resolvedSummary);
+    accUpdateSummaryBar(summary);
 
     if (count === 0) {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
@@ -519,7 +459,13 @@ function accRenderDayBook(entries, summary) {
 }
 
 function accExportExcel() {
-    alert('Excel export functionality - to be implemented');
+    const fromDate = document.getElementById('accFromDate').value;
+    const toDate = document.getElementById('accToDate').value;
+    const voucherType = document.getElementById('accVoucherTypeFilter').value;
+    window.location.href = accBaseUrl + 'index.php?page=api_accounting&acc_action=export_day_book'
+        + '&from_date=' + encodeURIComponent(fromDate)
+        + '&to_date=' + encodeURIComponent(toDate)
+        + '&voucher_type=' + encodeURIComponent(voucherType || '');
 }
 
 function accFormatPrintDateTime() {

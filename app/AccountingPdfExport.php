@@ -19,8 +19,9 @@ class AccountingPdfExport
     public static function exportDayBook(PDO $pdo, string $fromDate, string $toDate, ?string $voucherType = null): void
     {
         $entries = LedgerEntryRepository::getDayBook($pdo, $fromDate, $toDate, $voucherType);
-        
-        $html = self::generateDayBookHtml($entries, $fromDate, $toDate, $voucherType);
+        $summary = LedgerEntryRepository::getDayBookSummary($pdo, $fromDate, $toDate, $voucherType);
+
+        $html = self::generateDayBookHtml($entries, $summary, $fromDate, $toDate, $voucherType);
         self::outputPdf('Day_Book_' . $fromDate . '_to_' . $toDate . '.pdf', $html);
     }
 
@@ -70,10 +71,15 @@ class AccountingPdfExport
     }
 
     /**
-     * Generate Day Book HTML
+     * Generate Day Book HTML (uses same AccountingBalance summary as the Day Book page)
      */
-    private static function generateDayBookHtml(array $entries, string $fromDate, string $toDate, ?string $voucherType): string
-    {
+    private static function generateDayBookHtml(
+        array $entries,
+        array $summary,
+        string $fromDate,
+        string $toDate,
+        ?string $voucherType
+    ): string {
         $rows = '';
         foreach ($entries as $entry) {
             $rows .= sprintf(
@@ -102,10 +108,26 @@ class AccountingPdfExport
             );
         }
 
-        $recordCount = count($entries);
+        $recordCount = (int) ($summary['total_records'] ?? count($entries));
+        $summaryHtml = sprintf(
+            '<table border="0" cellpadding="4" cellspacing="0" style="width: 100%%; margin-bottom: 12px; font-size: 11px;">
+                <tr>
+                    <td><strong>Opening Balance:</strong> %s</td>
+                    <td><strong>Total Debit:</strong> %s</td>
+                    <td><strong>Total Credit:</strong> %s</td>
+                    <td><strong>Closing Balance:</strong> %s</td>
+                    <td><strong>Total Records:</strong> %d</td>
+                </tr>
+             </table>',
+            self::fmtMoney($summary['opening_balance'] ?? 0),
+            self::fmtMoney($summary['total_debit'] ?? 0),
+            self::fmtMoney($summary['total_credit'] ?? 0),
+            self::fmtMoney($summary['closing_balance'] ?? 0),
+            $recordCount
+        );
 
-        return self::getPdfTemplate('Day Book', $fromDate, $toDate, $voucherType, sprintf(
-            '<table border="1" cellpadding="5" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 11px;">
+        return self::getPdfTemplate('Day Book', $fromDate, $toDate, $voucherType, $summaryHtml . sprintf(
+            '<table border="1" cellpadding="5" cellspacing="0" style="width: 100%%; border-collapse: collapse; font-size: 11px;">
                 <thead>
                     <tr style="background-color: #4A4A4A; color: #FFF;">
                         <th>Date</th>

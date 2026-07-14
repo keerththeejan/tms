@@ -19,8 +19,9 @@ class AccountingExcelExport
     public static function exportDayBook(PDO $pdo, string $fromDate, string $toDate, ?string $voucherType = null): void
     {
         $entries = LedgerEntryRepository::getDayBook($pdo, $fromDate, $toDate, $voucherType);
-        
-        $csv = self::generateDayBookCsv($entries, $fromDate, $toDate, $voucherType);
+        $summary = LedgerEntryRepository::getDayBookSummary($pdo, $fromDate, $toDate, $voucherType);
+
+        $csv = self::generateDayBookCsv($entries, $summary, $fromDate, $toDate, $voucherType);
         self::outputCsv('Day_Book_' . $fromDate . '_to_' . $toDate . '.csv', $csv);
     }
 
@@ -70,12 +71,17 @@ class AccountingExcelExport
     }
 
     /**
-     * Generate Day Book CSV
+     * Generate Day Book CSV (uses same AccountingBalance summary as the Day Book page)
      */
-    private static function generateDayBookCsv(array $entries, string $fromDate, string $toDate, ?string $voucherType): string
-    {
+    private static function generateDayBookCsv(
+        array $entries,
+        array $summary,
+        string $fromDate,
+        string $toDate,
+        ?string $voucherType
+    ): string {
         $lines = [];
-        
+
         // Header
         $lines[] = 'Day Book';
         $lines[] = 'Period: ' . $fromDate . ' to ' . $toDate;
@@ -83,10 +89,18 @@ class AccountingExcelExport
             $lines[] = 'Filter: ' . $voucherType;
         }
         $lines[] = '';
-        
+
+        // Summary — Closing = Opening + Credit − Debit (Credit = Cash In)
+        $lines[] = 'Opening Balance,' . self::fmtMoney($summary['opening_balance'] ?? 0);
+        $lines[] = 'Total Debit,' . self::fmtMoney($summary['total_debit'] ?? 0);
+        $lines[] = 'Total Credit,' . self::fmtMoney($summary['total_credit'] ?? 0);
+        $lines[] = 'Closing Balance,' . self::fmtMoney($summary['closing_balance'] ?? 0);
+        $lines[] = 'Total Records,' . (int) ($summary['total_records'] ?? count($entries));
+        $lines[] = '';
+
         // Column headers
         $lines[] = 'Date,Voucher No,Type,Account,Reference,Narration,Debit,Credit,Branch,Created By';
-        
+
         // Data rows
         foreach ($entries as $entry) {
             $lines[] = sprintf(
@@ -103,10 +117,7 @@ class AccountingExcelExport
                 self::escapeCsv($entry['created_by'] ?? '')
             );
         }
-        
-        $lines[] = '';
-        $lines[] = 'Total Records,' . count($entries);
-        
+
         return implode("\n", $lines);
     }
 

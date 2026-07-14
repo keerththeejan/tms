@@ -421,6 +421,7 @@ SQL);
             'cancelled_at' => 'timestamp NULL',
             'cancelled_by' => 'bigint unsigned NULL',
             'cancellation_reason' => 'text NULL',
+            'is_locked' => 'tinyint(1) NOT NULL DEFAULT 0',
         ];
         foreach ($columns as $name => $definition) {
             if (!self::columnExists($pdo, 'vouchers', $name)) {

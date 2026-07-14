@@ -58,6 +58,14 @@ $config = [
     // Integrations
     // Provide your Google Maps API key to enable Places Autocomplete on Delivery Location fields
     'google_maps_api_key' => '', // e.g., 'AIza...'
+
+    // Accounting — voucher delete / fiscal year policies
+    'accounting' => [
+        // Years listed here cannot have vouchers deleted (e.g. ['2023', '2024'])
+        'closed_fiscal_years' => [],
+        // When true, vouchers with approval_status = APPROVED cannot be deleted
+        'block_delete_when_approved' => true,
+    ],
 ];
 
 // Override company (and optional keys) from config/company.json if present (saved via Settings page)

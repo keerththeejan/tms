@@ -15,10 +15,13 @@ class AccountRepository
 
   private static function balanceSelectSql(): string
     {
-        return '(CASE WHEN a.opening_balance_type = \'CREDIT\' THEN -a.opening_balance ELSE a.opening_balance END)
+        $valid = AccountingBalanceService::validVoucherPredicate('v');
+        // Cash-In/Cash-Out: Balance = signed master opening + Σ(credit − debit) for POSTED lines
+        return '(CASE WHEN a.opening_balance_type = \'DEBIT\' THEN -a.opening_balance ELSE a.opening_balance END)
                 + COALESCE((
-                    SELECT SUM(le.debit_amount) - SUM(le.credit_amount)
+                    SELECT SUM(le.credit_amount) - SUM(le.debit_amount)
                     FROM ledger_entries le
+                    INNER JOIN vouchers v ON v.id = le.voucher_id AND ' . $valid . '
                     WHERE le.account_id = a.id
                 ), 0)';
     }
@@ -428,34 +431,35 @@ class AccountRepository
             return 0.0;
         }
 
-        $openingBalance = (float) ($account['opening_balance'] ?? 0);
-        $openingBalanceType = $account['opening_balance_type'] ?? 'DEBIT';
-        
-        // Calculate opening balance sign
-        if ($openingBalanceType === 'CREDIT') {
-            $openingBalance = -$openingBalance;
-        }
+        // CREDIT opening = Cash In (+); DEBIT opening = Cash Out (−)
+        $openingBalance = AccountingBalanceService::signedAmount(
+            (float) ($account['opening_balance'] ?? 0),
+            (string) ($account['opening_balance_type'] ?? 'CREDIT')
+        );
 
-        // Get ledger entries
-        $sql = 'SELECT SUM(debit_amount) AS total_debit, SUM(credit_amount) AS total_credit
-                FROM ledger_entries
-                WHERE account_id = ?';
-        
+        $valid = AccountingBalanceService::validVoucherPredicate('v');
+        $sql = "SELECT COALESCE(SUM(le.debit_amount), 0) AS total_debit,
+                       COALESCE(SUM(le.credit_amount), 0) AS total_credit
+                FROM ledger_entries le
+                INNER JOIN vouchers v ON v.id = le.voucher_id AND {$valid}
+                WHERE le.account_id = ?";
+
         $params = [$accountId];
-        
+
         if ($asOfDate) {
-            $sql .= ' AND entry_date <= ?';
+            $sql .= ' AND le.entry_date <= ?';
             $params[] = $asOfDate;
         }
-        
+
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $result = $st->fetch(PDO::FETCH_ASSOC);
-        
+
         $totalDebit = (float) ($result['total_debit'] ?? 0);
         $totalCredit = (float) ($result['total_credit'] ?? 0);
-        
-        return $openingBalance + $totalDebit - $totalCredit;
+
+        // Closing = Opening + Credit − Debit
+        return AccountingBalanceService::calculateClosingBalance($openingBalance, $totalDebit, $totalCredit);
     }
 
     /** @return list<array<string,mixed>> */
@@ -466,69 +470,78 @@ class AccountRepository
             return [];
         }
 
-        $openingBalance = (float) ($account['opening_balance'] ?? 0);
-        $openingBalanceType = $account['opening_balance_type'] ?? 'DEBIT';
-        
-        // Calculate opening balance sign
-        if ($openingBalanceType === 'CREDIT') {
-            $openingBalance = -$openingBalance;
-        }
+        $openingBalance = AccountingBalanceService::signedAmount(
+            (float) ($account['opening_balance'] ?? 0),
+            (string) ($account['opening_balance_type'] ?? 'CREDIT')
+        );
 
-        // Get opening balance before from date
+        $valid = AccountingBalanceService::validVoucherPredicate('v');
+
+        // Opening for period = master + activity strictly before From Date
         $openingBalanceBefore = $openingBalance;
         if ($fromDate) {
             $st = $pdo->prepare(
-                'SELECT SUM(debit_amount) AS total_debit, SUM(credit_amount) AS total_credit
-                 FROM ledger_entries
-                 WHERE account_id = ? AND entry_date < ?'
+                "SELECT COALESCE(SUM(le.debit_amount), 0) AS total_debit,
+                        COALESCE(SUM(le.credit_amount), 0) AS total_credit
+                 FROM ledger_entries le
+                 INNER JOIN vouchers v ON v.id = le.voucher_id AND {$valid}
+                 WHERE le.account_id = ? AND le.entry_date < ?"
             );
             $st->execute([$accountId, $fromDate]);
             $result = $st->fetch(PDO::FETCH_ASSOC);
             $totalDebit = (float) ($result['total_debit'] ?? 0);
             $totalCredit = (float) ($result['total_credit'] ?? 0);
-            $openingBalanceBefore = $openingBalance + $totalDebit - $totalCredit;
+            $openingBalanceBefore = AccountingBalanceService::calculateOpeningBalance(
+                $totalDebit,
+                $totalCredit,
+                $openingBalance
+            );
         }
 
-        // Get ledger entries
-        $sql = 'SELECT le.*, v.voucher_date, v.voucher_type, v.narration AS voucher_narration
+        $sql = "SELECT le.*, v.voucher_date, v.voucher_type, v.narration AS voucher_narration
                 FROM ledger_entries le
-                INNER JOIN vouchers v ON v.id = le.voucher_id
-                WHERE le.account_id = ?';
-        
+                INNER JOIN vouchers v ON v.id = le.voucher_id AND {$valid}
+                WHERE le.account_id = ?";
+
         $params = [$accountId];
-        
+
         if ($fromDate) {
             $sql .= ' AND le.entry_date >= ?';
             $params[] = $fromDate;
         }
-        
+
         if ($toDate) {
             $sql .= ' AND le.entry_date <= ?';
             $params[] = $toDate;
         }
-        
+
         $sql .= ' ORDER BY le.entry_date ASC, le.id ASC';
-        
+
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $entries = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // Calculate running balance
         $runningBalance = $openingBalanceBefore;
         foreach ($entries as &$entry) {
             $debit = (float) ($entry['debit_amount'] ?? 0);
             $credit = (float) ($entry['credit_amount'] ?? 0);
-            $runningBalance += $debit - $credit;
+            $runningBalance = AccountingBalanceService::applyMovement($runningBalance, $debit, $credit);
+            $display = AccountingBalanceService::displayBalance($runningBalance);
             $entry['running_balance'] = $runningBalance;
-            $entry['balance_type'] = $runningBalance >= 0 ? 'DEBIT' : 'CREDIT';
+            $entry['balance_type'] = $display['type'];
         }
 
+        $openingDisplay = AccountingBalanceService::displayBalance($openingBalanceBefore);
+        $closingDisplay = AccountingBalanceService::displayBalance($runningBalance);
+
         return [
-            'opening_balance' => abs($openingBalanceBefore),
-            'opening_balance_type' => $openingBalanceBefore >= 0 ? 'DEBIT' : 'CREDIT',
+            'opening_balance' => $openingDisplay['amount'],
+            'opening_balance_type' => $openingDisplay['type'],
             'entries' => $entries,
-            'closing_balance' => abs($runningBalance),
-            'closing_balance_type' => $runningBalance >= 0 ? 'DEBIT' : 'CREDIT',
+            'closing_balance' => $closingDisplay['amount'],
+            'closing_balance_type' => $closingDisplay['type'],
+            'opening_balance_signed' => $openingBalanceBefore,
+            'closing_balance_signed' => $runningBalance,
         ];
     }
 }
