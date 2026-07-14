@@ -433,7 +433,7 @@ class AccountingController
         $st = $pdo->prepare(
             'UPDATE vouchers SET status = ?, posted_at = CURRENT_TIMESTAMP, posted_by = ? WHERE id = ?'
         );
-        $st->execute(['POSTED', Auth::user()['id'] ?? null, $voucherId]);
+        $st->execute(['POSTED', Auth::id(), $voucherId]);
     }
 
     private static function cancelVoucher(PDO $pdo, bool $isPost): void
@@ -452,7 +452,7 @@ class AccountingController
             return;
         }
 
-        AccountingVoucherRepository::cancel($pdo, $id, $reason, Auth::user()['id'] ?? null);
+        AccountingVoucherRepository::cancel($pdo, $id, $reason, Auth::id());
         self::json(['ok' => true]);
     }
 
@@ -485,7 +485,7 @@ class AccountingController
             AccountingVoucherDeleteService::deleteVoucher(
                 $pdo,
                 $id,
-                Auth::user()['id'] ?? null,
+                Auth::id(),
                 $reason
             );
             self::json([
@@ -926,7 +926,7 @@ class AccountingController
 
         $payload = $_POST;
         $id = (int) ($payload['id'] ?? 0);
-        $userId = Auth::user()['id'] ?? null;
+        $userId = Auth::id();
         $groupId = (int) ($payload['account_group_id'] ?? 0);
 
         $errors = AccountRepository::validateAccountData($pdo, $payload, $id > 0 ? $id : null);
@@ -1040,7 +1040,7 @@ class AccountingController
         }
 
         try {
-            AccountRepository::delete($pdo, $id, Auth::user()['id'] ?? null);
+            AccountRepository::delete($pdo, $id, Auth::id());
         } catch (RuntimeException $e) {
             self::json(['ok' => false, 'success' => false, 'message' => $e->getMessage(), 'errors' => []], 400);
             return;

@@ -11,6 +11,30 @@ class Auth
         return $_SESSION['user'] ?? null;
     }
 
+    /**
+     * Numeric primary key of the authenticated user, or null if guest / invalid.
+     * Always returns ?int — never a numeric string (PDO session residue).
+     */
+    public static function id(): ?int
+    {
+        $user = self::user();
+        if ($user === null || !array_key_exists('id', $user)) {
+            return null;
+        }
+
+        $raw = $user['id'];
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (!is_numeric($raw)) {
+            return null;
+        }
+
+        $id = (int) $raw;
+
+        return $id > 0 ? $id : null;
+    }
+
     public static function attempt(string $username, string $password): bool
     {
         $pdo = Database::pdo();
@@ -23,6 +47,11 @@ class Auth
                 return false;
             }
             unset($user['password_hash']);
+            // PDO returns numeric columns as strings — normalize IDs for PHP 8 strict typing.
+            $user['id'] = (int) $user['id'];
+            if (array_key_exists('branch_id', $user) && $user['branch_id'] !== null && $user['branch_id'] !== '') {
+                $user['branch_id'] = (int) $user['branch_id'];
+            }
             session_regenerate_id(true);
             $_SESSION['user'] = $user;
             return true;
