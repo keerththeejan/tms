@@ -28,11 +28,16 @@ class AccountingPdfExport
     /**
      * Export Ledger to PDF
      */
-    public static function exportLedger(PDO $pdo, int $accountId, ?string $fromDate = null, ?string $toDate = null): void
-    {
-        $ledger = AccountRepository::getLedger($pdo, $accountId, $fromDate, $toDate);
+    public static function exportLedger(
+        PDO $pdo,
+        int $accountId,
+        ?string $fromDate = null,
+        ?string $toDate = null,
+        array $filters = []
+    ): void {
+        $ledger = AccountRepository::getLedger($pdo, $accountId, $fromDate, $toDate, $filters);
         $account = AccountRepository::getById($pdo, $accountId);
-        
+
         $html = self::generateLedgerHtml($ledger, $account, $fromDate, $toDate);
         self::outputPdf('Ledger_' . ($account['account_code'] ?? 'Account') . '.pdf', $html);
     }
@@ -157,12 +162,19 @@ class AccountingPdfExport
     }
 
     /**
-     * Generate Ledger HTML
+     * Generate Ledger HTML — same ERP layout as on-screen / print (7 columns).
      */
     private static function generateLedgerHtml(array $ledger, ?array $account, ?string $fromDate, ?string $toDate): string
     {
         $rows = '';
         foreach ($ledger['entries'] ?? [] as $entry) {
+            $debit = AccountingBalanceService::formatSideAmount((float) ($entry['debit_amount'] ?? 0));
+            $credit = AccountingBalanceService::formatSideAmount((float) ($entry['credit_amount'] ?? 0));
+            $running = (string) ($entry['running_balance_display']
+                ?? AccountingBalanceService::formatBalanceDrCr(
+                    (float) ($entry['running_balance'] ?? 0),
+                    (string) ($entry['balance_type'] ?? 'DEBIT')
+                ));
             $rows .= sprintf(
                 '<tr>
                     <td>%s</td>
@@ -171,57 +183,149 @@ class AccountingPdfExport
                     <td>%s</td>
                     <td style="text-align: right;">%s</td>
                     <td style="text-align: right;">%s</td>
-                    <td style="text-align: right;">%s %s</td>
+                    <td style="text-align: right;">%s</td>
                 </tr>',
-                htmlspecialchars($entry['entry_date'] ?? $entry['voucher_date'] ?? ''),
-                htmlspecialchars($entry['voucher_number'] ?? ''),
-                htmlspecialchars($entry['voucher_type'] ?? ''),
-                htmlspecialchars($entry['narration'] ?? $entry['voucher_narration'] ?? ''),
-                self::fmtMoney($entry['debit_amount'] ?? 0),
-                self::fmtMoney($entry['credit_amount'] ?? 0),
-                self::fmtMoney($entry['running_balance'] ?? 0),
-                htmlspecialchars($entry['balance_type'] ?? '')
+                htmlspecialchars((string) ($entry['entry_date'] ?? $entry['voucher_date'] ?? '')),
+                htmlspecialchars((string) ($entry['voucher_number'] ?? '')),
+                htmlspecialchars((string) ($entry['voucher_type'] ?? '')),
+                htmlspecialchars((string) ($entry['narration'] ?? $entry['voucher_narration'] ?? '')),
+                htmlspecialchars($debit),
+                htmlspecialchars($credit),
+                htmlspecialchars($running)
             );
         }
 
-        return self::getPdfTemplate(
-            'Ledger - ' . ($account['account_name'] ?? 'Account'),
-            $fromDate ?? '',
-            $toDate ?? '',
-            null,
-            sprintf(
-                '<div style="margin-bottom: 10px;">
-                    <strong>Account:</strong> %s (%s)<br>
-                    <strong>Opening Balance:</strong> %s %s
-                </div>
-                <table border="1" cellpadding="5" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 11px;">
+        $openingLabel = (string) ($ledger['opening_balance_display']
+            ?? AccountingBalanceService::formatBalanceDrCr(
+                (float) ($ledger['opening_balance'] ?? 0),
+                (string) ($ledger['opening_balance_type'] ?? 'DEBIT')
+            ));
+        $closingLabel = (string) ($ledger['closing_balance_display']
+            ?? AccountingBalanceService::formatBalanceDrCr(
+                (float) ($ledger['closing_balance'] ?? 0),
+                (string) ($ledger['closing_balance_type'] ?? 'DEBIT')
+            ));
+        $totalTxn = (int) ($ledger['total_transactions'] ?? count($ledger['entries'] ?? []));
+        $accountType = (string) ($ledger['account_type'] ?? $account['account_type'] ?? '');
+
+        $summary = sprintf(
+            '<table border="0" cellpadding="4" cellspacing="0" style="width: 100%%; margin: 12px 0; font-size: 11px; border: 1px solid #000;">
+                <tr><td style="width: 40%%;"><strong>Opening Balance</strong></td><td>%s</td></tr>
+                <tr><td><strong>Total Debit</strong></td><td>%s</td></tr>
+                <tr><td><strong>Total Credit</strong></td><td>%s</td></tr>
+                <tr><td><strong>Closing Balance</strong></td><td>%s</td></tr>
+                <tr><td><strong>Total Transactions</strong></td><td>%d</td></tr>
+            </table>',
+            htmlspecialchars($openingLabel),
+            htmlspecialchars(number_format((float) ($ledger['total_debit'] ?? 0), 2, '.', ',')),
+            htmlspecialchars(number_format((float) ($ledger['total_credit'] ?? 0), 2, '.', ',')),
+            htmlspecialchars($closingLabel),
+            $totalTxn
+        );
+
+        $meta = sprintf(
+            '<div style="margin-bottom: 10px; font-size: 11px; line-height: 1.5;">
+                <strong>Account Name:</strong> %s<br>
+                <strong>Account Code:</strong> %s<br>
+                <strong>Account Type:</strong> %s<br>
+                <strong>Normal Balance:</strong> %s<br>
+                <strong>Date Range:</strong> %s to %s
+            </div>',
+            htmlspecialchars((string) ($account['account_name'] ?? '')),
+            htmlspecialchars((string) ($account['account_code'] ?? '')),
+            htmlspecialchars($accountType),
+            htmlspecialchars((string) ($ledger['normal_balance'] ?? '')),
+            htmlspecialchars((string) ($fromDate ?? '')),
+            htmlspecialchars((string) ($toDate ?? ''))
+        );
+
+        return self::getLedgerPdfDocument(
+            'General Ledger Report',
+            $meta . sprintf(
+                '<table border="1" cellpadding="5" cellspacing="0" style="width: 100%%; border-collapse: collapse; font-size: 10px;">
                     <thead>
                         <tr style="background-color: #4A4A4A; color: #FFF;">
                             <th>Date</th>
                             <th>Voucher No</th>
-                            <th>Type</th>
+                            <th>Voucher Type</th>
                             <th>Narration</th>
                             <th style="text-align: right;">Debit</th>
                             <th style="text-align: right;">Credit</th>
-                            <th style="text-align: right;">Balance</th>
+                            <th style="text-align: right;">Running Balance</th>
                         </tr>
                     </thead>
                     <tbody>%s</tbody>
-                    <tfoot>
-                        <tr style="font-weight: bold; background-color: #E0E0E0;">
-                            <td colspan="6" style="text-align: right;">Closing Balance:</td>
-                            <td style="text-align: right;">%s %s</td>
-                        </tr>
-                    </tfoot>
                 </table>',
-                htmlspecialchars($account['account_name'] ?? ''),
-                htmlspecialchars($account['account_code'] ?? ''),
-                self::fmtMoney($ledger['opening_balance'] ?? 0),
-                htmlspecialchars($ledger['opening_balance_type'] ?? ''),
-                $rows,
-                self::fmtMoney($ledger['closing_balance'] ?? 0),
-                htmlspecialchars($ledger['closing_balance_type'] ?? '')
-            )
+                $rows
+            ) . $summary
+        );
+    }
+
+    /**
+     * A4 portrait ERP letterhead for General Ledger PDF.
+     */
+    private static function getLedgerPdfDocument(string $reportName, string $content): string
+    {
+        $company = Helpers::company();
+        $companyName = (string) ($company['name'] ?? 'TS Transport');
+        $logoDisplay = (string) ($company['logo_display'] ?? 'builtin');
+        $logoUrl = (string) ($company['logo_url'] ?? '');
+        $logoInitials = strtoupper((string) ($company['logo_initials'] ?? 'TS'));
+        if ($logoUrl !== '' && strpos($logoUrl, 'http') !== 0 && strpos($logoUrl, '//') !== 0) {
+            $logoUrl = Helpers::baseUrl($logoUrl);
+        }
+        $printedBy = '';
+        try {
+            $u = Auth::user();
+            $printedBy = (string) ($u['full_name'] ?? $u['username'] ?? '');
+        } catch (Throwable $e) {
+            $printedBy = '';
+        }
+        $printedDate = date('Y-m-d H:i');
+
+        $logoHtml = ($logoDisplay === 'image' && $logoUrl !== '')
+            ? '<img src="' . htmlspecialchars($logoUrl) . '" style="max-height:48px;max-width:90px;" alt="">'
+            : '<div style="width:48px;height:48px;background:#c00;color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center;">'
+                . htmlspecialchars($logoInitials) . '</div>';
+
+        return sprintf(
+            '<!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>%s</title>
+                <style>
+                    @page { size: A4 portrait; margin: 12mm; }
+                    body { font-family: Arial, Tahoma, sans-serif; font-size: 11px; color: #000; margin: 16px; }
+                    .letterhead { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
+                    .company { font-size: 16px; font-weight: bold; margin: 0; }
+                    .report { font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 2px 0 0 0; }
+                    .print-meta { font-size: 10px; color: #333; margin-bottom: 8px; }
+                    table { page-break-inside: auto; }
+                    tr { page-break-inside: avoid; }
+                </style>
+            </head>
+            <body>
+                <div class="letterhead">
+                    %s
+                    <div>
+                        <p class="company">%s</p>
+                        <p class="report">%s</p>
+                    </div>
+                </div>
+                <div class="print-meta">
+                    <strong>Printed By:</strong> %s &nbsp;|&nbsp; <strong>Printed Date:</strong> %s
+                </div>
+                %s
+            </body>
+            </html>',
+            htmlspecialchars($reportName),
+            $logoHtml,
+            htmlspecialchars($companyName),
+            htmlspecialchars($reportName),
+            htmlspecialchars($printedBy !== '' ? $printedBy : '—'),
+            htmlspecialchars($printedDate),
+            $content
         );
     }
 

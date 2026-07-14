@@ -371,12 +371,33 @@
     return 'DEBIT';
   }
 
+  function accountTypeForGroup(groupId) {
+    var g = groups.find(function (row) { return String(row.id) === String(groupId); });
+    if (!g) return 'GENERAL';
+    var type = String(g.group_type || '').toUpperCase();
+    if (type === 'ASSETS') return 'ASSET';
+    if (type === 'LIABILITIES') return 'LIABILITY';
+    if (type === 'CAPITAL') return 'CAPITAL';
+    if (type === 'INCOME') return 'INCOME';
+    if (type === 'EXPENSES') return 'EXPENSE';
+    return 'GENERAL';
+  }
+
   function onGroupChanged() {
     var groupId = getGroupValue();
     clearFieldError('accAccountGroup');
     if (!groupId) { updateSaveButtonState(); return; }
+    var side = balanceTypeForGroup(groupId);
     if (!balanceTypeManual) {
-      document.getElementById('accOpeningType').value = balanceTypeForGroup(groupId);
+      document.getElementById('accOpeningType').value = side;
+    }
+    var nbEl = document.getElementById('accNormalBalance');
+    if (nbEl && !document.getElementById('accAccountId').value) {
+      nbEl.value = side;
+    }
+    var atEl = document.getElementById('accAccountType');
+    if (atEl && !document.getElementById('accAccountId').value) {
+      atEl.value = accountTypeForGroup(groupId);
     }
     if (!document.getElementById('accAccountId').value) {
       if (getCodeMode() === 'auto') {
@@ -384,6 +405,18 @@
       }
     }
     updateSaveButtonState();
+  }
+
+  function fillParentAccountSelect(excludeId) {
+    var sel = document.getElementById('accParentAccount');
+    if (!sel) return;
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— None —</option>';
+    accounts.forEach(function (a) {
+      if (excludeId && String(a.id) === String(excludeId)) return;
+      sel.innerHTML += '<option value="' + a.id + '">' + escapeHtml(a.account_code + ' - ' + a.account_name) + '</option>';
+    });
+    if (current) sel.value = current;
   }
 
   function getCodeMode() {
@@ -546,6 +579,13 @@
     document.getElementById('accOpeningBalance').value = '0.00';
     document.getElementById('accAccountDeleteWrap')?.classList.add('d-none');
     document.getElementById('accCodeModeWrap')?.classList.remove('d-none');
+    fillParentAccountSelect(null);
+    var nb = document.getElementById('accNormalBalance');
+    if (nb) nb.value = 'DEBIT';
+    var at = document.getElementById('accAccountType');
+    if (at) at.value = 'GENERAL';
+    var lt = document.getElementById('accLedgerType');
+    if (lt) lt.value = 'GENERAL';
     pendingGroupSelectId = null;
     balanceTypeManual = false;
     setCodeMode('auto');
@@ -573,6 +613,15 @@
       document.getElementById('accOpeningBalance').value = parseFloat(a.opening_balance || 0).toFixed(2);
       document.getElementById('accOpeningType').value = a.opening_balance_type || 'DEBIT';
       document.getElementById('accAccountActive').value = String(a.is_active ?? 1);
+      fillParentAccountSelect(a.id);
+      var nb = document.getElementById('accNormalBalance');
+      if (nb) nb.value = a.normal_balance || a.group_nature || a.opening_balance_type || 'DEBIT';
+      var at = document.getElementById('accAccountType');
+      if (at) at.value = a.account_type || accountTypeForGroup(a.account_group_id) || 'GENERAL';
+      var lt = document.getElementById('accLedgerType');
+      if (lt) lt.value = a.ledger_type || 'GENERAL';
+      var pa = document.getElementById('accParentAccount');
+      if (pa) pa.value = a.parent_account_id ? String(a.parent_account_id) : '';
       document.getElementById('accAccountDeleteWrap')?.classList.remove('d-none');
       document.getElementById('accCodeModeWrap')?.classList.add('d-none');
       balanceTypeManual = true;
@@ -637,8 +686,12 @@
       account_code: document.getElementById('accAccountCode').value.trim(),
       account_name: document.getElementById('accAccountName').value.trim(),
       account_group_id: getGroupValue(),
+      parent_account_id: document.getElementById('accParentAccount')?.value || '',
       opening_balance: document.getElementById('accOpeningBalance').value || '0',
       opening_balance_type: document.getElementById('accOpeningType').value,
+      normal_balance: document.getElementById('accNormalBalance')?.value || document.getElementById('accOpeningType').value,
+      account_type: document.getElementById('accAccountType')?.value || 'GENERAL',
+      ledger_type: document.getElementById('accLedgerType')?.value || 'GENERAL',
       is_active: document.getElementById('accAccountActive').value,
     };
 

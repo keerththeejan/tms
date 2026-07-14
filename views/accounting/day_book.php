@@ -331,11 +331,48 @@ $dbPrintCssVer = is_file($dbPrintCssPath) ? (string)filemtime($dbPrintCssPath) :
             </tbody>
         </table>
     </div>
+
+        <!-- Print-only summary (same AccountingBalanceService totals as screen) -->
+        <div class="db-print-only db-print-summary" id="accDayBookPrintSummary" aria-label="Day Book Summary">
+            <div class="db-print-summary-title">DAY BOOK SUMMARY</div>
+            <table class="db-print-summary-table">
+                <tbody>
+                    <tr>
+                        <th scope="row">Opening Balance</th>
+                        <td id="accPrintOpeningBalance">LKR 0.00</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Total Credit</th>
+                        <td id="accPrintTotalCredit">LKR 0.00</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Total Debit</th>
+                        <td id="accPrintTotalDebit">LKR 0.00</td>
+                    </tr>
+                    <tr class="is-closing">
+                        <th scope="row">Closing Balance</th>
+                        <td id="accPrintClosingBalance">LKR 0.00</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Total Records</th>
+                        <td id="accPrintTotalRecords" class="is-count">0</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <script>
 const accBaseUrl = '<?php echo htmlspecialchars($baseUrl); ?>';
+/** Last server summary — shared by screen cards and print report */
+let accLastDayBookSummary = {
+    total_records: 0,
+    opening_balance: 0,
+    total_debit: 0,
+    total_credit: 0,
+    closing_balance: 0,
+};
 
 document.addEventListener('DOMContentLoaded', function () {
     accLoadDayBook();
@@ -359,13 +396,55 @@ function accFormatCurrency(n) {
     return 'Rs. ' + accFormatAmount(n);
 }
 
+/**
+ * Print / report money format: LKR 1,234.56 or -LKR 12,500.00
+ * Uses the same absolute amounts as the Day Book summary API.
+ */
+function accFormatPrintLkr(n) {
+    const value = parseFloat(n);
+    const amount = isFinite(value) ? value : 0;
+    const absFormatted = Math.abs(amount).toLocaleString('en-LK', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+    return amount < 0 ? ('-LKR ' + absFormatted) : ('LKR ' + absFormatted);
+}
+
+function accEmptySummary() {
+    return {
+        total_records: 0,
+        opening_balance: 0,
+        total_debit: 0,
+        total_credit: 0,
+        closing_balance: 0,
+    };
+}
+
 function accSetSummaryLoading(isLoading) {
     document.querySelectorAll('.acc-db-summary-card').forEach(function (card) {
         card.classList.toggle('is-loading', isLoading);
     });
 }
 
+function accUpdatePrintSummary(summary) {
+    const s = summary || accEmptySummary();
+    const openingEl = document.getElementById('accPrintOpeningBalance');
+    const creditEl = document.getElementById('accPrintTotalCredit');
+    const debitEl = document.getElementById('accPrintTotalDebit');
+    const closingEl = document.getElementById('accPrintClosingBalance');
+    const recordsEl = document.getElementById('accPrintTotalRecords');
+
+    if (openingEl) openingEl.textContent = accFormatPrintLkr(s.opening_balance ?? 0);
+    if (creditEl) creditEl.textContent = accFormatPrintLkr(s.total_credit ?? 0);
+    if (debitEl) debitEl.textContent = accFormatPrintLkr(s.total_debit ?? 0);
+    if (closingEl) closingEl.textContent = accFormatPrintLkr(s.closing_balance ?? 0);
+    if (recordsEl) recordsEl.textContent = String(s.total_records ?? 0);
+}
+
 function accUpdateSummaryBar(summary) {
+    const resolved = summary || accEmptySummary();
+    accLastDayBookSummary = resolved;
+
     const totalRecordsEl = document.getElementById('accSummaryTotalRecords');
     const openingEl = document.getElementById('accSummaryOpeningBalance');
     const debitEl = document.getElementById('accSummaryTotalDebit');
@@ -378,6 +457,7 @@ function accUpdateSummaryBar(summary) {
         if (debitEl) debitEl.textContent = '—';
         if (creditEl) creditEl.textContent = '—';
         if (closingEl) closingEl.textContent = '—';
+        accUpdatePrintSummary(accEmptySummary());
         return;
     }
 
@@ -386,6 +466,9 @@ function accUpdateSummaryBar(summary) {
     if (debitEl) debitEl.textContent = accFormatCurrency(summary.total_debit ?? 0);
     if (creditEl) creditEl.textContent = accFormatCurrency(summary.total_credit ?? 0);
     if (closingEl) closingEl.textContent = accFormatCurrency(summary.closing_balance ?? 0);
+
+    // Keep print summary in sync with the same API totals (Credit = Cash In)
+    accUpdatePrintSummary(summary);
 }
 
 function accEscapeHtml(s) {
@@ -434,8 +517,9 @@ async function accLoadDayBook() {
 function accRenderDayBook(entries, summary) {
     const tbody = document.getElementById('accDayBookBody');
     const count = entries.length;
+    const resolvedSummary = summary || accEmptySummary();
 
-    accUpdateSummaryBar(summary);
+    accUpdateSummaryBar(resolvedSummary);
 
     if (count === 0) {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
@@ -480,6 +564,8 @@ function printReport() {
     const infoPrintDateEl = document.getElementById('dbInfoPrintDate');
     if (printDateEl) printDateEl.textContent = printed;
     if (infoPrintDateEl) infoPrintDateEl.textContent = printed;
+    // Ensure print totals match the loaded Day Book summary before printing
+    accUpdatePrintSummary(accLastDayBookSummary || accEmptySummary());
     window.print();
 }
 </script>

@@ -292,7 +292,9 @@ function accRenderCashBook(ledger) {
         tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px; color: #999;">No entries found</td></tr>';
         document.getElementById('accTotalDebit').textContent = '0.00';
         document.getElementById('accTotalCredit').textContent = '0.00';
-        document.getElementById('accClosingBalance').textContent = ledger.opening_balance.toFixed(2) + ' ' + ledger.opening_balance_type;
+        document.getElementById('accClosingBalance').textContent =
+            (parseFloat(ledger.closing_balance || ledger.opening_balance || 0)).toFixed(2)
+            + ' ' + (ledger.closing_balance_type || ledger.opening_balance_type || '');
         return;
     }
 

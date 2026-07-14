@@ -72,6 +72,42 @@
           </select>
           <div class="form-text">Auto-selected from group; you may override.</div>
         </div>
+        <div class="col-md-4">
+          <label class="form-label" for="accNormalBalance">Normal Balance</label>
+          <select class="form-select form-select-sm" name="normal_balance" id="accNormalBalance" data-enhance="false">
+            <option value="DEBIT">Debit</option>
+            <option value="CREDIT">Credit</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="accAccountType">Account Type</label>
+          <select class="form-select form-select-sm" name="account_type" id="accAccountType" data-enhance="false">
+            <option value="ASSET">Asset</option>
+            <option value="LIABILITY">Liability</option>
+            <option value="CAPITAL">Capital</option>
+            <option value="INCOME">Income</option>
+            <option value="EXPENSE">Expense</option>
+            <option value="GENERAL">General</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="accLedgerType">Ledger Type</label>
+          <select class="form-select form-select-sm" name="ledger_type" id="accLedgerType" data-enhance="false">
+            <option value="GENERAL">General</option>
+            <option value="CASH">Cash</option>
+            <option value="BANK">Bank</option>
+            <option value="CUSTOMER">Customer</option>
+            <option value="SUPPLIER">Supplier</option>
+            <option value="EXPENSE">Expense</option>
+            <option value="INCOME">Income</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="accParentAccount">Parent Account</label>
+          <select class="form-select form-select-sm" name="parent_account_id" id="accParentAccount" data-enhance="false">
+            <option value="">— None —</option>
+          </select>
+        </div>
         <div class="col-12">
           <label class="form-label" for="accAccountActive">Status</label>
           <select class="form-select form-select-sm" name="is_active" id="accAccountActive" data-enhance="false">

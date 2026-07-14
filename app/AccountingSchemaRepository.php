@@ -14,6 +14,7 @@ class AccountingSchemaRepository
         self::ensureAccountGroupColumns($pdo);
         self::seedAccountGroups($pdo);
         self::createAccountsTable($pdo);
+        self::ensureAccountLedgerColumns($pdo);
         self::seedAccounts($pdo);
         self::ensureVoucherColumns($pdo);
         self::createVoucherSeriesTable($pdo);
@@ -337,6 +338,93 @@ CREATE TABLE accounts (
   CONSTRAINT fk_accounts_group FOREIGN KEY (account_group_id) REFERENCES account_groups(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 SQL);
+    }
+
+    /**
+     * General Ledger CoA attributes: Normal Balance, Ledger Type, Parent Account.
+     * Backfills Normal Balance from account group nature.
+     */
+    private static function ensureAccountLedgerColumns(PDO $pdo): void
+    {
+        if (!self::tableExists($pdo, 'accounts')) {
+            return;
+        }
+
+        $columns = [
+            'normal_balance' => "enum('DEBIT','CREDIT') NOT NULL DEFAULT 'DEBIT'",
+            'ledger_type' => "varchar(40) NOT NULL DEFAULT 'GENERAL'",
+            'account_type' => "varchar(40) NOT NULL DEFAULT 'GENERAL'",
+            'parent_account_id' => 'bigint unsigned NULL',
+        ];
+        foreach ($columns as $name => $definition) {
+            if (!self::columnExists($pdo, 'accounts', $name)) {
+                self::exec($pdo, "ALTER TABLE accounts ADD COLUMN {$name} {$definition}");
+            }
+        }
+
+        if (self::tableExists($pdo, 'account_groups')) {
+            self::exec($pdo, <<<'SQL'
+UPDATE accounts a
+INNER JOIN account_groups ag ON ag.id = a.account_group_id
+SET a.normal_balance = ag.nature
+WHERE a.deleted_at IS NULL
+  AND ag.nature IN ('DEBIT', 'CREDIT')
+  AND a.normal_balance <> ag.nature
+SQL);
+            self::exec($pdo, <<<'SQL'
+UPDATE accounts a
+INNER JOIN account_groups ag ON ag.id = a.account_group_id
+SET a.ledger_type = CASE
+    WHEN ag.group_code = 'CASH' OR UPPER(ag.group_name) LIKE '%CASH%' THEN 'CASH'
+    WHEN ag.group_code = 'BANK' OR UPPER(ag.group_name) LIKE '%BANK%' THEN 'BANK'
+    WHEN ag.group_code = 'SUNDRY_DEBTORS' OR UPPER(ag.group_name) LIKE '%DEBTOR%' THEN 'CUSTOMER'
+    WHEN ag.group_code = 'SUNDRY_CREDITORS' OR UPPER(ag.group_name) LIKE '%CREDITOR%' THEN 'SUPPLIER'
+    WHEN ag.group_type = 'INCOME' THEN 'INCOME'
+    WHEN ag.group_type = 'EXPENSES' THEN 'EXPENSE'
+    WHEN ag.group_type = 'CAPITAL' THEN 'CAPITAL'
+    WHEN ag.group_type = 'LIABILITIES' THEN 'LIABILITY'
+    ELSE IF(a.ledger_type IS NULL OR a.ledger_type = '', 'GENERAL', a.ledger_type)
+END
+WHERE a.deleted_at IS NULL
+SQL);
+            self::exec($pdo, <<<'SQL'
+UPDATE accounts a
+INNER JOIN account_groups ag ON ag.id = a.account_group_id
+SET a.account_type = CASE
+    WHEN ag.group_type = 'ASSETS' THEN 'ASSET'
+    WHEN ag.group_type = 'LIABILITIES' THEN 'LIABILITY'
+    WHEN ag.group_type = 'CAPITAL' THEN 'CAPITAL'
+    WHEN ag.group_type = 'INCOME' THEN 'INCOME'
+    WHEN ag.group_type = 'EXPENSES' THEN 'EXPENSE'
+    ELSE IF(a.account_type IS NULL OR a.account_type = '' OR a.account_type = 'GENERAL', 'GENERAL', a.account_type)
+END
+WHERE a.deleted_at IS NULL
+  AND (a.account_type IS NULL OR a.account_type = '' OR a.account_type = 'GENERAL')
+SQL);
+        }
+
+        self::ensureIndex($pdo, 'accounts', 'idx_accounts_parent', 'parent_account_id');
+        self::ensureIndex($pdo, 'accounts', 'idx_accounts_normal_balance', 'normal_balance');
+        if (self::tableExists($pdo, 'ledger_entries')) {
+            self::ensureIndex($pdo, 'ledger_entries', 'idx_le_account_date', 'account_id, entry_date');
+        }
+    }
+
+    private static function ensureIndex(PDO $pdo, string $table, string $index, string $columns): void
+    {
+        $st = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.statistics
+             WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?'
+        );
+        $st->execute([$table, $index]);
+        if ((int) $st->fetchColumn() > 0) {
+            return;
+        }
+        try {
+            self::exec($pdo, "ALTER TABLE {$table} ADD KEY {$index} ({$columns})");
+        } catch (Throwable $e) {
+            /* best-effort */
+        }
     }
 
     private static function seedAccounts(PDO $pdo): void

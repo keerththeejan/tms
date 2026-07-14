@@ -1,6 +1,6 @@
 /**
  * Day Book — dedicated print stylesheet
- * Prints only #report-print-area (header + info + table).
+ * Prints #report-print-area: letterhead + info + table + DAY BOOK SUMMARY totals.
  */
 
 /* Screen: hide print-only chrome inside the print area */
@@ -11,8 +11,8 @@
 /* ── Print: isolate report area only ── */
 @media print {
   @page {
-    size: auto;
-    margin: 8mm;
+    size: A4 portrait;
+    margin: 10mm;
   }
 
   html,
@@ -167,5 +167,71 @@
   .db-print-header-wrap .rpt-info-panel {
     margin-bottom: 6px;
     padding: 6px 8px;
+  }
+
+  /*
+   * DAY BOOK SUMMARY — print footer after last transaction row.
+   * Not in <tfoot> so it does not repeat on every page; only the final page.
+   */
+  #report-print-area .db-print-summary {
+    display: block !important;
+    visibility: visible !important;
+    margin-top: 14px;
+    padding-top: 8px;
+    border-top: 2px solid #1E4FA8;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-before: auto;
+  }
+
+  #report-print-area .db-print-summary-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #111;
+    margin: 0 0 8px;
+    text-align: left;
+  }
+
+  #report-print-area .db-print-summary-table {
+    width: 100%;
+    max-width: 420px;
+    margin-left: auto;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  #report-print-area .db-print-summary-table th,
+  #report-print-area .db-print-summary-table td {
+    padding: 4px 8px;
+    border: 1px solid #E5E7EB;
+    vertical-align: middle;
+  }
+
+  #report-print-area .db-print-summary-table th {
+    font-weight: 700;
+    text-align: left;
+    width: 55%;
+    background: #F8F9FB !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #report-print-area .db-print-summary-table td {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+    font-family: 'Courier New', Consolas, monospace;
+    font-weight: 600;
+  }
+
+  #report-print-area .db-print-summary-table tr.is-closing th,
+  #report-print-area .db-print-summary-table tr.is-closing td {
+    border-top: 2px solid #1E4FA8;
+    font-weight: 700;
+  }
+
+  #report-print-area .db-print-summary-table td.is-count {
+    font-family: Tahoma, Arial, sans-serif;
   }
 }

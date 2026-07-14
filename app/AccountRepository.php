@@ -16,14 +16,27 @@ class AccountRepository
   private static function balanceSelectSql(): string
     {
         $valid = AccountingBalanceService::validVoucherPredicate('v');
-        // Cash-In/Cash-Out: Balance = signed master opening + Σ(credit − debit) for POSTED lines
-        return '(CASE WHEN a.opening_balance_type = \'DEBIT\' THEN -a.opening_balance ELSE a.opening_balance END)
-                + COALESCE((
-                    SELECT SUM(le.credit_amount) - SUM(le.debit_amount)
-                    FROM ledger_entries le
-                    INNER JOIN vouchers v ON v.id = le.voucher_id AND ' . $valid . '
-                    WHERE le.account_id = a.id
-                ), 0)';
+        // Per-account Normal Balance (group nature / accounts.normal_balance):
+        // DEBIT-normal:  signed_opening + Σ(debit − credit)
+        // CREDIT-normal: signed_opening + Σ(credit − debit)
+        return '(CASE
+                    WHEN COALESCE(a.normal_balance, ag.nature, \'DEBIT\') = \'CREDIT\' THEN
+                        (CASE WHEN a.opening_balance_type = \'CREDIT\' THEN a.opening_balance ELSE -a.opening_balance END)
+                        + COALESCE((
+                            SELECT SUM(le.credit_amount) - SUM(le.debit_amount)
+                            FROM ledger_entries le
+                            INNER JOIN vouchers v ON v.id = le.voucher_id AND ' . $valid . '
+                            WHERE le.account_id = a.id
+                        ), 0)
+                    ELSE
+                        (CASE WHEN a.opening_balance_type = \'DEBIT\' THEN a.opening_balance ELSE -a.opening_balance END)
+                        + COALESCE((
+                            SELECT SUM(le.debit_amount) - SUM(le.credit_amount)
+                            FROM ledger_entries le
+                            INNER JOIN vouchers v ON v.id = le.voucher_id AND ' . $valid . '
+                            WHERE le.account_id = a.id
+                        ), 0)
+                 END)';
     }
 
     /** @return list<array<string,mixed>> */
@@ -352,16 +365,37 @@ class AccountRepository
             $code = self::generateNextCode($pdo, (int) ($data['account_group_id'] ?? 0));
         }
 
+        $normal = strtoupper(trim((string) ($data['normal_balance'] ?? $data['opening_balance_type'] ?? 'DEBIT')));
+        if ($normal !== 'CREDIT') {
+            $normal = 'DEBIT';
+        }
+        $ledgerType = strtoupper(trim((string) ($data['ledger_type'] ?? 'GENERAL')));
+        if ($ledgerType === '') {
+            $ledgerType = 'GENERAL';
+        }
+        $accountType = strtoupper(trim((string) ($data['account_type'] ?? 'GENERAL')));
+        if ($accountType === '') {
+            $accountType = 'GENERAL';
+        }
+        $parentId = isset($data['parent_account_id']) && (int) $data['parent_account_id'] > 0
+            ? (int) $data['parent_account_id']
+            : null;
+
         $st = $pdo->prepare(
-            'INSERT INTO accounts (account_code, account_name, account_group_id, opening_balance, opening_balance_type, is_active, is_system, branch_id, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO accounts (account_code, account_name, account_group_id, parent_account_id, opening_balance, opening_balance_type,
+             normal_balance, ledger_type, account_type, is_active, is_system, branch_id, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $st->execute([
             $code,
             trim((string) ($data['account_name'] ?? '')),
             $data['account_group_id'],
+            $parentId,
             (float) ($data['opening_balance'] ?? 0),
-            $data['opening_balance_type'] ?? 'DEBIT',
+            $data['opening_balance_type'] ?? $normal,
+            $normal,
+            $ledgerType,
+            $accountType,
             (int) ($data['is_active'] ?? 1),
             (int) ($data['is_system'] ?? 0),
             $data['branch_id'] ?? null,
@@ -377,12 +411,35 @@ class AccountRepository
         $fields = [];
         $params = [];
         
-        foreach (['account_name', 'account_group_id', 'opening_balance', 'opening_balance_type', 'is_active', 'branch_id'] as $field) {
+        foreach ([
+            'account_name',
+            'account_group_id',
+            'parent_account_id',
+            'opening_balance',
+            'opening_balance_type',
+            'normal_balance',
+            'ledger_type',
+            'account_type',
+            'is_active',
+            'branch_id',
+        ] as $field) {
             if (array_key_exists($field, $data)) {
                 $fields[] = "{$field} = ?";
                 $value = $data[$field];
                 if ($field === 'account_name') {
                     $value = trim((string) $value);
+                }
+                if ($field === 'normal_balance') {
+                    $value = strtoupper(trim((string) $value)) === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+                }
+                if ($field === 'ledger_type' || $field === 'account_type') {
+                    $value = strtoupper(trim((string) $value));
+                    if ($value === '') {
+                        $value = 'GENERAL';
+                    }
+                }
+                if ($field === 'parent_account_id') {
+                    $value = ($value === null || $value === '' || (int) $value <= 0) ? null : (int) $value;
                 }
                 $params[] = $value;
             }
@@ -423,7 +480,7 @@ class AccountRepository
         return $st->execute([$id]);
     }
 
-    /** @return float */
+    /** @return float Signed balance in the account's Normal Balance units (positive = natural side). */
     public static function getBalance(PDO $pdo, int $accountId, ?string $asOfDate = null): float
     {
         $account = self::getById($pdo, $accountId);
@@ -431,10 +488,11 @@ class AccountRepository
             return 0.0;
         }
 
-        // CREDIT opening = Cash In (+); DEBIT opening = Cash Out (−)
-        $openingBalance = AccountingBalanceService::signedAmount(
+        $normal = AccountingBalanceService::resolveNormalBalance($account);
+        $masterSigned = AccountingBalanceService::signMasterOpening(
             (float) ($account['opening_balance'] ?? 0),
-            (string) ($account['opening_balance_type'] ?? 'CREDIT')
+            (string) ($account['opening_balance_type'] ?? $normal),
+            $normal
         );
 
         $valid = AccountingBalanceService::validVoucherPredicate('v');
@@ -445,7 +503,6 @@ class AccountRepository
                 WHERE le.account_id = ?";
 
         $params = [$accountId];
-
         if ($asOfDate) {
             $sql .= ' AND le.entry_date <= ?';
             $params[] = $asOfDate;
@@ -453,95 +510,250 @@ class AccountRepository
 
         $st = $pdo->prepare($sql);
         $st->execute($params);
-        $result = $st->fetch(PDO::FETCH_ASSOC);
+        $result = $st->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        $totalDebit = (float) ($result['total_debit'] ?? 0);
-        $totalCredit = (float) ($result['total_credit'] ?? 0);
-
-        // Closing = Opening + Credit − Debit
-        return AccountingBalanceService::calculateClosingBalance($openingBalance, $totalDebit, $totalCredit);
+        return AccountingBalanceService::calculateLedgerClosingBalance(
+            $normal,
+            $masterSigned,
+            (float) ($result['total_debit'] ?? 0),
+            (float) ($result['total_credit'] ?? 0)
+        );
     }
 
-    /** @return list<array<string,mixed>> */
-    public static function getLedger(PDO $pdo, int $accountId, ?string $fromDate = null, ?string $toDate = null): array
-    {
+    /**
+     * General Ledger for one Chart of Accounts line (independent ledger).
+     *
+     * @param array<string,mixed> $filters voucher_type, branch_id, status
+     * @return array<string,mixed>
+     */
+    public static function getLedger(
+        PDO $pdo,
+        int $accountId,
+        ?string $fromDate = null,
+        ?string $toDate = null,
+        array $filters = []
+    ): array {
+        if ($fromDate === null && isset($filters['from_date']) && $filters['from_date'] !== '') {
+            $fromDate = (string) $filters['from_date'];
+        }
+        if ($toDate === null && isset($filters['to_date']) && $filters['to_date'] !== '') {
+            $toDate = (string) $filters['to_date'];
+        }
+
         $account = self::getById($pdo, $accountId);
         if (!$account) {
             return [];
         }
 
-        $openingBalance = AccountingBalanceService::signedAmount(
+        return self::buildLedgerReport($pdo, $account, $fromDate, $toDate, $filters);
+    }
+
+    /**
+     * @param array<string,mixed> $account
+     * @param array<string,mixed> $filters
+     * @return array<string,mixed>
+     */
+    public static function buildLedgerReport(
+        PDO $pdo,
+        array $account,
+        ?string $fromDate,
+        ?string $toDate,
+        array $filters = []
+    ): array {
+        $accountId = (int) ($account['id'] ?? 0);
+        $normal = AccountingBalanceService::resolveNormalBalance($account);
+        $masterSigned = AccountingBalanceService::signMasterOpening(
             (float) ($account['opening_balance'] ?? 0),
-            (string) ($account['opening_balance_type'] ?? 'CREDIT')
+            (string) ($account['opening_balance_type'] ?? $normal),
+            $normal
         );
 
         $valid = AccountingBalanceService::validVoucherPredicate('v');
-
-        // Opening for period = master + activity strictly before From Date
-        $openingBalanceBefore = $openingBalance;
-        if ($fromDate) {
-            $st = $pdo->prepare(
-                "SELECT COALESCE(SUM(le.debit_amount), 0) AS total_debit,
-                        COALESCE(SUM(le.credit_amount), 0) AS total_credit
-                 FROM ledger_entries le
-                 INNER JOIN vouchers v ON v.id = le.voucher_id AND {$valid}
-                 WHERE le.account_id = ? AND le.entry_date < ?"
-            );
-            $st->execute([$accountId, $fromDate]);
-            $result = $st->fetch(PDO::FETCH_ASSOC);
-            $totalDebit = (float) ($result['total_debit'] ?? 0);
-            $totalCredit = (float) ($result['total_credit'] ?? 0);
-            $openingBalanceBefore = AccountingBalanceService::calculateOpeningBalance(
-                $totalDebit,
-                $totalCredit,
-                $openingBalance
-            );
+        $statusFilter = strtoupper(trim((string) ($filters['status'] ?? '')));
+        if ($statusFilter !== '' && $statusFilter !== 'POSTED') {
+            $valid = 'v.deleted_at IS NULL AND v.status = ' . $pdo->quote($statusFilter);
         }
 
-        $sql = "SELECT le.*, v.voucher_date, v.voucher_type, v.narration AS voucher_narration
+        $voucherType = trim((string) ($filters['voucher_type'] ?? ''));
+        $branchId = (int) ($filters['branch_id'] ?? 0);
+
+        $debitBefore = 0.0;
+        $creditBefore = 0.0;
+        if ($fromDate) {
+            // Opening carry-forward includes all prior types for this account only
+            $priorSql = "SELECT COALESCE(SUM(le.debit_amount), 0) AS total_debit,
+                                COALESCE(SUM(le.credit_amount), 0) AS total_credit
+                         FROM ledger_entries le
+                         INNER JOIN vouchers v ON v.id = le.voucher_id AND {$valid}
+                         WHERE le.account_id = ? AND le.entry_date < ?";
+            $priorParams = [$accountId, $fromDate];
+            if ($branchId > 0) {
+                $priorSql .= ' AND v.branch_id = ?';
+                $priorParams[] = $branchId;
+            }
+            $st = $pdo->prepare($priorSql);
+            $st->execute($priorParams);
+            $prior = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+            $debitBefore = (float) ($prior['total_debit'] ?? 0);
+            $creditBefore = (float) ($prior['total_credit'] ?? 0);
+        }
+
+        $openingSigned = AccountingBalanceService::calculateLedgerOpeningBalance(
+            $normal,
+            $masterSigned,
+            $debitBefore,
+            $creditBefore
+        );
+
+        $entries = self::getLedgerTransactions($pdo, $accountId, $fromDate, $toDate, [
+            'voucher_type' => $voucherType,
+            'branch_id' => $branchId,
+            'valid_sql' => $valid,
+        ]);
+
+        $running = $openingSigned;
+        $totalDebit = 0.0;
+        $totalCredit = 0.0;
+        foreach ($entries as &$entry) {
+            $sides = AccountingBalanceService::normalizeSingleSidedAmounts(
+                (float) ($entry['debit_amount'] ?? 0),
+                (float) ($entry['credit_amount'] ?? 0)
+            );
+            $debit = $sides['debit'];
+            $credit = $sides['credit'];
+            $entry['debit_amount'] = $debit;
+            $entry['credit_amount'] = $credit;
+            $entry['debit_display'] = AccountingBalanceService::formatSideAmount($debit);
+            $entry['credit_display'] = AccountingBalanceService::formatSideAmount($credit);
+            $totalDebit += $debit;
+            $totalCredit += $credit;
+            $running = AccountingBalanceService::calculateRunningBalance($normal, $running, $debit, $credit);
+            $display = AccountingBalanceService::displayLedgerBalance($normal, $running);
+            $entry['running_balance'] = $display['amount'];
+            $entry['running_balance_signed'] = $running;
+            $entry['balance_type'] = $display['type'];
+            $entry['running_balance_display'] = $display['label'];
+        }
+        unset($entry);
+
+        $openingDisplay = AccountingBalanceService::displayLedgerBalance($normal, $openingSigned);
+        $closingSigned = AccountingBalanceService::calculateLedgerClosingBalance(
+            $normal,
+            $openingSigned,
+            $totalDebit,
+            $totalCredit
+        );
+        $closingDisplay = AccountingBalanceService::displayLedgerBalance($normal, $closingSigned);
+        $accountType = AccountingBalanceService::resolveAccountType($account);
+
+        return [
+            'account' => [
+                'id' => $accountId,
+                'account_code' => (string) ($account['account_code'] ?? ''),
+                'account_name' => (string) ($account['account_name'] ?? ''),
+                'group_name' => (string) ($account['group_name'] ?? ''),
+                'group_type' => (string) ($account['group_type'] ?? ''),
+                'account_type' => $accountType,
+                'ledger_type' => (string) ($account['ledger_type'] ?? 'GENERAL'),
+                'normal_balance' => $normal,
+                'parent_account_id' => isset($account['parent_account_id']) ? (int) $account['parent_account_id'] : null,
+            ],
+            'normal_balance' => $normal,
+            'account_type' => $accountType,
+            'opening_balance' => $openingDisplay['amount'],
+            'opening_balance_type' => $openingDisplay['type'],
+            'opening_balance_display' => $openingDisplay['label'],
+            'opening_balance_signed' => $openingSigned,
+            'total_debit' => $totalDebit,
+            'total_credit' => $totalCredit,
+            'total_debit_display' => number_format($totalDebit, 2, '.', ','),
+            'total_credit_display' => number_format($totalCredit, 2, '.', ','),
+            'closing_balance' => $closingDisplay['amount'],
+            'closing_balance_type' => $closingDisplay['type'],
+            'closing_balance_display' => $closingDisplay['label'],
+            'closing_balance_signed' => $closingSigned,
+            'running_balance' => $closingDisplay['amount'],
+            'running_balance_type' => $closingDisplay['type'],
+            'running_balance_display' => $closingDisplay['label'],
+            'total_transactions' => count($entries),
+            'entries' => $entries,
+        ];
+    }
+
+    /**
+     * Posted lines for one account only — no cross-ledger duplication.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    public static function getLedgerTransactions(
+        PDO $pdo,
+        int $accountId,
+        ?string $fromDate = null,
+        ?string $toDate = null,
+        array $filters = []
+    ): array {
+        $valid = (string) ($filters['valid_sql'] ?? AccountingBalanceService::validVoucherPredicate('v'));
+        $voucherType = trim((string) ($filters['voucher_type'] ?? ''));
+        $branchId = (int) ($filters['branch_id'] ?? 0);
+
+        $sql = "SELECT le.id,
+                       le.entry_date,
+                       le.voucher_number,
+                       le.voucher_type,
+                       le.debit_amount,
+                       le.credit_amount,
+                       le.narration,
+                       v.reference_number AS reference,
+                       v.narration AS voucher_narration,
+                       v.branch_id,
+                       b.name AS branch_name,
+                       COALESCE(u.full_name, u.username, '') AS created_by
                 FROM ledger_entries le
                 INNER JOIN vouchers v ON v.id = le.voucher_id AND {$valid}
+                LEFT JOIN branches b ON b.id = v.branch_id
+                LEFT JOIN users u ON u.id = v.created_by
                 WHERE le.account_id = ?";
 
         $params = [$accountId];
-
         if ($fromDate) {
             $sql .= ' AND le.entry_date >= ?';
             $params[] = $fromDate;
         }
-
         if ($toDate) {
             $sql .= ' AND le.entry_date <= ?';
             $params[] = $toDate;
         }
-
+        if ($voucherType !== '') {
+            $sql .= ' AND v.voucher_type = ?';
+            $params[] = $voucherType;
+        }
+        if ($branchId > 0) {
+            $sql .= ' AND v.branch_id = ?';
+            $params[] = $branchId;
+        }
         $sql .= ' ORDER BY le.entry_date ASC, le.id ASC';
 
         $st = $pdo->prepare($sql);
         $st->execute($params);
-        $entries = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        $runningBalance = $openingBalanceBefore;
-        foreach ($entries as &$entry) {
-            $debit = (float) ($entry['debit_amount'] ?? 0);
-            $credit = (float) ($entry['credit_amount'] ?? 0);
-            $runningBalance = AccountingBalanceService::applyMovement($runningBalance, $debit, $credit);
-            $display = AccountingBalanceService::displayBalance($runningBalance);
-            $entry['running_balance'] = $runningBalance;
-            $entry['balance_type'] = $display['type'];
-        }
-
-        $openingDisplay = AccountingBalanceService::displayBalance($openingBalanceBefore);
-        $closingDisplay = AccountingBalanceService::displayBalance($runningBalance);
-
-        return [
-            'opening_balance' => $openingDisplay['amount'],
-            'opening_balance_type' => $openingDisplay['type'],
-            'entries' => $entries,
-            'closing_balance' => $closingDisplay['amount'],
-            'closing_balance_type' => $closingDisplay['type'],
-            'opening_balance_signed' => $openingBalanceBefore,
-            'closing_balance_signed' => $runningBalance,
-        ];
+        return array_map(static function (array $row): array {
+            return [
+                'id' => (int) ($row['id'] ?? 0),
+                'entry_date' => (string) ($row['entry_date'] ?? ''),
+                'voucher_date' => (string) ($row['entry_date'] ?? ''),
+                'voucher_number' => (string) ($row['voucher_number'] ?? ''),
+                'voucher_type' => (string) ($row['voucher_type'] ?? ''),
+                'reference' => (string) ($row['reference'] ?? ''),
+                'narration' => (string) (($row['narration'] ?? '') !== '' ? $row['narration'] : ($row['voucher_narration'] ?? '')),
+                'voucher_narration' => (string) ($row['voucher_narration'] ?? ''),
+                'debit_amount' => (float) ($row['debit_amount'] ?? 0),
+                'credit_amount' => (float) ($row['credit_amount'] ?? 0),
+                'branch' => (string) ($row['branch_name'] ?? ''),
+                'branch_id' => isset($row['branch_id']) ? (int) $row['branch_id'] : null,
+                'created_by' => (string) ($row['created_by'] ?? ''),
+            ];
+        }, $rows);
     }
 }

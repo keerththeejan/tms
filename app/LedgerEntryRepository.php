@@ -260,8 +260,8 @@ class LedgerEntryRepository
         foreach ($entries as &$entry) {
             $debit = (float) ($entry['debit_amount'] ?? 0);
             $credit = (float) ($entry['credit_amount'] ?? 0);
-            // Credit = Cash In; Debit = Cash Out → Closing = Opening + Credit − Debit
-            $runningBalance = AccountingBalanceService::calculateClosingBalance($runningBalance, $debit, $credit);
+            // Cash/Bank are DEBIT-normal assets: Running = Opening + Debit − Credit
+            $runningBalance = AccountingBalanceService::calculateRunningBalance('DEBIT', $runningBalance, $debit, $credit);
             $entry['running_balance'] = $runningBalance;
         }
 
@@ -274,7 +274,7 @@ class LedgerEntryRepository
         $valid = AccountingBalanceService::validVoucherPredicate('v');
         $st = $pdo->prepare(
             "SELECT a.id, a.account_code, a.account_name, a.opening_balance, a.opening_balance_type,
-                    ag.group_name, ag.group_type, ag.nature AS group_nature,
+                    a.normal_balance, ag.group_name, ag.group_type, ag.nature AS group_nature,
                     COALESCE(SUM(le.debit_amount), 0) AS total_debit,
                     COALESCE(SUM(le.credit_amount), 0) AS total_credit
              FROM accounts a
@@ -287,7 +287,7 @@ class LedgerEntryRepository
                )
              WHERE a.deleted_at IS NULL
              GROUP BY a.id, a.account_code, a.account_name, a.opening_balance, a.opening_balance_type,
-                      ag.group_name, ag.group_type, ag.nature
+                      a.normal_balance, ag.group_name, ag.group_type, ag.nature
              ORDER BY ag.group_type, a.account_code"
         );
         $st->execute([$asOfDate]);
@@ -300,34 +300,36 @@ class LedgerEntryRepository
         ];
 
         foreach ($accounts as $account) {
-            $openingBalance = AccountingBalanceService::signedAmount(
+            $normal = AccountingBalanceService::resolveNormalBalance($account);
+            $masterSigned = AccountingBalanceService::signMasterOpening(
                 (float) ($account['opening_balance'] ?? 0),
-                (string) ($account['opening_balance_type'] ?? 'CREDIT')
+                (string) ($account['opening_balance_type'] ?? $normal),
+                $normal
             );
             $totalDebit = (float) ($account['total_debit'] ?? 0);
             $totalCredit = (float) ($account['total_credit'] ?? 0);
 
-            // Closing = Opening + Credit − Debit (Cash In − Cash Out)
-            $netBalance = AccountingBalanceService::calculateClosingBalance($openingBalance, $totalDebit, $totalCredit);
+            $netBalance = AccountingBalanceService::calculateLedgerClosingBalance(
+                $normal,
+                $masterSigned,
+                $totalDebit,
+                $totalCredit
+            );
 
             if (abs($netBalance) < 0.01) {
                 continue;
             }
 
-            // Positive net = Credit (Cash In surplus); Negative = Debit (Cash Out surplus)
-            if ($netBalance >= 0) {
-                $debitAmount = 0;
-                $creditAmount = $netBalance;
-            } else {
-                $debitAmount = abs($netBalance);
-                $creditAmount = 0;
-            }
+            $display = AccountingBalanceService::displayLedgerBalance($normal, $netBalance);
+            $debitAmount = $display['type'] === 'DEBIT' ? $display['amount'] : 0.0;
+            $creditAmount = $display['type'] === 'CREDIT' ? $display['amount'] : 0.0;
 
             $trialBalance['accounts'][] = [
                 'account_code' => $account['account_code'],
                 'account_name' => $account['account_name'],
                 'group_name' => $account['group_name'],
                 'group_type' => $account['group_type'],
+                'normal_balance' => $normal,
                 'debit_amount' => $debitAmount,
                 'credit_amount' => $creditAmount,
             ];

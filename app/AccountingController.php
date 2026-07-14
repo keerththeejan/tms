@@ -125,6 +125,10 @@ class AccountingController
                     self::ledger($pdo);
                     return;
 
+                case 'export_ledger':
+                    self::exportLedger($pdo);
+                    return;
+
                 case 'list_customer_ledgers':
                     self::listCustomerLedgers($pdo);
                     return;
@@ -392,19 +396,36 @@ class AccountingController
         }
 
         $ledgerEntries = [];
+        $sumDebit = 0.0;
+        $sumCredit = 0.0;
         foreach ($details as $detail) {
+            $debit = (float) ($detail['debit_amount'] ?? 0);
+            $credit = (float) ($detail['credit_amount'] ?? 0);
+            $sumDebit += $debit;
+            $sumCredit += $credit;
             $ledgerEntries[] = [
                 'voucher_detail_id' => $detail['id'],
                 'account_id' => $detail['account_id'],
                 'entry_date' => $voucher['voucher_date'],
                 'voucher_type' => $voucher['voucher_type'],
                 'voucher_number' => $voucher['voucher_number'],
-                'debit_amount' => $detail['debit_amount'],
-                'credit_amount' => $detail['credit_amount'],
-                'balance_type' => ((float) ($detail['debit_amount'] ?? 0) > 0) ? 'DEBIT' : 'CREDIT',
+                'debit_amount' => $debit,
+                'credit_amount' => $credit,
+                'balance_type' => ($debit > 0) ? 'DEBIT' : 'CREDIT',
                 'narration' => $detail['narration'] ?? $voucher['narration'],
                 'branch_id' => $voucher['branch_id'],
             ];
+        }
+
+        if (abs($sumDebit - $sumCredit) > 0.009) {
+            throw new RuntimeException(
+                'Unbalanced voucher: Debit ' . number_format($sumDebit, 2, '.', '')
+                . ' ≠ Credit ' . number_format($sumCredit, 2, '.', '')
+                . '. Double-entry requires equal totals before posting to ledgers.'
+            );
+        }
+        if (count($ledgerEntries) < 2) {
+            throw new RuntimeException('Double-entry requires at least two ledger lines (one Debit and one Credit).');
         }
 
         LedgerEntryRepository::createBatch($pdo, $voucherId, $ledgerEntries);
@@ -686,15 +707,42 @@ class AccountingController
         $accountId = (int) ($_GET['account_id'] ?? 0);
         $fromDate = $_GET['from_date'] ?? null;
         $toDate = $_GET['to_date'] ?? null;
+        $filters = [
+            'voucher_type' => $_GET['voucher_type'] ?? '',
+            'branch_id' => (int) ($_GET['branch_id'] ?? 0),
+            'status' => $_GET['status'] ?? '',
+        ];
 
         if ($accountId <= 0) {
             self::json(['ok' => false, 'error' => 'Invalid account id'], 400);
             return;
         }
 
-        $ledger = AccountRepository::getLedger($pdo, $accountId, $fromDate, $toDate);
+        $ledger = AccountRepository::getLedger($pdo, $accountId, $fromDate, $toDate, $filters);
         $customerLink = CustomerLedgerRepository::getByAccountId($pdo, $accountId);
         self::json(['ok' => true, 'data' => $ledger, 'customer' => $customerLink]);
+    }
+
+    private static function exportLedger(PDO $pdo): void
+    {
+        $accountId = (int) ($_GET['account_id'] ?? 0);
+        $fromDate = $_GET['from_date'] ?? null;
+        $toDate = $_GET['to_date'] ?? null;
+        $filters = [
+            'voucher_type' => $_GET['voucher_type'] ?? '',
+            'branch_id' => (int) ($_GET['branch_id'] ?? 0),
+            'status' => $_GET['status'] ?? '',
+        ];
+        if ($accountId <= 0) {
+            self::json(['ok' => false, 'error' => 'Invalid account id'], 400);
+            return;
+        }
+        $format = strtolower((string) ($_GET['format'] ?? 'csv'));
+        if ($format === 'pdf') {
+            AccountingPdfExport::exportLedger($pdo, $accountId, $fromDate, $toDate, $filters);
+            return;
+        }
+        AccountingExcelExport::exportLedger($pdo, $accountId, $fromDate, $toDate, $filters);
     }
 
     private static function listCustomerLedgers(PDO $pdo): void
@@ -901,11 +949,42 @@ class AccountingController
             $balanceType = 'DEBIT';
         }
 
+        $normalBalance = strtoupper(trim((string) ($payload['normal_balance'] ?? '')));
+        if (!in_array($normalBalance, ['DEBIT', 'CREDIT'], true)) {
+            $normalBalance = $group ? (string) ($group['nature'] ?? $balanceType) : $balanceType;
+        }
+        if (!in_array($normalBalance, ['DEBIT', 'CREDIT'], true)) {
+            $normalBalance = 'DEBIT';
+        }
+        $ledgerType = strtoupper(trim((string) ($payload['ledger_type'] ?? 'GENERAL')));
+        if ($ledgerType === '') {
+            $ledgerType = 'GENERAL';
+        }
+        $accountType = strtoupper(trim((string) ($payload['account_type'] ?? '')));
+        if ($accountType === '' && $group) {
+            $accountType = match (strtoupper((string) ($group['group_type'] ?? ''))) {
+                'ASSETS' => 'ASSET',
+                'LIABILITIES' => 'LIABILITY',
+                'CAPITAL' => 'CAPITAL',
+                'INCOME' => 'INCOME',
+                'EXPENSES' => 'EXPENSE',
+                default => 'GENERAL',
+            };
+        }
+        if ($accountType === '') {
+            $accountType = 'GENERAL';
+        }
+        $parentAccountId = (int) ($payload['parent_account_id'] ?? 0);
+
         $accountData = [
             'account_name' => trim((string) ($payload['account_name'] ?? '')),
             'account_group_id' => $groupId,
+            'parent_account_id' => $parentAccountId > 0 ? $parentAccountId : null,
             'opening_balance' => (float) ($payload['opening_balance'] ?? 0),
             'opening_balance_type' => $balanceType,
+            'normal_balance' => $normalBalance,
+            'ledger_type' => $ledgerType,
+            'account_type' => $accountType,
             'is_active' => (int) ($payload['is_active'] ?? 1),
         ];
 

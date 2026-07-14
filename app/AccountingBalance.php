@@ -176,7 +176,7 @@ class AccountingBalanceService
     }
 
     /**
-     * Display side for a signed balance under Cash-In/Cash-Out rules.
+     * Display side for a signed balance under Cash-In/Cash-Out rules (Day Book).
      * Positive → CREDIT (Cash In surplus); Negative → DEBIT (Cash Out surplus).
      *
      * @return array{amount: float, type: string}
@@ -187,6 +187,214 @@ class AccountingBalanceService
             'amount' => abs($signedBalance),
             'type' => $signedBalance >= 0 ? 'CREDIT' : 'DEBIT',
         ];
+    }
+
+    // -------------------------------------------------------------------------
+    // General Ledger — Normal Balance (double-entry account ledgers)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolve Normal Balance for an account (DEBIT or CREDIT).
+     * Prefers accounts.normal_balance, falls back to group nature, then DEBIT.
+     *
+     * @param array<string,mixed> $account
+     */
+    public static function resolveNormalBalance(array $account): string
+    {
+        $nb = strtoupper(trim((string) ($account['normal_balance'] ?? '')));
+        if ($nb === 'DEBIT' || $nb === 'CREDIT') {
+            return $nb;
+        }
+        $groupNature = strtoupper(trim((string) ($account['group_nature'] ?? $account['nature'] ?? '')));
+        if ($groupNature === 'DEBIT' || $groupNature === 'CREDIT') {
+            return $groupNature;
+        }
+        $groupType = strtoupper(trim((string) ($account['group_type'] ?? '')));
+        if (in_array($groupType, ['LIABILITIES', 'CAPITAL', 'INCOME'], true)) {
+            return 'CREDIT';
+        }
+
+        return 'DEBIT';
+    }
+
+    /**
+     * Sign a Chart-of-Accounts master opening into the account's Normal Balance units.
+     * Same side as Normal Balance → positive; opposite side → negative.
+     */
+    public static function signMasterOpening(
+        float $amount,
+        string $openingBalanceType,
+        string $normalBalance
+    ): float {
+        $amount = abs($amount);
+        $type = strtoupper(trim($openingBalanceType));
+        $normal = strtoupper(trim($normalBalance)) === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+        if ($type === '') {
+            $type = $normal;
+        }
+        if ($type === $normal) {
+            return $amount;
+        }
+
+        return -$amount;
+    }
+
+    /**
+     * Opening balance for a ledger period (Normal Balance convention).
+     *
+     * Debit-normal:  masterSigned + debit_before − credit_before
+     * Credit-normal: masterSigned + credit_before − debit_before
+     *
+     * (Transactions on/after From Date are excluded — only date < From Date.)
+     */
+    public static function calculateLedgerOpeningBalance(
+        string $normalBalance,
+        float $masterSigned,
+        float $debitBefore,
+        float $creditBefore
+    ): float {
+        $normal = strtoupper(trim($normalBalance)) === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+        if ($normal === 'DEBIT') {
+            return $masterSigned + $debitBefore - $creditBefore;
+        }
+
+        return $masterSigned + $creditBefore - $debitBefore;
+    }
+
+    /**
+     * Apply one ledger line to the running balance (Normal Balance convention).
+     *
+     * Debit-normal:  balance + Debit − Credit
+     * Credit-normal: balance + Credit − Debit
+     */
+    public static function calculateRunningBalance(
+        string $normalBalance,
+        float $currentBalance,
+        float $debit,
+        float $credit
+    ): float {
+        $normal = strtoupper(trim($normalBalance)) === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+        if ($normal === 'DEBIT') {
+            return $currentBalance + $debit - $credit;
+        }
+
+        return $currentBalance + $credit - $debit;
+    }
+
+    /**
+     * Closing balance for a ledger period (Normal Balance convention).
+     * Same arithmetic as running: Opening ± period movements.
+     */
+    public static function calculateLedgerClosingBalance(
+        string $normalBalance,
+        float $openingBalance,
+        float $totalDebit,
+        float $totalCredit
+    ): float {
+        return self::calculateRunningBalance($normalBalance, $openingBalance, $totalDebit, $totalCredit);
+    }
+
+    /**
+     * Present a signed ledger balance as absolute amount + Debit/Credit side.
+     * Positive → on Normal Balance side; Negative → opposite side.
+     * Never returns a negative amount.
+     *
+     * @return array{amount: float, type: string, signed: float, label: string}
+     */
+    public static function displayLedgerBalance(string $normalBalance, float $signedBalance): array
+    {
+        $normal = strtoupper(trim($normalBalance)) === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+        $opposite = $normal === 'DEBIT' ? 'CREDIT' : 'DEBIT';
+        if (abs($signedBalance) < 0.0000001) {
+            return [
+                'amount' => 0.0,
+                'type' => $normal,
+                'signed' => 0.0,
+                'label' => self::formatBalanceDrCr(0.0, $normal),
+            ];
+        }
+        if ($signedBalance > 0) {
+            $amount = abs($signedBalance);
+
+            return [
+                'amount' => $amount,
+                'type' => $normal,
+                'signed' => $signedBalance,
+                'label' => self::formatBalanceDrCr($amount, $normal),
+            ];
+        }
+
+        $amount = abs($signedBalance);
+
+        return [
+            'amount' => $amount,
+            'type' => $opposite,
+            'signed' => $signedBalance,
+            'label' => self::formatBalanceDrCr($amount, $opposite),
+        ];
+    }
+
+    /**
+     * ERP display: "10,000.00 DR" / "25,500.00 CR" (never negative).
+     */
+    public static function formatBalanceDrCr(float $amount, string $balanceType): string
+    {
+        $side = strtoupper(trim($balanceType)) === 'CREDIT' ? 'CR' : 'DR';
+        $formatted = number_format(abs($amount), 2, '.', ',');
+
+        return $formatted . ' ' . $side;
+    }
+
+    /**
+     * Ensure a ledger line is single-sided (only Debit OR only Credit has an amount).
+     *
+     * @return array{debit: float, credit: float}
+     */
+    public static function normalizeSingleSidedAmounts(float $debit, float $credit): array
+    {
+        $debit = round(abs($debit), 2);
+        $credit = round(abs($credit), 2);
+        if ($debit < 0.005 && $credit < 0.005) {
+            return ['debit' => 0.0, 'credit' => 0.0];
+        }
+        if ($debit >= $credit) {
+            return ['debit' => $debit, 'credit' => 0.0];
+        }
+
+        return ['debit' => 0.0, 'credit' => $credit];
+    }
+
+    /**
+     * Format a debit/credit cell: blank when zero (ERP / Tally style).
+     */
+    public static function formatSideAmount(float $amount): string
+    {
+        if (abs($amount) < 0.005) {
+            return '';
+        }
+
+        return number_format(abs($amount), 2, '.', ',');
+    }
+
+    /**
+     * Resolve Chart of Accounts "Account Type" from stored value or group type.
+     */
+    public static function resolveAccountType(array $account): string
+    {
+        $stored = strtoupper(trim((string) ($account['account_type'] ?? '')));
+        if ($stored !== '') {
+            return $stored;
+        }
+        $groupType = strtoupper(trim((string) ($account['group_type'] ?? '')));
+
+        return match ($groupType) {
+            'ASSETS' => 'ASSET',
+            'LIABILITIES' => 'LIABILITY',
+            'CAPITAL' => 'CAPITAL',
+            'INCOME' => 'INCOME',
+            'EXPENSES' => 'EXPENSE',
+            default => 'GENERAL',
+        };
     }
 
     // -------------------------------------------------------------------------

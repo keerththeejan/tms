@@ -26,13 +26,18 @@ class AccountingExcelExport
     }
 
     /**
-     * Export Ledger to Excel
+     * Export Ledger to Excel/CSV
      */
-    public static function exportLedger(PDO $pdo, int $accountId, ?string $fromDate = null, ?string $toDate = null): void
-    {
-        $ledger = AccountRepository::getLedger($pdo, $accountId, $fromDate, $toDate);
+    public static function exportLedger(
+        PDO $pdo,
+        int $accountId,
+        ?string $fromDate = null,
+        ?string $toDate = null,
+        array $filters = []
+    ): void {
+        $ledger = AccountRepository::getLedger($pdo, $accountId, $fromDate, $toDate, $filters);
         $account = AccountRepository::getById($pdo, $accountId);
-        
+
         $csv = self::generateLedgerCsv($ledger, $account, $fromDate, $toDate);
         self::outputCsv('Ledger_' . ($account['account_code'] ?? 'Account') . '.csv', $csv);
     }
@@ -126,39 +131,69 @@ class AccountingExcelExport
      */
     private static function generateLedgerCsv(array $ledger, ?array $account, ?string $fromDate, ?string $toDate): string
     {
-        $lines = [];
-        
-        // Header
-        $lines[] = 'Ledger - ' . ($account['account_name'] ?? 'Account');
-        $lines[] = 'Account Code: ' . ($account['account_code'] ?? '');
-        $lines[] = 'Opening Balance: ' . self::fmtMoney($ledger['opening_balance'] ?? 0) . ' ' . ($ledger['opening_balance_type'] ?? '');
-        if ($fromDate && $toDate) {
-            $lines[] = 'Period: ' . $fromDate . ' to ' . $toDate;
+        $company = Helpers::company();
+        $companyName = (string) ($company['name'] ?? 'TS Transport');
+        $printedBy = '';
+        try {
+            $u = Auth::user();
+            $printedBy = (string) ($u['full_name'] ?? $u['username'] ?? '');
+        } catch (Throwable $e) {
+            $printedBy = '';
         }
+
+        $lines = [];
+        $lines[] = $companyName;
+        $lines[] = 'General Ledger Report';
+        $lines[] = 'Account Name: ' . ($account['account_name'] ?? '');
+        $lines[] = 'Account Code: ' . ($account['account_code'] ?? '');
+        $lines[] = 'Account Type: ' . ($ledger['account_type'] ?? $account['account_type'] ?? '');
+        $lines[] = 'Normal Balance: ' . ($ledger['normal_balance'] ?? '');
+        if ($fromDate && $toDate) {
+            $lines[] = 'Date Range: ' . $fromDate . ' to ' . $toDate;
+        }
+        $lines[] = 'Printed By: ' . ($printedBy !== '' ? $printedBy : '—');
+        $lines[] = 'Printed Date: ' . date('Y-m-d H:i');
         $lines[] = '';
-        
-        // Column headers
-        $lines[] = 'Date,Voucher No,Type,Narration,Debit,Credit,Balance';
-        
-        // Data rows
+        $lines[] = 'Date,Voucher No,Voucher Type,Narration,Debit,Credit,Running Balance';
+
         foreach ($ledger['entries'] ?? [] as $entry) {
+            $debit = AccountingBalanceService::formatSideAmount((float) ($entry['debit_amount'] ?? 0));
+            $credit = AccountingBalanceService::formatSideAmount((float) ($entry['credit_amount'] ?? 0));
+            $running = (string) ($entry['running_balance_display']
+                ?? AccountingBalanceService::formatBalanceDrCr(
+                    (float) ($entry['running_balance'] ?? 0),
+                    (string) ($entry['balance_type'] ?? 'DEBIT')
+                ));
             $lines[] = sprintf(
-                '%s,%s,%s,%s,%s,%s,%s %s',
+                '%s,%s,%s,%s,%s,%s,%s',
                 self::escapeCsv($entry['entry_date'] ?? $entry['voucher_date'] ?? ''),
                 self::escapeCsv($entry['voucher_number'] ?? ''),
                 self::escapeCsv($entry['voucher_type'] ?? ''),
                 self::escapeCsv($entry['narration'] ?? $entry['voucher_narration'] ?? ''),
-                self::fmtMoney($entry['debit_amount'] ?? 0),
-                self::fmtMoney($entry['credit_amount'] ?? 0),
-                self::fmtMoney($entry['running_balance'] ?? 0),
-                self::escapeCsv($entry['balance_type'] ?? '')
+                self::escapeCsv($debit),
+                self::escapeCsv($credit),
+                self::escapeCsv($running)
             );
         }
-        
-        // Closing balance
+
+        $openingLabel = (string) ($ledger['opening_balance_display']
+            ?? AccountingBalanceService::formatBalanceDrCr(
+                (float) ($ledger['opening_balance'] ?? 0),
+                (string) ($ledger['opening_balance_type'] ?? 'DEBIT')
+            ));
+        $closingLabel = (string) ($ledger['closing_balance_display']
+            ?? AccountingBalanceService::formatBalanceDrCr(
+                (float) ($ledger['closing_balance'] ?? 0),
+                (string) ($ledger['closing_balance_type'] ?? 'DEBIT')
+            ));
+
         $lines[] = '';
-        $lines[] = 'Closing Balance:,' . self::fmtMoney($ledger['closing_balance'] ?? 0) . ' ' . ($ledger['closing_balance_type'] ?? '');
-        
+        $lines[] = 'Opening Balance,' . self::escapeCsv($openingLabel);
+        $lines[] = 'Total Debit,' . number_format((float) ($ledger['total_debit'] ?? 0), 2, '.', ',');
+        $lines[] = 'Total Credit,' . number_format((float) ($ledger['total_credit'] ?? 0), 2, '.', ',');
+        $lines[] = 'Closing Balance,' . self::escapeCsv($closingLabel);
+        $lines[] = 'Total Transactions,' . (int) ($ledger['total_transactions'] ?? count($ledger['entries'] ?? []));
+
         return implode("\n", $lines);
     }
 
