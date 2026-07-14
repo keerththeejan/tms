@@ -38,14 +38,18 @@ class AccountingController
 
         $isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
         if ($isPost) {
-            $csrfToken = (string) ($_POST['csrf_token'] ?? '');
-            if ($csrfToken === '' && str_contains((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
-                $jsonBody = json_decode((string) file_get_contents('php://input'), true);
+            // Always hydrate JSON request bodies into $_POST so voucher details
+            // (including credit_amount) are available to save_voucher handlers.
+            $contentType = (string) ($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '');
+            if (str_contains(strtolower($contentType), 'application/json')) {
+                $raw = (string) file_get_contents('php://input');
+                $jsonBody = json_decode($raw, true);
                 if (is_array($jsonBody)) {
-                    $csrfToken = (string) ($jsonBody['csrf_token'] ?? '');
                     $_POST = array_merge($_POST, $jsonBody);
                 }
             }
+
+            $csrfToken = (string) ($_POST['csrf_token'] ?? '');
             if (!Helpers::verifyCsrf($csrfToken)) {
                 self::json(['ok' => false, 'error' => 'Invalid CSRF token.'], 400);
                 return;
@@ -284,12 +288,19 @@ class AccountingController
 
         try {
             VoucherAutoLedgerService::validateSimpleLines($normalizedDetails);
+            $completed = VoucherAutoLedgerService::buildCompleteDetails(
+                $pdo,
+                $voucherType,
+                $paymentMode,
+                $normalizedDetails,
+                (string) ($payload['header_narration'] ?? $payload['narration'] ?? '')
+            );
         } catch (InvalidArgumentException $e) {
             self::json(['ok' => false, 'error' => $e->getMessage()], 400);
             return;
         }
 
-        $details = VoucherAutoLedgerService::detailsForStorage($normalizedDetails);
+        $details = VoucherAutoLedgerService::detailsForStorage($completed);
 
         $totalDebit = 0;
         $totalCredit = 0;

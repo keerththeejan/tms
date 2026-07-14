@@ -126,7 +126,16 @@
         accountInput.addEventListener('blur', function () { resolveAccountFromText(accountInput); });
 
         [debitInput, creditInput].forEach(function (input) {
-            input.addEventListener('input', recalcTotals);
+            input.addEventListener('input', function () {
+                // ERP rule: one side only per line — typing Debit clears Credit and vice versa
+                if (input === debitInput && parseAmount(debitInput.value) > 0) {
+                    creditInput.value = '';
+                }
+                if (input === creditInput && parseAmount(creditInput.value) > 0) {
+                    debitInput.value = '';
+                }
+                recalcTotals();
+            });
             input.addEventListener('blur', function () {
                 const value = parseAmount(input.value);
                 input.value = value > 0 ? formatAmount(value) : '';
@@ -416,6 +425,10 @@
                 if (!opts.silent) throw new Error('Enter a debit or credit amount.');
                 return;
             }
+            if (debit > 0 && credit > 0) {
+                if (!opts.silent) throw new Error('Enter either Debit or Credit on a line, not both.');
+                return;
+            }
             items.push({
                 account_id: parseInt(accountId, 10),
                 account_name: accountName,
@@ -450,11 +463,15 @@
             const credit = parseAmount(line.credit_amount);
             if (account <= 0) return false;
             if (debit < 0 || credit < 0) return false;
+            if (debit > 0 && credit > 0) return false;
             return debit > 0 || credit > 0;
         });
         if (validLines.length < 1) {
             throw new Error('At least one valid voucher line is required.');
         }
+
+        // Single-entry UI: server appends payment-mode (Cash/Bank) balancing line.
+        // Do not block save when the user entered only Debit or only Credit.
 
         let rawMode = document.getElementById('busyPaymentMode')?.value || 'CASH';
         if (rawMode === 'PETTY_CASH') {
@@ -695,7 +712,46 @@
             updateCurrentBalance();
         }
         closeAccountSearch();
-        row?.querySelector('.debit-input')?.focus();
+        focusAmountAfterAccountSelect(row);
+    }
+
+    /**
+     * After picking an account, focus the amount column that needs an entry.
+     * Previous behaviour always focused Debit — Journal credit lines were missed
+     * and only Debit reached the backend (Debit X ≠ Credit 0.00).
+     */
+    function focusAmountAfterAccountSelect(row) {
+        if (!row) return;
+        const debit = row.querySelector('.debit-input');
+        const credit = row.querySelector('.credit-input');
+        const lines = collectLineItems({ silent: true });
+        let totalDr = 0;
+        let totalCr = 0;
+        lines.forEach(function (l) {
+            totalDr += parseAmount(l.debit_amount);
+            totalCr += parseAmount(l.credit_amount);
+        });
+
+        const needsCredit = totalDr > totalCr + 0.009;
+        const needsDebit = totalCr > totalDr + 0.009;
+
+        if ((voucherType === 'JOURNAL' || voucherType === 'CONTRA' || voucherType === 'TRANSFER') && needsCredit) {
+            credit?.focus();
+            return;
+        }
+        if ((voucherType === 'JOURNAL' || voucherType === 'CONTRA' || voucherType === 'TRANSFER') && needsDebit) {
+            debit?.focus();
+            return;
+        }
+        if (debit && parseAmount(debit.value) <= 0) {
+            debit.focus();
+            return;
+        }
+        if (credit && parseAmount(credit.value) <= 0) {
+            credit.focus();
+            return;
+        }
+        debit?.focus();
     }
 
     async function loadExistingVoucher() {
@@ -752,7 +808,8 @@
     function updateStatusText() {
         const text = document.getElementById('busyAutoLineText');
         if (!text) return;
-        text.textContent = 'Simple voucher entry mode';
+        const mode = document.getElementById('busyPaymentMode')?.value || 'CASH';
+        text.textContent = 'Single-entry mode: opposite ' + mode + ' account posts automatically';
     }
 
     function showAlert(message, type) {
