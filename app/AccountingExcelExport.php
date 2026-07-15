@@ -96,10 +96,13 @@ class AccountingExcelExport
         $lines[] = '';
 
         // Summary — Closing = Opening + Credit − Debit (Credit = Cash In)
+        // Closing Balance uses display formatting only (absolute value, no minus sign).
         $lines[] = 'Opening Balance,' . self::fmtMoney($summary['opening_balance'] ?? 0);
         $lines[] = 'Total Debit,' . self::fmtMoney($summary['total_debit'] ?? 0);
         $lines[] = 'Total Credit,' . self::fmtMoney($summary['total_credit'] ?? 0);
-        $lines[] = 'Closing Balance,' . self::fmtMoney($summary['closing_balance'] ?? 0);
+        $lines[] = 'Closing Balance,' . self::escapeCsv(
+            AccountingBalanceService::formatBalance($summary['closing_balance'] ?? 0, true, true)
+        );
         $lines[] = 'Total Records,' . (int) ($summary['total_records'] ?? count($entries));
         $lines[] = '';
 

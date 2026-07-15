@@ -41,6 +41,36 @@ class Helpers
         return $withSymbol ? $symbol . ' ' . $formatted : $formatted;
     }
 
+    /**
+     * Display-only signed balance: never shows a minus sign.
+     * Internally $amount may be negative (preserved for calculations elsewhere).
+     *
+     * Examples (withSymbol=true, withSide=true):
+     *   20   → "LKR 20.00 CR"
+     *  -20   → "LKR 20.00 DR"
+     *    0   → "LKR 0.00"
+     */
+    public static function formatBalance(
+        float|int|string $amount,
+        bool $withSymbol = true,
+        bool $withSide = false
+    ): string {
+        $value = (float) $amount;
+        $decimals = (int) self::configGet('currency.decimals', 2);
+        $absFormatted = number_format(abs($value), $decimals, '.', ',');
+        $display = $withSymbol
+            ? (self::currencySymbol() . ' ' . $absFormatted)
+            : $absFormatted;
+
+        if (!$withSide || abs($value) < 0.005) {
+            return $display;
+        }
+
+        // Day Book / cash formula: Closing = Opening + Credit − Debit
+        // Positive net → CR (Cash In excess); negative net → DR (Cash Out excess)
+        return $display . ' ' . ($value < 0 ? 'DR' : 'CR');
+    }
+
     /** JSON-safe currency settings for front-end scripts. */
     public static function currencyJsConfig(): array
     {

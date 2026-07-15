@@ -127,7 +127,11 @@ class AccountingPdfExport
             self::fmtMoney($summary['opening_balance'] ?? 0),
             self::fmtMoney($summary['total_debit'] ?? 0),
             self::fmtMoney($summary['total_credit'] ?? 0),
-            self::fmtMoney($summary['closing_balance'] ?? 0),
+            htmlspecialchars(
+                AccountingBalanceService::formatBalance($summary['closing_balance'] ?? 0, true, true),
+                ENT_QUOTES,
+                'UTF-8'
+            ),
             $recordCount
         );
 

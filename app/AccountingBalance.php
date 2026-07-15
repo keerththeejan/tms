@@ -346,6 +346,20 @@ class AccountingBalanceService
     }
 
     /**
+     * Display-only helper for signed Day Book / cash closing amounts.
+     * Does not change the stored or calculated value — UI formatting only.
+     *
+     * @see Helpers::formatBalance()
+     */
+    public static function formatBalance(
+        float|int|string $amount,
+        bool $withSymbol = true,
+        bool $withSide = true
+    ): string {
+        return Helpers::formatBalance($amount, $withSymbol, $withSide);
+    }
+
+    /**
      * Ensure a ledger line is single-sided (only Debit OR only Credit has an amount).
      *
      * @return array{debit: float, credit: float}

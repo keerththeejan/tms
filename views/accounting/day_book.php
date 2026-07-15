@@ -397,8 +397,26 @@ function accFormatCurrency(n) {
 }
 
 /**
- * Print / report money format: LKR 1,234.56 or -LKR 12,500.00
- * Uses the same absolute amounts as the Day Book summary API.
+ * Display-only balance formatter (matches Helpers::formatBalance / AccountingBalanceService::formatBalance).
+ * Never shows a minus sign. Optional DR/CR from the signed value.
+ * Does not alter the underlying numeric amount used for calculations.
+ */
+function accFormatBalance(n, withSide) {
+    const value = parseFloat(n);
+    const amount = isFinite(value) ? value : 0;
+    const absFormatted = Math.abs(amount).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+    let display = 'Rs. ' + absFormatted;
+    if (withSide !== false && Math.abs(amount) >= 0.005) {
+        display += amount < 0 ? ' DR' : ' CR';
+    }
+    return display;
+}
+
+/**
+ * Print / report money format: LKR 1,234.56 (unsigned absolute for Closing Balance via accFormatBalancePrint)
  */
 function accFormatPrintLkr(n) {
     const value = parseFloat(n);
@@ -408,6 +426,21 @@ function accFormatPrintLkr(n) {
         maximumFractionDigits: 2,
     });
     return amount < 0 ? ('-LKR ' + absFormatted) : ('LKR ' + absFormatted);
+}
+
+/** Closing Balance print: absolute amount + DR/CR, never a leading minus. */
+function accFormatBalancePrint(n) {
+    const value = parseFloat(n);
+    const amount = isFinite(value) ? value : 0;
+    const absFormatted = Math.abs(amount).toLocaleString('en-LK', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+    let display = 'LKR ' + absFormatted;
+    if (Math.abs(amount) >= 0.005) {
+        display += amount < 0 ? ' DR' : ' CR';
+    }
+    return display;
 }
 
 function accEmptySummary() {
@@ -437,7 +470,7 @@ function accUpdatePrintSummary(summary) {
     if (openingEl) openingEl.textContent = accFormatPrintLkr(s.opening_balance ?? 0);
     if (creditEl) creditEl.textContent = accFormatPrintLkr(s.total_credit ?? 0);
     if (debitEl) debitEl.textContent = accFormatPrintLkr(s.total_debit ?? 0);
-    if (closingEl) closingEl.textContent = accFormatPrintLkr(s.closing_balance ?? 0);
+    if (closingEl) closingEl.textContent = accFormatBalancePrint(s.closing_balance ?? 0);
     if (recordsEl) recordsEl.textContent = String(s.total_records ?? 0);
 }
 
@@ -465,7 +498,7 @@ function accUpdateSummaryBar(summary) {
     if (openingEl) openingEl.textContent = accFormatCurrency(summary.opening_balance ?? 0);
     if (debitEl) debitEl.textContent = accFormatCurrency(summary.total_debit ?? 0);
     if (creditEl) creditEl.textContent = accFormatCurrency(summary.total_credit ?? 0);
-    if (closingEl) closingEl.textContent = accFormatCurrency(summary.closing_balance ?? 0);
+    if (closingEl) closingEl.textContent = accFormatBalance(summary.closing_balance ?? 0, true);
 
     // Keep print summary in sync with the same API totals (Credit = Cash In)
     accUpdatePrintSummary(summary);
