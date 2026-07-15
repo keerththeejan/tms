@@ -122,13 +122,15 @@ class VoucherService
     }
 
     /**
-     * Auto balance disabled — simple voucher entry stores lines as entered.
+     * Auto balance permanently disabled — manual voucher entry only.
      */
     public function autoBalanceVoucher(int $voucherId): array
     {
+        unset($voucherId);
+
         return [
             'success' => false,
-            'error' => 'Auto balance is disabled for simple voucher entry.',
+            'error' => 'Auto balance has been removed. Enter debit and credit lines manually.',
         ];
     }
 
@@ -425,24 +427,6 @@ class VoucherService
             'total_credit' => $totalCredit,
             'balance_amount' => $balance
         ]);
-    }
-
-    /**
-     * Get default balance account (for auto-balancing)
-     */
-    private function getDefaultBalanceAccount(): ?array
-    {
-        // Try Cash first, then Bank, then Suspense
-        $accountCodes = ['1001', '1002', '9001'];
-
-        foreach ($accountCodes as $code) {
-            $account = $this->repository->getLedgerAccountByCode($code);
-            if ($account) {
-                return $account;
-            }
-        }
-
-        return null;
     }
 
     /**

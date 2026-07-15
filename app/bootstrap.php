@@ -48,6 +48,14 @@ require_once __DIR__ . '/EmployeeApi.php';
 require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/Sms.php';
 require_once __DIR__ . '/DataReset.php';
+require_once __DIR__ . '/BackupSchemaRepository.php';
+require_once __DIR__ . '/BackupRepository.php';
+require_once __DIR__ . '/BackupLogger.php';
+require_once __DIR__ . '/GoogleDriveService.php';
+require_once __DIR__ . '/BackupService.php';
+require_once __DIR__ . '/RestoreService.php';
+require_once __DIR__ . '/BackupScheduler.php';
+require_once __DIR__ . '/BackupController.php';
 require_once __DIR__ . '/CashbookRepository.php';
 require_once __DIR__ . '/CashbookAccountService.php';
 require_once __DIR__ . '/CashbookApi.php';
@@ -112,6 +120,11 @@ try {
     EmployeeSchemaRepository::ensureSchema(Database::pdo());
 } catch (Throwable $e) {
     /* HRMS module optional until DB ready */
+}
+try {
+    BackupSchemaRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* backup module optional until DB ready */
 }
 
 // Initialize Mailer (available as $GLOBALS['mailer'])

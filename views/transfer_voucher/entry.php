@@ -1316,39 +1316,7 @@ function tvSetupKeyboardShortcuts() {
 }
 
 function tvAutoBalance() {
-    let totalDebit = 0;
-    let totalCredit = 0;
-
-    document.querySelectorAll('#tvGridBody tr').forEach(row => {
-        totalDebit += parseFloat(row.querySelector('.tv-debit-input').value) || 0;
-        totalCredit += parseFloat(row.querySelector('.tv-credit-input').value) || 0;
-    });
-
-    const difference = totalDebit - totalCredit;
-    
-    if (Math.abs(difference) < 0.01) {
-        alert('Voucher is already balanced!');
-        return;
-    }
-
-    // Add balancing row
-    tvAddRow();
-    const rows = document.querySelectorAll('#tvGridBody tr');
-    const lastRow = rows[rows.length - 1];
-
-    if (difference > 0) {
-        // Debit is higher, add credit
-        lastRow.querySelector('.tv-credit-input').value = difference.toFixed(2);
-        lastRow.querySelector('.tv-account-input').value = 'Balance Account';
-        lastRow.querySelector('.tv-narration-input').value = 'Auto-balanced entry';
-    } else {
-        // Credit is higher, add debit
-        lastRow.querySelector('.tv-debit-input').value = Math.abs(difference).toFixed(2);
-        lastRow.querySelector('.tv-account-input').value = 'Balance Account';
-        lastRow.querySelector('.tv-narration-input').value = 'Auto-balanced entry';
-    }
-
-    tvCalculateTotals();
+    alert('Auto balance has been removed. Enter debit and credit lines manually.');
 }
 
 async function tvSaveDraft() {

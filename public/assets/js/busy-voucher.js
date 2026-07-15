@@ -470,8 +470,7 @@
             throw new Error('At least one valid voucher line is required.');
         }
 
-        // Single-entry UI: server appends payment-mode (Cash/Bank) balancing line.
-        // Do not block save when the user entered only Debit or only Credit.
+        // Manual entry: save exactly the lines the user entered (no server-side balancing).
 
         let rawMode = document.getElementById('busyPaymentMode')?.value || 'CASH';
         if (rawMode === 'PETTY_CASH') {
@@ -808,8 +807,7 @@
     function updateStatusText() {
         const text = document.getElementById('busyAutoLineText');
         if (!text) return;
-        const mode = document.getElementById('busyPaymentMode')?.value || 'CASH';
-        text.textContent = 'Single-entry mode: opposite ' + mode + ' account posts automatically';
+        text.textContent = 'Manual voucher entry — only the lines you enter are saved';
     }
 
     function showAlert(message, type) {

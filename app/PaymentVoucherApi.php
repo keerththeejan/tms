@@ -86,7 +86,7 @@ class PaymentVoucherApi
                     $api->getLineItems();
                     break;
 
-                // Auto balancing
+                // Auto balance (disabled — manual entry only)
                 case 'auto_balance':
                     $api->autoBalance();
                     break;
@@ -252,18 +252,15 @@ class PaymentVoucherApi
     }
 
     /**
-     * Auto-balance voucher
+     * Auto-balance API stub — permanently disabled.
      */
     private function autoBalance(): void
     {
-        $voucherId = (int) ($_POST['voucher_id'] ?? 0);
-        if ($voucherId <= 0) {
-            self::json(['ok' => false, 'error' => 'Invalid voucher ID'], 400);
-            return;
-        }
-
-        $result = $this->voucherService->autoBalanceVoucher($voucherId);
-        self::json($result);
+        self::json([
+            'success' => false,
+            'ok' => false,
+            'error' => 'Auto balance has been removed. Enter debit and credit lines manually.',
+        ], 400);
     }
 
     /**

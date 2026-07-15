@@ -1,0 +1,10 @@
+[2026-07-14 20:54:47] backup#1 Backup started {"type":"AUTO"}
+[2026-07-14 20:54:47] backup#1 mysqldump completed {"size":105154}
+[2026-07-14 20:54:47] backup#1 ZIP created {"bytes":14615}
+[2026-07-14 20:54:47] backup#1 Google Drive skipped (not configured) 
+[2026-07-14 20:54:47] backup#1 Backup finished {"status":"SUCCESS","duration":0.49}
+[2026-07-14 20:56:04] backup#2 Backup started {"type":"MANUAL"}
+[2026-07-14 20:56:05] backup#2 mysqldump completed {"size":105939}
+[2026-07-14 20:56:05] backup#2 ZIP created {"bytes":14790}
+[2026-07-14 20:56:05] backup#2 Google Drive skipped (not configured) 
+[2026-07-14 20:56:05] backup#2 Backup finished {"status":"SUCCESS","duration":0.25}

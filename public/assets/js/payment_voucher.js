@@ -365,77 +365,10 @@ class PaymentVoucherModule {
     }
 
     /**
-     * Auto-balance voucher
+     * Auto-balance removed — manual entry only.
      */
     async autoBalance() {
-        try {
-            this.showNotification('Auto-balancing voucher...', 'info');
-
-            if (!this.voucherId) {
-                // First save as draft
-                await this.saveDraft();
-            }
-
-            const response = await fetch(this.apiBase, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    pv_action: 'auto_balance',
-                    voucher_id: this.voucherId,
-                    csrf_token: this.csrf
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Add balance row
-                const grid = document.getElementById('pvGridBody');
-                const rowIndex = grid.rows.length + 1;
-
-                const row = document.createElement('tr');
-                row.dataset.rowIndex = rowIndex;
-
-                const balanceAmount = data.balance_amount || 0;
-                const isDebit = data.balance_item?.debit_amount > 0;
-
-                row.innerHTML = `
-                    <td style="text-align: center; color: #6c757d; font-weight: 600;">${rowIndex}</td>
-                    <td>
-                        <input type="text" class="account-code" value="${data.balance_account || 'AUTO'}" readonly>
-                    </td>
-                    <td>
-                        <input type="text" class="account-name" value="${data.balance_account || 'Auto-Balance'}" readonly style="background: #fff3cd;">
-                    </td>
-                    <td class="text-right">
-                        <input type="number" class="debit-amount" value="${isDebit ? balanceAmount : 0}" readonly style="background: #e9ecef;">
-                    </td>
-                    <td class="text-right">
-                        <input type="number" class="credit-amount" value="${!isDebit ? balanceAmount : 0}" readonly style="background: #e9ecef;">
-                    </td>
-                    <td>
-                        <div class="pv-grid-row-actions">
-                            <button type="button" class="pv-grid-row-btn pv-grid-row-btn-delete" onclick="pv.deleteRow(${rowIndex})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                `;
-
-                grid.appendChild(row);
-                this.updateLineCount();
-                this.calculateTotals();
-
-                this.showNotification('Voucher auto-balanced successfully!', 'success');
-            } else {
-                this.showNotification(data.error || 'Failed to auto-balance', 'error');
-            }
-        } catch (error) {
-            console.error('Auto-balance error:', error);
-            this.showNotification('Error during auto-balance', 'error');
-        }
+        this.showNotification('Auto balance has been removed. Enter debit and credit lines manually.', 'info');
     }
 
     /**

@@ -3,30 +3,21 @@
 declare(strict_types=1);
 
 /**
- * Busy / Tally-style simple voucher entry.
+ * Manual voucher line validation and normalization.
  *
- * User enters party lines only. When Debit ≠ Credit, the payment-mode account
- * (CASH / BANK / CHEQUE) is appended as the automatic balancing line so the
- * voucher is always complete double-entry before posting.
- *
- * Does not alter Debit/Credit amounts the user entered — only adds the missing side.
+ * Saves only user-entered lines — never creates cash / balancing / counter entries.
  */
 class VoucherAutoLedgerService
 {
-    /** @var list<string> */
-    private const AUTO_LEDGER_TYPES = ['PAYMENT', 'RECEIPT', 'JOURNAL', 'CONTRA'];
-
-    public static function supportsAutoLedger(string $voucherType): bool
-    {
-        return in_array(strtoupper(trim($voucherType)), self::AUTO_LEDGER_TYPES, true);
-    }
-
     public static function normalizePaymentMode(string $paymentMode): string
     {
         return AccountingPaymentModeSettingsRepository::normalizePaymentMode($paymentMode);
     }
 
     /**
+     * Passthrough for callers that formerly expected auto-complete behaviour.
+     * Returns user lines unchanged (no balancing insert).
+     *
      * @param list<array<string, mixed>> $rawDetails
      * @return list<array<string, mixed>>
      */
@@ -37,66 +28,21 @@ class VoucherAutoLedgerService
         array $rawDetails,
         ?string $headerNarration = null
     ): array {
+        unset($pdo, $voucherType, $paymentMode, $headerNarration);
         $lines = self::stripMeta($rawDetails);
         self::validateSimpleLines($lines);
 
-        if (!self::supportsAutoLedger($voucherType)) {
-            return $lines;
-        }
-
-        $sumDebit = 0.0;
-        $sumCredit = 0.0;
-        foreach ($lines as $line) {
-            $sumDebit += (float) ($line['debit_amount'] ?? 0);
-            $sumCredit += (float) ($line['credit_amount'] ?? 0);
-        }
-
-        $diff = round($sumDebit - $sumCredit, 2);
-        if (abs($diff) < 0.009) {
-            return $lines;
-        }
-
-        $modeAccountId = AccountingPaymentModeSettingsRepository::getAccountIdForMode($pdo, $paymentMode);
-        if ($modeAccountId === null || $modeAccountId <= 0) {
-            throw new InvalidArgumentException(
-                'Payment mode account is not configured for ' . strtoupper(trim($paymentMode))
-                . '. Set it under Accounting → Settings before saving.'
-            );
-        }
-
-        // Do not auto-post onto an account the user already used on a party line
-        // when that would create an ambiguous balancing entry — still allowed if
-        // they used cash as party; balancing still uses payment-mode account.
-        $narration = trim((string) ($headerNarration ?? ''));
-        if ($narration === '') {
-            $narration = 'Auto balancing (' . self::normalizePaymentMode($paymentMode) . ')';
-        } else {
-            $narration = 'Auto: ' . $narration;
-        }
-
-        if ($diff > 0) {
-            // Excess debit → credit payment-mode account (e.g. Cash Payment)
-            $lines[] = [
-                'account_id' => $modeAccountId,
-                'debit_amount' => 0.0,
-                'credit_amount' => abs($diff),
-                'narration' => $narration,
-                'cost_center_id' => null,
-                'is_auto_generated' => true,
-            ];
-        } else {
-            // Excess credit → debit payment-mode account (e.g. Cash Receipt)
-            $lines[] = [
-                'account_id' => $modeAccountId,
-                'debit_amount' => abs($diff),
-                'credit_amount' => 0.0,
-                'narration' => $narration,
-                'cost_center_id' => null,
-                'is_auto_generated' => true,
-            ];
-        }
-
         return $lines;
+    }
+
+    /**
+     * @deprecated Auto-ledger is permanently disabled (manual entry only).
+     */
+    public static function supportsAutoLedger(string $voucherType): bool
+    {
+        unset($voucherType);
+
+        return false;
     }
 
     /**
@@ -109,10 +55,9 @@ class VoucherAutoLedgerService
         string $paymentMode,
         array $details
     ): array {
+        unset($pdo, $voucherType, $paymentMode);
         foreach ($details as &$line) {
-            if (!isset($line['is_auto_generated'])) {
-                $line['is_auto_generated'] = false;
-            }
+            $line['is_auto_generated'] = false;
         }
         unset($line);
 
@@ -174,7 +119,7 @@ class VoucherAutoLedgerService
     private static function stripMeta(array $details): array
     {
         return array_map(static function (array $line): array {
-            unset($line['amount']);
+            unset($line['amount'], $line['is_auto_generated']);
 
             return $line;
         }, $details);

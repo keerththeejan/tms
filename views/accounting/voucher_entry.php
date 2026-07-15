@@ -102,7 +102,7 @@ $jsVer = is_file($jsPath) ? (string) filemtime($jsPath) : '1';
             <span class="busy-cur-bal" id="busyCurBal">( Cur. Bal. : <?php echo Helpers::formatMoney(0); ?> )</span>
             <span class="busy-auto-line-panel" id="busyAutoLinePanel">
                 <span class="busy-auto-label">Status:</span>
-                <span class="busy-auto-text" id="busyAutoLineText">Simple single-entry voucher mode</span>
+                <span class="busy-auto-text" id="busyAutoLineText">Manual voucher entry — only the lines you enter are saved</span>
             </span>
         </div>
 

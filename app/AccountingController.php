@@ -288,19 +288,13 @@ class AccountingController
 
         try {
             VoucherAutoLedgerService::validateSimpleLines($normalizedDetails);
-            $completed = VoucherAutoLedgerService::buildCompleteDetails(
-                $pdo,
-                $voucherType,
-                $paymentMode,
-                $normalizedDetails,
-                (string) ($payload['header_narration'] ?? $payload['narration'] ?? '')
-            );
         } catch (InvalidArgumentException $e) {
             self::json(['ok' => false, 'error' => $e->getMessage()], 400);
             return;
         }
 
-        $details = VoucherAutoLedgerService::detailsForStorage($completed);
+        // Manual entry only — persist exactly the lines the user entered
+        $details = VoucherAutoLedgerService::detailsForStorage($normalizedDetails);
 
         $totalDebit = 0;
         $totalCredit = 0;
@@ -407,13 +401,9 @@ class AccountingController
         }
 
         $ledgerEntries = [];
-        $sumDebit = 0.0;
-        $sumCredit = 0.0;
         foreach ($details as $detail) {
             $debit = (float) ($detail['debit_amount'] ?? 0);
             $credit = (float) ($detail['credit_amount'] ?? 0);
-            $sumDebit += $debit;
-            $sumCredit += $credit;
             $ledgerEntries[] = [
                 'voucher_detail_id' => $detail['id'],
                 'account_id' => $detail['account_id'],
@@ -428,16 +418,7 @@ class AccountingController
             ];
         }
 
-        if (abs($sumDebit - $sumCredit) > 0.009) {
-            throw new RuntimeException(
-                'Unbalanced voucher: Debit ' . number_format($sumDebit, 2, '.', '')
-                . ' ≠ Credit ' . number_format($sumCredit, 2, '.', '')
-                . '. Double-entry requires equal totals before posting to ledgers.'
-            );
-        }
-        if (count($ledgerEntries) < 2) {
-            throw new RuntimeException('Double-entry requires at least two ledger lines (one Debit and one Credit).');
-        }
+        // Manual voucher entry: post whatever lines the user saved (no Debit=Credit requirement)
 
         LedgerEntryRepository::createBatch($pdo, $voucherId, $ledgerEntries);
 
