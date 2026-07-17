@@ -176,14 +176,20 @@ class AccountingVoucherRepository
             throw new RuntimeException('Voucher not found.');
         }
 
-        if (($voucher['status'] ?? '') !== 'DRAFT') {
+        // Admin users may edit any non-cancelled, non-deleted voucher.
+        // Non-admin users may only edit DRAFT vouchers.
+        $status = (string) ($voucher['status'] ?? '');
+        if ($status === 'CANCELLED') {
+            throw new RuntimeException('Cancelled vouchers cannot be edited.');
+        }
+        if ($status !== 'DRAFT' && !Auth::isAdmin()) {
             throw new RuntimeException('Only draft vouchers can be edited.');
         }
 
         $fields = [];
         $params = [];
         
-        foreach (['voucher_date', 'reference_number', 'payment_mode', 'cheque_number', 'cheque_date', 'bank_account_id', 'narration', 'total_debit', 'total_credit'] as $field) {
+        foreach (['voucher_date', 'reference_number', 'payment_mode', 'cheque_number', 'cheque_date', 'bank_account_id', 'narration', 'total_debit', 'total_credit', 'branch_id'] as $field) {
             if (array_key_exists($field, $data)) {
                 $fields[] = "{$field} = ?";
                 $params[] = $data[$field];

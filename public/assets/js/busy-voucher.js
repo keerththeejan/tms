@@ -527,12 +527,14 @@
             });
             const data = await res.json();
             if (data.ok && data.data) {
+                const isUpdate = parseInt(document.getElementById('busyVoucherId')?.value || '0', 10) > 0;
                 document.getElementById('busyVoucherId').value = data.data.id;
                 document.getElementById('busyVoucherNo').value = data.data.voucher_number || '';
+                const msg = data.message || (isUpdate ? 'Voucher Updated Successfully.' : 'Voucher saved successfully.');
                 if (window.AccModule && AccModule.toast) {
-                    AccModule.toast('Voucher saved successfully.');
+                    AccModule.toast(msg);
                 } else {
-                    showAlert('Voucher saved successfully.', 'success');
+                    showAlert(msg, 'success');
                 }
                 if ((data.data.status || '') === 'POSTED') {
                     console.log('[Voucher] posted to ledger:', data.data.id);
@@ -770,17 +772,23 @@
     }
 
     function populateVoucher(voucher) {
+        // Header fields
         document.getElementById('busyVoucherNo').value = voucher.voucher_number || '';
         document.getElementById('busyVoucherDate').value = voucher.voucher_date || '';
         document.getElementById('busyPaymentMode').value = voucher.payment_mode || 'CASH';
         document.getElementById('busyLongNarration').value = voucher.narration || '';
+        document.getElementById('busyVoucherTypeField').value = voucher.reference_number || '';
+        document.getElementById('busyHeaderNarration').value = voucher.header_narration || voucher.narration || '';
+        const pdcEl = document.getElementById('busyPdcDate');
+        if (pdcEl) pdcEl.value = voucher.cheque_date || '';
         updateDateDisplay();
 
+        // Detail lines
         let details = voucher.details || [];
 
         const tbody = document.getElementById('busyGridBody');
         tbody.innerHTML = '';
-        const count = Math.max(ROW_COUNT, details.length);
+        const count = Math.max(ROW_COUNT, details.length + 2);
         for (let i = 1; i <= count; i++) {
             tbody.appendChild(createRow(i));
         }
@@ -790,7 +798,7 @@
             if (!row) {
                 return;
             }
-            if (d.account_name) {
+            if (d.account_name || d.account_id) {
                 row.querySelector('.account-input').value = d.account_name || '';
                 row.querySelector('.account-id').value = d.account_id || '';
             }
@@ -799,6 +807,10 @@
             row.querySelector('.debit-input').value = debit > 0 ? formatAmount(debit) : '';
             row.querySelector('.credit-input').value = credit > 0 ? formatAmount(credit) : '';
             row.querySelector('.desc-input').value = d.narration || '';
+            const refInput = row.querySelector('.ref-input');
+            if (refInput) refInput.value = d.reference || d.cost_center_id || '';
+            const branchInput = row.querySelector('.branch-input');
+            if (branchInput) branchInput.value = d.branch || '';
         });
 
         recalcTotals();

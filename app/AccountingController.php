@@ -313,15 +313,32 @@ class AccountingController
             $payload['branch_id'] = $user['branch_id'] ?? null;
         }
 
+        // Existing voucher: route through VoucherUpdateService for admin-safe edit+repost
+        if (isset($payload['id']) && (int) $payload['id'] > 0) {
+            $result = VoucherUpdateService::updateVoucher(
+                $pdo,
+                (int) $payload['id'],
+                $payload,
+                $normalizedDetails,
+                Auth::id()
+            );
+            if (!empty($result['ok'])) {
+                self::json([
+                    'ok' => true,
+                    'data' => $result['data'],
+                    'message' => $result['message'] ?? 'Voucher Updated Successfully.',
+                ]);
+            } else {
+                self::json(['ok' => false, 'error' => $result['error'] ?? 'Update failed'], 400);
+            }
+            return;
+        }
+
+        // New voucher: create + post
         $pdo->beginTransaction();
         try {
-            if (isset($payload['id']) && $payload['id'] > 0) {
-                $voucher = AccountingVoucherRepository::update($pdo, (int) $payload['id'], $payload);
-                $voucherId = (int) $payload['id'];
-            } else {
-                $voucher = AccountingVoucherRepository::create($pdo, $payload);
-                $voucherId = (int) $voucher['id'];
-            }
+            $voucher = AccountingVoucherRepository::create($pdo, $payload);
+            $voucherId = (int) $voucher['id'];
 
             // Save details
             VoucherDetailRepository::createBatch($pdo, $voucherId, $details);

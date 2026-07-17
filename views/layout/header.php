@@ -44,6 +44,7 @@ $user = Auth::user();
   $parcelsListUrl = Helpers::baseUrl('index.php?page=parcels');
   $isParcelsCreateActive = ($currentPage === 'parcels' && in_array($action, ['new','edit'], true));
   $isParcelsListActive = ($currentPage === 'parcels' && !in_array($action, ['new','edit'], true));
+  $isItemsActive = ($currentPage === 'items');
   $isDN = ($currentPage === 'delivery_notes');
   $dnAction = $action;
   $isRouteActive = $isDN && ($dnAction === 'route');
@@ -68,8 +69,16 @@ $user = Auth::user();
       <?php if (($user['role'] ?? '') === 'admin'): ?>
         <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='users'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=users'); ?>"<?php echo $navCurrent($currentPage==='users'); ?>><i class="bi bi-people" aria-hidden="true"></i><span>Users</span></a></li>
       <?php endif; ?>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsCreateActive?'active':''; ?>" href="<?php echo $parcelsCreateUrl; ?>"<?php echo $navCurrent($isParcelsCreateActive); ?>><i class="bi bi-box-seam" aria-hidden="true"></i><span>Parcels</span></a></li>
-      <li class="nav-item"><a class="nav-link text-white <?php echo $isParcelsListActive?'active':''; ?>" href="<?php echo $parcelsListUrl; ?>"<?php echo $navCurrent($isParcelsListActive); ?>><i class="bi bi-card-list" aria-hidden="true"></i><span>Parcel Details</span></a></li>
+      <li class="nav-item">
+        <span class="nav-link text-white fw-semibold"><i class="bi bi-box-seam" aria-hidden="true"></i><span>Parcels</span></span>
+        <ul class="nav flex-column ms-3 mb-1" aria-label="Parcels menu">
+          <li class="nav-item"><a class="nav-link text-white py-1 <?php echo $isParcelsCreateActive?'active':''; ?>" href="<?php echo $parcelsCreateUrl; ?>"<?php echo $navCurrent($isParcelsCreateActive); ?>><i class="bi bi-plus-circle" aria-hidden="true"></i><span>New Parcel</span></a></li>
+          <li class="nav-item"><a class="nav-link text-white py-1 <?php echo $isParcelsListActive?'active':''; ?>" href="<?php echo $parcelsListUrl; ?>"<?php echo $navCurrent($isParcelsListActive); ?>><i class="bi bi-card-list" aria-hidden="true"></i><span>Parcel Details</span></a></li>
+          <?php if (Auth::isAdmin()): ?>
+            <li class="nav-item"><a class="nav-link text-white py-1 <?php echo $isItemsActive?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=items'); ?>"<?php echo $navCurrent($isItemsActive); ?>><i class="bi bi-box2-heart" aria-hidden="true"></i><span>Add Items</span></a></li>
+          <?php endif; ?>
+        </ul>
+      </li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='customers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=customers'); ?>"<?php echo $navCurrent($currentPage==='customers'); ?>><i class="bi bi-person-lines-fill" aria-hidden="true"></i><span>Customers</span></a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='delivery_routes'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=delivery_routes'); ?>"<?php echo $navCurrent($currentPage==='delivery_routes'); ?>><i class="bi bi-signpost" aria-hidden="true"></i><span>Delivery Routes</span></a></li>
       <li class="nav-item"><a class="nav-link text-white <?php echo $currentPage==='suppliers'?'active':''; ?>" href="<?php echo Helpers::baseUrl('index.php?page=suppliers'); ?>"<?php echo $navCurrent($currentPage==='suppliers'); ?>><i class="bi bi-truck" aria-hidden="true"></i><span>Suppliers</span></a></li>

@@ -1813,11 +1813,141 @@ switch ($page) {
         Helpers::view('suppliers/index', compact('suppliers','q','name','phone','code','branch_id','branchesAll','success','hasFilters'));
         break;
 
+    case 'items':
+        if (!Auth::isAdmin()) {
+            http_response_code(403);
+            echo 'Forbidden';
+            break;
+        }
+
+        $pdo = Database::pdo();
+        ItemRepository::ensureSchema($pdo);
+        $action = (string) ($_GET['action'] ?? 'index');
+        $error = null;
+
+        if ($action === 'save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf((string) ($_POST['csrf_token'] ?? ''))) {
+                http_response_code(400);
+                echo 'Invalid CSRF token.';
+                break;
+            }
+
+            $id = (int) ($_POST['id'] ?? 0);
+            $itemName = trim((string) ($_POST['item_name'] ?? ''));
+            $unitRateRaw = trim((string) ($_POST['unit_rate'] ?? ''));
+            $status = (string) ($_POST['status'] ?? 'Active');
+            $editingItem = [
+                'id' => $id,
+                'item_name' => $itemName,
+                'unit_rate' => $unitRateRaw,
+                'status' => $status,
+            ];
+
+            if ($itemName === '') {
+                $error = 'Item Name is required.';
+            } elseif ($unitRateRaw === '' || !is_numeric($unitRateRaw) || (float) $unitRateRaw < 0) {
+                $error = 'Unit Rate is required and must be a valid non-negative number.';
+            } elseif (!in_array($status, ['Active', 'Inactive'], true)) {
+                $error = 'Invalid item status.';
+            } elseif (ItemRepository::nameExists($pdo, $itemName, $id)) {
+                $error = 'An item with this name already exists.';
+            }
+
+            if ($error === null) {
+                try {
+                    if ($id > 0) {
+                        if (ItemRepository::find($pdo, $id) === null) {
+                            http_response_code(404);
+                            echo 'Item not found.';
+                            break;
+                        }
+                        ItemRepository::update($pdo, $id, $itemName, (float) $unitRateRaw, $status);
+                        Helpers::redirect('index.php?page=items&updated=1');
+                    } else {
+                        ItemRepository::create($pdo, $itemName, (float) $unitRateRaw, $status);
+                        Helpers::redirect('index.php?page=items&saved=1');
+                    }
+                    break;
+                } catch (PDOException $e) {
+                    if ((string) $e->getCode() === '23000') {
+                        $error = 'An item with this name already exists.';
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
+        }
+
+        if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!Helpers::verifyCsrf((string) ($_POST['csrf_token'] ?? ''))) {
+                http_response_code(400);
+                echo 'Invalid CSRF token.';
+                break;
+            }
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id > 0) {
+                ItemRepository::delete($pdo, $id);
+            }
+            Helpers::redirect('index.php?page=items&deleted=1');
+            break;
+        }
+
+        if ($action === 'edit' && $error === null) {
+            $editingItem = ItemRepository::find($pdo, (int) ($_GET['id'] ?? 0));
+            if ($editingItem === null) {
+                http_response_code(404);
+                echo 'Item not found.';
+                break;
+            }
+        }
+
+        $editingItem = $editingItem ?? [
+            'id' => 0,
+            'item_name' => '',
+            'unit_rate' => '',
+            'status' => 'Active',
+        ];
+        $q = trim((string) ($_GET['q'] ?? ''));
+        $statusFilter = (string) ($_GET['status'] ?? '');
+        $sort = (string) ($_GET['sort'] ?? 'created_at');
+        $order = strtoupper((string) ($_GET['order'] ?? 'DESC')) === 'ASC' ? 'ASC' : 'DESC';
+        $pageNumber = max(1, (int) ($_GET['p'] ?? 1));
+        $limit = max(5, min(100, (int) ($_GET['limit'] ?? 20)));
+        $itemsResult = ItemRepository::paginate(
+            $pdo,
+            ['q' => $q, 'status' => $statusFilter, 'sort' => $sort, 'order' => $order],
+            $pageNumber,
+            $limit
+        );
+
+        $success = null;
+        if (isset($_GET['saved'])) {
+            $success = 'Item Added Successfully';
+        } elseif (isset($_GET['updated'])) {
+            $success = 'Item Updated Successfully';
+        } elseif (isset($_GET['deleted'])) {
+            $success = 'Item Deleted Successfully';
+        }
+
+        Helpers::view('items/index', compact(
+            'itemsResult',
+            'editingItem',
+            'q',
+            'statusFilter',
+            'sort',
+            'order',
+            'limit',
+            'success',
+            'error'
+        ));
+        break;
+
     case 'parcels':
         if (!Auth::check()) { http_response_code(403); echo 'Forbidden'; break; }
         if (!Auth::canCreateParcels()) { http_response_code(403); echo 'Forbidden'; break; }
         $action = $_GET['action'] ?? 'index';
         $pdo = Database::pdo();
+        $activeItems = ItemRepository::activeOptions($pdo);
 
         try { $pdo->exec("ALTER TABLE parcels ADD COLUMN delivery_route VARCHAR(255) NULL"); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcels ADD COLUMN invoice_no INT UNSIGNED NULL'); } catch (Throwable $e) { /* ignore if exists */ }
@@ -2085,7 +2215,7 @@ switch ($page) {
                     $deliveryRoutesAll = $deliveryRoutesAll ?? [];
                     $lastParcel = null;
                     $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','deliveryRoutesAll','lastParcel') + ['policy'=>['priceOnly'=>false,'lockAll'=>true,'canEnterItemAmounts'=>$canEnterItemAmounts]]);
+                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','deliveryRoutesAll','lastParcel','activeItems') + ['policy'=>['priceOnly'=>false,'lockAll'=>true,'canEnterItemAmounts'=>$canEnterItemAmounts]]);
                     break;
                 }
                 if ($isKilinochchi) {
@@ -2132,7 +2262,7 @@ switch ($page) {
                         }
                         $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
                         $lastParcel = null;
-                        Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','lastParcel'));
+                        Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','lastParcel','activeItems'));
                         break;
                     }
                 } else {
@@ -2165,7 +2295,7 @@ switch ($page) {
                 }
                 $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
                 $lastParcel = null;
-                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel'));
+                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel','activeItems'));
                 break;
             }
 
@@ -2192,7 +2322,7 @@ switch ($page) {
                 }
                 $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
                 $lastParcel = null;
-                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel'));
+                Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel','activeItems'));
                 break;
             }
 
@@ -2232,7 +2362,7 @@ switch ($page) {
                     }
                     $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
                     $lastParcel = null;
-                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel'));
+                    Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','error','items','vehiclesAll','policy','deliveryRoutesAll','lastParcel','activeItems'));
                     break;
                 }
             }
@@ -2850,7 +2980,7 @@ switch ($page) {
             // Determine lock/priceOnly flags for UI
             $policy = ['priceOnly'=>false,'lockAll'=>false,'canEnterItemAmounts'=>$canEnterItemAmounts];
             $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel','deliveryRoutesAll','todayBillSummary'));
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','items','vehiclesAll','policy','lastParcel','deliveryRoutesAll','todayBillSummary','activeItems'));
             break;
         }
 
@@ -2879,7 +3009,7 @@ switch ($page) {
                 $policy['statusOnlyEdit'] = true;
             }
             $branchesAll = BranchRepository::forParcelForm($pdo, $parcel);
-            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy','deliveryRoutesAll'));
+            Helpers::view('parcels/form', compact('parcel','branchesAll','customersAll','suppliersAll','isMain','items','vehiclesAll','policy','deliveryRoutesAll','activeItems'));
             break;
         }
 

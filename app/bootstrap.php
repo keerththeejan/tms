@@ -38,6 +38,7 @@ require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Helpers.php';
 require_once __DIR__ . '/ParcelSaveService.php';
 require_once __DIR__ . '/ParcelBillingService.php';
+require_once __DIR__ . '/ItemRepository.php';
 require_once __DIR__ . '/BranchRepository.php';
 require_once __DIR__ . '/BranchFixedMaster.php';
 require_once __DIR__ . '/EmployeeListService.php';
@@ -73,6 +74,7 @@ require_once __DIR__ . '/AccountingExcelExport.php';
 require_once __DIR__ . '/AccountingPdfExport.php';
 require_once __DIR__ . '/AccountingPaymentModeSettingsRepository.php';
 require_once __DIR__ . '/VoucherAutoLedgerService.php';
+require_once __DIR__ . '/VoucherUpdateService.php';
 require_once __DIR__ . '/AccountingController.php';
 require_once __DIR__ . '/AccountingDashboardSeedService.php';
 require_once __DIR__ . '/AccountingModule.php';
@@ -89,6 +91,11 @@ require_once __DIR__ . '/AuditLogRepository.php';
 
 // Load config and initialize DB (already loaded above)
 Database::init($config);
+try {
+    ItemRepository::ensureSchema(Database::pdo());
+} catch (Throwable $e) {
+    /* item master optional until DB ready */
+}
 try {
     BranchRepository::ensureSchema(Database::pdo());
 } catch (Throwable $e) {

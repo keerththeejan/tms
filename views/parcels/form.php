@@ -1,4 +1,7 @@
-<?php /** @var array $parcel */ ?>
+<?php
+/** @var array $parcel */
+$activeItems = $activeItems ?? [];
+?>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
   body:has(.parcel-form-page) {
@@ -2348,7 +2351,7 @@
           <thead>
             <tr>
               <th scope="col" class="col-no">No</th>
-              <th scope="col" class="col-description">Description</th>
+              <th scope="col" class="col-description">Item</th>
               <th scope="col" class="col-qty">Qty</th>
               <th scope="col" class="col-rate">Rate</th>
               <th scope="col" class="col-amount">Amount</th>
@@ -2388,9 +2391,29 @@
             ?>
             <tr>
               <td class="text-center align-middle pf-item-no-cell col-no"><?php echo $rowIndex; ?></td>
-              <td class="col-description"><input type="text" name="items[<?php echo $rowIndex; ?>][description]" class="form-control item-desc" value="<?php echo htmlspecialchars($it['description'] ?? ''); ?>" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td class="col-description">
+                <?php $selectedItemName = trim((string) ($it['description'] ?? '')); ?>
+                <select name="items[<?php echo $rowIndex; ?>][description]" class="form-select item-desc" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'disabled' : ''; ?>>
+                  <option value="">Select Item</option>
+                  <?php $selectedFound = false; ?>
+                  <?php foreach ($activeItems as $masterItem): ?>
+                    <?php
+                      $masterName = (string) ($masterItem['item_name'] ?? '');
+                      $isSelected = $selectedItemName !== '' && $masterName === $selectedItemName;
+                      $selectedFound = $selectedFound || $isSelected;
+                    ?>
+                    <option value="<?php echo htmlspecialchars($masterName); ?>" data-rate="<?php echo htmlspecialchars((string) ($masterItem['unit_rate'] ?? '0')); ?>" <?php echo $isSelected ? 'selected' : ''; ?>><?php echo htmlspecialchars($masterName); ?></option>
+                  <?php endforeach; ?>
+                  <?php if ($selectedItemName !== '' && !$selectedFound): ?>
+                    <option value="<?php echo htmlspecialchars($selectedItemName); ?>" data-rate="<?php echo htmlspecialchars((string) $r); ?>" selected><?php echo htmlspecialchars($selectedItemName); ?> (Saved)</option>
+                  <?php endif; ?>
+                </select>
+                <?php if ($lockAll || ($isEdit && $priceOnly)): ?>
+                  <input type="hidden" name="items[<?php echo $rowIndex; ?>][description]" value="<?php echo htmlspecialchars($selectedItemName); ?>">
+                <?php endif; ?>
+              </td>
               <td class="col-qty"><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
+              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : 'readonly'; ?> placeholder="Rate"></td>
               <?php
                 $addAmounts = [];
                 if (!empty($it['additional_amounts'])) {
@@ -2430,9 +2453,16 @@
             <?php if (empty($itemsList)): ?>
             <tr>
               <td class="text-center align-middle pf-item-no-cell col-no">1</td>
-              <td class="col-description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
+              <td class="col-description">
+                <select name="items[1][description]" class="form-select item-desc" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'disabled' : ''; ?>>
+                  <option value="">Select Item</option>
+                  <?php foreach ($activeItems as $masterItem): ?>
+                    <option value="<?php echo htmlspecialchars((string) ($masterItem['item_name'] ?? '')); ?>" data-rate="<?php echo htmlspecialchars((string) ($masterItem['unit_rate'] ?? '0')); ?>"><?php echo htmlspecialchars((string) ($masterItem['item_name'] ?? '')); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </td>
               <td class="col-qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ''; ?> placeholder="Rate"></td>
+              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : 'readonly'; ?> placeholder="Rate"></td>
               <td class="align-middle pf-item-amt-cell col-amount">
                 <span class="item-amount fw-semibold pf-amount-readout">—</span>
               </td>
@@ -2698,6 +2728,19 @@
   const priceOnly = <?php echo $priceOnly ? 'true' : 'false'; ?>;
   const lockAll = <?php echo $lockAll ? 'true' : 'false'; ?>;
   const canEnterItemAmounts = <?php echo $canEnterItemAmounts ? 'true' : 'false'; ?>;
+  const itemOptionsHtml = <?php
+    $itemOptionsMarkup = '<option value="">Select Item</option>';
+    foreach ($activeItems as $masterItem) {
+      $itemOptionsMarkup .= '<option value="'
+        . htmlspecialchars((string) ($masterItem['item_name'] ?? ''), ENT_QUOTES, 'UTF-8')
+        . '" data-rate="'
+        . htmlspecialchars((string) ($masterItem['unit_rate'] ?? '0'), ENT_QUOTES, 'UTF-8')
+        . '">'
+        . htmlspecialchars((string) ($masterItem['item_name'] ?? ''), ENT_QUOTES, 'UTF-8')
+        . '</option>';
+    }
+    echo json_encode($itemOptionsMarkup, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+  ?>;
   const customersSearchData = <?php echo json_encode(array_map(function($c){
     $id = (int)($c['id'] ?? 0);
     $type = strtolower(trim((string)($c['customer_type'] ?? '')));
@@ -3050,9 +3093,9 @@
                 tbody.innerHTML = `
                   <tr>
                     <td class="text-center align-middle pf-item-no-cell col-no">1</td>
-                    <td class="col-description"><input type="text" name="items[1][description]" class="form-control item-desc" placeholder="Description"></td>
+                    <td class="col-description"><select name="items[1][description]" class="form-select item-desc">${itemOptionsHtml}</select></td>
                     <td class="col-qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty"></td>
-                    <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
+                    <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" ${canEnterItemAmounts ? 'readonly' : 'disabled'} placeholder="Rate"></td>
                     <td class="align-middle pf-item-amt-cell col-amount">
                       <span class="item-amount fw-semibold pf-amount-readout">—</span>
                     </td>
@@ -4071,6 +4114,19 @@
     }
   });
 
+  table?.addEventListener('change', function(e) {
+    const select = e.target.closest('.item-desc');
+    if (!select || lockAll) return;
+    const row = select.closest('tr');
+    const rateInput = row?.querySelector('.item-rate');
+    const selected = select.options[select.selectedIndex];
+    if (rateInput) {
+      const rate = parseFloat(selected?.dataset.rate || '0') || 0;
+      rateInput.value = select.value && rate >= 0 ? rate.toFixed(2) : '';
+    }
+    recalc();
+  });
+
   function syncAddRemoveButtons(root){
     if (!root) return;
     let lists = [];
@@ -4143,9 +4199,9 @@
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="text-center align-middle pf-item-no-cell col-no">${idx}</td>
-      <td class="col-description"><input type="text" name="items[${idx}][description]" class="form-control item-desc" placeholder="Description"></td>
+      <td class="col-description"><select name="items[${idx}][description]" class="form-select item-desc">${itemOptionsHtml}</select></td>
       <td class="col-qty"><input type="number" step="0.01" name="items[${idx}][qty]" class="form-control item-qty" placeholder="Qty"></td>
-      <td class="col-rate"><input type="number" step="0.01" min="0" name="items[${idx}][rate]" class="form-control item-rate" ${canEnterItemAmounts ? '' : 'disabled'} placeholder="Rate"></td>
+      <td class="col-rate"><input type="number" step="0.01" min="0" name="items[${idx}][rate]" class="form-control item-rate" ${canEnterItemAmounts ? 'readonly' : 'disabled'} placeholder="Rate"></td>
       <td class="align-middle pf-item-amt-cell col-amount">
         <span class="item-amount fw-semibold pf-amount-readout">—</span>
       </td>
@@ -4170,9 +4226,9 @@
     `;
     tbody.appendChild(tr);
     syncAddRemoveButtons(tr);
-    // Focus Description of the newly added row for quick typing
-    const desc = tr.querySelector(`input[name="items[${idx}][description]"]`);
-    if (desc) { desc.focus(); desc.select(); }
+    // Focus Item of the newly added row for quick selection
+    const itemSelect = tr.querySelector(`select[name="items[${idx}][description]"]`);
+    if (itemSelect) itemSelect.focus();
   });
 
   recalc();
