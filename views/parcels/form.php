@@ -564,6 +564,36 @@ $activeItems = $activeItems ?? [];
   .parcel-form-page #itemsTable .item-desc {
     text-align: left;
   }
+  .parcel-form-page #itemsTable .pf-item-pick {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+  .parcel-form-page #itemsTable .pf-manual-toggle-wrap {
+    margin: 0;
+    min-height: auto;
+    padding-left: 2.1em;
+  }
+  .parcel-form-page #itemsTable .pf-manual-toggle-wrap .form-check-input {
+    margin-top: 0.2rem;
+  }
+  .parcel-form-page #itemsTable .pf-manual-toggle-wrap .form-check-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    user-select: none;
+  }
+  .parcel-form-page #itemsTable .pf-manual-fields {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .parcel-form-page #itemsTable .pf-manual-fields.d-none {
+    display: none !important;
+  }
+  .parcel-form-page #itemsTable .item-manual-name,
+  .parcel-form-page #itemsTable .item-manual-unit {
+    text-align: left;
+  }
   .parcel-form-page #itemsTable .item-qty,
   .parcel-form-page #itemsTable .item-rate {
     text-align: center;
@@ -2361,6 +2391,58 @@ $activeItems = $activeItems ?? [];
           </thead>
           <tbody>
             <?php
+              if (!function_exists('pf_render_item_pick_cell')) {
+                function pf_render_item_pick_cell(int $rowIndex, array $it, array $activeItems, bool $lockAll, bool $isEdit, bool $priceOnly, float $rate): void {
+                  $selectedItemName = trim((string) ($it['description'] ?? ''));
+                  $isManual = !empty($it['is_manual']) && (string) $it['is_manual'] !== '0';
+                  $manualName = trim((string) ($it['manual_item_name'] ?? ''));
+                  if ($isManual && $manualName === '') {
+                    $manualName = $selectedItemName;
+                  }
+                  $manualUnit = trim((string) ($it['manual_unit'] ?? ''));
+                  $descDisabled = ($lockAll || ($isEdit && $priceOnly));
+                  $selectDisabled = $descDisabled || $isManual;
+                  ?>
+                <div class="pf-item-pick" data-manual="<?php echo $isManual ? '1' : '0'; ?>">
+                  <select name="items[<?php echo $rowIndex; ?>][description]" class="form-select item-desc" <?php echo $selectDisabled ? 'disabled' : ''; ?><?php echo $isManual ? ' style="display:none"' : ''; ?>>
+                    <option value="">Select Item</option>
+                    <?php $selectedFound = false; ?>
+                    <?php foreach ($activeItems as $masterItem): ?>
+                      <?php
+                        $masterName = (string) ($masterItem['item_name'] ?? '');
+                        $isSelected = !$isManual && $selectedItemName !== '' && $masterName === $selectedItemName;
+                        $selectedFound = $selectedFound || $isSelected;
+                      ?>
+                      <option value="<?php echo htmlspecialchars($masterName); ?>" data-rate="<?php echo htmlspecialchars((string) ($masterItem['unit_rate'] ?? '0')); ?>" <?php echo $isSelected ? 'selected' : ''; ?>><?php echo htmlspecialchars($masterName); ?></option>
+                    <?php endforeach; ?>
+                    <?php if (!$isManual && $selectedItemName !== '' && !$selectedFound): ?>
+                      <option value="<?php echo htmlspecialchars($selectedItemName); ?>" data-rate="<?php echo htmlspecialchars((string) $rate); ?>" selected><?php echo htmlspecialchars($selectedItemName); ?> (Saved)</option>
+                    <?php endif; ?>
+                  </select>
+                  <?php if ($descDisabled): ?>
+                    <input type="hidden" name="items[<?php echo $rowIndex; ?>][description]" value="<?php echo htmlspecialchars($selectedItemName); ?>">
+                    <?php if ($isManual): ?>
+                      <input type="hidden" name="items[<?php echo $rowIndex; ?>][is_manual]" value="1">
+                      <input type="hidden" name="items[<?php echo $rowIndex; ?>][manual_item_name]" value="<?php echo htmlspecialchars($manualName); ?>">
+                      <input type="hidden" name="items[<?php echo $rowIndex; ?>][manual_unit]" value="<?php echo htmlspecialchars($manualUnit); ?>">
+                    <?php endif; ?>
+                  <?php else: ?>
+                    <div class="form-check form-switch pf-manual-toggle-wrap">
+                      <input class="form-check-input item-manual-toggle" type="checkbox" role="switch" id="itemManual<?php echo $rowIndex; ?>" name="items[<?php echo $rowIndex; ?>][is_manual]" value="1" <?php echo $isManual ? 'checked' : ''; ?>>
+                      <label class="form-check-label" for="itemManual<?php echo $rowIndex; ?>">Manual Entry</label>
+                    </div>
+                    <div class="pf-manual-fields <?php echo $isManual ? '' : 'd-none'; ?>">
+                      <input type="text" class="form-control form-control-sm item-manual-name" name="items[<?php echo $rowIndex; ?>][manual_item_name]" value="<?php echo htmlspecialchars($manualName); ?>" placeholder="Item Name" maxlength="200" autocomplete="off" <?php echo $isManual ? '' : 'disabled'; ?>>
+                      <input type="text" class="form-control form-control-sm item-manual-unit" name="items[<?php echo $rowIndex; ?>][manual_unit]" value="<?php echo htmlspecialchars($manualUnit); ?>" placeholder="Unit" maxlength="50" autocomplete="off" <?php echo $isManual ? '' : 'disabled'; ?>>
+                    </div>
+                  <?php endif; ?>
+                  <?php if ($descDisabled && $isManual): ?>
+                    <div class="small text-muted"><?php echo htmlspecialchars($manualName !== '' ? $manualName : $selectedItemName); ?><?php echo $manualUnit !== '' ? ' (' . htmlspecialchars($manualUnit) . ')' : ''; ?></div>
+                  <?php endif; ?>
+                </div>
+                  <?php
+                }
+              }
               $itemsList = $items ?? [];
               $parcelPrice = (float)($parcel['price'] ?? 0);
               $sumWithRate = 0.0;
@@ -2383,37 +2465,21 @@ $activeItems = $activeItems ?? [];
               $rowIndex++;
               $q = (float)($it['qty'] ?? 0);
               $r = (float)($it['rate'] ?? 0);
+              $isManualRow = !empty($it['is_manual']) && (string) $it['is_manual'] !== '0';
               $amt = $q > 0 && $r > 0 ? ($q * $r) : 0;
               if ($amt <= 0 && $noRateCount > 0 && $parcelPrice > 0 && ($q > 0 || trim((string)($it['description'] ?? '')) !== '')) {
                 $noRateIdx++;
                 $amt = ($remainderForNoRate / $noRateCount);
               }
+              $rateReadonly = ($lockAll || !$canEnterItemAmounts) ? 'disabled' : ($isManualRow ? '' : 'readonly');
             ?>
-            <tr>
+            <tr class="<?php echo $isManualRow ? 'pf-row-manual' : ''; ?>">
               <td class="text-center align-middle pf-item-no-cell col-no"><?php echo $rowIndex; ?></td>
               <td class="col-description">
-                <?php $selectedItemName = trim((string) ($it['description'] ?? '')); ?>
-                <select name="items[<?php echo $rowIndex; ?>][description]" class="form-select item-desc" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'disabled' : ''; ?>>
-                  <option value="">Select Item</option>
-                  <?php $selectedFound = false; ?>
-                  <?php foreach ($activeItems as $masterItem): ?>
-                    <?php
-                      $masterName = (string) ($masterItem['item_name'] ?? '');
-                      $isSelected = $selectedItemName !== '' && $masterName === $selectedItemName;
-                      $selectedFound = $selectedFound || $isSelected;
-                    ?>
-                    <option value="<?php echo htmlspecialchars($masterName); ?>" data-rate="<?php echo htmlspecialchars((string) ($masterItem['unit_rate'] ?? '0')); ?>" <?php echo $isSelected ? 'selected' : ''; ?>><?php echo htmlspecialchars($masterName); ?></option>
-                  <?php endforeach; ?>
-                  <?php if ($selectedItemName !== '' && !$selectedFound): ?>
-                    <option value="<?php echo htmlspecialchars($selectedItemName); ?>" data-rate="<?php echo htmlspecialchars((string) $r); ?>" selected><?php echo htmlspecialchars($selectedItemName); ?> (Saved)</option>
-                  <?php endif; ?>
-                </select>
-                <?php if ($lockAll || ($isEdit && $priceOnly)): ?>
-                  <input type="hidden" name="items[<?php echo $rowIndex; ?>][description]" value="<?php echo htmlspecialchars($selectedItemName); ?>">
-                <?php endif; ?>
+                <?php pf_render_item_pick_cell($rowIndex, $it, $activeItems, $lockAll, $isEdit, $priceOnly, $r); ?>
               </td>
               <td class="col-qty"><input type="number" step="0.01" name="items[<?php echo $rowIndex; ?>][qty]" class="form-control item-qty" value="<?php echo htmlspecialchars((string)$q); ?>" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
-              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : 'readonly'; ?> placeholder="Rate"></td>
+              <td class="col-rate"><input type="number" step="0.01" min="0" name="items[<?php echo $rowIndex; ?>][rate]" class="form-control item-rate" value="<?php echo $r > 0 ? number_format($r, 2, '.', '') : ''; ?>" <?php echo $rateReadonly; ?> placeholder="Rate"></td>
               <?php
                 $addAmounts = [];
                 if (!empty($it['additional_amounts'])) {
@@ -2454,12 +2520,7 @@ $activeItems = $activeItems ?? [];
             <tr>
               <td class="text-center align-middle pf-item-no-cell col-no">1</td>
               <td class="col-description">
-                <select name="items[1][description]" class="form-select item-desc" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'disabled' : ''; ?>>
-                  <option value="">Select Item</option>
-                  <?php foreach ($activeItems as $masterItem): ?>
-                    <option value="<?php echo htmlspecialchars((string) ($masterItem['item_name'] ?? '')); ?>" data-rate="<?php echo htmlspecialchars((string) ($masterItem['unit_rate'] ?? '0')); ?>"><?php echo htmlspecialchars((string) ($masterItem['item_name'] ?? '')); ?></option>
-                  <?php endforeach; ?>
-                </select>
+                <?php pf_render_item_pick_cell(1, [], $activeItems, $lockAll, $isEdit, $priceOnly, 0.0); ?>
               </td>
               <td class="col-qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty" <?php echo ($lockAll || ($isEdit && $priceOnly)) ? 'readonly' : ''; ?>></td>
               <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" <?php echo ($lockAll || !$canEnterItemAmounts) ? 'disabled' : 'readonly'; ?> placeholder="Rate"></td>
@@ -2741,6 +2802,67 @@ $activeItems = $activeItems ?? [];
     }
     echo json_encode($itemOptionsMarkup, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
   ?>;
+
+  function buildItemPickHtml(idx) {
+    return `
+      <div class="pf-item-pick" data-manual="0">
+        <select name="items[${idx}][description]" class="form-select item-desc">${itemOptionsHtml}</select>
+        <div class="form-check form-switch pf-manual-toggle-wrap">
+          <input class="form-check-input item-manual-toggle" type="checkbox" role="switch" id="itemManual${idx}" name="items[${idx}][is_manual]" value="1">
+          <label class="form-check-label" for="itemManual${idx}">Manual Entry</label>
+        </div>
+        <div class="pf-manual-fields d-none">
+          <input type="text" class="form-control form-control-sm item-manual-name" name="items[${idx}][manual_item_name]" placeholder="Item Name" maxlength="200" autocomplete="off" disabled>
+          <input type="text" class="form-control form-control-sm item-manual-unit" name="items[${idx}][manual_unit]" placeholder="Unit" maxlength="50" autocomplete="off" disabled>
+        </div>
+      </div>`;
+  }
+
+  function getRowItemName(row) {
+    if (!row) return '';
+    const toggle = row.querySelector('.item-manual-toggle');
+    if (toggle && toggle.checked) {
+      return (row.querySelector('.item-manual-name')?.value || '').trim();
+    }
+    return (row.querySelector('select.item-desc')?.value || '').trim();
+  }
+
+  function setRowManualMode(row, enabled) {
+    if (!row || lockAll) return;
+    const pick = row.querySelector('.pf-item-pick');
+    const select = row.querySelector('select.item-desc');
+    const fields = row.querySelector('.pf-manual-fields');
+    const nameInput = row.querySelector('.item-manual-name');
+    const unitInput = row.querySelector('.item-manual-unit');
+    const rateInput = row.querySelector('.item-rate');
+    const toggle = row.querySelector('.item-manual-toggle');
+    if (toggle) toggle.checked = !!enabled;
+    if (pick) pick.dataset.manual = enabled ? '1' : '0';
+    row.classList.toggle('pf-row-manual', !!enabled);
+    if (select) {
+      select.disabled = !!enabled;
+      select.style.display = enabled ? 'none' : '';
+      if (enabled) select.value = '';
+    }
+    if (fields) fields.classList.toggle('d-none', !enabled);
+    if (nameInput) {
+      nameInput.disabled = !enabled;
+      if (!enabled) nameInput.value = '';
+    }
+    if (unitInput) {
+      unitInput.disabled = !enabled;
+      if (!enabled) unitInput.value = '';
+    }
+    if (rateInput && canEnterItemAmounts && !(isEdit && priceOnly)) {
+      if (enabled) {
+        rateInput.removeAttribute('readonly');
+        rateInput.disabled = false;
+      } else {
+        rateInput.readOnly = true;
+        rateInput.disabled = false;
+      }
+    }
+  }
   const customersSearchData = <?php echo json_encode(array_map(function($c){
     $id = (int)($c['id'] ?? 0);
     $type = strtolower(trim((string)($c['customer_type'] ?? '')));
@@ -2972,6 +3094,45 @@ $activeItems = $activeItems ?? [];
           customerSearchEl?.classList.remove('is-invalid');
         }
       }
+
+      // Per-row item validation (catalog + manual) without changing existing save payload shape
+      if (table && !lockAll && !(isEdit && priceOnly)) {
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+          const toggle = row.querySelector('.item-manual-toggle');
+          const isManual = !!(toggle && toggle.checked);
+          const nameInput = row.querySelector('.item-manual-name');
+          const select = row.querySelector('select.item-desc');
+          const qtyInput = row.querySelector('.item-qty');
+          const rateInput = row.querySelector('.item-rate');
+          const desc = getRowItemName(row);
+          const qty = parseFloat(qtyInput?.value || '0') || 0;
+          const rate = parseFloat(rateInput?.value || '0') || 0;
+          let addSum = 0;
+          row.querySelectorAll('.item-add').forEach(function (inp) {
+            addSum += parseFloat(inp?.value || '0') || 0;
+          });
+          const hasContent = desc !== '' || qty > 0 || rate > 0 || addSum > 0 || isManual;
+          if (nameInput) nameInput.setCustomValidity('');
+          if (select && !select.disabled) select.setCustomValidity('');
+          if (qtyInput) qtyInput.setCustomValidity('');
+          if (rateInput) rateInput.setCustomValidity('');
+          if (!hasContent) return;
+          if (isManual) {
+            if (!desc) {
+              nameInput?.setCustomValidity('Item Name is required.');
+            }
+          } else if (!desc) {
+            select?.setCustomValidity('Please select an item or enable Manual Entry.');
+          }
+          if (qty <= 0) {
+            qtyInput?.setCustomValidity('Quantity must be greater than zero.');
+          }
+          if (rate < 0) {
+            rateInput?.setCustomValidity('Rate must be zero or greater.');
+          }
+        });
+      }
+
       // Scroll to first invalid field (HTML5 validation)
       if (!form.checkValidity()) {
         form.classList.add('was-validated');
@@ -3093,7 +3254,7 @@ $activeItems = $activeItems ?? [];
                 tbody.innerHTML = `
                   <tr>
                     <td class="text-center align-middle pf-item-no-cell col-no">1</td>
-                    <td class="col-description"><select name="items[1][description]" class="form-select item-desc">${itemOptionsHtml}</select></td>
+                    <td class="col-description">${buildItemPickHtml(1)}</td>
                     <td class="col-qty"><input type="number" step="0.01" name="items[1][qty]" class="form-control item-qty" placeholder="Qty"></td>
                     <td class="col-rate"><input type="number" step="0.01" min="0" name="items[1][rate]" class="form-control item-rate" ${canEnterItemAmounts ? 'readonly' : 'disabled'} placeholder="Rate"></td>
                     <td class="align-middle pf-item-amt-cell col-amount">
@@ -3167,7 +3328,7 @@ $activeItems = $activeItems ?? [];
     let subTotal = 0;
     let additionalTotal = 0;
     table.querySelectorAll('tbody tr').forEach((row) => {
-      const desc = (row.querySelector('.item-desc')?.value || '').trim();
+      const desc = getRowItemName(row);
       const qty = parseFloat(row.querySelector('.item-qty')?.value || '0') || 0;
       const rate = parseFloat(row.querySelector('.item-rate')?.value || '0') || 0;
       let addSum = 0;
@@ -4109,15 +4270,26 @@ $activeItems = $activeItems ?? [];
     const target = e.target;
     if (lockAll) return;
     if (!canEnterItemAmounts) return;
-    if (target.classList.contains('item-qty') || target.classList.contains('item-rate') || target.classList.contains('item-add')) {
+    if (target.classList.contains('item-qty') || target.classList.contains('item-rate') || target.classList.contains('item-add') || target.classList.contains('item-manual-name')) {
       recalc();
     }
   });
 
   table?.addEventListener('change', function(e) {
-    const select = e.target.closest('.item-desc');
+    const toggle = e.target.closest('.item-manual-toggle');
+    if (toggle) {
+      const row = toggle.closest('tr');
+      setRowManualMode(row, toggle.checked);
+      if (toggle.checked) {
+        row?.querySelector('.item-manual-name')?.focus();
+      }
+      recalc();
+      return;
+    }
+    const select = e.target.closest('select.item-desc');
     if (!select || lockAll) return;
     const row = select.closest('tr');
+    if (row?.querySelector('.item-manual-toggle')?.checked) return;
     const rateInput = row?.querySelector('.item-rate');
     const selected = select.options[select.selectedIndex];
     if (rateInput) {
@@ -4199,7 +4371,7 @@ $activeItems = $activeItems ?? [];
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="text-center align-middle pf-item-no-cell col-no">${idx}</td>
-      <td class="col-description"><select name="items[${idx}][description]" class="form-select item-desc">${itemOptionsHtml}</select></td>
+      <td class="col-description">${buildItemPickHtml(idx)}</td>
       <td class="col-qty"><input type="number" step="0.01" name="items[${idx}][qty]" class="form-control item-qty" placeholder="Qty"></td>
       <td class="col-rate"><input type="number" step="0.01" min="0" name="items[${idx}][rate]" class="form-control item-rate" ${canEnterItemAmounts ? 'readonly' : 'disabled'} placeholder="Rate"></td>
       <td class="align-middle pf-item-amt-cell col-amount">

@@ -1954,6 +1954,7 @@ switch ($page) {
         ParcelBillingService::ensureSchema($pdo);
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amount DECIMAL(12,2) NULL'); } catch (Throwable $e) { /* ignore if exists */ }
         try { $pdo->exec('ALTER TABLE parcel_items ADD COLUMN additional_amounts TEXT NULL'); } catch (Throwable $e) { /* ignore if exists */ }
+        ParcelSaveService::ensureParcelItemsManualColumns($pdo);
         try {
             $pdo->exec("ALTER TABLE parcels MODIFY COLUMN status ENUM('pending','in_transit','delivered','cancelled','returned','failed','on_hold','out_for_delivery') NOT NULL DEFAULT 'pending'");
         } catch (Throwable $e) { /* ignore if not permitted or already migrated */ }
@@ -2328,6 +2329,9 @@ switch ($page) {
 
             if (!$priceOnlyEdit) {
                 $err = ParcelSaveService::validateParcelPayload($weight, $delivery_location, $priceOnlyEdit);
+                if ($err === null && is_array($items)) {
+                    $err = ParcelSaveService::validateItemRows($items);
+                }
                 if ($err !== null) {
                     $error = $err;
                     $parcel = array_merge(
@@ -2416,23 +2420,26 @@ switch ($page) {
                     // Replace items allowed for non-Kilinochchi
                     $pdo->prepare('DELETE FROM parcel_items WHERE parcel_id=?')->execute([$id]);
                     if (is_array($items)) {
-                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate, additional_amount, additional_amounts) VALUES (?,?,?,?,?,?)');
+                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate, additional_amount, additional_amounts, is_manual, manual_item_name, manual_unit) VALUES (?,?,?,?,?,?,?,?,?)');
                         foreach ($items as $it) {
-                            $desc = trim($it['description'] ?? '');
-                            $qty = (float)($it['qty'] ?? 0);
-                            $rate = (float)($it['rate'] ?? 0);
-                            if ($rate <= 0) { $rs = (float)($it['rs'] ?? 0); $cts = (float)($it['cts'] ?? 0); $rate = $rs + ($cts/100.0); }
-                            $rate = ($rate > 0) ? $rate : null;
-                            $addArr = $it['additional_amounts'] ?? [];
-                            if (is_string($addArr)) { $addArr = json_decode($addArr, true) ?: []; }
-                            $addAmt = 0;
-                            foreach ((array)$addArr as $a) { $addAmt += (float)$a; }
-                            $addAmt = ($addAmt > 0) ? $addAmt : null;
-                            $addJson = !empty($addArr) ? json_encode(array_values(array_filter(array_map('floatval', $addArr)))) : null;
-                            if ($addJson === '[]') $addJson = null;
-                            if ($desc !== '' || $qty > 0) {
-                                $insItem->execute([$id, $qty, $desc, $rate, $addAmt, $addJson]);
+                            if (!is_array($it)) {
+                                continue;
                             }
+                            $row = ParcelSaveService::normalizeItemRow($it);
+                            if ($row === null) {
+                                continue;
+                            }
+                            $insItem->execute([
+                                $id,
+                                $row['qty'],
+                                $row['description'],
+                                $row['rate'],
+                                $row['additional_amount'],
+                                $row['additional_amounts'],
+                                $row['is_manual'],
+                                $row['manual_item_name'],
+                                $row['manual_unit'],
+                            ]);
                         }
                     }
                     // Sync any linked delivery note amounts to the (possibly) updated computed amount
@@ -2558,23 +2565,26 @@ switch ($page) {
                 // Insert item rows on create so list can show descriptions immediately
                 if ($id > 0 && is_array($items)) {
                     try {
-                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate, additional_amount, additional_amounts) VALUES (?,?,?,?,?,?)');
+                        $insItem = $pdo->prepare('INSERT INTO parcel_items (parcel_id, qty, description, rate, additional_amount, additional_amounts, is_manual, manual_item_name, manual_unit) VALUES (?,?,?,?,?,?,?,?,?)');
                         foreach ($items as $it) {
-                            $desc = trim($it['description'] ?? '');
-                            $qty = (float)($it['qty'] ?? 0);
-                            $rate = (float)($it['rate'] ?? 0);
-                            if ($rate <= 0) { $rs = (float)($it['rs'] ?? 0); $cts = (float)($it['cts'] ?? 0); $rate = $rs + ($cts/100.0); }
-                            $rate = ($rate > 0) ? $rate : null;
-                            $addArr = $it['additional_amounts'] ?? [];
-                            if (is_string($addArr)) { $addArr = json_decode($addArr, true) ?: []; }
-                            $addAmt = 0;
-                            foreach ((array)$addArr as $a) { $addAmt += (float)$a; }
-                            $addAmt = ($addAmt > 0) ? $addAmt : null;
-                            $addJson = !empty($addArr) ? json_encode(array_values(array_filter(array_map('floatval', $addArr)))) : null;
-                            if ($addJson === '[]') $addJson = null;
-                            if ($desc !== '' || $qty > 0) {
-                                $insItem->execute([$id, $qty, $desc, $rate, $addAmt, $addJson]);
+                            if (!is_array($it)) {
+                                continue;
                             }
+                            $row = ParcelSaveService::normalizeItemRow($it);
+                            if ($row === null) {
+                                continue;
+                            }
+                            $insItem->execute([
+                                $id,
+                                $row['qty'],
+                                $row['description'],
+                                $row['rate'],
+                                $row['additional_amount'],
+                                $row['additional_amounts'],
+                                $row['is_manual'],
+                                $row['manual_item_name'],
+                                $row['manual_unit'],
+                            ]);
                         }
                     } catch (Throwable $e) { /* ignore if table missing */ }
                 }
