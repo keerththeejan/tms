@@ -552,10 +552,27 @@ class AccountingController
 
     private static function searchAccounts(PDO $pdo): void
     {
-        $query = $_GET['q'] ?? '';
+        $query = (string) ($_GET['q'] ?? $_GET['term'] ?? '');
         $limit = (int) ($_GET['limit'] ?? 50);
         $accounts = AccountRepository::searchAccounts($pdo, $query, $limit);
-        self::json(['ok' => true, 'data' => $accounts]);
+        $results = [];
+        foreach ($accounts as $acc) {
+            $code = (string) ($acc['account_code'] ?? '');
+            $name = (string) ($acc['account_name'] ?? '');
+            $label = trim($code . ' - ' . $name, ' -');
+            $results[] = [
+                'id' => (int) ($acc['id'] ?? 0),
+                'text' => $label,
+                'account_code' => $code,
+                'account_name' => $name,
+                'group_name' => (string) ($acc['group_name'] ?? ''),
+            ];
+        }
+        self::json([
+            'ok' => true,
+            'data' => $accounts,
+            'results' => $results,
+        ]);
     }
 
     private static function getAccountBalance(PDO $pdo): void

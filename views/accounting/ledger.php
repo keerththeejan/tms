@@ -235,6 +235,67 @@ $printedDate = date('Y-m-d H:i');
   .acc-ledger-table td { border: 1px solid #000 !important; }
 }
 .acc-ledger-print-meta { display: none; }
+
+/* Searchable account selector (Select2) — matches ledger toolbar */
+.acc-ledger-form-group--account {
+    min-width: min(100%, 280px);
+    flex: 1 1 240px;
+    max-width: 420px;
+}
+.acc-ledger-form-group--account select,
+.acc-ledger-toolbar .select2-container {
+    min-width: 220px;
+    width: 100% !important;
+}
+.acc-ledger-toolbar .select2-container--bootstrap-5 .select2-selection {
+    font-size: 11px;
+    font-family: 'Tahoma', 'Arial', sans-serif;
+    border: 1px solid #999;
+    border-radius: 0;
+    min-height: 28px;
+}
+.acc-ledger-toolbar .select2-container--bootstrap-5 .select2-selection--single {
+    padding: 2px 5px;
+}
+.acc-ledger-toolbar .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+    padding-left: 2px;
+    line-height: 22px;
+    color: #000;
+}
+.acc-ledger-toolbar .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+    height: 26px;
+}
+.acc-ledger-toolbar .select2-container--bootstrap-5 .select2-selection__clear {
+    margin-right: 18px;
+    font-size: 14px;
+}
+.select2-container--bootstrap-5 .select2-dropdown {
+    font-size: 12px;
+    font-family: 'Tahoma', 'Arial', sans-serif;
+    border-color: #999;
+    z-index: 3000;
+}
+.select2-container--bootstrap-5 .select2-search--dropdown {
+    display: block !important;
+    padding: 6px;
+}
+.select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
+    display: block !important;
+    width: 100% !important;
+    min-height: 28px;
+    font-size: 12px;
+    border: 1px solid #999;
+    padding: 4px 6px;
+}
+.select2-container--bootstrap-5 .select2-results__option--highlighted {
+    background-color: #357ABD !important;
+}
+@media (max-width: 767.98px) {
+  .acc-ledger-form-group--account {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
 </style>
 
 <div class="acc-ledger-module">
@@ -247,10 +308,35 @@ $printedDate = date('Y-m-d H:i');
 
     <!-- Toolbar -->
     <div class="acc-ledger-toolbar no-print">
-        <div class="acc-ledger-form-group">
-            <label>Account</label>
-            <select id="accAccountId">
-                <option value="">Select Account</option>
+        <div class="acc-ledger-form-group acc-ledger-form-group--account">
+            <label for="accAccountId">Account</label>
+            <select id="accAccountId"
+                    class="acc-ledger-account-select"
+                    data-enhance="false"
+                    data-placeholder="Search Account..."
+                    aria-label="Search Account">
+                <option value="">Search Account...</option>
+                <?php
+                $preselectedAccount = null;
+                if ($accountId > 0) {
+                    try {
+                        $preselectedAccount = AccountRepository::getById(Database::pdo(), $accountId);
+                    } catch (Throwable $e) {
+                        $preselectedAccount = null;
+                    }
+                }
+                if (is_array($preselectedAccount)):
+                    $preLabel = trim(
+                        (string) ($preselectedAccount['account_code'] ?? '')
+                        . ' - '
+                        . (string) ($preselectedAccount['account_name'] ?? ''),
+                        ' -'
+                    );
+                ?>
+                <option value="<?php echo (int) $preselectedAccount['id']; ?>" selected>
+                    <?php echo htmlspecialchars($preLabel !== '' ? $preLabel : ('Account #' . $accountId)); ?>
+                </option>
+                <?php endif; ?>
             </select>
         </div>
         <div class="acc-ledger-form-group">
@@ -381,15 +467,17 @@ const accBaseUrl = <?php echo json_encode($baseUrl, JSON_UNESCAPED_SLASHES); ?>;
 const accPrintCompany = <?php echo json_encode($companyName, JSON_UNESCAPED_UNICODE); ?>;
 const accPrintedBy = <?php echo json_encode($printedBy, JSON_UNESCAPED_UNICODE); ?>;
 const accPrintedDate = <?php echo json_encode($printedDate); ?>;
+const accPreselectedAccountId = <?php echo (int) $accountId; ?>;
 let accLastLedger = null;
+let accAccountSelectInitializing = false;
 
 document.addEventListener('DOMContentLoaded', function () {
-    accLoadAccounts();
+    accInitAccountSelect();
     accLoadBranches();
 });
 
 function accLedgerQuery() {
-    const accountId = document.getElementById('accAccountId').value;
+    const accountId = accGetSelectedAccountId();
     const fromDate = document.getElementById('accFromDate').value;
     const toDate = document.getElementById('accToDate').value;
     const voucherType = document.getElementById('accVoucherType').value;
@@ -401,6 +489,70 @@ function accLedgerQuery() {
         + '&voucher_type=' + encodeURIComponent(voucherType || '')
         + '&branch_id=' + encodeURIComponent(branchId || '')
         + '&status=' + encodeURIComponent(status || '');
+}
+
+function accGetSelectedAccountId() {
+    const select = document.getElementById('accAccountId');
+    if (!select) return '';
+    let value = '';
+    try {
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2 && jQuery(select).data('select2')) {
+            value = jQuery(select).val();
+        }
+    } catch (e) { /* ignore */ }
+    if (value == null || value === '') {
+        value = select.value;
+    }
+    return String(value || '');
+}
+
+function accAccountLabel(acc) {
+    const code = String((acc && acc.account_code) || '');
+    const name = String((acc && acc.account_name) || '');
+    const label = (code + ' - ' + name).replace(/^\s*-\s*|\s*-\s*$/g, '').trim();
+    return label || ('Account #' + String((acc && acc.id) || ''));
+}
+
+function accSyncAccountUrl(accountId) {
+    try {
+        const url = new URL(window.location.href);
+        if (accountId) {
+            url.searchParams.set('account_id', String(accountId));
+        } else {
+            url.searchParams.delete('account_id');
+        }
+        const fromDate = document.getElementById('accFromDate')?.value;
+        const toDate = document.getElementById('accToDate')?.value;
+        if (fromDate) url.searchParams.set('from_date', fromDate);
+        if (toDate) url.searchParams.set('to_date', toDate);
+        // Preserve page/action and any other existing query params
+        window.history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString());
+    } catch (e) { /* ignore */ }
+}
+
+function accBindAccountChange(select) {
+    if (!select || select.dataset.accChangeBound === '1') return;
+    select.dataset.accChangeBound = '1';
+
+    const onChange = function () {
+        if (accAccountSelectInitializing) return;
+        const value = accGetSelectedAccountId();
+        accSyncAccountUrl(value);
+        if (value) {
+            accLoadLedger();
+        }
+    };
+
+    // Prefer jQuery event when Select2 is present (Select2 triggers jQuery change).
+    // Otherwise use native change for the HTML select fallback.
+    try {
+        if (typeof jQuery !== 'undefined') {
+            jQuery(select).off('change.accLedgerSelect').on('change.accLedgerSelect', onChange);
+            return;
+        }
+    } catch (e) { /* fall through */ }
+
+    select.addEventListener('change', onChange);
 }
 
 async function accLoadBranches() {
@@ -420,30 +572,202 @@ async function accLoadBranches() {
     } catch (e) { /* optional */ }
 }
 
-async function accLoadAccounts() {
+/**
+ * Always populate the native <select> so Ledger works even if Select2 fails.
+ * Returns number of accounts loaded.
+ */
+async function accLoadAccountsNative() {
+    const select = document.getElementById('accAccountId');
+    if (!select) return 0;
+
     try {
         const response = await fetch(accBaseUrl + 'index.php?page=api_accounting&acc_action=list_accounts');
         const data = await response.json();
-
-        if (data.ok && data.data) {
-            const select = document.getElementById('accAccountId');
-            select.innerHTML = '<option value="">Select Account</option>';
-            data.data.forEach(acc => {
-                select.innerHTML += `<option value="${acc.id}">${acc.account_code} - ${acc.account_name}</option>`;
-            });
-
-            <?php if ($accountId > 0): ?>
-            select.value = <?php echo $accountId; ?>;
-            accLoadLedger();
-            <?php endif; ?>
+        if (!data.ok || !Array.isArray(data.data)) {
+            console.error('Ledger: list_accounts failed', data);
+            return 0;
         }
+
+        const preferred = String(
+            accGetSelectedAccountId() || accPreselectedAccountId || select.value || ''
+        );
+
+        select.innerHTML = '<option value="">Search Account...</option>';
+        data.data.forEach(function (acc) {
+            const id = String(acc.id || '');
+            if (!id) return;
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = accAccountLabel(acc);
+            if (preferred && id === preferred) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+
+        if (preferred) {
+            select.value = preferred;
+        }
+        return data.data.length;
     } catch (error) {
         console.error('Error loading accounts:', error);
+        return 0;
     }
 }
 
+function accInitSelect2Search(select, useAjax) {
+    if (typeof jQuery === 'undefined' || !jQuery.fn.select2 || !select) {
+        return false;
+    }
+
+    const $el = jQuery(select);
+    try {
+        if ($el.data('select2')) {
+            $el.select2('destroy');
+        }
+    } catch (e) { /* ignore */ }
+
+    const opts = {
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Search Account...',
+        allowClear: true,
+        dropdownAutoWidth: false,
+        // Keep search box always visible
+        minimumResultsForSearch: 0,
+        // Render outside .acc-module (overflow:hidden) so search/results are visible
+        dropdownParent: jQuery(document.body),
+    };
+
+    if (useAjax) {
+        opts.minimumInputLength = 0;
+        opts.ajax = {
+            delay: 200,
+            cache: true,
+            dataType: 'json',
+            data: function (params) {
+                return {
+                    page: 'api_accounting',
+                    acc_action: 'search_accounts',
+                    q: params.term || '',
+                    limit: 50,
+                };
+            },
+            transport: function (params, success, failure) {
+                const q = (params.data && params.data.q) || '';
+                const url = accBaseUrl
+                    + 'index.php?page=api_accounting&acc_action=search_accounts'
+                    + '&q=' + encodeURIComponent(q)
+                    + '&limit=50';
+                fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error('Account search failed');
+                        return res.json();
+                    })
+                    .then(success)
+                    .catch(failure);
+            },
+            processResults: function (data) {
+                const rows = (data && Array.isArray(data.results) && data.results.length)
+                    ? data.results
+                    : ((data && data.data) || []).map(function (acc) {
+                        return { id: String(acc.id), text: accAccountLabel(acc) };
+                    });
+                return {
+                    results: rows.map(function (row) {
+                        return { id: String(row.id), text: String(row.text || '') };
+                    }),
+                };
+            },
+        };
+    }
+
+    try {
+        $el.select2(opts);
+        // Keep native option in sync when an AJAX result is chosen
+        $el.on('select2:select.accLedgerSelect', function (e) {
+            const item = e.params && e.params.data ? e.params.data : null;
+            if (!item || item.id == null) return;
+            const id = String(item.id);
+            let opt = select.querySelector('option[value="' + id.replace(/"/g, '\\"') + '"]');
+            if (!opt) {
+                opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = String(item.text || id);
+                select.appendChild(opt);
+            }
+            opt.selected = true;
+            select.value = id;
+        });
+        $el.on('select2:clear.accLedgerSelect', function () {
+            select.value = '';
+        });
+        return true;
+    } catch (err) {
+        console.warn('Select2 init failed; using native account dropdown.', err);
+        try {
+            if ($el.data('select2')) $el.select2('destroy');
+        } catch (e2) { /* ignore */ }
+        return false;
+    }
+}
+
+function accWhenSelect2Ready(callback) {
+    let tries = 0;
+    (function wait() {
+        if (typeof jQuery !== 'undefined' && jQuery.fn && jQuery.fn.select2) {
+            callback(true);
+            return;
+        }
+        tries += 1;
+        if (tries >= 40) {
+            callback(false);
+            return;
+        }
+        setTimeout(wait, 50);
+    })();
+}
+
+async function accInitAccountSelect() {
+    const select = document.getElementById('accAccountId');
+    if (!select) return;
+    if (select.dataset.accSelectInit === '1') return;
+    select.dataset.accSelectInit = '1';
+    accAccountSelectInitializing = true;
+
+    // 1) Always fill native <select> first (ledger works even without Select2)
+    const count = await accLoadAccountsNative();
+
+    // 2) Wait for Select2 (loaded in footer) then enhance
+    await new Promise(function (resolve) {
+        accWhenSelect2Ready(function (ready) {
+            const useAjax = count > 500;
+            const select2Ok = ready ? accInitSelect2Search(select, useAjax) : false;
+            accBindAccountChange(select);
+            accAccountSelectInitializing = false;
+
+            const selected = accGetSelectedAccountId();
+            if (selected) {
+                if (select2Ok && typeof jQuery !== 'undefined') {
+                    try {
+                        jQuery(select).val(selected).trigger('change.select2');
+                    } catch (e) {
+                        select.value = selected;
+                    }
+                }
+                accLoadLedger();
+            }
+
+            if (!select2Ok && count === 0) {
+                console.warn('Ledger account dropdown has no options and Select2 is unavailable.');
+            }
+            resolve();
+        });
+    });
+}
+
 async function accLoadLedger() {
-    const accountId = document.getElementById('accAccountId').value;
+    const accountId = accGetSelectedAccountId();
     if (!accountId) {
         alert('Please select an account');
         return;
@@ -455,6 +779,7 @@ async function accLoadLedger() {
 
         if (data.ok && data.data) {
             accLastLedger = data.data;
+            accSyncAccountUrl(accountId);
             accRenderLedger(data.data);
         } else {
             alert('Error loading Ledger: ' + (data.error || 'Unknown error'));
@@ -529,13 +854,13 @@ function accRenderLedger(ledger) {
 }
 
 function accExportExcel() {
-    const accountId = document.getElementById('accAccountId').value;
+    const accountId = accGetSelectedAccountId();
     if (!accountId) { alert('Please select an account'); return; }
     window.location.href = accBaseUrl + 'index.php?page=api_accounting&acc_action=export_ledger&format=csv&' + accLedgerQuery();
 }
 
 function accExportPdf() {
-    const accountId = document.getElementById('accAccountId').value;
+    const accountId = accGetSelectedAccountId();
     if (!accountId) { alert('Please select an account'); return; }
     window.location.href = accBaseUrl + 'index.php?page=api_accounting&acc_action=export_ledger&format=pdf&' + accLedgerQuery();
 }

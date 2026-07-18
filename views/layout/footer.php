@@ -113,6 +113,7 @@ $accJsVerFooter = is_file($accJsPathFooter) ? (string) filemtime($accJsPathFoote
 if (!empty($accAction)):
 ?>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="<?php echo Helpers::baseUrl('assets/js/accounting-module.js?v=' . rawurlencode($accJsVerFooter)); ?>"></script>
 <?php
   if (($accAction ?? '') === 'dashboard'):
@@ -125,7 +126,6 @@ if (!empty($accAction)):
   $accAccountsJsPath = dirname(__DIR__, 2) . '/public/assets/js/accounting-accounts.js';
   $accAccountsJsVer = is_file($accAccountsJsPath) ? (string) filemtime($accAccountsJsPath) : '6';
 ?>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="<?php echo Helpers::baseUrl('assets/js/accounting-accounts.js?v=' . rawurlencode($accAccountsJsVer)); ?>"></script>
 <?php endif; ?>
 <?php endif; ?>

@@ -314,16 +314,31 @@ class AccountRepository
     /** @return list<array<string,mixed>> */
     public static function searchAccounts(PDO $pdo, string $query, int $limit = 50): array
     {
+        $limit = max(1, min(100, $limit));
+        $query = trim($query);
+        $params = [];
+        $where = 'a.is_active = 1 AND a.deleted_at IS NULL';
+
+        if ($query !== '') {
+            // Search account name, code, and numeric id (account number)
+            $where .= ' AND (a.account_code LIKE ? OR a.account_name LIKE ? OR CAST(a.id AS CHAR) LIKE ?)';
+            $like = '%' . $query . '%';
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+
         $st = $pdo->prepare(
-            'SELECT a.*, ag.group_name, ag.group_type, ag.nature AS group_nature
+            "SELECT a.id, a.account_code, a.account_name, a.is_active,
+                    ag.group_name, ag.group_type, ag.nature AS group_nature
              FROM accounts a
              INNER JOIN account_groups ag ON ag.id = a.account_group_id
-             WHERE (a.account_code LIKE ? OR a.account_name LIKE ?)
-             AND a.is_active = 1 AND a.deleted_at IS NULL
-             ORDER BY a.account_name ASC
-             LIMIT ?'
+             WHERE {$where}
+             ORDER BY a.account_code ASC, a.account_name ASC
+             LIMIT {$limit}"
         );
-        $st->execute(["%{$query}%", "%{$query}%", $limit]);
+        $st->execute($params);
+
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
