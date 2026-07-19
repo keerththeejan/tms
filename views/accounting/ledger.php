@@ -241,9 +241,10 @@ $printedDate = date('Y-m-d H:i');
     min-width: min(100%, 280px);
     flex: 1 1 240px;
     max-width: 420px;
+    position: relative;
 }
-.acc-ledger-form-group--account select,
-.acc-ledger-toolbar .select2-container {
+/* Only the in-toolbar Select2 shell — never the body-level dropdown holder */
+.acc-ledger-form-group--account > .select2-container {
     min-width: 220px;
     width: 100% !important;
 }
@@ -269,11 +270,18 @@ $printedDate = date('Y-m-d H:i');
     margin-right: 18px;
     font-size: 14px;
 }
-.select2-container--bootstrap-5 .select2-dropdown {
+/* Body-level dropdown (dropdownParent: body) — keep searchable & wide enough */
+body > .select2-container--open {
+    z-index: 3000 !important;
+}
+.select2-container--bootstrap-5 .select2-dropdown,
+body > .select2-container .select2-dropdown {
     font-size: 12px;
     font-family: 'Tahoma', 'Arial', sans-serif;
     border-color: #999;
     z-index: 3000;
+    min-width: 260px !important;
+    box-sizing: border-box;
 }
 .select2-container--bootstrap-5 .select2-search--dropdown {
     display: block !important;
@@ -282,13 +290,19 @@ $printedDate = date('Y-m-d H:i');
 .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field {
     display: block !important;
     width: 100% !important;
+    min-width: 0 !important;
     min-height: 28px;
     font-size: 12px;
     border: 1px solid #999;
     padding: 4px 6px;
+    box-sizing: border-box;
 }
 .select2-container--bootstrap-5 .select2-results__option--highlighted {
     background-color: #357ABD !important;
+}
+.select2-container--bootstrap-5 .select2-results__message {
+    color: #666;
+    padding: 8px;
 }
 @media (max-width: 767.98px) {
   .acc-ledger-form-group--account {
@@ -311,6 +325,7 @@ $printedDate = date('Y-m-d H:i');
         <div class="acc-ledger-form-group acc-ledger-form-group--account">
             <label for="accAccountId">Account</label>
             <select id="accAccountId"
+                    name="account_id"
                     class="acc-ledger-account-select"
                     data-enhance="false"
                     data-placeholder="Search Account..."
@@ -573,15 +588,18 @@ async function accLoadBranches() {
 }
 
 /**
- * Always populate the native <select> so Ledger works even if Select2 fails.
- * Returns number of accounts loaded.
+ * Lightweight native <select> fill (fallback if Select2 unavailable).
+ * Uses for_select=1 to avoid heavy balance subqueries.
  */
 async function accLoadAccountsNative() {
     const select = document.getElementById('accAccountId');
     if (!select) return 0;
 
     try {
-        const response = await fetch(accBaseUrl + 'index.php?page=api_accounting&acc_action=list_accounts');
+        const response = await fetch(
+            accBaseUrl + 'index.php?page=api_accounting&acc_action=list_accounts&for_select=1',
+            { credentials: 'same-origin', headers: { Accept: 'application/json' } }
+        );
         const data = await response.json();
         if (!data.ok || !Array.isArray(data.data)) {
             console.error('Ledger: list_accounts failed', data);
@@ -615,7 +633,28 @@ async function accLoadAccountsNative() {
     }
 }
 
-function accInitSelect2Search(select, useAjax) {
+/** Fix Select2 body-dropdown width (bootstrap-5 + dropdownParent:body collapses to ~1px). */
+function accFixSelect2DropdownWidth($el) {
+    try {
+        const api = $el.data('select2');
+        if (!api) return;
+        const selW = api.$container && api.$container.outerWidth
+            ? api.$container.outerWidth()
+            : 280;
+        const width = Math.max(260, Math.round(selW) || 280);
+        if (api.$dropdown) {
+            api.$dropdown.css('width', width + 'px');
+            api.$dropdown.find('.select2-search__field').css('width', '100%');
+        }
+        // Body-level positioning container Select2 creates when dropdownParent is body
+        const $open = jQuery('body > .select2-container--open');
+        if ($open.length) {
+            $open.css('width', width + 'px');
+        }
+    } catch (e) { /* ignore */ }
+}
+
+function accInitSelect2Search(select) {
     if (typeof jQuery === 'undefined' || !jQuery.fn.select2 || !select) {
         return false;
     }
@@ -627,80 +666,116 @@ function accInitSelect2Search(select, useAjax) {
         }
     } catch (e) { /* ignore */ }
 
+    // Always AJAX — instant ERP-style search, scales past 1000 accounts
     const opts = {
         theme: 'bootstrap-5',
         width: '100%',
         placeholder: 'Search Account...',
         allowClear: true,
         dropdownAutoWidth: false,
-        // Keep search box always visible
         minimumResultsForSearch: 0,
-        // Render outside .acc-module (overflow:hidden) so search/results are visible
+        minimumInputLength: 0,
+        // Outside .acc-module (overflow:hidden) so results are not clipped
         dropdownParent: jQuery(document.body),
-    };
-
-    if (useAjax) {
-        opts.minimumInputLength = 0;
-        opts.ajax = {
+        language: {
+            inputTooShort: function () { return 'Type to search accounts…'; },
+            searching: function () { return 'Searching…'; },
+            noResults: function () { return 'No accounts found'; },
+            errorLoading: function () { return 'Unable to load accounts'; },
+            loadingMore: function () { return 'Loading more…'; },
+        },
+        ajax: {
             delay: 200,
             cache: true,
             dataType: 'json',
             data: function (params) {
                 return {
-                    page: 'api_accounting',
-                    acc_action: 'search_accounts',
                     q: params.term || '',
                     limit: 50,
+                    // MUST NOT use "page" — conflicts with TMS router (?page=api_accounting)
+                    page_no: params.page || 1,
                 };
             },
             transport: function (params, success, failure) {
                 const q = (params.data && params.data.q) || '';
+                const pageNo = (params.data && params.data.page_no) || 1;
                 const url = accBaseUrl
                     + 'index.php?page=api_accounting&acc_action=search_accounts'
                     + '&q=' + encodeURIComponent(q)
-                    + '&limit=50';
+                    + '&limit=50'
+                    + '&page_no=' + encodeURIComponent(pageNo);
                 fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
                     .then(function (res) {
-                        if (!res.ok) throw new Error('Account search failed');
+                        if (!res.ok) throw new Error('Unable to load accounts');
                         return res.json();
                     })
-                    .then(success)
-                    .catch(failure);
+                    .then(function (data) {
+                        if (data && data.ok === false) {
+                            throw new Error(data.error || 'Unable to load accounts');
+                        }
+                        success(data);
+                    })
+                    .catch(function (err) {
+                        console.error('Ledger account search failed', err);
+                        failure(err);
+                    });
             },
-            processResults: function (data) {
-                const rows = (data && Array.isArray(data.results) && data.results.length)
-                    ? data.results
-                    : ((data && data.data) || []).map(function (acc) {
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                let rows = [];
+                if (data && Array.isArray(data.results)) {
+                    rows = data.results;
+                } else if (data && Array.isArray(data.data)) {
+                    rows = data.data.map(function (acc) {
                         return { id: String(acc.id), text: accAccountLabel(acc) };
                     });
+                }
+                const more = !!(data && data.pagination && data.pagination.more);
                 return {
                     results: rows.map(function (row) {
-                        return { id: String(row.id), text: String(row.text || '') };
+                        return {
+                            id: String(row.id),
+                            text: String(row.text || accAccountLabel(row) || row.id),
+                        };
                     }),
+                    pagination: { more: more },
                 };
             },
-        };
-    }
+        },
+    };
 
     try {
         $el.select2(opts);
-        // Keep native option in sync when an AJAX result is chosen
-        $el.on('select2:select.accLedgerSelect', function (e) {
+
+        $el.off('select2:open.accLedgerWidth').on('select2:open.accLedgerWidth', function () {
+            // Defer until Select2 has appended the dropdown to body
+            setTimeout(function () { accFixSelect2DropdownWidth($el); }, 0);
+            setTimeout(function () { accFixSelect2DropdownWidth($el); }, 50);
+        });
+
+        // Keep native <option> in sync when an AJAX result is chosen
+        $el.off('select2:select.accLedgerSelect').on('select2:select.accLedgerSelect', function (e) {
             const item = e.params && e.params.data ? e.params.data : null;
             if (!item || item.id == null) return;
             const id = String(item.id);
-            let opt = select.querySelector('option[value="' + id.replace(/"/g, '\\"') + '"]');
+            const safe = (window.CSS && CSS.escape) ? CSS.escape(id) : id.replace(/"/g, '\\"');
+            let opt = select.querySelector('option[value="' + safe + '"]');
             if (!opt) {
                 opt = document.createElement('option');
                 opt.value = id;
                 opt.textContent = String(item.text || id);
                 select.appendChild(opt);
+            } else {
+                opt.textContent = String(item.text || opt.textContent || id);
             }
             opt.selected = true;
             select.value = id;
         });
-        $el.on('select2:clear.accLedgerSelect', function () {
+        $el.off('select2:clear.accLedgerSelect').on('select2:clear.accLedgerSelect', function () {
             select.value = '';
+            // Keep placeholder option selected
+            const blank = select.querySelector('option[value=""]');
+            if (blank) blank.selected = true;
         });
         return true;
     } catch (err) {
@@ -735,14 +810,12 @@ async function accInitAccountSelect() {
     select.dataset.accSelectInit = '1';
     accAccountSelectInitializing = true;
 
-    // 1) Always fill native <select> first (ledger works even without Select2)
+    // Prefill native options as fallback (Select2 uses AJAX for search)
     const count = await accLoadAccountsNative();
 
-    // 2) Wait for Select2 (loaded in footer) then enhance
     await new Promise(function (resolve) {
         accWhenSelect2Ready(function (ready) {
-            const useAjax = count > 500;
-            const select2Ok = ready ? accInitSelect2Search(select, useAjax) : false;
+            const select2Ok = ready ? accInitSelect2Search(select) : false;
             accBindAccountChange(select);
             accAccountSelectInitializing = false;
 
@@ -750,7 +823,11 @@ async function accInitAccountSelect() {
             if (selected) {
                 if (select2Ok && typeof jQuery !== 'undefined') {
                     try {
-                        jQuery(select).val(selected).trigger('change.select2');
+                        // Ensure Select2 shows the preselected label
+                        const opt = select.querySelector('option[value="' + String(selected).replace(/"/g, '\\"') + '"]');
+                        if (opt) {
+                            jQuery(select).val(selected).trigger('change.select2');
+                        }
                     } catch (e) {
                         select.value = selected;
                     }

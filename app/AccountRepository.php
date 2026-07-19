@@ -311,35 +311,135 @@ class AccountRepository
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    /** @return list<array<string,mixed>> */
-    public static function searchAccounts(PDO $pdo, string $query, int $limit = 50): array
+    /**
+     * Search active ledger accounts for Select2 / ERP pickers.
+     * Matches account name, account code, ledger type, numeric id, and customer ledger code.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function searchAccounts(PDO $pdo, string $query, int $limit = 50, int $page = 1): array
     {
         $limit = max(1, min(100, $limit));
+        $page = max(1, $page);
+        $offset = ($page - 1) * $limit;
         $query = trim($query);
         $params = [];
         $where = 'a.is_active = 1 AND a.deleted_at IS NULL';
 
-        if ($query !== '') {
-            // Search account name, code, and numeric id (account number)
-            $where .= ' AND (a.account_code LIKE ? OR a.account_name LIKE ? OR CAST(a.id AS CHAR) LIKE ?)';
-            $like = '%' . $query . '%';
-            $params[] = $like;
-            $params[] = $like;
-            $params[] = $like;
+        $hasCustomerLedger = false;
+        try {
+            $chk = $pdo->query("SHOW TABLES LIKE 'customer_ledger'");
+            $hasCustomerLedger = $chk && $chk->fetchColumn();
+        } catch (Throwable $e) {
+            $hasCustomerLedger = false;
         }
+
+        if ($query !== '') {
+            $like = '%' . $query . '%';
+            $parts = [
+                'a.account_code LIKE ?',
+                'a.account_name LIKE ?',
+                'a.ledger_type LIKE ?',
+                'a.account_type LIKE ?',
+                'CAST(a.id AS CHAR) LIKE ?',
+                'ag.group_name LIKE ?',
+            ];
+            $params = array_fill(0, 6, $like);
+            if ($hasCustomerLedger) {
+                $parts[] = 'cl.ledger_code LIKE ?';
+                $params[] = $like;
+            }
+            $where .= ' AND (' . implode(' OR ', $parts) . ')';
+        }
+
+        $joinCl = $hasCustomerLedger
+            ? 'LEFT JOIN customer_ledger cl ON cl.account_id = a.id'
+            : '';
+        $clSelect = $hasCustomerLedger ? ', cl.ledger_code' : ', NULL AS ledger_code';
 
         $st = $pdo->prepare(
             "SELECT a.id, a.account_code, a.account_name, a.is_active,
+                    a.ledger_type, a.account_type,
                     ag.group_name, ag.group_type, ag.nature AS group_nature
+                    {$clSelect}
              FROM accounts a
              INNER JOIN account_groups ag ON ag.id = a.account_group_id
+             {$joinCl}
              WHERE {$where}
              ORDER BY a.account_code ASC, a.account_name ASC
-             LIMIT {$limit}"
+             LIMIT {$limit} OFFSET {$offset}"
         );
         $st->execute($params);
 
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Count active accounts matching the same filters as searchAccounts (for Select2 pagination).
+     */
+    public static function countSearchAccounts(PDO $pdo, string $query): int
+    {
+        $query = trim($query);
+        $params = [];
+        $where = 'a.is_active = 1 AND a.deleted_at IS NULL';
+
+        $hasCustomerLedger = false;
+        try {
+            $chk = $pdo->query("SHOW TABLES LIKE 'customer_ledger'");
+            $hasCustomerLedger = $chk && $chk->fetchColumn();
+        } catch (Throwable $e) {
+            $hasCustomerLedger = false;
+        }
+
+        if ($query !== '') {
+            $like = '%' . $query . '%';
+            $parts = [
+                'a.account_code LIKE ?',
+                'a.account_name LIKE ?',
+                'a.ledger_type LIKE ?',
+                'a.account_type LIKE ?',
+                'CAST(a.id AS CHAR) LIKE ?',
+                'ag.group_name LIKE ?',
+            ];
+            $params = array_fill(0, 6, $like);
+            if ($hasCustomerLedger) {
+                $parts[] = 'cl.ledger_code LIKE ?';
+                $params[] = $like;
+            }
+            $where .= ' AND (' . implode(' OR ', $parts) . ')';
+        }
+
+        $joinCl = $hasCustomerLedger
+            ? 'LEFT JOIN customer_ledger cl ON cl.account_id = a.id'
+            : '';
+
+        $st = $pdo->prepare(
+            "SELECT COUNT(*)
+             FROM accounts a
+             INNER JOIN account_groups ag ON ag.id = a.account_group_id
+             {$joinCl}
+             WHERE {$where}"
+        );
+        $st->execute($params);
+        return (int) $st->fetchColumn();
+    }
+
+    /**
+     * Lightweight active-account list for dropdowns (no balance subqueries).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function listAccountsForSelect(PDO $pdo, int $limit = 2000): array
+    {
+        $limit = max(1, min(5000, $limit));
+        $sql = "SELECT a.id, a.account_code, a.account_name, a.ledger_type, a.account_type,
+                       ag.group_name
+                FROM accounts a
+                INNER JOIN account_groups ag ON ag.id = a.account_group_id
+                WHERE a.is_active = 1 AND a.deleted_at IS NULL
+                ORDER BY a.account_code ASC, a.account_name ASC
+                LIMIT {$limit}";
+        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     /** @return array<string,mixed>|null */

@@ -517,6 +517,12 @@ class AccountingController
 
     private static function listAccounts(PDO $pdo): void
     {
+        // Lightweight list for dropdowns (avoids slow balance subqueries).
+        if (($_GET['for_select'] ?? '') === '1') {
+            $accounts = AccountRepository::listAccountsForSelect($pdo);
+            self::json(['ok' => true, 'success' => true, 'data' => $accounts]);
+            return;
+        }
         $accounts = AccountRepository::listAccounts($pdo, ($_GET['include_inactive'] ?? '') === '1');
         self::json(['ok' => true, 'success' => true, 'data' => $accounts]);
     }
@@ -552,27 +558,51 @@ class AccountingController
 
     private static function searchAccounts(PDO $pdo): void
     {
-        $query = (string) ($_GET['q'] ?? $_GET['term'] ?? '');
-        $limit = (int) ($_GET['limit'] ?? 50);
-        $accounts = AccountRepository::searchAccounts($pdo, $query, $limit);
-        $results = [];
-        foreach ($accounts as $acc) {
-            $code = (string) ($acc['account_code'] ?? '');
-            $name = (string) ($acc['account_name'] ?? '');
-            $label = trim($code . ' - ' . $name, ' -');
-            $results[] = [
-                'id' => (int) ($acc['id'] ?? 0),
-                'text' => $label,
-                'account_code' => $code,
-                'account_name' => $name,
-                'group_name' => (string) ($acc['group_name'] ?? ''),
-            ];
+        try {
+            $query = (string) ($_GET['q'] ?? $_GET['term'] ?? '');
+            $limit = (int) ($_GET['limit'] ?? 50);
+            $page = max(1, (int) ($_GET['page_no'] ?? $_GET['p'] ?? 1));
+            $accounts = AccountRepository::searchAccounts($pdo, $query, $limit, $page);
+            $total = AccountRepository::countSearchAccounts($pdo, $query);
+            $results = [];
+            foreach ($accounts as $acc) {
+                $code = (string) ($acc['account_code'] ?? '');
+                $name = (string) ($acc['account_name'] ?? '');
+                $ledgerCode = trim((string) ($acc['ledger_code'] ?? ''));
+                $label = trim($code . ' - ' . $name, ' -');
+                if ($ledgerCode !== '' && stripos($label, $ledgerCode) === false) {
+                    $label .= ' [' . $ledgerCode . ']';
+                }
+                $results[] = [
+                    'id' => (int) ($acc['id'] ?? 0),
+                    'text' => $label !== '' ? $label : ('Account #' . (int) ($acc['id'] ?? 0)),
+                    'account_code' => $code,
+                    'account_name' => $name,
+                    'ledger_code' => $ledgerCode,
+                    'ledger_type' => (string) ($acc['ledger_type'] ?? ''),
+                    'group_name' => (string) ($acc['group_name'] ?? ''),
+                ];
+            }
+            self::json([
+                'ok' => true,
+                'data' => $accounts,
+                'results' => $results,
+                'pagination' => [
+                    'more' => ($page * max(1, min(100, $limit))) < $total,
+                ],
+                'total' => $total,
+                'page' => $page,
+            ]);
+        } catch (Throwable $e) {
+            self::json([
+                'ok' => false,
+                'error' => 'Unable to load accounts',
+                'message' => 'Unable to load accounts',
+                'results' => [],
+                'data' => [],
+                'pagination' => ['more' => false],
+            ], 500);
         }
-        self::json([
-            'ok' => true,
-            'data' => $accounts,
-            'results' => $results,
-        ]);
     }
 
     private static function getAccountBalance(PDO $pdo): void
